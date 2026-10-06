@@ -129,10 +129,52 @@ import rtcRoutes from './routes/rtc';
 
 const app = express();
 const server = http.createServer(app);
+const isVercelRuntime = process.env.VERCEL === '1';
+let serverlessInitialization: Promise<boolean> | null = null;
+let serverlessInitialized = false;
 
-// The frontend Next.js server is the only trusted reverse proxy in the current
-// Dev Tunnel topology. Direct requests from other addresses cannot assert XFF.
-app.set('trust proxy', 'loopback');
+// Trust the Vercel proxy chain in serverless; locally trust only the frontend
+// development proxy so clients cannot spoof forwarded IP headers.
+app.set('trust proxy', isVercelRuntime ? true : 'loopback');
+
+async function ensureServerlessInitialization(): Promise<boolean> {
+  if (mongoose.connection.readyState === 1 && serverlessInitialized) return true;
+  if (!serverlessInitialization) {
+    serverlessInitialization = (async () => {
+      const connection = await connectDB();
+      if (!connection || mongoose.connection.readyState !== 1) return false;
+      if (!serverlessInitialized) {
+        await migrateRefreshTokensAtRest();
+        await cleanupExpiredVerificationCodes();
+        serverlessInitialized = true;
+      }
+      return true;
+    })()
+      .catch((error: unknown) => {
+        const errorName = error instanceof Error ? error.name : 'UnknownError';
+        console.error('[Startup] Serverless initialization failed.', { errorName });
+        return false;
+      })
+      .finally(() => {
+        serverlessInitialization = null;
+      });
+  }
+  return serverlessInitialization;
+}
+
+if (isVercelRuntime) {
+  app.use(async (_req, res, next) => {
+    if (await ensureServerlessInitialization()) {
+      next();
+      return;
+    }
+    res.status(503).json({
+      status: 'unavailable',
+      code: isDbConfigMissing() ? 'DB_NOT_CONFIGURED' : 'DB_UNAVAILABLE',
+      message: 'WorkGrind data storage is unavailable. Check the backend database configuration and connectivity.',
+    });
+  });
+}
 
 const sendHealthStatus = (_req: express.Request, res: express.Response) => {
   const databaseReady = mongoose.connection.readyState === 1;
@@ -367,13 +409,13 @@ async function startServer(): Promise<void> {
     logR2Config();
     logGeminiConfig();
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.error(`❌ WorkGrind startup aborted; MongoDB/API server is not ready: ${message}`);
+    const errorName = error instanceof Error ? error.name : 'UnknownError';
+    console.error('❌ WorkGrind startup aborted; MongoDB/API server is not ready.', { errorName });
     process.exitCode = 1;
     await mongoose.disconnect().catch(() => undefined);
   }
 }
 
-void startServer();
+if (!isVercelRuntime) void startServer();
 
 export default app;

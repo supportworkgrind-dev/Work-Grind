@@ -610,22 +610,35 @@ Use `.env.example` for safe placeholder values.
 
 ## Production Vercel API and Google OAuth
 
+The backend Vercel project uses `backend` as its Root Directory. Its
+`backend/vercel.json` routes requests through `backend/api/index.ts` to the
+Express application in `backend/src/index.ts`; local development continues to
+start the HTTP listener normally.
+
 Set these Vercel environment variables for the frontend and backend projects, then
 redeploy both projects so build-time and runtime configuration is applied:
 
 | Project | Variable | Production value |
 | --- | --- | --- |
-| Frontend | `NEXT_PUBLIC_API_URL` | `https://backend-rho-vert-59.vercel.app/api` |
+| Frontend | `NEXT_PUBLIC_API_URL` | `https://backend-rho-vert-59.vercel.app` |
 | Backend | `BACKEND_URL` | `https://backend-rho-vert-59.vercel.app` |
 | Backend | `CLIENT_URL` | `https://frontend-mu-rosy-fb41u8nrz0.vercel.app` |
 | Backend | `GOOGLE_REDIRECT_URI` | `https://backend-rho-vert-59.vercel.app/api/auth/oauth/google/callback` |
+| Backend | `MONGODB_URI` | MongoDB connection string (secret) |
+| Backend | `JWT_SECRET` | Production access-token signing key (secret) |
+| Backend | `JWT_REFRESH_SECRET` | Separate production refresh-token signing key (secret) |
 | Backend | `GOOGLE_CLIENT_ID` | The Google OAuth client ID |
 | Backend | `GOOGLE_CLIENT_SECRET` | The matching Google OAuth client secret |
+| Backend | `SMS_PROVIDER` | `twilio` (to enable production phone OTP) |
+| Backend | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER` | Twilio server-side SMS configuration |
 
 In Google Cloud Console, add the backend callback URL above as an authorized
 redirect URI for the same OAuth client. Do not register the frontend URL as the
 production Google redirect URI. `NEXT_PUBLIC_API_URL` is public and is embedded
-in the frontend build; OAuth client secrets must remain backend-only.
+in the frontend build; it may be set to the backend origin (recommended) or its
+`/api` URL. The legacy `NEXT_PUBLIC_API_BASE_URL` alias is also accepted; if
+both public variables are set, they must use the same backend origin. Remove
+any conflicting value and redeploy. OAuth client secrets must remain backend-only.
 
 ---
 

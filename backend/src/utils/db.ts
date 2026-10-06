@@ -50,8 +50,8 @@ export const connectDB = async (): Promise<typeof mongoose | null> => {
 
   const connectOptions: mongoose.ConnectOptions = {
     // Connection pool
-    maxPoolSize: 20,
-    minPoolSize: 5,
+    maxPoolSize: process.env.VERCEL === '1' ? 10 : 20,
+    minPoolSize: process.env.VERCEL === '1' ? 0 : 5,
     // Timeout tuning — reduced from 10 s to 8 s so failures are reported
     // before Mongoose's own 10 s buffer timeout fires.
     serverSelectionTimeoutMS: 8000,
@@ -111,7 +111,8 @@ export const connectDB = async (): Promise<typeof mongoose | null> => {
         return conn;
       }
     }
-    console.error(`❌ MongoDB connection error: ${error.message || error}`);
+    const errorName = error instanceof Error ? error.name : 'UnknownError';
+    console.error('❌ MongoDB connection failed.', { errorName });
     throw error;
   }
 };
