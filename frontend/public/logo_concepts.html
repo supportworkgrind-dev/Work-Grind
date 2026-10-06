@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>WorkGrind Logo Design Concepts</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #0f172a;
+      color: #f8fafc;
+      padding: 40px;
+      margin: 0;
+    }
+    h1 { text-align: center; margin-bottom: 8px; font-size: 28px; font-weight: 800; }
+    p.subtitle { text-align: center; color: #94a3b8; margin-bottom: 40px; font-size: 14px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 24px; max-width: 1200px; margin: 0 auto; }
+    .card { background: #1e293b; border: 1px solid #334155; border-radius: 24px; padding: 32px; text-align: center; }
+    .card:hover { border-color: #38bdf8; transform: translateY(-2px); transition: all 0.2s; }
+    .badge { display: inline-block; padding: 4px 12px; border-radius: 99px; background: rgba(56, 189, 248, 0.1); color: #38bdf8; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 16px; }
+    .preview-box { background: #090d16; border-radius: 16px; padding: 32px; display: flex; align-items: center; justify-content: center; margin-bottom: 20px; border: 1px solid #1e293b; }
+    .light-box { background: #ffffff; border-radius: 12px; padding: 16px; margin-top: 12px; display: flex; align-items: center; justify-content: center; gap: 12px; }
+    .light-box span { color: #0f172a; font-weight: 900; font-size: 18px; }
+    h3 { font-size: 18px; font-weight: 700; margin: 0 0 8px 0; }
+    p.desc { font-size: 13px; color: #94a3b8; line-height: 1.5; margin: 0; }
+  </style>
+</head>
+<body>
+  <h1>WorkGrind Logo Design Concepts</h1>
+  <p class="subtitle">Select your preferred concept for full application integration</p>
+
+  <div class="grid">
+    <!-- Concept 1 -->
+    <div class="card">
+      <span class="badge">Concept 1</span>
+      <h3>"Nexus Flow" (Connected T + F Nodes)</h3>
+      <div class="preview-box">
+        <svg width="120" height="120" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="c1_grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#4F46E5" />
+              <stop offset="50%" stop-color="#2563EB" />
+              <stop offset="100%" stop-color="#06B6D4" />
+            </linearGradient>
+            <filter id="glow1" x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#2563EB" flood-opacity="0.3"/>
+            </filter>
+          </defs>
+          <!-- Interlocking ribbon forming T+F workflow -->
+          <path d="M 22 28 C 22 18, 78 18, 78 28 C 78 38, 50 38, 50 78 C 50 85, 34 85, 34 78" stroke="url(#c1_grad1)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow1)"/>
+          <path d="M 38 48 C 50 48, 70 48, 70 56 C 70 64, 50 64, 38 64" stroke="url(#c1_grad1)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+          <!-- Connected nodes -->
+          <circle cx="22" cy="28" r="6" fill="#38BDF8"/>
+          <circle cx="78" cy="28" r="6" fill="#818CF8"/>
+          <circle cx="34" cy="78" r="6" fill="#4F46E5"/>
+        </svg>
+      </div>
+      <div class="light-box">
+        <svg width="28" height="28" viewBox="0 0 100 100" fill="none">
+          <path d="M 22 28 C 22 18, 78 18, 78 28 C 78 38, 50 38, 50 78 C 50 85, 34 85, 34 78" stroke="url(#c1_grad1)" stroke-width="10" stroke-linecap="round"/>
+          <path d="M 38 48 C 50 48, 70 48, 70 56 C 70 64, 50 64, 38 64" stroke="url(#c1_grad1)" stroke-width="8" stroke-linecap="round"/>
+          <circle cx="22" cy="28" r="6" fill="#06B6D4"/>
+          <circle cx="78" cy="28" r="6" fill="#2563EB"/>
+          <circle cx="34" cy="78" r="6" fill="#4F46E5"/>
+        </svg>
+        <span>Work<span style="color:#4f46e5">Grind</span></span>
+      </div>
+      <p class="desc" style="margin-top:12px">Interlocking continuous ribbon linking 3 node points. Represents seamless team connectivity and structured task flow.</p>
+    </div>
+
+    <!-- Concept 2 -->
+    <div class="card">
+      <span class="badge">Concept 2</span>
+      <h3>"Sync Pulse" (Chat Bubble + Task Checkmark)</h3>
+      <div class="preview-box">
+        <svg width="120" height="120" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="c2_grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#2563EB" />
+              <stop offset="100%" stop-color="#7C3AED" />
+            </linearGradient>
+            <linearGradient id="c2_grad2" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#06B6D4" />
+              <stop offset="100%" stop-color="#10B981" />
+            </linearGradient>
+          </defs>
+          <!-- Chat bubble base -->
+          <rect x="18" y="20" width="54" height="42" rx="14" fill="url(#c2_grad1)" opacity="0.9"/>
+          <!-- Overlapping checkmark / task arrow bubble -->
+          <path d="M 40 45 L 54 59 L 84 25" stroke="url(#c2_grad2)" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+          <!-- Connection node dots -->
+          <circle cx="32" cy="41" r="3.5" fill="#FFFFFF"/>
+          <circle cx="44" cy="41" r="3.5" fill="#FFFFFF"/>
+          <circle cx="56" cy="41" r="3.5" fill="#FFFFFF"/>
+        </svg>
+      </div>
+      <div class="light-box">
+        <svg width="28" height="28" viewBox="0 0 100 100" fill="none">
+          <rect x="18" y="20" width="54" height="42" rx="14" fill="url(#c2_grad1)"/>
+          <path d="M 40 45 L 54 59 L 84 25" stroke="url(#c2_grad2)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span>Work<span style="color:#4f46e5">Grind</span></span>
+      </div>
+      <p class="desc" style="margin-top:12px">Overlapping chat bubble fused with a sharp productivity checkmark. Represents communication meeting execution.</p>
+    </div>
+
+    <!-- Concept 3 -->
+    <div class="card">
+      <span class="badge">Concept 3</span>
+      <h3>"Infinity Loop" (Continuous Collaboration Path)</h3>
+      <div class="preview-box">
+        <svg width="120" height="120" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="c3_grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#0284C7" />
+              <stop offset="50%" stop-color="#2563EB" />
+              <stop offset="100%" stop-color="#4F46E5" />
+            </linearGradient>
+          </defs>
+          <!-- Smooth dynamic loop -->
+          <path d="M 30 50 C 15 32, 15 68, 30 50 C 45 32, 55 68, 70 50 C 85 32, 85 68, 70 50 C 55 32, 45 68, 30 50 Z" stroke="url(#c3_grad1)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="30" cy="50" fill="#38BDF8" r="6"/>
+          <circle cx="70" cy="50" fill="#818CF8" r="6"/>
+          <circle cx="50" cy="50" fill="#6366F1" r="5"/>
+        </svg>
+      </div>
+      <div class="light-box">
+        <svg width="28" height="28" viewBox="0 0 100 100" fill="none">
+          <path d="M 30 50 C 15 32, 15 68, 30 50 C 45 32, 55 68, 70 50 C 85 32, 85 68, 70 50 C 55 32, 45 68, 30 50 Z" stroke="url(#c3_grad1)" stroke-width="10" stroke-linecap="round"/>
+          <circle cx="30" cy="50" fill="#0284C7" r="6"/>
+          <circle cx="70" cy="50" fill="#4F46E5" r="6"/>
+        </svg>
+        <span>Work<span style="color:#4f46e5">Grind</span></span>
+      </div>
+      <p class="desc" style="margin-top:12px">Continuous infinity loop connecting 3 core node hubs. Represents non-stop collaboration and effortless workflow.</p>
+    </div>
+  </div>
+</body>
+</html>

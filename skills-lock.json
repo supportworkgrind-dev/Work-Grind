@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "skills": {
+    "internal-dev-workbench": {
+      "source": "vercel/workflow",
+      "sourceType": "github",
+      "skillPath": "skills/internal-dev-workbench/SKILL.md",
+      "computedHash": "c195a2e4b7f23001955d2a36f5b2b74ff9b55c28393c705b96c4621cdc2d5588"
+    },
+    "migrating-to-workflow-sdk": {
+      "source": "vercel/workflow",
+      "sourceType": "github",
+      "skillPath": "skills/migrating-to-workflow-sdk/SKILL.md",
+      "computedHash": "c8091a84ddf29001b9e3eb0470c33c6ed43cbb8bb43e47dca838c47236378210"
+    },
+    "migrating-workflow-v4-to-v5": {
+      "source": "vercel/workflow",
+      "sourceType": "github",
+      "skillPath": "skills/migrating-workflow-v4-to-v5/SKILL.md",
+      "computedHash": "4e2613eeb3730430bb783fef09581b983b4602d685cdf8b2b3d329e8a7a11616"
+    },
+    "migrating-world-v4-to-v5": {
+      "source": "vercel/workflow",
+      "sourceType": "github",
+      "skillPath": "skills/migrating-world-v4-to-v5/SKILL.md",
+      "computedHash": "d56b3294338cd21c651d028af58121215abb39960af036fb36819d0e6e57498b"
+    },
+    "workflow": {
+      "source": "vercel/workflow",
+      "sourceType": "github",
+      "skillPath": "skills/workflow/SKILL.md",
+      "computedHash": "3e8eaf225ff8fed3af1946e09f88c8b9a5919755d8b93be017d8031f2212db4c"
+    },
+    "workflow-init": {
+      "source": "vercel/workflow",
+      "sourceType": "github",
+      "skillPath": "skills/workflow-init/SKILL.md",
+      "computedHash": "a3f845e2f32ff5aeb1536c8668d677189a99c39e3de9c26da88993ec9870da00"
+    }
+  }
+}

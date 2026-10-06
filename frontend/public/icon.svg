@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 56 56" fill="none">
+  <!--
+    WorkGrind icon — "Upward W"
+    W shape with rising centre peak communicating Work + Grind (progress/momentum)
+  -->
+  <defs>
+    <linearGradient id="wg-i-main" x1="4" y1="28" x2="52" y2="28" gradientUnits="userSpaceOnUse">
+      <stop offset="0%"   stop-color="#818cf8"/>
+      <stop offset="48%"  stop-color="#a78bfa"/>
+      <stop offset="100%" stop-color="#60a5fa"/>
+    </linearGradient>
+    <linearGradient id="wg-i-dot" x1="24" y1="5" x2="32" y2="12" gradientUnits="userSpaceOnUse">
+      <stop offset="0%"   stop-color="#c4b5fd"/>
+      <stop offset="100%" stop-color="#93c5fd"/>
+    </linearGradient>
+  </defs>
+  <!-- W stroke -->
+  <polyline points="4,46 15,16 22,34 28,8 34,34 41,16 52,46"
+    stroke="url(#wg-i-main)" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- Centre-peak accent dot -->
+  <circle cx="28" cy="8" r="2.8" fill="url(#wg-i-dot)"/>
+</svg>
