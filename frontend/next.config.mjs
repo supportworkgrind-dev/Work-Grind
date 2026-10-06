@@ -44,7 +44,30 @@ const nextConfig = {
 
   // ── API proxy rewrites ─────────────────────────────────────────────────────
   async rewrites() {
-    const backendUrl = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:5000';
+    const configuredApiUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
+    if (!configuredApiUrl && isProduction) {
+      throw new Error('NEXT_PUBLIC_API_URL must be configured for production deployments.');
+    }
+
+    let backendUrl = 'http://localhost:5000';
+    if (configuredApiUrl) {
+      let apiUrl;
+      try {
+        apiUrl = new URL(configuredApiUrl);
+      } catch {
+        throw new Error('NEXT_PUBLIC_API_URL must be an absolute backend URL optionally followed by /api.');
+      }
+      if (apiUrl.username || apiUrl.password || apiUrl.search || apiUrl.hash ||
+          (apiUrl.pathname !== '' && apiUrl.pathname !== '/' && apiUrl.pathname !== '/api' && apiUrl.pathname !== '/api/')) {
+        throw new Error('NEXT_PUBLIC_API_URL must be a backend origin, optionally followed by /api.');
+      }
+      if (isProduction && (apiUrl.protocol !== 'https:' ||
+          /^(localhost|127\.0\.0\.1|\[::1\])$/i.test(apiUrl.hostname))) {
+        throw new Error('NEXT_PUBLIC_API_URL must be a public HTTPS backend URL in production.');
+      }
+      backendUrl = apiUrl.origin;
+    }
+
     return [
       {
         source: '/socket.io',

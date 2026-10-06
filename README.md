@@ -608,6 +608,25 @@ Never commit real secrets to Git.
 
 Use `.env.example` for safe placeholder values.
 
+## Production Vercel API and Google OAuth
+
+Set these Vercel environment variables for the frontend and backend projects, then
+redeploy both projects so build-time and runtime configuration is applied:
+
+| Project | Variable | Production value |
+| --- | --- | --- |
+| Frontend | `NEXT_PUBLIC_API_URL` | `https://backend-rho-vert-59.vercel.app/api` |
+| Backend | `BACKEND_URL` | `https://backend-rho-vert-59.vercel.app` |
+| Backend | `CLIENT_URL` | `https://frontend-mu-rosy-fb41u8nrz0.vercel.app` |
+| Backend | `GOOGLE_REDIRECT_URI` | `https://backend-rho-vert-59.vercel.app/api/auth/oauth/google/callback` |
+| Backend | `GOOGLE_CLIENT_ID` | The Google OAuth client ID |
+| Backend | `GOOGLE_CLIENT_SECRET` | The matching Google OAuth client secret |
+
+In Google Cloud Console, add the backend callback URL above as an authorized
+redirect URI for the same OAuth client. Do not register the frontend URL as the
+production Google redirect URI. `NEXT_PUBLIC_API_URL` is public and is embedded
+in the frontend build; OAuth client secrets must remain backend-only.
+
 ---
 
 # 🔐 Authentication Flow

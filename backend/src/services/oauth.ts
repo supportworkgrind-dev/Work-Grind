@@ -86,6 +86,9 @@ export function getOAuthConfigurationIssue(provider: OAuthProvider): string | nu
     if (process.env.NODE_ENV === 'production' && (base.protocol !== 'https:' || redirect.protocol !== 'https:')) {
       return 'BACKEND_URL and the provider redirect URI must use HTTPS in production.';
     }
+    if (process.env.NODE_ENV === 'production' && redirect.origin !== base.origin) {
+      return `${redirectKey} must use the configured BACKEND_URL origin in production.`;
+    }
     if (redirect.pathname !== expectedPath) return `${redirectKey} path must be ${expectedPath}.`;
     if (redirect.username || redirect.password || redirect.search || redirect.hash) {
       return `${redirectKey} must not include credentials, query parameters, or a fragment.`;

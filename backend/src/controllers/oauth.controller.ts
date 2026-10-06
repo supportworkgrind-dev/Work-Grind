@@ -103,8 +103,8 @@ function errorRedirect(res: Response, code: string, returnTo?: string, link = fa
 }
 
 function clearStateCookie(res: Response, provider: OAuthProvider) {
-  const sameSite = provider === 'apple' ? 'None' : 'Lax';
-  const secure = provider === 'apple' || process.env.NODE_ENV === 'production' ? '; Secure' : '';
+  const sameSite = provider === 'apple' || process.env.NODE_ENV === 'production' ? 'None' : 'Lax';
+  const secure = sameSite === 'None' ? '; Secure' : '';
   res.append('Set-Cookie', `wg_oauth_${provider}_state=; Path=/api/auth/oauth; Max-Age=0; HttpOnly; SameSite=${sameSite}${secure}`);
 }
 
@@ -170,16 +170,18 @@ export const startOAuth = async (req: Request, res: Response): Promise<void> => 
       expiresAt: new Date(Date.now() + 10 * 60_000),
     });
     res.setHeader('Cache-Control', 'no-store');
-    const sameSite = provider === 'apple' ? 'None' : 'Lax';
-    const secure = provider === 'apple' || process.env.NODE_ENV === 'production' ? '; Secure' : '';
+    const sameSite = provider === 'apple' || process.env.NODE_ENV === 'production' ? 'None' : 'Lax';
+    const secure = sameSite === 'None' ? '; Secure' : '';
     res.append(
       'Set-Cookie',
       `wg_oauth_${provider}_state=${encodeURIComponent(state)}; Path=/api/auth/oauth; Max-Age=600; HttpOnly; SameSite=${sameSite}${secure}`,
     );
-    res.json({
-      success: true,
-      authUrl: buildAuthorizationUrl(provider, configuration, state, nonce, codeVerifier),
-    });
+    const authUrl = buildAuthorizationUrl(provider, configuration, state, nonce, codeVerifier);
+    if (intent !== 'link' && req.accepts('html')) {
+      res.redirect(303, authUrl);
+      return;
+    }
+    res.json({ success: true, authUrl });
   } catch {
     console.error('[OAuth] Sign-in setup failed.', { provider, stage: 'transaction_creation', reason: 'database_error' });
     res.status(503).json({ success: false, code: 'OAUTH_UNAVAILABLE', message: 'Sign-in could not be started. Please try again.' });

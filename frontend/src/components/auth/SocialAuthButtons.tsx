@@ -50,6 +50,15 @@ export function SocialAuthButtons({ intent = 'login', className = '' }: SocialAu
         : requestedReturnTo && requestedReturnTo.startsWith('/') && !requestedReturnTo.startsWith('//')
           ? requestedReturnTo
           : '/dashboard';
+      if (intent !== 'link') {
+        const startUrl = api.getUri({
+          url: `/auth/oauth/${provider}/start`,
+          params: { returnTo },
+        });
+        window.location.assign(startUrl);
+        return;
+      }
+
       const response = await api.get(`/auth/oauth/${provider}/start`, {
         withCredentials: true,
         params: {
