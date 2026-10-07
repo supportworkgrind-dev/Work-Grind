@@ -1,0 +1,10 @@
+.agents/
+backend/node_modules/
+backend/.env*
+backend/dist/
+backend/coverage/
+frontend/.next-dev/
+frontend/buildlog.txt
+node_modules/
+scratch/
+tavro-ai/

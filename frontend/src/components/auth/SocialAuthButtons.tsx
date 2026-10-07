@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { AlertCircle, LoaderCircle } from 'lucide-react';
 import { api } from '@/lib/api';
+import { getApiEndpointUrl } from '@/lib/apiConfig';
 
 type SocialAuthButtonsProps = {
   intent?: 'login' | 'link';
@@ -51,10 +52,7 @@ export function SocialAuthButtons({ intent = 'login', className = '' }: SocialAu
           ? requestedReturnTo
           : '/dashboard';
       if (intent !== 'link') {
-        const startUrl = api.getUri({
-          url: `/auth/oauth/${provider}/start`,
-          params: { returnTo },
-        });
+        const startUrl = getApiEndpointUrl(`/auth/oauth/${provider}/start`, { returnTo });
         window.location.assign(startUrl);
         return;
       }
