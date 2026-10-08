@@ -128,15 +128,15 @@
               "projectName": "chromium",
               "results": [
                 {
-                  "workerIndex": 3,
-                  "parallelIndex": 3,
+                  "workerIndex": 2,
+                  "parallelIndex": 2,
                   "status": "passed",
-                  "duration": 11257,
+                  "duration": 11395,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-08T17:35:36.821Z",
+                  "startTime": "2026-10-08T17:37:42.368Z",
                   "annotations": [],
                   "attachments": [
                     {
@@ -152,7 +152,81 @@
           ],
           "id": "2aae5247a7454980396a-e7bd1d6a51e69aeedfa4",
           "file": "workgrind-audit.spec.ts",
-          "line": 251,
+          "line": 262,
+          "column": 5
+        },
+        {
+          "title": "login form exposes required email/password fields and blocks empty submission",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 4,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2388,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-08T17:37:43.953Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "2aae5247a7454980396a-a9816071c1c18ba95f54",
+          "file": "workgrind-audit.spec.ts",
+          "line": 293,
+          "column": 5
+        },
+        {
+          "title": "protected application routes redirect unauthenticated visitors",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 4,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 57392,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-08T17:37:46.424Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "protected-route-audit.json",
+                      "contentType": "application/json",
+                      "body": "ewogICJyZXN1bHRzIjogWwogICAgewogICAgICAicGF0aCI6ICIvZGFzaGJvYXJkIiwKICAgICAgInN0YXR1cyI6IDIwMCwKICAgICAgImxhbmRlZEF0IjogIi9sb2dpbiIKICAgIH0sCiAgICB7CiAgICAgICJwYXRoIjogIi9kYWlseS1mb2N1cyIsCiAgICAgICJzdGF0dXMiOiAyMDAsCiAgICAgICJsYW5kZWRBdCI6ICIvbG9naW4iCiAgICB9LAogICAgewogICAgICAicGF0aCI6ICIvdGFza3MiLAogICAgICAic3RhdHVzIjogMjAwLAogICAgICAibGFuZGVkQXQiOiAiL2xvZ2luIgogICAgfSwKICAgIHsKICAgICAgInBhdGgiOiAiL3Byb2plY3RzIiwKICAgICAgInN0YXR1cyI6IDIwMCwKICAgICAgImxhbmRlZEF0IjogIi9sb2dpbiIKICAgIH0sCiAgICB7CiAgICAgICJwYXRoIjogIi9jYWxlbmRhciIsCiAgICAgICJzdGF0dXMiOiAyMDAsCiAgICAgICJsYW5kZWRBdCI6ICIvbG9naW4iCiAgICB9LAogICAgewogICAgICAicGF0aCI6ICIvY3JtIiwKICAgICAgInN0YXR1cyI6IDIwMCwKICAgICAgImxhbmRlZEF0IjogIi9sb2dpbiIKICAgIH0sCiAgICB7CiAgICAgICJwYXRoIjogIi9jbGllbnQtcG9ydGFsLW1nbXQiLAogICAgICAic3RhdHVzIjogMjAwLAogICAgICAibGFuZGVkQXQiOiAiL2xvZ2luIgogICAgfSwKICAgIHsKICAgICAgInBhdGgiOiAiL2NoYXQiLAogICAgICAic3RhdHVzIjogMjAwLAogICAgICAibGFuZGVkQXQiOiAiL2xvZ2luIgogICAgfSwKICAgIHsKICAgICAgInBhdGgiOiAiL21lZXRpbmdzIiwKICAgICAgInN0YXR1cyI6IDIwMCwKICAgICAgImxhbmRlZEF0IjogIi9sb2dpbiIKICAgIH0sCiAgICB7CiAgICAgICJwYXRoIjogIi93aGl0ZWJvYXJkIiwKICAgICAgInN0YXR1cyI6IDIwMCwKICAgICAgImxhbmRlZEF0IjogIi9sb2dpbiIKICAgIH0sCiAgICB7CiAgICAgICJwYXRoIjogIi9kb2NzIiwKICAgICAgInN0YXR1cyI6IDIwMCwKICAgICAgImxhbmRlZEF0IjogIi9sb2dpbiIKICAgIH0sCiAgICB7CiAgICAgICJwYXRoIjogIi9maWxlcyIsCiAgICAgICJzdGF0dXMiOiAyMDAsCiAgICAgICJsYW5kZWRBdCI6ICIvbG9naW4iCiAgICB9LAogICAgewogICAgICAicGF0aCI6ICIvYW5hbHl0aWNzIiwKICAgICAgInN0YXR1cyI6IDIwMCwKICAgICAgImxhbmRlZEF0IjogIi9sb2dpbiIKICAgIH0sCiAgICB7CiAgICAgICJwYXRoIjogIi93b3JrZmxvd3MiLAogICAgICAic3RhdHVzIjogMjAwLAogICAgICAibGFuZGVkQXQiOiAiL2xvZ2luIgogICAgfSwKICAgIHsKICAgICAgInBhdGgiOiAiL2FpIiwKICAgICAgInN0YXR1cyI6IDIwMCwKICAgICAgImxhbmRlZEF0IjogIi9sb2dpbiIKICAgIH0sCiAgICB7CiAgICAgICJwYXRoIjogIi90ZWFtIiwKICAgICAgInN0YXR1cyI6IDIwMCwKICAgICAgImxhbmRlZEF0IjogIi9sb2dpbiIKICAgIH0sCiAgICB7CiAgICAgICJwYXRoIjogIi9ub3RpZmljYXRpb25zIiwKICAgICAgInN0YXR1cyI6IDIwMCwKICAgICAgImxhbmRlZEF0IjogIi9sb2dpbiIKICAgIH0sCiAgICB7CiAgICAgICJwYXRoIjogIi9iaWxsaW5nIiwKICAgICAgInN0YXR1cyI6IDIwMCwKICAgICAgImxhbmRlZEF0IjogIi9sb2dpbiIKICAgIH0sCiAgICB7CiAgICAgICJwYXRoIjogIi9zZXR0aW5ncyIsCiAgICAgICJzdGF0dXMiOiAyMDAsCiAgICAgICJsYW5kZWRBdCI6ICIvbG9naW4iCiAgICB9LAogICAgewogICAgICAicGF0aCI6ICIvY2FsbGluZyIsCiAgICAgICJzdGF0dXMiOiAyMDAsCiAgICAgICJsYW5kZWRBdCI6ICIvbG9naW4iCiAgICB9LAogICAgewogICAgICAicGF0aCI6ICIvZGV2ZWxvcGVyIiwKICAgICAgInN0YXR1cyI6IDIwMCwKICAgICAgImxhbmRlZEF0IjogIi9sb2dpbiIKICAgIH0sCiAgICB7CiAgICAgICJwYXRoIjogIi9kZXZlbG9wZXIvZG9jcyIsCiAgICAgICJzdGF0dXMiOiAyMDAsCiAgICAgICJsYW5kZWRBdCI6ICIvbG9naW4iCiAgICB9LAogICAgewogICAgICAicGF0aCI6ICIvc2hlZXRzIiwKICAgICAgInN0YXR1cyI6IDIwMCwKICAgICAgImxhbmRlZEF0IjogIi9sb2dpbiIKICAgIH0sCiAgICB7CiAgICAgICJwYXRoIjogIi9tb2RlcmF0aW9uIiwKICAgICAgInN0YXR1cyI6IDIwMCwKICAgICAgImxhbmRlZEF0IjogIi9sb2dpbiIKICAgIH0KICBdLAogICJpc3N1ZXMiOiBbXQp9"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "2aae5247a7454980396a-a37d8e66239c6eaa7490",
+          "file": "workgrind-audit.spec.ts",
+          "line": 307,
           "column": 5
         },
         {
@@ -168,7 +242,7 @@
                   "description": "Set WORKGRIND_TEST_EMAIL and WORKGRIND_TEST_PASSWORD in the environment to run authenticated checks.",
                   "location": {
                     "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
-                    "line": 285,
+                    "line": 332,
                     "column": 8
                   }
                 }
@@ -178,22 +252,22 @@
               "projectName": "chromium",
               "results": [
                 {
-                  "workerIndex": 4,
-                  "parallelIndex": 0,
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
                   "status": "skipped",
-                  "duration": 287,
+                  "duration": 204,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-08T17:35:38.561Z",
+                  "startTime": "2026-10-08T17:37:48.593Z",
                   "annotations": [
                     {
                       "type": "skip",
                       "description": "Set WORKGRIND_TEST_EMAIL and WORKGRIND_TEST_PASSWORD in the environment to run authenticated checks.",
                       "location": {
                         "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
-                        "line": 285,
+                        "line": 332,
                         "column": 8
                       }
                     }
@@ -206,7 +280,7 @@
           ],
           "id": "2aae5247a7454980396a-3c9ef85307d5ea494580",
           "file": "workgrind-audit.spec.ts",
-          "line": 282,
+          "line": 329,
           "column": 5
         },
         {
@@ -222,7 +296,7 @@
                   "description": "Set WORKGRIND_TEST_EMAIL and WORKGRIND_TEST_PASSWORD in the environment to run authenticated checks.",
                   "location": {
                     "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
-                    "line": 379,
+                    "line": 428,
                     "column": 8
                   }
                 }
@@ -232,22 +306,22 @@
               "projectName": "chromium",
               "results": [
                 {
-                  "workerIndex": 4,
-                  "parallelIndex": 0,
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
                   "status": "skipped",
-                  "duration": 490,
+                  "duration": 293,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-08T17:35:38.894Z",
+                  "startTime": "2026-10-08T17:37:48.829Z",
                   "annotations": [
                     {
                       "type": "skip",
                       "description": "Set WORKGRIND_TEST_EMAIL and WORKGRIND_TEST_PASSWORD in the environment to run authenticated checks.",
                       "location": {
                         "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
-                        "line": 379,
+                        "line": 428,
                         "column": 8
                       }
                     }
@@ -260,7 +334,7 @@
           ],
           "id": "2aae5247a7454980396a-ee5c79a9feda4e3bd845",
           "file": "workgrind-audit.spec.ts",
-          "line": 376,
+          "line": 425,
           "column": 5
         }
       ],
@@ -268,7 +342,7 @@
         {
           "title": "WorkGrind public-site audit",
           "file": "workgrind-audit.spec.ts",
-          "line": 212,
+          "line": 213,
           "column": 6,
           "specs": [
             {
@@ -287,37 +361,37 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "failed",
-                      "duration": 10075,
+                      "duration": 7589,
                       "error": {
                         "message": "Error: / audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 5\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"Button without accessible name: <button class=\\\"h-7 w-7 rounded-lg bg-indigo-600 flex items-center justify-center hover:bg-indigo-500 transition-colors\\\"><svg xmlns=\\\"http://www.w3.org/2000/svg\\\" width=\\\"24\\\" height=\\\"24\\\" viewBox=\\\"0 0 24 24\\\" fill=\\\"none\\\" stroke=\\\"currentColor\\\" str\",\u001b[39m\n\u001b[31m+   \"Button without accessible name: <button class=\\\"text-slate-600 hover:text-slate-400 transition-colors\\\"><svg xmlns=\\\"http://www.w3.org/2000/svg\\\" width=\\\"24\\\" height=\\\"24\\\" viewBox=\\\"0 0 24 24\\\" fill=\\\"none\\\" stroke=\\\"currentColor\\\" stroke-width=\\\"2\\\" stroke-linecap=\\\"round\\\" stroke-linejo\",\u001b[39m\n\u001b[31m+   \"Old-brand text: TF\",\u001b[39m\n\u001b[31m+ ]\u001b[39m",
-                        "stack": "Error: / audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 5\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"Button without accessible name: <button class=\\\"h-7 w-7 rounded-lg bg-indigo-600 flex items-center justify-center hover:bg-indigo-500 transition-colors\\\"><svg xmlns=\\\"http://www.w3.org/2000/svg\\\" width=\\\"24\\\" height=\\\"24\\\" viewBox=\\\"0 0 24 24\\\" fill=\\\"none\\\" stroke=\\\"currentColor\\\" str\",\u001b[39m\n\u001b[31m+   \"Button without accessible name: <button class=\\\"text-slate-600 hover:text-slate-400 transition-colors\\\"><svg xmlns=\\\"http://www.w3.org/2000/svg\\\" width=\\\"24\\\" height=\\\"24\\\" viewBox=\\\"0 0 24 24\\\" fill=\\\"none\\\" stroke=\\\"currentColor\\\" stroke-width=\\\"2\\\" stroke-linecap=\\\"round\\\" stroke-linejo\",\u001b[39m\n\u001b[31m+   \"Old-brand text: TF\",\u001b[39m\n\u001b[31m+ ]\u001b[39m\n    at C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts:244:46",
+                        "stack": "Error: / audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 5\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"Button without accessible name: <button class=\\\"h-7 w-7 rounded-lg bg-indigo-600 flex items-center justify-center hover:bg-indigo-500 transition-colors\\\"><svg xmlns=\\\"http://www.w3.org/2000/svg\\\" width=\\\"24\\\" height=\\\"24\\\" viewBox=\\\"0 0 24 24\\\" fill=\\\"none\\\" stroke=\\\"currentColor\\\" str\",\u001b[39m\n\u001b[31m+   \"Button without accessible name: <button class=\\\"text-slate-600 hover:text-slate-400 transition-colors\\\"><svg xmlns=\\\"http://www.w3.org/2000/svg\\\" width=\\\"24\\\" height=\\\"24\\\" viewBox=\\\"0 0 24 24\\\" fill=\\\"none\\\" stroke=\\\"currentColor\\\" stroke-width=\\\"2\\\" stroke-linecap=\\\"round\\\" stroke-linejo\",\u001b[39m\n\u001b[31m+   \"Old-brand text: TF\",\u001b[39m\n\u001b[31m+ ]\u001b[39m\n    at C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts:255:46",
                         "location": {
                           "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
                           "column": 46,
-                          "line": 244
+                          "line": 255
                         },
-                        "snippet": "\u001b[0m \u001b[90m 242 |\u001b[39m         contentType\u001b[33m:\u001b[39m \u001b[32m'application/json'\u001b[39m\u001b[33m,\u001b[39m\n \u001b[90m 243 |\u001b[39m       })\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 244 |\u001b[39m       expect(issues\u001b[33m,\u001b[39m \u001b[32m`${path} audit issues`\u001b[39m)\u001b[33m.\u001b[39mtoEqual([])\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m                                              \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 245 |\u001b[39m       test\u001b[33m.\u001b[39minfo()\u001b[33m.\u001b[39mannotations\u001b[33m.\u001b[39mpush({ type\u001b[33m:\u001b[39m \u001b[32m'navigation-ms'\u001b[39m\u001b[33m,\u001b[39m description\u001b[33m:\u001b[39m \u001b[33mString\u001b[39m(audit\u001b[33m.\u001b[39melapsedMs) })\u001b[33m;\u001b[39m\n \u001b[90m 246 |\u001b[39m       audit\u001b[33m.\u001b[39mstopTracking()\u001b[33m;\u001b[39m\n \u001b[90m 247 |\u001b[39m     })\u001b[33m;\u001b[39m\u001b[0m"
+                        "snippet": "\u001b[0m \u001b[90m 253 |\u001b[39m         contentType\u001b[33m:\u001b[39m \u001b[32m'application/json'\u001b[39m\u001b[33m,\u001b[39m\n \u001b[90m 254 |\u001b[39m       })\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 255 |\u001b[39m       expect(issues\u001b[33m,\u001b[39m \u001b[32m`${path} audit issues`\u001b[39m)\u001b[33m.\u001b[39mtoEqual([])\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m                                              \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 256 |\u001b[39m       test\u001b[33m.\u001b[39minfo()\u001b[33m.\u001b[39mannotations\u001b[33m.\u001b[39mpush({ type\u001b[33m:\u001b[39m \u001b[32m'navigation-ms'\u001b[39m\u001b[33m,\u001b[39m description\u001b[33m:\u001b[39m \u001b[33mString\u001b[39m(audit\u001b[33m.\u001b[39melapsedMs) })\u001b[33m;\u001b[39m\n \u001b[90m 257 |\u001b[39m       audit\u001b[33m.\u001b[39mstopTracking()\u001b[33m;\u001b[39m\n \u001b[90m 258 |\u001b[39m     })\u001b[33m;\u001b[39m\u001b[0m"
                       },
                       "errors": [
                         {
                           "location": {
                             "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
                             "column": 46,
-                            "line": 244
+                            "line": 255
                           },
-                          "message": "Error: / audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 5\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"Button without accessible name: <button class=\\\"h-7 w-7 rounded-lg bg-indigo-600 flex items-center justify-center hover:bg-indigo-500 transition-colors\\\"><svg xmlns=\\\"http://www.w3.org/2000/svg\\\" width=\\\"24\\\" height=\\\"24\\\" viewBox=\\\"0 0 24 24\\\" fill=\\\"none\\\" stroke=\\\"currentColor\\\" str\",\u001b[39m\n\u001b[31m+   \"Button without accessible name: <button class=\\\"text-slate-600 hover:text-slate-400 transition-colors\\\"><svg xmlns=\\\"http://www.w3.org/2000/svg\\\" width=\\\"24\\\" height=\\\"24\\\" viewBox=\\\"0 0 24 24\\\" fill=\\\"none\\\" stroke=\\\"currentColor\\\" stroke-width=\\\"2\\\" stroke-linecap=\\\"round\\\" stroke-linejo\",\u001b[39m\n\u001b[31m+   \"Old-brand text: TF\",\u001b[39m\n\u001b[31m+ ]\u001b[39m\n\n  242 |         contentType: 'application/json',\n  243 |       });\n> 244 |       expect(issues, `${path} audit issues`).toEqual([]);\n      |                                              ^\n  245 |       test.info().annotations.push({ type: 'navigation-ms', description: String(audit.elapsedMs) });\n  246 |       audit.stopTracking();\n  247 |     });\n    at C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts:244:46"
+                          "message": "Error: / audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 5\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"Button without accessible name: <button class=\\\"h-7 w-7 rounded-lg bg-indigo-600 flex items-center justify-center hover:bg-indigo-500 transition-colors\\\"><svg xmlns=\\\"http://www.w3.org/2000/svg\\\" width=\\\"24\\\" height=\\\"24\\\" viewBox=\\\"0 0 24 24\\\" fill=\\\"none\\\" stroke=\\\"currentColor\\\" str\",\u001b[39m\n\u001b[31m+   \"Button without accessible name: <button class=\\\"text-slate-600 hover:text-slate-400 transition-colors\\\"><svg xmlns=\\\"http://www.w3.org/2000/svg\\\" width=\\\"24\\\" height=\\\"24\\\" viewBox=\\\"0 0 24 24\\\" fill=\\\"none\\\" stroke=\\\"currentColor\\\" stroke-width=\\\"2\\\" stroke-linecap=\\\"round\\\" stroke-linejo\",\u001b[39m\n\u001b[31m+   \"Old-brand text: TF\",\u001b[39m\n\u001b[31m+ ]\u001b[39m\n\n  253 |         contentType: 'application/json',\n  254 |       });\n> 255 |       expect(issues, `${path} audit issues`).toEqual([]);\n      |                                              ^\n  256 |       test.info().annotations.push({ type: 'navigation-ms', description: String(audit.elapsedMs) });\n  257 |       audit.stopTracking();\n  258 |     });\n    at C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts:255:46"
                         }
                       ],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-10-08T17:35:18.986Z",
+                      "startTime": "2026-10-08T17:37:24.432Z",
                       "annotations": [],
                       "attachments": [
                         {
                           "name": "page-audit.json",
                           "contentType": "application/json",
-                          "body": "ewogICJ1cmwiOiAiaHR0cHM6Ly93b3JrZ3JpbmQudmVyY2VsLmFwcC8iLAogICJwYXRoIjogIi8iLAogICJzdGF0dXMiOiAyMDAsCiAgInRpdGxlIjogIldvcmtHcmluZCB8IEFsbC1pbi1PbmUgQnVzaW5lc3MgV29ya3NwYWNlIiwKICAiZWxhcHNlZE1zIjogNTEzMiwKICAiaXNzdWVzIjogWwogICAgIkJ1dHRvbiB3aXRob3V0IGFjY2Vzc2libGUgbmFtZTogPGJ1dHRvbiBjbGFzcz1cImgtNyB3LTcgcm91bmRlZC1sZyBiZy1pbmRpZ28tNjAwIGZsZXggaXRlbXMtY2VudGVyIGp1c3RpZnktY2VudGVyIGhvdmVyOmJnLWluZGlnby01MDAgdHJhbnNpdGlvbi1jb2xvcnNcIj48c3ZnIHhtbG5zPVwiaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmdcIiB3aWR0aD1cIjI0XCIgaGVpZ2h0PVwiMjRcIiB2aWV3Qm94PVwiMCAwIDI0IDI0XCIgZmlsbD1cIm5vbmVcIiBzdHJva2U9XCJjdXJyZW50Q29sb3JcIiBzdHIiLAogICAgIkJ1dHRvbiB3aXRob3V0IGFjY2Vzc2libGUgbmFtZTogPGJ1dHRvbiBjbGFzcz1cInRleHQtc2xhdGUtNjAwIGhvdmVyOnRleHQtc2xhdGUtNDAwIHRyYW5zaXRpb24tY29sb3JzXCI+PHN2ZyB4bWxucz1cImh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnXCIgd2lkdGg9XCIyNFwiIGhlaWdodD1cIjI0XCIgdmlld0JveD1cIjAgMCAyNCAyNFwiIGZpbGw9XCJub25lXCIgc3Ryb2tlPVwiY3VycmVudENvbG9yXCIgc3Ryb2tlLXdpZHRoPVwiMlwiIHN0cm9rZS1saW5lY2FwPVwicm91bmRcIiBzdHJva2UtbGluZWpvIiwKICAgICJPbGQtYnJhbmQgdGV4dDogVEYiCiAgXSwKICAib2xkQnJhbmRNYXRjaGVzIjogWwogICAgIlRGIgogIF0KfQ=="
+                          "body": "ewogICJ1cmwiOiAiaHR0cHM6Ly93b3JrZ3JpbmQudmVyY2VsLmFwcC8iLAogICJwYXRoIjogIi8iLAogICJzdGF0dXMiOiAyMDAsCiAgImNvbnRlbnRTZWN1cml0eVBvbGljeSI6IHRydWUsCiAgInN0cmljdFRyYW5zcG9ydFNlY3VyaXR5IjogdHJ1ZSwKICAic2V0Q29va2llQXR0cmlidXRlcyI6IFtdLAogICJ0aXRsZSI6ICJXb3JrR3JpbmQgfCBBbGwtaW4tT25lIEJ1c2luZXNzIFdvcmtzcGFjZSIsCiAgImVsYXBzZWRNcyI6IDE5NjMsCiAgImlzc3VlcyI6IFsKICAgICJCdXR0b24gd2l0aG91dCBhY2Nlc3NpYmxlIG5hbWU6IDxidXR0b24gY2xhc3M9XCJoLTcgdy03IHJvdW5kZWQtbGcgYmctaW5kaWdvLTYwMCBmbGV4IGl0ZW1zLWNlbnRlciBqdXN0aWZ5LWNlbnRlciBob3ZlcjpiZy1pbmRpZ28tNTAwIHRyYW5zaXRpb24tY29sb3JzXCI+PHN2ZyB4bWxucz1cImh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnXCIgd2lkdGg9XCIyNFwiIGhlaWdodD1cIjI0XCIgdmlld0JveD1cIjAgMCAyNCAyNFwiIGZpbGw9XCJub25lXCIgc3Ryb2tlPVwiY3VycmVudENvbG9yXCIgc3RyIiwKICAgICJCdXR0b24gd2l0aG91dCBhY2Nlc3NpYmxlIG5hbWU6IDxidXR0b24gY2xhc3M9XCJ0ZXh0LXNsYXRlLTYwMCBob3Zlcjp0ZXh0LXNsYXRlLTQwMCB0cmFuc2l0aW9uLWNvbG9yc1wiPjxzdmcgeG1sbnM9XCJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2Z1wiIHdpZHRoPVwiMjRcIiBoZWlnaHQ9XCIyNFwiIHZpZXdCb3g9XCIwIDAgMjQgMjRcIiBmaWxsPVwibm9uZVwiIHN0cm9rZT1cImN1cnJlbnRDb2xvclwiIHN0cm9rZS13aWR0aD1cIjJcIiBzdHJva2UtbGluZWNhcD1cInJvdW5kXCIgc3Ryb2tlLWxpbmVqbyIsCiAgICAiT2xkLWJyYW5kIHRleHQ6IFRGIgogIF0sCiAgIm9sZEJyYW5kTWF0Y2hlcyI6IFsKICAgICJURiIKICBdCn0="
                         },
                         {
                           "name": "screenshot",
@@ -333,7 +407,7 @@
                       "errorLocation": {
                         "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
                         "column": 46,
-                        "line": 244
+                        "line": 255
                       }
                     }
                   ],
@@ -342,7 +416,7 @@
               ],
               "id": "2aae5247a7454980396a-376ff0e51771ab9d5ac0",
               "file": "workgrind-audit.spec.ts",
-              "line": 214,
+              "line": 215,
               "column": 9
             },
             {
@@ -355,7 +429,7 @@
                   "annotations": [
                     {
                       "type": "navigation-ms",
-                      "description": "4926"
+                      "description": "5025"
                     }
                   ],
                   "expectedStatus": "passed",
@@ -366,23 +440,23 @@
                       "workerIndex": 1,
                       "parallelIndex": 1,
                       "status": "passed",
-                      "duration": 8675,
+                      "duration": 8950,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-10-08T17:35:18.958Z",
+                      "startTime": "2026-10-08T17:37:24.506Z",
                       "annotations": [
                         {
                           "type": "navigation-ms",
-                          "description": "4926"
+                          "description": "5025"
                         }
                       ],
                       "attachments": [
                         {
                           "name": "page-audit.json",
                           "contentType": "application/json",
-                          "body": "ewogICJ1cmwiOiAiaHR0cHM6Ly93b3JrZ3JpbmQudmVyY2VsLmFwcC9hYm91dCIsCiAgInBhdGgiOiAiL2Fib3V0IiwKICAic3RhdHVzIjogMjAwLAogICJ0aXRsZSI6ICJXb3JrR3JpbmQgfCBBbGwtaW4tT25lIEJ1c2luZXNzIFdvcmtzcGFjZSIsCiAgImVsYXBzZWRNcyI6IDQ5MjYsCiAgImlzc3VlcyI6IFtdLAogICJvbGRCcmFuZE1hdGNoZXMiOiBbXQp9"
+                          "body": "ewogICJ1cmwiOiAiaHR0cHM6Ly93b3JrZ3JpbmQudmVyY2VsLmFwcC9hYm91dCIsCiAgInBhdGgiOiAiL2Fib3V0IiwKICAic3RhdHVzIjogMjAwLAogICJjb250ZW50U2VjdXJpdHlQb2xpY3kiOiB0cnVlLAogICJzdHJpY3RUcmFuc3BvcnRTZWN1cml0eSI6IHRydWUsCiAgInNldENvb2tpZUF0dHJpYnV0ZXMiOiBbXSwKICAidGl0bGUiOiAiV29ya0dyaW5kIHwgQWxsLWluLU9uZSBCdXNpbmVzcyBXb3Jrc3BhY2UiLAogICJlbGFwc2VkTXMiOiA1MDI1LAogICJpc3N1ZXMiOiBbXSwKICAib2xkQnJhbmRNYXRjaGVzIjogW10KfQ=="
                         }
                       ]
                     }
@@ -392,7 +466,7 @@
               ],
               "id": "2aae5247a7454980396a-84ddd1c4469e897651f5",
               "file": "workgrind-audit.spec.ts",
-              "line": 214,
+              "line": 215,
               "column": 9
             },
             {
@@ -405,7 +479,7 @@
                   "annotations": [
                     {
                       "type": "navigation-ms",
-                      "description": "5662"
+                      "description": "5628"
                     }
                   ],
                   "expectedStatus": "passed",
@@ -416,23 +490,23 @@
                       "workerIndex": 2,
                       "parallelIndex": 2,
                       "status": "passed",
-                      "duration": 9988,
+                      "duration": 10056,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-10-08T17:35:18.941Z",
+                      "startTime": "2026-10-08T17:37:24.464Z",
                       "annotations": [
                         {
                           "type": "navigation-ms",
-                          "description": "5662"
+                          "description": "5628"
                         }
                       ],
                       "attachments": [
                         {
                           "name": "page-audit.json",
                           "contentType": "application/json",
-                          "body": "ewogICJ1cmwiOiAiaHR0cHM6Ly93b3JrZ3JpbmQudmVyY2VsLmFwcC9mZWF0dXJlcyIsCiAgInBhdGgiOiAiL2ZlYXR1cmVzIiwKICAic3RhdHVzIjogMjAwLAogICJ0aXRsZSI6ICJXb3JrR3JpbmQgRmVhdHVyZXMgfCBSZWFsIFdvcmtmbG93LCBDUk0sIEFJLCBhbmQgQ2xpZW50IFBvcnRhbCBUb29scyIsCiAgImVsYXBzZWRNcyI6IDU2NjIsCiAgImlzc3VlcyI6IFtdLAogICJvbGRCcmFuZE1hdGNoZXMiOiBbXQp9"
+                          "body": "ewogICJ1cmwiOiAiaHR0cHM6Ly93b3JrZ3JpbmQudmVyY2VsLmFwcC9mZWF0dXJlcyIsCiAgInBhdGgiOiAiL2ZlYXR1cmVzIiwKICAic3RhdHVzIjogMjAwLAogICJjb250ZW50U2VjdXJpdHlQb2xpY3kiOiB0cnVlLAogICJzdHJpY3RUcmFuc3BvcnRTZWN1cml0eSI6IHRydWUsCiAgInNldENvb2tpZUF0dHJpYnV0ZXMiOiBbXSwKICAidGl0bGUiOiAiV29ya0dyaW5kIEZlYXR1cmVzIHwgUmVhbCBXb3JrZmxvdywgQ1JNLCBBSSwgYW5kIENsaWVudCBQb3J0YWwgVG9vbHMiLAogICJlbGFwc2VkTXMiOiA1NjI4LAogICJpc3N1ZXMiOiBbXSwKICAib2xkQnJhbmRNYXRjaGVzIjogW10KfQ=="
                         }
                       ]
                     }
@@ -442,7 +516,7 @@
               ],
               "id": "2aae5247a7454980396a-edb4efe8490e1513f0c9",
               "file": "workgrind-audit.spec.ts",
-              "line": 214,
+              "line": 215,
               "column": 9
             },
             {
@@ -455,7 +529,7 @@
                   "annotations": [
                     {
                       "type": "navigation-ms",
-                      "description": "4382"
+                      "description": "4584"
                     }
                   ],
                   "expectedStatus": "passed",
@@ -466,23 +540,23 @@
                       "workerIndex": 3,
                       "parallelIndex": 3,
                       "status": "passed",
-                      "duration": 7954,
+                      "duration": 8429,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-10-08T17:35:18.798Z",
+                      "startTime": "2026-10-08T17:37:24.561Z",
                       "annotations": [
                         {
                           "type": "navigation-ms",
-                          "description": "4382"
+                          "description": "4584"
                         }
                       ],
                       "attachments": [
                         {
                           "name": "page-audit.json",
                           "contentType": "application/json",
-                          "body": "ewogICJ1cmwiOiAiaHR0cHM6Ly93b3JrZ3JpbmQudmVyY2VsLmFwcC9kZW1vIiwKICAicGF0aCI6ICIvZGVtbyIsCiAgInN0YXR1cyI6IDIwMCwKICAidGl0bGUiOiAiV29ya0dyaW5kIHwgQWxsLWluLU9uZSBCdXNpbmVzcyBXb3Jrc3BhY2UiLAogICJlbGFwc2VkTXMiOiA0MzgyLAogICJpc3N1ZXMiOiBbXSwKICAib2xkQnJhbmRNYXRjaGVzIjogW10KfQ=="
+                          "body": "ewogICJ1cmwiOiAiaHR0cHM6Ly93b3JrZ3JpbmQudmVyY2VsLmFwcC9kZW1vIiwKICAicGF0aCI6ICIvZGVtbyIsCiAgInN0YXR1cyI6IDIwMCwKICAiY29udGVudFNlY3VyaXR5UG9saWN5IjogdHJ1ZSwKICAic3RyaWN0VHJhbnNwb3J0U2VjdXJpdHkiOiB0cnVlLAogICJzZXRDb29raWVBdHRyaWJ1dGVzIjogW10sCiAgInRpdGxlIjogIldvcmtHcmluZCB8IEFsbC1pbi1PbmUgQnVzaW5lc3MgV29ya3NwYWNlIiwKICAiZWxhcHNlZE1zIjogNDU4NCwKICAiaXNzdWVzIjogW10sCiAgIm9sZEJyYW5kTWF0Y2hlcyI6IFtdCn0="
                         }
                       ]
                     }
@@ -492,7 +566,7 @@
               ],
               "id": "2aae5247a7454980396a-5db2e059ed12195a70c2",
               "file": "workgrind-audit.spec.ts",
-              "line": 214,
+              "line": 215,
               "column": 9
             },
             {
@@ -505,7 +579,7 @@
                   "annotations": [
                     {
                       "type": "navigation-ms",
-                      "description": "6623"
+                      "description": "7047"
                     }
                   ],
                   "expectedStatus": "passed",
@@ -513,26 +587,26 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 3,
-                      "parallelIndex": 3,
+                      "workerIndex": 4,
+                      "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 9596,
+                      "duration": 10228,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-10-08T17:35:27.187Z",
+                      "startTime": "2026-10-08T17:37:33.418Z",
                       "annotations": [
                         {
                           "type": "navigation-ms",
-                          "description": "6623"
+                          "description": "7047"
                         }
                       ],
                       "attachments": [
                         {
                           "name": "page-audit.json",
                           "contentType": "application/json",
-                          "body": "ewogICJ1cmwiOiAiaHR0cHM6Ly93b3JrZ3JpbmQudmVyY2VsLmFwcC9jb250YWN0IiwKICAicGF0aCI6ICIvY29udGFjdCIsCiAgInN0YXR1cyI6IDIwMCwKICAidGl0bGUiOiAiQ29udGFjdCBXb3JrR3JpbmQgfCBXb3JrR3JpbmQiLAogICJlbGFwc2VkTXMiOiA2NjIzLAogICJpc3N1ZXMiOiBbXSwKICAib2xkQnJhbmRNYXRjaGVzIjogW10KfQ=="
+                          "body": "ewogICJ1cmwiOiAiaHR0cHM6Ly93b3JrZ3JpbmQudmVyY2VsLmFwcC9jb250YWN0IiwKICAicGF0aCI6ICIvY29udGFjdCIsCiAgInN0YXR1cyI6IDIwMCwKICAiY29udGVudFNlY3VyaXR5UG9saWN5IjogdHJ1ZSwKICAic3RyaWN0VHJhbnNwb3J0U2VjdXJpdHkiOiB0cnVlLAogICJzZXRDb29raWVBdHRyaWJ1dGVzIjogW10sCiAgInRpdGxlIjogIkNvbnRhY3QgV29ya0dyaW5kIHwgV29ya0dyaW5kIiwKICAiZWxhcHNlZE1zIjogNzA0NywKICAiaXNzdWVzIjogW10sCiAgIm9sZEJyYW5kTWF0Y2hlcyI6IFtdCn0="
                         }
                       ]
                     }
@@ -542,7 +616,7 @@
               ],
               "id": "2aae5247a7454980396a-313eedc694fe00b30ece",
               "file": "workgrind-audit.spec.ts",
-              "line": 214,
+              "line": 215,
               "column": 9
             },
             {
@@ -558,40 +632,40 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 1,
-                      "parallelIndex": 1,
+                      "workerIndex": 3,
+                      "parallelIndex": 3,
                       "status": "failed",
-                      "duration": 7597,
+                      "duration": 7652,
                       "error": {
                         "message": "Error: /pricing audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 3\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"Old-brand text: TF\",\u001b[39m\n\u001b[31m+ ]\u001b[39m",
-                        "stack": "Error: /pricing audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 3\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"Old-brand text: TF\",\u001b[39m\n\u001b[31m+ ]\u001b[39m\n    at C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts:244:46",
+                        "stack": "Error: /pricing audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 3\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"Old-brand text: TF\",\u001b[39m\n\u001b[31m+ ]\u001b[39m\n    at C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts:255:46",
                         "location": {
                           "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
                           "column": 46,
-                          "line": 244
+                          "line": 255
                         },
-                        "snippet": "\u001b[0m \u001b[90m 242 |\u001b[39m         contentType\u001b[33m:\u001b[39m \u001b[32m'application/json'\u001b[39m\u001b[33m,\u001b[39m\n \u001b[90m 243 |\u001b[39m       })\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 244 |\u001b[39m       expect(issues\u001b[33m,\u001b[39m \u001b[32m`${path} audit issues`\u001b[39m)\u001b[33m.\u001b[39mtoEqual([])\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m                                              \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 245 |\u001b[39m       test\u001b[33m.\u001b[39minfo()\u001b[33m.\u001b[39mannotations\u001b[33m.\u001b[39mpush({ type\u001b[33m:\u001b[39m \u001b[32m'navigation-ms'\u001b[39m\u001b[33m,\u001b[39m description\u001b[33m:\u001b[39m \u001b[33mString\u001b[39m(audit\u001b[33m.\u001b[39melapsedMs) })\u001b[33m;\u001b[39m\n \u001b[90m 246 |\u001b[39m       audit\u001b[33m.\u001b[39mstopTracking()\u001b[33m;\u001b[39m\n \u001b[90m 247 |\u001b[39m     })\u001b[33m;\u001b[39m\u001b[0m"
+                        "snippet": "\u001b[0m \u001b[90m 253 |\u001b[39m         contentType\u001b[33m:\u001b[39m \u001b[32m'application/json'\u001b[39m\u001b[33m,\u001b[39m\n \u001b[90m 254 |\u001b[39m       })\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 255 |\u001b[39m       expect(issues\u001b[33m,\u001b[39m \u001b[32m`${path} audit issues`\u001b[39m)\u001b[33m.\u001b[39mtoEqual([])\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m                                              \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 256 |\u001b[39m       test\u001b[33m.\u001b[39minfo()\u001b[33m.\u001b[39mannotations\u001b[33m.\u001b[39mpush({ type\u001b[33m:\u001b[39m \u001b[32m'navigation-ms'\u001b[39m\u001b[33m,\u001b[39m description\u001b[33m:\u001b[39m \u001b[33mString\u001b[39m(audit\u001b[33m.\u001b[39melapsedMs) })\u001b[33m;\u001b[39m\n \u001b[90m 257 |\u001b[39m       audit\u001b[33m.\u001b[39mstopTracking()\u001b[33m;\u001b[39m\n \u001b[90m 258 |\u001b[39m     })\u001b[33m;\u001b[39m\u001b[0m"
                       },
                       "errors": [
                         {
                           "location": {
                             "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
                             "column": 46,
-                            "line": 244
+                            "line": 255
                           },
-                          "message": "Error: /pricing audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 3\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"Old-brand text: TF\",\u001b[39m\n\u001b[31m+ ]\u001b[39m\n\n  242 |         contentType: 'application/json',\n  243 |       });\n> 244 |       expect(issues, `${path} audit issues`).toEqual([]);\n      |                                              ^\n  245 |       test.info().annotations.push({ type: 'navigation-ms', description: String(audit.elapsedMs) });\n  246 |       audit.stopTracking();\n  247 |     });\n    at C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts:244:46"
+                          "message": "Error: /pricing audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 3\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"Old-brand text: TF\",\u001b[39m\n\u001b[31m+ ]\u001b[39m\n\n  253 |         contentType: 'application/json',\n  254 |       });\n> 255 |       expect(issues, `${path} audit issues`).toEqual([]);\n      |                                              ^\n  256 |       test.info().annotations.push({ type: 'navigation-ms', description: String(audit.elapsedMs) });\n  257 |       audit.stopTracking();\n  258 |     });\n    at C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts:255:46"
                         }
                       ],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-10-08T17:35:28.289Z",
+                      "startTime": "2026-10-08T17:37:33.815Z",
                       "annotations": [],
                       "attachments": [
                         {
                           "name": "page-audit.json",
                           "contentType": "application/json",
-                          "body": "ewogICJ1cmwiOiAiaHR0cHM6Ly93b3JrZ3JpbmQudmVyY2VsLmFwcC9wcmljaW5nIiwKICAicGF0aCI6ICIvcHJpY2luZyIsCiAgInN0YXR1cyI6IDIwMCwKICAidGl0bGUiOiAiV29ya0dyaW5kIHwgQWxsLWluLU9uZSBCdXNpbmVzcyBXb3Jrc3BhY2UiLAogICJlbGFwc2VkTXMiOiA0NTQwLAogICJpc3N1ZXMiOiBbCiAgICAiT2xkLWJyYW5kIHRleHQ6IFRGIgogIF0sCiAgIm9sZEJyYW5kTWF0Y2hlcyI6IFsKICAgICJURiIKICBdCn0="
+                          "body": "ewogICJ1cmwiOiAiaHR0cHM6Ly93b3JrZ3JpbmQudmVyY2VsLmFwcC9wcmljaW5nIiwKICAicGF0aCI6ICIvcHJpY2luZyIsCiAgInN0YXR1cyI6IDIwMCwKICAiY29udGVudFNlY3VyaXR5UG9saWN5IjogdHJ1ZSwKICAic3RyaWN0VHJhbnNwb3J0U2VjdXJpdHkiOiB0cnVlLAogICJzZXRDb29raWVBdHRyaWJ1dGVzIjogW10sCiAgInRpdGxlIjogIldvcmtHcmluZCB8IEFsbC1pbi1PbmUgQnVzaW5lc3MgV29ya3NwYWNlIiwKICAiZWxhcHNlZE1zIjogNDc1NCwKICAiaXNzdWVzIjogWwogICAgIk9sZC1icmFuZCB0ZXh0OiBURiIKICBdLAogICJvbGRCcmFuZE1hdGNoZXMiOiBbCiAgICAiVEYiCiAgXQp9"
                         },
                         {
                           "name": "screenshot",
@@ -607,7 +681,7 @@
                       "errorLocation": {
                         "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
                         "column": 46,
-                        "line": 244
+                        "line": 255
                       }
                     }
                   ],
@@ -616,7 +690,7 @@
               ],
               "id": "2aae5247a7454980396a-e944d0e49a7d12da7e1e",
               "file": "workgrind-audit.spec.ts",
-              "line": 214,
+              "line": 215,
               "column": 9
             },
             {
@@ -629,7 +703,7 @@
                   "annotations": [
                     {
                       "type": "navigation-ms",
-                      "description": "3786"
+                      "description": "4628"
                     }
                   ],
                   "expectedStatus": "passed",
@@ -637,26 +711,26 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 2,
-                      "parallelIndex": 2,
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
                       "status": "passed",
-                      "duration": 6960,
+                      "duration": 7546,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-10-08T17:35:29.481Z",
+                      "startTime": "2026-10-08T17:37:34.036Z",
                       "annotations": [
                         {
                           "type": "navigation-ms",
-                          "description": "3786"
+                          "description": "4628"
                         }
                       ],
                       "attachments": [
                         {
                           "name": "page-audit.json",
                           "contentType": "application/json",
-                          "body": "ewogICJ1cmwiOiAiaHR0cHM6Ly93b3JrZ3JpbmQudmVyY2VsLmFwcC9wcml2YWN5IiwKICAicGF0aCI6ICIvcHJpdmFjeSIsCiAgInN0YXR1cyI6IDIwMCwKICAidGl0bGUiOiAiUHJpdmFjeSBQb2xpY3kgfCBXb3JrR3JpbmQiLAogICJlbGFwc2VkTXMiOiAzNzg2LAogICJpc3N1ZXMiOiBbXSwKICAib2xkQnJhbmRNYXRjaGVzIjogW10KfQ=="
+                          "body": "ewogICJ1cmwiOiAiaHR0cHM6Ly93b3JrZ3JpbmQudmVyY2VsLmFwcC9wcml2YWN5IiwKICAicGF0aCI6ICIvcHJpdmFjeSIsCiAgInN0YXR1cyI6IDIwMCwKICAiY29udGVudFNlY3VyaXR5UG9saWN5IjogdHJ1ZSwKICAic3RyaWN0VHJhbnNwb3J0U2VjdXJpdHkiOiB0cnVlLAogICJzZXRDb29raWVBdHRyaWJ1dGVzIjogW10sCiAgInRpdGxlIjogIlByaXZhY3kgUG9saWN5IHwgV29ya0dyaW5kIiwKICAiZWxhcHNlZE1zIjogNDYyOCwKICAiaXNzdWVzIjogW10sCiAgIm9sZEJyYW5kTWF0Y2hlcyI6IFtdCn0="
                         }
                       ]
                     }
@@ -666,7 +740,7 @@
               ],
               "id": "2aae5247a7454980396a-b1d4f7f9614e5af496d1",
               "file": "workgrind-audit.spec.ts",
-              "line": 214,
+              "line": 215,
               "column": 9
             },
             {
@@ -679,7 +753,7 @@
                   "annotations": [
                     {
                       "type": "navigation-ms",
-                      "description": "3878"
+                      "description": "4287"
                     }
                   ],
                   "expectedStatus": "passed",
@@ -687,26 +761,26 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 4,
-                      "parallelIndex": 0,
+                      "workerIndex": 2,
+                      "parallelIndex": 2,
                       "status": "passed",
-                      "duration": 6839,
+                      "duration": 7254,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-10-08T17:35:31.511Z",
+                      "startTime": "2026-10-08T17:37:35.059Z",
                       "annotations": [
                         {
                           "type": "navigation-ms",
-                          "description": "3878"
+                          "description": "4287"
                         }
                       ],
                       "attachments": [
                         {
                           "name": "page-audit.json",
                           "contentType": "application/json",
-                          "body": "ewogICJ1cmwiOiAiaHR0cHM6Ly93b3JrZ3JpbmQudmVyY2VsLmFwcC90ZXJtcyIsCiAgInBhdGgiOiAiL3Rlcm1zIiwKICAic3RhdHVzIjogMjAwLAogICJ0aXRsZSI6ICJUZXJtcyBvZiBTZXJ2aWNlIHwgV29ya0dyaW5kIiwKICAiZWxhcHNlZE1zIjogMzg3OCwKICAiaXNzdWVzIjogW10sCiAgIm9sZEJyYW5kTWF0Y2hlcyI6IFtdCn0="
+                          "body": "ewogICJ1cmwiOiAiaHR0cHM6Ly93b3JrZ3JpbmQudmVyY2VsLmFwcC90ZXJtcyIsCiAgInBhdGgiOiAiL3Rlcm1zIiwKICAic3RhdHVzIjogMjAwLAogICJjb250ZW50U2VjdXJpdHlQb2xpY3kiOiB0cnVlLAogICJzdHJpY3RUcmFuc3BvcnRTZWN1cml0eSI6IHRydWUsCiAgInNldENvb2tpZUF0dHJpYnV0ZXMiOiBbXSwKICAidGl0bGUiOiAiVGVybXMgb2YgU2VydmljZSB8IFdvcmtHcmluZCIsCiAgImVsYXBzZWRNcyI6IDQyODcsCiAgImlzc3VlcyI6IFtdLAogICJvbGRCcmFuZE1hdGNoZXMiOiBbXQp9"
                         }
                       ]
                     }
@@ -716,7 +790,7 @@
               ],
               "id": "2aae5247a7454980396a-9ca28fcca5fd1c3c141b",
               "file": "workgrind-audit.spec.ts",
-              "line": 214,
+              "line": 215,
               "column": 9
             },
             {
@@ -729,7 +803,7 @@
                   "annotations": [
                     {
                       "type": "navigation-ms",
-                      "description": "4077"
+                      "description": "3902"
                     }
                   ],
                   "expectedStatus": "passed",
@@ -737,26 +811,26 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 5,
+                      "workerIndex": 1,
                       "parallelIndex": 1,
                       "status": "passed",
-                      "duration": 6815,
+                      "duration": 6951,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-10-08T17:35:37.137Z",
+                      "startTime": "2026-10-08T17:37:41.610Z",
                       "annotations": [
                         {
                           "type": "navigation-ms",
-                          "description": "4077"
+                          "description": "3902"
                         }
                       ],
                       "attachments": [
                         {
                           "name": "page-audit.json",
                           "contentType": "application/json",
-                          "body": "ewogICJ1cmwiOiAiaHR0cHM6Ly93b3JrZ3JpbmQudmVyY2VsLmFwcC9zaWdudXAiLAogICJwYXRoIjogIi9zaWdudXAiLAogICJzdGF0dXMiOiAyMDAsCiAgInRpdGxlIjogIkFjY291bnQgQWNjZXNzIHwgV29ya0dyaW5kIiwKICAiZWxhcHNlZE1zIjogNDA3NywKICAiaXNzdWVzIjogW10sCiAgIm9sZEJyYW5kTWF0Y2hlcyI6IFtdCn0="
+                          "body": "ewogICJ1cmwiOiAiaHR0cHM6Ly93b3JrZ3JpbmQudmVyY2VsLmFwcC9zaWdudXAiLAogICJwYXRoIjogIi9zaWdudXAiLAogICJzdGF0dXMiOiAyMDAsCiAgImNvbnRlbnRTZWN1cml0eVBvbGljeSI6IHRydWUsCiAgInN0cmljdFRyYW5zcG9ydFNlY3VyaXR5IjogdHJ1ZSwKICAic2V0Q29va2llQXR0cmlidXRlcyI6IFtdLAogICJ0aXRsZSI6ICJBY2NvdW50IEFjY2VzcyB8IFdvcmtHcmluZCIsCiAgImVsYXBzZWRNcyI6IDM5MDIsCiAgImlzc3VlcyI6IFtdLAogICJvbGRCcmFuZE1hdGNoZXMiOiBbXQp9"
                         }
                       ]
                     }
@@ -766,7 +840,7 @@
               ],
               "id": "2aae5247a7454980396a-f274e394f137bdf7ad29",
               "file": "workgrind-audit.spec.ts",
-              "line": 214,
+              "line": 215,
               "column": 9
             },
             {
@@ -779,7 +853,7 @@
                   "annotations": [
                     {
                       "type": "navigation-ms",
-                      "description": "4764"
+                      "description": "4463"
                     }
                   ],
                   "expectedStatus": "passed",
@@ -787,26 +861,26 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 2,
-                      "parallelIndex": 2,
+                      "workerIndex": 5,
+                      "parallelIndex": 3,
                       "status": "passed",
-                      "duration": 7384,
+                      "duration": 7391,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-10-08T17:35:36.484Z",
+                      "startTime": "2026-10-08T17:37:42.636Z",
                       "annotations": [
                         {
                           "type": "navigation-ms",
-                          "description": "4764"
+                          "description": "4463"
                         }
                       ],
                       "attachments": [
                         {
                           "name": "page-audit.json",
                           "contentType": "application/json",
-                          "body": "ewogICJ1cmwiOiAiaHR0cHM6Ly93b3JrZ3JpbmQudmVyY2VsLmFwcC9sb2dpbiIsCiAgInBhdGgiOiAiL2xvZ2luIiwKICAic3RhdHVzIjogMjAwLAogICJ0aXRsZSI6ICJBY2NvdW50IEFjY2VzcyB8IFdvcmtHcmluZCIsCiAgImVsYXBzZWRNcyI6IDQ3NjQsCiAgImlzc3VlcyI6IFtdLAogICJvbGRCcmFuZE1hdGNoZXMiOiBbXQp9"
+                          "body": "ewogICJ1cmwiOiAiaHR0cHM6Ly93b3JrZ3JpbmQudmVyY2VsLmFwcC9sb2dpbiIsCiAgInBhdGgiOiAiL2xvZ2luIiwKICAic3RhdHVzIjogMjAwLAogICJjb250ZW50U2VjdXJpdHlQb2xpY3kiOiB0cnVlLAogICJzdHJpY3RUcmFuc3BvcnRTZWN1cml0eSI6IHRydWUsCiAgInNldENvb2tpZUF0dHJpYnV0ZXMiOiBbXSwKICAidGl0bGUiOiAiQWNjb3VudCBBY2Nlc3MgfCBXb3JrR3JpbmQiLAogICJlbGFwc2VkTXMiOiA0NDYzLAogICJpc3N1ZXMiOiBbXSwKICAib2xkQnJhbmRNYXRjaGVzIjogW10KfQ=="
                         }
                       ]
                     }
@@ -816,7 +890,7 @@
               ],
               "id": "2aae5247a7454980396a-ef429edf7af88c139840",
               "file": "workgrind-audit.spec.ts",
-              "line": 214,
+              "line": 215,
               "column": 9
             }
           ]
@@ -826,9 +900,9 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-10-08T17:35:17.241Z",
-    "duration": 30967.402,
-    "expected": 9,
+    "startTime": "2026-10-08T17:37:22.430Z",
+    "duration": 81570.42599999999,
+    "expected": 11,
     "skipped": 2,
     "unexpected": 2,
     "flaky": 0
