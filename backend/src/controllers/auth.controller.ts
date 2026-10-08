@@ -358,7 +358,8 @@ export const requestPhoneOtp = async (req: Request, res: Response): Promise<void
         success: false,
         code: error.diagnosticCode.toUpperCase(),
         message: error.diagnosticCode === 'sms_provider_unconfigured' ||
-          error.diagnosticCode === 'sms_provider_configuration_incomplete'
+          error.diagnosticCode === 'sms_provider_configuration_incomplete' ||
+          error.diagnosticCode === 'whatsapp_provider_configuration_incomplete'
           ? 'Phone verification is not configured on this server.'
           : 'We could not deliver a verification code. Please try again shortly.',
       });
@@ -439,7 +440,11 @@ export const startSocialPhoneVerification = async (req: AuthRequest, res: Respon
       success: false,
       code: error instanceof PhoneOtpDeliveryError ? error.diagnosticCode.toUpperCase() : 'PHONE_OTP_UNAVAILABLE',
       message: error instanceof PhoneOtpDeliveryError &&
-        ['sms_provider_unconfigured', 'sms_provider_configuration_incomplete'].includes(error.diagnosticCode)
+        [
+          'sms_provider_unconfigured',
+          'sms_provider_configuration_incomplete',
+          'whatsapp_provider_configuration_incomplete',
+        ].includes(error.diagnosticCode)
         ? 'Phone verification is not configured on this server.'
         : 'We could not send a verification code right now. Please try again shortly.',
     });

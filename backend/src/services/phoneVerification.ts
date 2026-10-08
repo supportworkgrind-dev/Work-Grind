@@ -38,7 +38,9 @@ export const phoneOtpMatches = (phone: string, purpose: PhoneOtpPurpose, code: s
 export class PhoneOtpDeliveryError extends Error {
   constructor(
     readonly diagnosticCode: 'sms_provider_unconfigured' | 'sms_provider_configuration_incomplete' |
-      'sms_provider_rejected' | 'sms_provider_unavailable',
+      'sms_provider_rejected' | 'sms_provider_unavailable' |
+      'whatsapp_provider_configuration_incomplete' | 'whatsapp_provider_rejected' |
+      'whatsapp_provider_unavailable',
     readonly httpStatus?: number,
     readonly providerCode?: number,
   ) {
@@ -48,10 +50,75 @@ export class PhoneOtpDeliveryError extends Error {
 
 export const sendPhoneOtp = async (phone: string, code: string): Promise<{ developmentCode?: never }> => {
   const isDevelopment = process.env.NODE_ENV === 'development';
-  const provider = process.env.SMS_PROVIDER?.trim().toLowerCase() || '';
+  const selectedProvider = process.env.SMS_PROVIDER?.trim().toLowerCase() || '';
+  const whatsappAccessToken = process.env.WHATSAPP_ACCESS_TOKEN?.trim();
+  const whatsappPhoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID?.trim();
+  const hasWhatsAppSettings = Boolean(
+    whatsappAccessToken ||
+    whatsappPhoneNumberId ||
+    process.env.WHATSAPP_BUSINESS_ACCOUNT_ID?.trim(),
+  );
+  const provider = selectedProvider || (hasWhatsAppSettings ? 'whatsapp' : '');
   if (provider === 'dev') {
     if (!isDevelopment) throw new PhoneOtpDeliveryError('sms_provider_unconfigured');
     console.info('[Phone OTP] Development code generated for', phone.replace(/.(?=.{4})/g, '*'), code);
+    return {};
+  }
+  if (provider === 'whatsapp') {
+    if (!whatsappAccessToken || !whatsappPhoneNumberId) {
+      throw new PhoneOtpDeliveryError('whatsapp_provider_configuration_incomplete');
+    }
+
+    let response: Response;
+    try {
+      response = await fetch(
+        `https://graph.facebook.com/v25.0/${encodeURIComponent(whatsappPhoneNumberId)}/messages`,
+        {
+          method: 'POST',
+          signal: AbortSignal.timeout(10_000),
+          headers: {
+            Authorization: `Bearer ${whatsappAccessToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            messaging_product: 'whatsapp',
+            recipient_type: 'individual',
+            to: phone.replace(/^\+/, ''),
+            type: 'template',
+            template: {
+              name: 'verification_code',
+              language: { code: 'en_US' },
+              components: [
+                { type: 'body', parameters: [{ type: 'text', text: code }] },
+                {
+                  type: 'button',
+                  sub_type: 'url',
+                  index: '0',
+                  parameters: [{ type: 'text', text: code }],
+                },
+              ],
+            },
+          }),
+        },
+      );
+    } catch {
+      throw new PhoneOtpDeliveryError('whatsapp_provider_unavailable');
+    }
+    if (!response.ok) {
+      let providerCode: number | undefined;
+      try {
+        const result = await response.json() as { error?: { code?: unknown } };
+        if (typeof result.error?.code === 'number') providerCode = result.error.code;
+      } catch {
+        // Status is sufficient when the provider response body is absent or not JSON.
+      }
+      console.error('[Phone OTP] WhatsApp provider rejected delivery.', {
+        provider: 'whatsapp',
+        httpStatus: response.status,
+        ...(providerCode ? { providerCode } : {}),
+      });
+      throw new PhoneOtpDeliveryError('whatsapp_provider_rejected', response.status, providerCode);
+    }
     return {};
   }
   if (provider !== 'twilio') throw new PhoneOtpDeliveryError('sms_provider_unconfigured');

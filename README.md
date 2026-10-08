@@ -629,8 +629,14 @@ redeploy both projects so build-time and runtime configuration is applied:
 | Backend | `JWT_REFRESH_SECRET` | Separate production refresh-token signing key (secret) |
 | Backend | `GOOGLE_CLIENT_ID` | The Google OAuth client ID |
 | Backend | `GOOGLE_CLIENT_SECRET` | The matching Google OAuth client secret |
-| Backend | `SMS_PROVIDER` | `twilio` (to enable production phone OTP) |
-| Backend | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER` | Twilio server-side SMS configuration |
+| Backend | `SMS_PROVIDER` | `whatsapp` or `twilio` (production phone OTP); WhatsApp is auto-detected if this is unset and WhatsApp settings exist |
+| Backend | `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID` | Meta WhatsApp Cloud API server-side configuration |
+| Backend | `WHATSAPP_BUSINESS_ACCOUNT_ID` | Optional for OTP delivery; needed when managing WhatsApp message templates |
+| Backend | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER` | Optional Twilio server-side SMS configuration |
+
+WhatsApp OTP delivery uses the approved authentication template `verification_code`
+in `en_US`. Create and approve a copy-code authentication template with that name
+in WhatsApp Manager before sending production OTPs. Keep the access token backend-only.
 
 In Google Cloud Console, add the backend callback URL above as an authorized
 redirect URI for the same OAuth client. Do not register the frontend URL as the
