@@ -9,7 +9,7 @@ function createContentSecurityPolicy(nonce: string): string {
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob: https:",
     "font-src 'self' data:",
-    "connect-src 'self' http://localhost:5000 wss://workgrind.app wss://*.workgrind.app wss://*.devtunnels.ms ws://localhost:* ws://127.0.0.1:* stun: turn: turns:",
+    "connect-src 'self' https://backend-rho-vert-59.vercel.app http://localhost:5000 wss://workgrind.app wss://*.workgrind.app wss://*.devtunnels.ms ws://localhost:* ws://127.0.0.1:* stun: turn: turns:",
     "media-src 'self' blob: data:",
     "worker-src 'self' blob:",
     "frame-src 'self'",
