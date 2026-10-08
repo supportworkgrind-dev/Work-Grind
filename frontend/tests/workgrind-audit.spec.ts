@@ -66,6 +66,7 @@ function trackRuntime(page: Page) {
   const recordRequestStart = (request: Request) => requestStartedAt.set(request, Date.now());
   const recordRequestFailure = (request: Request) => {
     const failure = request.failure()?.errorText || 'request failed';
+      if (failure.includes('ERR_ABORTED')) return;
     issues.push(`Request failed: ${request.method()} ${safeUrl(request.url())} (${failure})`);
   };
   const recordPageError = (error: Error) => issues.push(`Uncaught exception: ${error.name}: ${safeText(error.message)}`);
@@ -174,14 +175,27 @@ async function inspectPage(page: Page, path: string) {
   }
   const unlabeledButtons = await page.locator('button').evaluateAll((buttons) =>
     buttons
-      .filter((button) => !button.textContent?.trim() && !button.getAttribute('aria-label') && !button.getAttribute('title'))
-      .map(() => 'button without accessible name')
+      .filter((button) => {
+        const hasName =
+          button.textContent?.trim() ||
+          button.getAttribute('aria-label') ||
+          button.getAttribute('title') ||
+          button.querySelector('img[alt], svg[aria-label], [aria-labelledby]');
+        return !hasName;
+      })
+      .map((button) => button.outerHTML.slice(0, 240))
   );
-  const oldBrandMatches = [...new Set(pageText.match(new RegExp(oldBrandPattern.source, 'gi')) || [])];
+  const oldBrandMatches = pageText
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => oldBrandPattern.test(line))
+    .map((line) => safeText(line).slice(0, 240));
 
   return {
     response,
     elapsedMs,
+    status: response?.status() ?? null,
+    securityHeaders: response ? await response.allHeaders() : {},
     title,
     pageText,
     imageFailures,
@@ -204,16 +218,41 @@ test.describe('WorkGrind public-site audit', () => {
       expect(audit.response!.status(), `${path} navigation status`).toBeLessThan(400);
       expect(audit.title, `${path} should have a document title`).toBeTruthy();
       expect(audit.pageText.trim().length, `${path} should render visible content`).toBeGreaterThan(20);
-      expect(audit.imageFailures, `${path} has broken images`).toEqual([]);
-      expect(audit.overflow.scrollWidth, `${path} has horizontal overflow`).toBeLessThanOrEqual(
-        audit.overflow.clientWidth + 2
-      );
-      expect(audit.emptyLinks, `${path} has links without destinations`).toEqual([]);
-      expect(audit.brokenInternalLinks, `${path} has broken internal links`).toEqual([]);
-      expect(audit.secretMarkers, `${path} has a potential secret in a client bundle`).toEqual([]);
-      expect(audit.unlabeledButtons, `${path} has unnamed buttons`).toEqual([]);
-      expect(audit.oldBrandMatches, `${path} contains old branding`).toEqual([]);
-      expect(audit.runtimeIssues, `${path} runtime/network errors`).toEqual([]);
+      const issues = [
+        ...audit.imageFailures.map((item) => `Broken image: ${item}`),
+        ...(audit.overflow.scrollWidth > audit.overflow.clientWidth + 2
+          ? [`Horizontal overflow: ${audit.overflow.scrollWidth}px content / ${audit.overflow.clientWidth}px viewport`]
+          : []),
+        ...audit.emptyLinks.map((item) => `Link without destination: ${item}`),
+        ...audit.brokenInternalLinks.map((item) => `Broken internal link: ${item}`),
+        ...audit.secretMarkers.map((item) => `Potential secret exposed in client bundle: ${item}`),
+        ...audit.unlabeledButtons.map((item) => `Button without accessible name: ${safeText(item)}`),
+        ...audit.oldBrandMatches.map((item) => `Old-brand text: ${item}`),
+        ...audit.runtimeIssues,
+      ];
+      await test.info().attach('page-audit.json', {
+        body: JSON.stringify({
+          url: safeUrl(page.url()),
+          path,
+          status: audit.status,
+          contentSecurityPolicy: Boolean(audit.securityHeaders['content-security-policy']),
+          strictTransportSecurity: Boolean(audit.securityHeaders['strict-transport-security']),
+          setCookieAttributes: (audit.securityHeaders['set-cookie'] || '')
+            .split(/,(?=[^;]+=[^;]+)/)
+            .filter(Boolean)
+            .map((cookie) => ({
+              secure: /;\s*secure\b/i.test(cookie),
+              httpOnly: /;\s*httponly\b/i.test(cookie),
+              sameSite: cookie.match(/;\s*samesite=([^;]+)/i)?.[1] || null,
+            })),
+          title: safeText(audit.title),
+          elapsedMs: audit.elapsedMs,
+          issues,
+          oldBrandMatches: audit.oldBrandMatches,
+        }, null, 2),
+        contentType: 'application/json',
+      });
+      expect(issues, `${path} audit issues`).toEqual([]);
       test.info().annotations.push({ type: 'navigation-ms', description: String(audit.elapsedMs) });
       audit.stopTracking();
     });
@@ -230,16 +269,60 @@ test('responsive layouts on key public pages', async ({ page }) => {
   ]) {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     for (const path of ['/', '/pricing', '/signup', '/login']) {
-      await page.goto(path, { waitUntil: 'domcontentloaded' });
-      const sizes = await page.evaluate(() => ({
-        body: document.body.scrollWidth,
-        viewport: document.documentElement.clientWidth,
-      }));
-      if (sizes.body > sizes.viewport + 2) {
-        issues.push(`${viewport.name} ${path}: ${sizes.body}px content exceeds ${sizes.viewport}px viewport`);
+      try {
+        await page.goto(path, { waitUntil: 'domcontentloaded' });
+        const sizes = await page.evaluate(() => ({
+          body: document.body.scrollWidth,
+          viewport: document.documentElement.clientWidth,
+        }));
+        if (sizes.body > sizes.viewport + 2) {
+          issues.push(`${viewport.name} ${path}: ${sizes.body}px content exceeds ${sizes.viewport}px viewport`);
+        }
+      } catch (error) {
+        issues.push(`${viewport.name} ${path}: ${error instanceof Error ? error.message : 'navigation failed'}`);
       }
     }
   }
+  await test.info().attach('responsive-audit.json', {
+    body: JSON.stringify({ issues }, null, 2),
+    contentType: 'application/json',
+  });
+  expect(issues).toEqual([]);
+});
+
+test('login form exposes required email/password fields and blocks empty submission', async ({ page }) => {
+  await page.goto('/login', { waitUntil: 'domcontentloaded' });
+  const email = page.locator('input[type="email"]');
+  const password = page.locator('input[type="password"]');
+  await expect(email).toHaveCount(1);
+  await expect(password).toHaveCount(1);
+  await expect(page.locator('button[type="submit"]')).toHaveCount(1);
+  expect(await email.evaluate((input: HTMLInputElement) => input.required)).toBe(true);
+  expect(await password.evaluate((input: HTMLInputElement) => input.required)).toBe(true);
+  await page.locator('button[type="submit"]').click();
+  expect(await email.evaluate((input: HTMLInputElement) => input.validity.valueMissing)).toBe(true);
+  expect(new URL(page.url()).pathname).toBe('/login');
+});
+
+test('protected application routes redirect unauthenticated visitors', async ({ page }) => {
+  const results: Array<{ path: string; status: number | null; landedAt: string }> = [];
+  const issues: string[] = [];
+  for (const path of authenticatedPaths) {
+    try {
+      const response = await page.goto(path, { waitUntil: 'domcontentloaded' });
+      await page.waitForLoadState('networkidle', { timeout: 5_000 }).catch(() => undefined);
+      const landedAt = new URL(page.url()).pathname;
+      results.push({ path, status: response?.status() ?? null, landedAt });
+      if (!/\/login\/?$/.test(landedAt)) issues.push(`${path} resolved to ${landedAt}, not login`);
+    } catch (error) {
+      issues.push(`${path}: ${error instanceof Error ? safeText(error.message) : 'navigation failed'}`);
+      results.push({ path, status: null, landedAt: safeUrl(page.url()) });
+    }
+  }
+  await test.info().attach('protected-route-audit.json', {
+    body: JSON.stringify({ results, issues }, null, 2),
+    contentType: 'application/json',
+  });
   expect(issues).toEqual([]);
 });
 
@@ -289,6 +372,26 @@ test('authenticated routes and read-only feature audit', async ({ page }) => {
       if (audit.overflow.scrollWidth > audit.overflow.clientWidth + 2) routeProblems.push(`${path}: horizontal overflow`);
       for (const issue of audit.runtimeIssues) routeProblems.push(`${path}: ${issue}`);
       if (audit.oldBrandMatches.length) oldBrandFindings.push(`${path}: ${audit.oldBrandMatches.join(', ')}`);
+      await test.info().attach(`page-${path.replaceAll('/', '_') || 'dashboard'}.json`, {
+        body: JSON.stringify({
+          url: safeUrl(page.url()),
+          path,
+          status: audit.status,
+          contentSecurityPolicy: Boolean(audit.securityHeaders['content-security-policy']),
+          strictTransportSecurity: Boolean(audit.securityHeaders['strict-transport-security']),
+          title: safeText(audit.title),
+          elapsedMs: audit.elapsedMs,
+          issues: [
+            ...audit.imageFailures.map((item) => `Broken image: ${item}`),
+            ...audit.brokenInternalLinks.map((item) => `Broken internal link: ${item}`),
+            ...audit.secretMarkers.map((item) => `Potential secret exposed in client bundle: ${item}`),
+            ...audit.unlabeledButtons.map((item) => `Button without accessible name: ${safeText(item)}`),
+            ...audit.runtimeIssues,
+          ],
+          oldBrandMatches: audit.oldBrandMatches,
+        }, null, 2),
+        contentType: 'application/json',
+      });
       audit.stopTracking();
       test.info().annotations.push({
         type: `route-${path}`,

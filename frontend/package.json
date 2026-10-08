@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "audit:e2e": "playwright test --config=playwright.config.ts"
+    "audit:e2e": "playwright test --config=playwright.config.ts",
+    "audit:report": "node tests/generate-audit-report.cjs"
   },
   "dependencies": {
     "@excalidraw/excalidraw": "^0.18.1",
