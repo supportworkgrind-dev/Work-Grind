@@ -107,8 +107,7 @@
 
 | Endpoint | Status | Error | Severity |
 |---|---:|---|---|
-| `/` | captured in issue | Button without accessible name: <button class="h-7 w-7 rounded-lg bg-indigo-600 flex items-center justify-center hover:bg-indigo-500 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str | HIGH |
-| `/` | captured in issue | Button without accessible name: <button class="text-slate-600 hover:text-slate-400 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejo | MEDIUM |
+| None observed on successful public page checks | — | No recorded HTTP 4xx/5xx or browser network error | — |
 
 ## Console / Runtime Errors
 
@@ -154,15 +153,15 @@ Navigation stabilization times include waiting for network idle and are not serv
 ## Recommended Fix Order
 
 1. Critical: none identified.
-2. High: fix server/runtime failures.
-3. Medium: fix Button without accessible name: <button class="text-slate-600 hover:text-slate-400 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejo.
+2. High: none identified.
+3. Medium: fix Button without accessible name: <button class="h-7 w-7 rounded-lg bg-indigo-600 flex items-center justify-center hover:bg-indigo-500 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str; Button without accessible name: <button class="text-slate-600 hover:text-slate-400 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejo.
 4. Low: remove legacy brand references on /, /pricing.
 
 ## Complete Findings
 
 | Page | Severity | Finding |
 |---|---|---|
-| `/` | HIGH | Button without accessible name: <button class="h-7 w-7 rounded-lg bg-indigo-600 flex items-center justify-center hover:bg-indigo-500 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str |
+| `/` | MEDIUM | Button without accessible name: <button class="h-7 w-7 rounded-lg bg-indigo-600 flex items-center justify-center hover:bg-indigo-500 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str |
 | `/` | MEDIUM | Button without accessible name: <button class="text-slate-600 hover:text-slate-400 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejo |
 | `/` | LOW | Old-brand text: TF |
 | `/pricing` | LOW | Old-brand text: TF |

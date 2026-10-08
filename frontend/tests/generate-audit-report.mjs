@@ -1,8 +1,10 @@
-const fs = require('node:fs');
-const path = require('node:path');
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const resultsPath = path.resolve(__dirname, '../../artifacts/playwright-results.json');
-const reportPath = path.resolve(__dirname, '../../audit-report.md');
+const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
+const resultsPath = path.resolve(scriptDirectory, '../../artifacts/playwright-results.json');
+const reportPath = path.resolve(scriptDirectory, '../../audit-report.md');
 if (!fs.existsSync(resultsPath)) {
   console.error('Playwright JSON results are missing; run npm run audit:e2e first.');
   process.exit(1);
@@ -52,7 +54,7 @@ const allIssues = pageAudits.flatMap((page) =>
 );
 const severityOf = (issue) => {
   if (/potential secret|private key|database URI/i.test(issue)) return 'CRITICAL';
-  if (/\b5\d\d\b|uncaught exception|app unusable/i.test(issue)) return 'HIGH';
+  if (/^(?:HTTP\s*)?5\d\d\b|(?:response|status)\s+(?:5\d\d)\b|uncaught exception|app unusable/i.test(issue)) return 'HIGH';
   if (/button without accessible name|horizontal overflow|broken internal link|broken image|hydration|failed:|console error|websocket/i.test(issue)) return 'MEDIUM';
   return 'LOW';
 };
@@ -160,7 +162,7 @@ ${functionalTests.map((test) => `| ${test.title.includes('login form') ? 'Login'
 
 | Endpoint | Status | Error | Severity |
 |---|---:|---|---|
-${allIssues.filter((item) => /\b(?:[45]\d\d|request failed|CORS|WebSocket)\b/i.test(item.issue)).map((item) => `| \`${item.path}\` | captured in issue | ${item.issue} | ${severityOf(item.issue)} |`).join('\n') || '| None observed on successful public page checks | — | No recorded HTTP 4xx/5xx or browser network error | — |'}
+${allIssues.filter((item) => /^(?:HTTP\s*)?[45]\d\d\b|(?:response|status)\s+[45]\d\d\b|request failed|CORS|WebSocket/i.test(item.issue)).map((item) => `| \`${item.path}\` | captured in issue | ${item.issue} | ${severityOf(item.issue)} |`).join('\n') || '| None observed on successful public page checks | — | No recorded HTTP 4xx/5xx or browser network error | — |'}
 
 ## Console / Runtime Errors
 
