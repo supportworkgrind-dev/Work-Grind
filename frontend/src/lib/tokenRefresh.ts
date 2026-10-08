@@ -22,7 +22,7 @@ export function refreshAuthTokens(expectedAccessToken: string): Promise<Refreshe
   }
 
   const request = axios
-    .post(`${getApiBaseUrl()}/auth/refresh`, { refreshToken: currentRefreshToken })
+    .post(`${getApiBaseUrl()}/auth/refresh`, { refreshToken: currentRefreshToken }, { withCredentials: true })
     .then((response) => {
       const { accessToken, refreshToken } = response.data as Partial<RefreshedAuthTokens>;
       if (typeof accessToken !== 'string' || !accessToken || typeof refreshToken !== 'string' || !refreshToken) {

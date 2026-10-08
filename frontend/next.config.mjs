@@ -45,15 +45,30 @@ const nextConfig = {
   // ── API proxy rewrites ─────────────────────────────────────────────────────
   async rewrites() {
     const configuredApiUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
-    if (!configuredApiUrl && isProduction) {
+    const configuredApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
+    if (configuredApiUrl && configuredApiBaseUrl) {
+      let apiUrl;
+      let apiBaseUrl;
+      try {
+        apiUrl = new URL(configuredApiUrl);
+        apiBaseUrl = new URL(configuredApiBaseUrl);
+      } catch {
+        throw new Error('NEXT_PUBLIC_API_URL and NEXT_PUBLIC_API_BASE_URL must be absolute backend URLs.');
+      }
+      if (apiUrl.origin !== apiBaseUrl.origin) {
+        throw new Error('NEXT_PUBLIC_API_URL and NEXT_PUBLIC_API_BASE_URL must use the same backend origin.');
+      }
+    }
+    const resolvedApiUrl = configuredApiUrl || configuredApiBaseUrl;
+    if (!resolvedApiUrl && isProduction) {
       throw new Error('NEXT_PUBLIC_API_URL must be configured for production deployments.');
     }
 
     let backendUrl = 'http://localhost:5000';
-    if (configuredApiUrl) {
+    if (resolvedApiUrl) {
       let apiUrl;
       try {
-        apiUrl = new URL(configuredApiUrl);
+        apiUrl = new URL(resolvedApiUrl);
       } catch {
         throw new Error('NEXT_PUBLIC_API_URL must be an absolute backend URL optionally followed by /api.');
       }
