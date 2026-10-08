@@ -303,7 +303,6 @@ export const requestPhoneOtp = async (req: Request, res: Response): Promise<void
   const genericResponse = {
     success: true,
     message: phoneOtpMessage,
-    ...(process.env.NODE_ENV === 'development' ? { developmentCode: createPhoneOtp() } : {}),
   };
   try {
     const purpose = req.body?.purpose as PhoneOtpPurpose;

@@ -25,7 +25,6 @@ function VerifyPhoneContent() {
   const [status, setStatus] = useState<'entry' | 'sending' | 'verifying' | 'success'>('entry');
   const [seconds, setSeconds] = useState(0);
   const [resending, setResending] = useState(false);
-  const [developmentCode, setDevelopmentCode] = useState('');
   const [maskedPhone, setMaskedPhone] = useState('');
   const [socialPhone, setSocialPhone] = useState('');
   const [startingPhone, setStartingPhone] = useState(false);
@@ -41,12 +40,8 @@ function VerifyPhoneContent() {
         }
         setMaskedPhone(`${userPhone.slice(0, 3)}••••${userPhone.slice(-3)}`);
         api.post('/auth/phone-otp/request-change')
-          .then((response) => {
+          .then(() => {
             setSeconds(60);
-            if (response.data.developmentCode) {
-              setDevelopmentCode(response.data.developmentCode);
-              setCode(response.data.developmentCode);
-            }
           })
           .catch((requestError: unknown) => setError(
             (requestError as AxiosError<{ message?: string }>).response?.data?.message ||
@@ -72,10 +67,6 @@ function VerifyPhoneContent() {
             .then((response) => {
               setMaskedPhone(response.data.phone || '');
               setSeconds(60);
-              if (response.data.developmentCode) {
-                setDevelopmentCode(response.data.developmentCode);
-                setCode(response.data.developmentCode);
-              }
             })
             .catch((requestError: unknown) => setError(
               (requestError as AxiosError<{ message?: string }>).response?.data?.message ||
@@ -84,16 +75,11 @@ function VerifyPhoneContent() {
         }
         return;
       }
-      const devCode = sessionStorage.getItem('workgrind_dev_phone_otp') || '';
       const phone = sessionStorage.getItem('workgrind_signup_phone_masked') || '';
       const sent = sessionStorage.getItem('workgrind_signup_phone_code_sent') !== 'false';
       sessionStorage.removeItem('workgrind_dev_phone_otp');
       sessionStorage.removeItem('workgrind_signup_phone_masked');
       sessionStorage.removeItem('workgrind_signup_phone_code_sent');
-      if (devCode) {
-        setDevelopmentCode(devCode);
-        setCode(devCode);
-      }
       if (phone) setMaskedPhone(phone);
       if (!sent) setSeconds(0);
     }, 0);
@@ -174,7 +160,7 @@ function VerifyPhoneContent() {
     setResending(true);
     setError('');
     try {
-      const response = purpose === 'change'
+      purpose === 'change'
         ? await api.post('/auth/phone-otp/request-change')
         : socialMode
           ? await api.post('/auth/phone-otp/start-social-signup', {}, {
@@ -183,8 +169,6 @@ function VerifyPhoneContent() {
           })
         : await api.post('/auth/phone-otp/request', { purpose: 'signup', email: email || user?.email });
       setSeconds(60);
-      setCode(response.data.developmentCode || '');
-      setDevelopmentCode(response.data.developmentCode || '');
     } catch {
       setError('We could not send a code right now. Please try again shortly.');
     } finally {
@@ -209,8 +193,6 @@ function VerifyPhoneContent() {
       });
       setMaskedPhone(response.data.phone || `${phoneNumber.number.slice(0, 3)}••••${phoneNumber.number.slice(-3)}`);
       setSocialPhoneExists(true);
-      setCode(response.data.developmentCode || '');
-      setDevelopmentCode(response.data.developmentCode || '');
       setSeconds(60);
     } catch (requestError: unknown) {
       setError((requestError as AxiosError<{ message?: string }>).response?.data?.message || 'We could not send a code right now. Please try again shortly.');
@@ -244,9 +226,6 @@ function VerifyPhoneContent() {
               : <>Enter the six-digit code we sent to {maskedPhone ? <strong className="font-semibold text-stone-800">{maskedPhone}</strong> : 'your mobile number'}. It expires in five minutes.</>}
           </p>
           {error && <div className="auth-error" role="alert"><AlertCircle size={15} className="mr-2 inline align-[-2px]" />{error}</div>}
-          {developmentCode && <p className="mb-4 rounded border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900" role="status">
-            Local development code: <strong>{developmentCode}</strong>
-          </p>}
           {socialMode && !socialPhoneExists ? <form onSubmit={handleStartSocialVerification}>
             <div className="auth-field">
               <label className="auth-label" htmlFor="social-phone">Mobile number</label>

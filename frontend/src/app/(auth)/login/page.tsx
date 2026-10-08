@@ -26,7 +26,6 @@ export default function LoginPage() {
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
   const [codeSent, setCodeSent] = useState(false);
-  const [developmentCode, setDevelopmentCode] = useState('');
   const [seconds, setSeconds] = useState(0);
   const [resending, setResending] = useState(false);
 
@@ -55,12 +54,10 @@ export default function LoginPage() {
           return;
         }
         if (!codeSent) {
-          const response = await api.post('/auth/phone-otp/request', { purpose: 'login', phone: phoneNumber.number });
+          await api.post('/auth/phone-otp/request', { purpose: 'login', phone: phoneNumber.number });
           setPhone(phoneNumber.number);
           setCodeSent(true);
           setSeconds(60);
-          setCode(response.data.developmentCode || '');
-          setDevelopmentCode(response.data.developmentCode || '');
           return;
         }
         if (code.length !== 6) {
@@ -100,10 +97,8 @@ export default function LoginPage() {
     setResending(true);
     setError('');
     try {
-      const response = await api.post('/auth/phone-otp/request', { purpose: 'login', phone: phoneNumber.number });
+      await api.post('/auth/phone-otp/request', { purpose: 'login', phone: phoneNumber.number });
       setSeconds(60);
-      setCode(response.data.developmentCode || '');
-      setDevelopmentCode(response.data.developmentCode || '');
     } catch {
       setError('We could not send a code right now. Please try again shortly.');
     } finally {
@@ -178,7 +173,6 @@ export default function LoginPage() {
                   setPhone(event.target.value);
                   setCodeSent(false);
                   setCode('');
-                  setDevelopmentCode('');
                 }} />
             </div>
           </div>
@@ -187,9 +181,6 @@ export default function LoginPage() {
               <label className="auth-label">Verification code</label>
               <OtpCodeInput code={code} onChange={setCode} label="Sign-in verification code" disabled={loading} />
             </div>
-            {developmentCode && <p className="mb-3 rounded border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900" role="status">
-              Local development code: <strong>{developmentCode}</strong>
-            </p>}
             <div className="mb-4 flex items-center justify-between gap-3 text-xs text-stone-500">
               <span>Need another code?</span>
               <button type="button" disabled={seconds > 0 || resending} onClick={resendPhoneCode}

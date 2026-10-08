@@ -51,7 +51,6 @@ function VerifyEmailContent() {
     try {
       const response = await api.post('/auth/verify-registration-code', { email, code });
       if (response.data.nextStep === 'verify-phone') {
-        if (response.data.developmentCode) sessionStorage.setItem('workgrind_dev_phone_otp', response.data.developmentCode);
         if (response.data.phone) sessionStorage.setItem('workgrind_signup_phone_masked', response.data.phone);
         sessionStorage.setItem('workgrind_signup_phone_code_sent', String(response.data.phoneCodeSent !== false));
         setStatus('success');

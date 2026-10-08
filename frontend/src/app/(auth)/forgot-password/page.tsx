@@ -18,7 +18,6 @@ export default function ForgotPasswordPage() {
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
   const [phoneCodeRequested, setPhoneCodeRequested] = useState(false);
-  const [developmentCode, setDevelopmentCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [seconds, setSeconds] = useState(0);
@@ -43,12 +42,10 @@ export default function ForgotPasswordPage() {
           return;
         }
         if (!phoneCodeRequested) {
-          const response = await api.post('/auth/phone-otp/request', { purpose: 'recovery', phone: phoneNumber.number });
+          await api.post('/auth/phone-otp/request', { purpose: 'recovery', phone: phoneNumber.number });
           setPhone(phoneNumber.number);
           setPhoneCodeRequested(true);
           setSeconds(60);
-          setDevelopmentCode(response.data.developmentCode || '');
-          setCode(response.data.developmentCode || '');
           return;
         }
         if (code.length !== 6) {
@@ -87,10 +84,8 @@ export default function ForgotPasswordPage() {
     setResending(true);
     setError('');
     try {
-      const response = await api.post('/auth/phone-otp/request', { purpose: 'recovery', phone: phoneNumber.number });
+      await api.post('/auth/phone-otp/request', { purpose: 'recovery', phone: phoneNumber.number });
       setSeconds(60);
-      setDevelopmentCode(response.data.developmentCode || '');
-      setCode(response.data.developmentCode || '');
     } catch {
       setError('We could not send a code right now. Please try again shortly.');
     } finally {
@@ -148,7 +143,6 @@ export default function ForgotPasswordPage() {
                       setPhone(event.target.value);
                       setPhoneCodeRequested(false);
                       setCode('');
-                      setDevelopmentCode('');
                     }} />
                 </div>
               </div>
@@ -157,9 +151,6 @@ export default function ForgotPasswordPage() {
                   <label className="auth-label">Verification code</label>
                   <OtpCodeInput code={code} onChange={setCode} label="Password recovery code" disabled={loading} />
                 </div>
-                {developmentCode && <p className="mb-3 rounded border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900" role="status">
-                  Local development code: <strong>{developmentCode}</strong>
-                </p>}
                 <div className="mb-4 flex items-center justify-between gap-3 text-xs text-stone-500">
                   <span>Need another code?</span>
                   <button type="button" disabled={seconds > 0 || resending} onClick={resendPhoneCode}

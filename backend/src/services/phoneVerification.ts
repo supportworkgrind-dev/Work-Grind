@@ -60,8 +60,10 @@ const safeProviderText = (value: unknown, secrets: string[], maxLength: number):
   return sanitized;
 };
 
-export const sendPhoneOtp = async (phone: string, code: string): Promise<{ developmentCode?: never }> => {
-  const isDevelopment = process.env.NODE_ENV === 'development';
+export const sendPhoneOtp = async (phone: string, code: string): Promise<{ developmentCode?: string }> => {
+  const isLocalDevelopment = process.env.NODE_ENV === 'development' &&
+    !process.env.VERCEL &&
+    !process.env.VERCEL_ENV;
   const selectedProvider = process.env.SMS_PROVIDER?.trim().toLowerCase() || '';
   const whatsappAccessToken = process.env.WHATSAPP_ACCESS_TOKEN?.trim();
   const whatsappPhoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID?.trim();
@@ -72,9 +74,8 @@ export const sendPhoneOtp = async (phone: string, code: string): Promise<{ devel
   );
   const provider = selectedProvider || (hasWhatsAppSettings ? 'whatsapp' : '');
   if (provider === 'dev') {
-    if (!isDevelopment) throw new PhoneOtpDeliveryError('sms_provider_unconfigured');
-    console.info('[Phone OTP] Development code generated for', phone.replace(/.(?=.{4})/g, '*'), code);
-    return {};
+    if (!isLocalDevelopment) throw new PhoneOtpDeliveryError('sms_provider_unconfigured');
+    return { developmentCode: code };
   }
   if (provider === 'whatsapp') {
     if (!whatsappAccessToken || !whatsappPhoneNumberId) {
