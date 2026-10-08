@@ -347,10 +347,6 @@ export default function SettingsPage() {
       if (res.data.success) {
         if (res.data.user) {
           setUser(res.data.user);
-          if (user?.phone !== res.data.user.phone && res.data.user.phone && !res.data.user.phoneVerified) {
-            router.push('/verify-phone?purpose=change');
-            return;
-          }
         }
         setProfileSaved(true);
         if (!res.data.user) await fetchCurrentUser();

@@ -13,9 +13,9 @@ import {
   generateSignedAvatarUrl,
 } from '../services/r2Storage';
 import { refreshAvatarUrls } from '../services/avatarUrls';
-import { normalizePhoneNumber } from '../services/phoneVerification';
 import { ensureUserCallingId, isValidCallingId, normalizeCallingId } from '../services/callingId';
 import { publishUserPresence } from '../utils/socket';
+import { parsePhoneNumberFromString } from 'libphonenumber-js/max';
 
 export const getUsers = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -150,29 +150,17 @@ export const updateMe = async (req: AuthRequest, res: Response): Promise<void> =
       }
       updates.fullName = updates.fullName.trim();
     }
-    let clearPhoneChallenge = false;
-    let clearPhoneValue = false;
     if (updates.phone !== undefined) {
       const phoneInput = typeof updates.phone === 'string' ? updates.phone.trim() : '';
-      const current = await User.findById(req.user!.userId).select('phone phoneVerified');
       if (!phoneInput) {
-        delete updates.phone;
-        if (current?.phone) {
-          updates.phoneVerified = false;
-          clearPhoneChallenge = true;
-          clearPhoneValue = true;
-        }
+        updates.phone = undefined;
       } else {
-        const normalizedPhone = normalizePhoneNumber(phoneInput);
-        if (!normalizedPhone) {
+        const normalizedPhone = parsePhoneNumberFromString(phoneInput);
+        if (!normalizedPhone?.isValid()) {
           res.status(400).json({ success: false, message: 'Enter a valid international mobile number, including its country code.' });
           return;
         }
-        updates.phone = normalizedPhone;
-        if (current && current.phone !== updates.phone) {
-          updates.phoneVerified = false;
-          clearPhoneChallenge = true;
-        }
+        updates.phone = normalizedPhone.number;
       }
     }
 
@@ -206,17 +194,9 @@ export const updateMe = async (req: AuthRequest, res: Response): Promise<void> =
     }
 
     const updateDocument: Record<string, unknown> = { $set: updates };
-    if (clearPhoneChallenge) {
-      const fieldsToUnset: Record<string, number> = {
-        phoneVerificationCodeHash: 1,
-        phoneVerificationPurpose: 1,
-        phoneVerificationExpiresAt: 1,
-        phoneVerificationAttempts: 1,
-        phoneVerificationResends: 1,
-        phoneVerificationSentAt: 1,
-      };
-      if (clearPhoneValue) fieldsToUnset.phone = 1;
-      updateDocument.$unset = fieldsToUnset;
+    if (updates.phone === undefined && req.body.phone !== undefined) {
+      delete updates.phone;
+      updateDocument.$unset = { phone: 1 };
     }
     const user = await User.findByIdAndUpdate(req.user!.userId, updateDocument, {
       new: true,

@@ -2,7 +2,7 @@ import mongoose, { Document, Schema } from 'mongoose';
 
 export interface IPendingRegistration extends Document {
   email: string;
-  phone: string;
+  phone?: string;
   fullName: string;
   passwordCiphertext: string;
   passwordIv: string;
@@ -17,7 +17,7 @@ export interface IPendingRegistration extends Document {
 
 const PendingRegistrationSchema = new Schema<IPendingRegistration>({
   email: { type: String, required: true, unique: true, lowercase: true, trim: true },
-  phone: { type: String, required: true, trim: true },
+  phone: { type: String, trim: true },
   fullName: { type: String, required: true, trim: true, maxlength: 100 },
   passwordCiphertext: { type: String, required: true },
   passwordIv: { type: String, required: true },

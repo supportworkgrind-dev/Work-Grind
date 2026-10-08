@@ -50,14 +50,6 @@ function VerifyEmailContent() {
     setStatus('checking');
     try {
       const response = await api.post('/auth/verify-registration-code', { email, code });
-      if (response.data.nextStep === 'verify-phone') {
-        if (response.data.phone) sessionStorage.setItem('workgrind_signup_phone_masked', response.data.phone);
-        sessionStorage.setItem('workgrind_signup_phone_code_sent', String(response.data.phoneCodeSent !== false));
-        setStatus('success');
-        const phoneVerificationUrl = `/verify-phone?email=${encodeURIComponent(email)}${invite ? `&invite=${encodeURIComponent(invite)}` : ''}`;
-        window.setTimeout(() => router.replace(phoneVerificationUrl), 500);
-        return;
-      }
       login(response.data.user, response.data.accessToken, response.data.refreshToken);
       if (invite) {
         try {
@@ -114,7 +106,7 @@ function VerifyEmailContent() {
           <p className="auth-form-subtitle">
             {status === 'legacy'
               ? 'Your email is confirmed. Sign in to continue to your workspace.'
-              : invite ? 'Your account is ready. Joining the invited workspace…' : 'We confirmed your email. Next, verify your mobile number.'}
+              : invite ? 'Your account is ready. Joining the invited workspace…' : 'Your email is confirmed. Sign in to continue to your workspace.'}
           </p>
           {status === 'legacy' && <Link href="/login" className="auth-primary no-underline">Continue to sign in <ArrowRight size={16} /></Link>}
         </div>

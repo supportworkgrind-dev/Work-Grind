@@ -4,7 +4,6 @@ import { FormEvent, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { AxiosError } from 'axios';
-import { parsePhoneNumberFromString } from 'libphonenumber-js/max';
 import { AlertCircle, ArrowRight, Eye, EyeOff, Lock, Mail, UserRound } from 'lucide-react';
 import { api } from '@/lib/api';
 import { AuthShell } from '@/components/auth/AuthShell';
@@ -14,7 +13,6 @@ export default function SignUpPage() {
   const router = useRouter();
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -38,11 +36,6 @@ export default function SignUpPage() {
       setError('Your name must be 100 characters or fewer.');
       return;
     }
-    const phoneNumber = parsePhoneNumberFromString(phone.trim());
-    if (!phoneNumber?.isValid()) {
-      setError('Enter a valid mobile number with its international country code, for example +1 415 555 2671.');
-      return;
-    }
     if (password !== confirm) {
       setError('Your passwords do not match.');
       return;
@@ -54,7 +47,7 @@ export default function SignUpPage() {
 
     setLoading(true);
     try {
-      await api.post('/auth/register', { fullName: fullName.trim(), email: email.trim(), phone: phoneNumber.number, password });
+      await api.post('/auth/register', { fullName: fullName.trim(), email: email.trim(), password });
       router.push(`/verify-email?email=${encodeURIComponent(email.trim())}`);
     } catch (requestError: unknown) {
       setError((requestError as AxiosError<{ message?: string }>).response?.data?.message || 'We could not start your signup. Please try again.');
@@ -67,7 +60,7 @@ export default function SignUpPage() {
     <AuthShell>
       <div className="auth-step"><b>01&nbsp; DETAILS</b><i /><span>02&nbsp; VERIFY EMAIL</span><i /><span>03&nbsp; WORKSPACE</span></div>
       <h1 className="auth-form-title">Start with a clear slate.</h1>
-      <p className="auth-form-subtitle">Create your account. We’ll send a one-time code before your workspace is activated.</p>
+      <p className="auth-form-subtitle">Create your account. We’ll email you a verification code before your workspace is activated.</p>
 
       <SocialAuthButtons className="mt-5" />
       <div className="my-5 flex items-center gap-3 text-[9px] font-bold uppercase tracking-[.14em] text-stone-400">
@@ -93,18 +86,6 @@ export default function SignUpPage() {
             <input id="signup-email" className="auth-input" type="email" required autoComplete="email"
               placeholder="you@company.com" value={email} onChange={(event) => setEmail(event.target.value)} />
           </div>
-        </div>
-        <div className="auth-field">
-          <label className="auth-label" htmlFor="signup-phone">Mobile number</label>
-          <div className="auth-input-wrap">
-            <input id="signup-phone" className="auth-input !pl-4" type="tel" required inputMode="tel"
-              autoComplete="tel" placeholder="+1 415 555 2671" value={phone}
-              aria-describedby="signup-phone-help"
-              onChange={(event) => setPhone(event.target.value)} />
-          </div>
-          <p id="signup-phone-help" className="mt-1.5 text-[10px] leading-relaxed text-stone-500">
-            Include your country code. We’ll text a one-time verification code.
-          </p>
         </div>
         <div className="auth-field">
           <label className="auth-label" htmlFor="signup-password">Password</label>

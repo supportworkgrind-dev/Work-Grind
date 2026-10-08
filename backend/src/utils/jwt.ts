@@ -8,7 +8,6 @@ export interface TokenPayload {
   isSuperAdmin?: boolean;
   mfaPending?: boolean;
   mfaAuthenticated?: boolean;
-  phoneVerificationPending?: boolean;
 }
 
 export const getJwtSecret = () => {
@@ -44,15 +43,12 @@ export const generateMfaChallengeToken = (userId: string, companyId: string) =>
     { expiresIn: '5m' },
   );
 
-export const generatePhoneVerificationToken = (userId: string, companyId: string, role: string) =>
-  jwt.sign(
-    { userId, companyId, role, phoneVerificationPending: true },
-    getJwtSecret(),
-    { expiresIn: '10m' },
-  );
-
 export const generateRefreshToken = (p: TokenPayload) =>
   jwt.sign({ ...p, jti: uuidv4() }, getRefreshJwtSecret(), { expiresIn: (process.env.JWT_REFRESH_EXPIRES_IN || '7d') as any });
 
-export const verifyAccessToken = (t: string) => jwt.verify(t, getJwtSecret()) as TokenPayload;
+export const verifyAccessToken = (t: string) => {
+  const payload = jwt.verify(t, getJwtSecret()) as TokenPayload & { phoneVerificationPending?: boolean };
+  if (payload.phoneVerificationPending) throw new Error('Deprecated phone verification token');
+  return payload;
+};
 export const verifyRefreshToken = (t: string) => jwt.verify(t, getRefreshJwtSecret()) as TokenPayload & { jti: string };

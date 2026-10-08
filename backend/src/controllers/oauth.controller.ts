@@ -8,7 +8,6 @@ import { createWorkGrindUser } from '../services/callingId';
 import { TRIAL_DAYS } from '../config/subscription';
 import { sendWelcomeEmail } from '../utils/email';
 import { sessionForUser } from './auth.controller';
-import { generatePhoneVerificationToken } from '../utils/jwt';
 import {
   buildAuthorizationUrl,
   createOAuthToken,
@@ -27,7 +26,6 @@ const providerField: Record<OAuthProvider, 'googleId' | 'appleId'> = {
   apple: 'appleId',
 };
 const validEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-const maskPhone = (phone: string) => `${phone.slice(0, 3)}••••${phone.slice(-3)}`;
 const safeError = (value: string) =>
   ['cancelled', 'mfa_required', 'provider_unavailable', 'invalid_request', 'account_exists',
     'identity_in_use', 'verified_email_required', 'try_again'].includes(value)
@@ -238,7 +236,6 @@ async function findOrCreateSocialUser(
       isSuperAdmin: false,
       role: 'owner',
       accountType: 'individual',
-      phoneVerified: false,
       subscriptionStatus: 'trialing',
       subscriptionPlan: 'free',
       trialStartDate: now,
@@ -405,27 +402,11 @@ export const exchangeOAuthSession = async (req: Request, res: Response): Promise
       res.status(403).json({ success: false, code: 'OAUTH_ACCOUNT_UNAVAILABLE', message: 'This account cannot sign in right now.' });
       return;
     }
-    if (!user.phone || !user.phoneVerified) {
-      res.json({
-        success: true,
-        phoneRequired: true,
-        phoneVerificationToken: generatePhoneVerificationToken(
-          user._id.toString(),
-          user.companyId?.toString() || '',
-          user.role,
-        ),
-        phoneExists: Boolean(user.phone),
-        ...(user.phone ? { phone: maskPhone(user.phone) } : {}),
-        returnTo: exchange.returnTo,
-      });
-      return;
-    }
     stage = 'workgrind_session_creation';
     const session = await sessionForUser(user);
     res.json({
       success: true,
       ...session,
-      phoneRequired: false,
       returnTo: exchange.returnTo,
     });
   } catch (error) {

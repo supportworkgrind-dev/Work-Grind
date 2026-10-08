@@ -41,19 +41,6 @@ function CallbackContent() {
       .then((response) => {
         const data = response.data;
         if (!data?.success || !data.user?._id || !data.accessToken || !data.refreshToken) {
-          if (data?.success && data.phoneRequired && data.phoneVerificationToken) {
-            sessionStorage.setItem('workgrind_phone_verification_token', data.phoneVerificationToken);
-            sessionStorage.setItem('workgrind_social_phone_exists', data.phoneExists ? 'true' : 'false');
-            const returnTo = typeof data.returnTo === 'string' &&
-              data.returnTo.startsWith('/') &&
-              !data.returnTo.startsWith('//') &&
-              !data.returnTo.includes('\\')
-              ? data.returnTo
-              : '/dashboard';
-            sessionStorage.setItem('workgrind_oauth_return_to', returnTo);
-            router.replace('/verify-phone?social=1');
-            return;
-          }
           throw new Error('Sign-in response was incomplete.');
         }
         login(data.user, data.accessToken, data.refreshToken);

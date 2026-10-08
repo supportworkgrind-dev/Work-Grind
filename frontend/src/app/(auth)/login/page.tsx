@@ -4,13 +4,11 @@ import { FormEvent, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { AxiosError } from 'axios';
-import { parsePhoneNumberFromString } from 'libphonenumber-js/max';
-import { AlertCircle, ArrowRight, Eye, EyeOff, Lock, Mail, Smartphone } from 'lucide-react';
+import { AlertCircle, ArrowRight, Eye, EyeOff, Lock, Mail } from 'lucide-react';
 import { api } from '@/lib/api';
 import { AuthShell } from '@/components/auth/AuthShell';
 import { SocialAuthButtons } from '@/components/auth/SocialAuthButtons';
 import { useAuthStore } from '@/store/useAuthStore';
-import { OtpCodeInput } from '@/components/auth/OtpCodeInput';
 import type { User } from '@/types';
 
 export default function LoginPage() {
@@ -21,19 +19,6 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [needsVerification, setNeedsVerification] = useState(false);
-  const [mode, setMode] = useState<'password' | 'phone'>('password');
-  const [phone, setPhone] = useState('');
-  const [code, setCode] = useState('');
-  const [codeSent, setCodeSent] = useState(false);
-  const [seconds, setSeconds] = useState(0);
-  const [resending, setResending] = useState(false);
-
-  useEffect(() => {
-    if (seconds <= 0) return;
-    const timer = window.setTimeout(() => setSeconds((remaining) => remaining - 1), 1000);
-    return () => window.clearTimeout(timer);
-  }, [seconds]);
 
   const completeLogin = (response: { data: { user: User; accessToken: string; refreshToken: string } }) => {
     login(response.data.user, response.data.accessToken, response.data.refreshToken);
@@ -44,29 +29,8 @@ export default function LoginPage() {
     event.preventDefault();
     if (loading) return;
     setError('');
-    setNeedsVerification(false);
     setLoading(true);
     try {
-      if (mode === 'phone') {
-        const phoneNumber = parsePhoneNumberFromString(phone.trim());
-        if (!phoneNumber?.isValid()) {
-          setError('Enter a valid mobile number with its international country code, for example +1 415 555 2671.');
-          return;
-        }
-        if (!codeSent) {
-          await api.post('/auth/phone-otp/request', { purpose: 'login', phone: phoneNumber.number });
-          setPhone(phoneNumber.number);
-          setCodeSent(true);
-          setSeconds(60);
-          return;
-        }
-        if (code.length !== 6) {
-          setError('Enter the six-digit code sent to your mobile.');
-          return;
-        }
-        completeLogin(await api.post('/auth/phone-otp/verify', { purpose: 'login', phone: phoneNumber.number, code }));
-        return;
-      }
       const response = await api.post('/auth/login', { email: email.trim(), password });
       if (!response.data.success) {
         setError('We could not sign you in. Check your details and try again.');
@@ -75,34 +39,9 @@ export default function LoginPage() {
       completeLogin(response);
     } catch (requestError: unknown) {
       const response = (requestError as AxiosError<{ code?: string; message?: string }>).response;
-      const code = response?.data?.code;
-      setNeedsVerification(code === 'EMAIL_NOT_VERIFIED' || code === 'PHONE_NOT_VERIFIED');
-      setError(code === 'EMAIL_NOT_VERIFIED'
-        ? 'Verify your email address before signing in.'
-        : code === 'PHONE_NOT_VERIFIED'
-          ? 'Verify your mobile number before signing in.'
-        : response?.data?.message || 'Email or password is incorrect.');
+      setError(response?.data?.message || 'Email or password is incorrect.');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const resendPhoneCode = async () => {
-    if (seconds > 0 || resending) return;
-    const phoneNumber = parsePhoneNumberFromString(phone.trim());
-    if (!phoneNumber?.isValid()) {
-      setError('Enter a valid mobile number with its international country code.');
-      return;
-    }
-    setResending(true);
-    setError('');
-    try {
-      await api.post('/auth/phone-otp/request', { purpose: 'login', phone: phoneNumber.number });
-      setSeconds(60);
-    } catch {
-      setError('We could not send a code right now. Please try again shortly.');
-    } finally {
-      setResending(false);
     }
   };
 
@@ -114,30 +53,18 @@ export default function LoginPage() {
 
       <SocialAuthButtons className="mt-5" />
       <div className="my-5 flex items-center gap-3 text-[9px] font-bold uppercase tracking-[.14em] text-stone-400">
-        <span className="h-px flex-1 bg-stone-200" />or sign in with email or phone<span className="h-px flex-1 bg-stone-200" />
+        <span className="h-px flex-1 bg-stone-200" />or sign in with email<span className="h-px flex-1 bg-stone-200" />
       </div>
 
       {error && <div className="auth-error" role="alert">
         <AlertCircle size={15} className="mr-2 inline align-[-2px]" />{error}
-        {needsVerification && <div className="mt-2"><Link className="auth-link"
-          href={error.includes('mobile') ? `/verify-phone?email=${encodeURIComponent(email)}` : `/verify-email?email=${encodeURIComponent(email)}`}>
+        {error.includes('Verify your email address') && <div className="mt-2"><Link className="auth-link"
+          href={`/verify-email?email=${encodeURIComponent(email)}`}>
           Enter a verification code
         </Link></div>}
       </div>}
 
-      <div className="mb-5 grid grid-cols-2 border border-stone-200 p-1 text-xs" role="group" aria-label="Sign-in method">
-        <button type="button" onClick={() => { setMode('password'); setError(''); }}
-          aria-pressed={mode === 'password'} className={`min-h-9 px-2 font-semibold ${mode === 'password' ? 'bg-[#edf1e9] text-[#425846]' : 'text-stone-500 hover:text-stone-800'}`}>
-          Email &amp; password
-        </button>
-        <button type="button" onClick={() => { setMode('phone'); setError(''); }}
-          aria-pressed={mode === 'phone'} className={`min-h-9 px-2 font-semibold ${mode === 'phone' ? 'bg-[#edf1e9] text-[#425846]' : 'text-stone-500 hover:text-stone-800'}`}>
-          Phone code
-        </button>
-      </div>
-
       <form onSubmit={handleSubmit}>
-        {mode === 'password' ? <>
         <div className="auth-field">
           <label className="auth-label" htmlFor="login-email">Work email</label>
           <div className="auth-input-wrap">
@@ -162,50 +89,12 @@ export default function LoginPage() {
             </button>
           </div>
         </div>
-        </> : <>
-          <div className="auth-field">
-            <label className="auth-label" htmlFor="login-phone">Mobile number</label>
-            <div className="auth-input-wrap">
-              <Smartphone size={16} className="auth-icon" />
-              <input id="login-phone" className="auth-input" type="tel" required inputMode="tel" autoComplete="tel"
-                placeholder="+1 415 555 2671" value={phone}
-                onChange={(event) => {
-                  setPhone(event.target.value);
-                  setCodeSent(false);
-                  setCode('');
-                }} />
-            </div>
-          </div>
-          {codeSent && <>
-            <div className="auth-field">
-              <label className="auth-label">Verification code</label>
-              <OtpCodeInput code={code} onChange={setCode} label="Sign-in verification code" disabled={loading} />
-            </div>
-            <div className="mb-4 flex items-center justify-between gap-3 text-xs text-stone-500">
-              <span>Need another code?</span>
-              <button type="button" disabled={seconds > 0 || resending} onClick={resendPhoneCode}
-                className="auth-link disabled:cursor-not-allowed disabled:text-stone-400">
-                {resending ? 'Sending…' : seconds > 0
-                  ? `Resend in ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
-                  : 'Resend code'}
-              </button>
-            </div>
-          </>}
-          <p className="mb-4 text-[11px] leading-relaxed text-stone-500">
-            We’ll send a one-time code only to a verified mobile number. It expires in five minutes.
-          </p>
-        </>}
         <button className="auth-primary" type="submit" disabled={loading}>
-          {loading ? (mode === 'phone' && !codeSent ? 'Sending code…' : 'Signing in…')
-            : mode === 'phone' ? codeSent ? <>Verify and sign in <ArrowRight size={16} /></> : <>Send verification code <ArrowRight size={16} /></>
-              : <>Sign in to WorkGrind <ArrowRight size={16} /></>}
+          {loading ? 'Signing in…' : <>Sign in to WorkGrind <ArrowRight size={16} /></>}
         </button>
       </form>
-      {mode === 'phone' && <p className="mt-4 text-center text-xs text-stone-500">
-        Need to reset your password? <Link href="/forgot-password" className="auth-link">Recover your account</Link>
-      </p>}
 
-      {mode === 'password' && <div className="mt-7 border-t border-stone-200 pt-4">
+      <div className="mt-7 border-t border-stone-200 pt-4">
         <p className="mb-2 text-center text-[9px] font-bold uppercase tracking-[.14em] text-stone-400">Demo access</p>
         <div className="grid grid-cols-2 gap-2">
           {[{ name: 'Sarah · Owner', email: 'sarah@apextech.io' }, { name: 'Alex · Admin', email: 'alex@apextech.io' }].map((demo) => (
@@ -215,7 +104,7 @@ export default function LoginPage() {
             </button>
           ))}
         </div>
-      </div>}
+      </div>
 
       <p className="mt-7 text-center text-xs text-stone-500">
         New to WorkGrind? <Link href="/signup" className="auth-link">Start your free trial</Link>

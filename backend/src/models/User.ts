@@ -75,7 +75,7 @@ const S = new Schema<IUser>({
   appleId: String,
   avatar: String, avatarStorageKey: String, jobTitle: String, department: String,
   phone: { type: String, trim: true },
-  // Preserve existing accounts; signup explicitly starts phone verification as false.
+  // Retained for compatibility with existing account records.
   phoneVerified: { type: Boolean, default: true },
   phoneVerificationCodeHash: { type: String, select: false },
   phoneVerificationExpiresAt: Date,

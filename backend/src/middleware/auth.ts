@@ -8,35 +8,6 @@ export interface AuthRequest extends Request {
   user?: { userId: string; companyId: string; role: string; isSuperAdmin?: boolean; mfaPending?: boolean; mfaAuthenticated?: boolean };
 }
 
-export const authenticatePhoneVerification = async (
-  req: AuthRequest,
-  res: Response,
-  next: NextFunction,
-): Promise<void> => {
-  try {
-    const token = getBearerToken(req.headers.authorization);
-    if (!token) {
-      res.status(401).json({ success: false, message: 'Sign in again to verify your mobile number.' });
-      return;
-    }
-    const payload = verifyAccessToken(token);
-    if (!payload.phoneVerificationPending || payload.mfaPending) {
-      res.status(401).json({ success: false, message: 'This mobile verification session is invalid or expired.' });
-      return;
-    }
-    const user = await User.findById(payload.userId).select('isVerified isActive isDeleted phone phoneVerified googleId appleId');
-    if (!user || !user.isVerified || !user.isActive || user.isDeleted || user.phoneVerified ||
-        (!user.googleId && !user.appleId)) {
-      res.status(403).json({ success: false, message: 'This account cannot verify a mobile number right now.' });
-      return;
-    }
-    req.user = payload;
-    next();
-  } catch {
-    res.status(401).json({ success: false, message: 'This mobile verification session is invalid or expired.' });
-  }
-};
-
 const BILLING_AND_BOOTSTRAP_PATHS = new Set([
   '/api/auth/me',
   '/api/auth/logout',
@@ -80,7 +51,7 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
   }
   try {
     const payload = verifyAccessToken(token);
-    if (payload.mfaPending || payload.phoneVerificationPending) {
+    if (payload.mfaPending) {
       res.status(401).json({ success: false, message: 'Complete the required authentication step first.' });
       return;
     }

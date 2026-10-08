@@ -25,110 +25,14 @@ import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from '.
 import { sendVerificationEmail, sendVerificationCodeEmail, sendPasswordResetEmail, sendPasswordChangedNotificationEmail, sendWelcomeEmail } from '../utils/email';
 import { AuthRequest } from '../middleware/auth';
 import { refreshAvatarUrls } from '../services/avatarUrls';
-import {
-  createPhoneOtp,
-  hashPhoneOtp,
-  isE164PhoneNumber,
-  normalizePhoneNumber,
-  PHONE_OTP_COOLDOWN_MS,
-  PHONE_OTP_MAX_ATTEMPTS,
-  PHONE_OTP_TTL_MS,
-  phoneOtpMatches,
-  PhoneOtpPurpose,
-  sendPhoneOtp,
-} from '../services/phoneVerification';
-
 const issue = (userId: string, companyId: string, role: string) => ({
   accessToken: generateAccessToken({ userId, companyId, role }),
   refreshToken: generateRefreshToken({ userId, companyId, role }),
 });
 
-const phoneOtpMessage = 'If this mobile number can be used, a verification code will be sent.';
-const invalidPhoneOtpMessage = 'That code is invalid or expired. Request a new code and try again.';
 const validPassword = (password: string) =>
   password.length >= 8 && /[A-Z]/.test(password) && /[a-z]/.test(password) &&
   /[0-9]/.test(password) && /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password);
-
-const maskPhone = (phone: string) => `${phone.slice(0, 3)}••••${phone.slice(-3)}`;
-
-const sendInitialPhoneOtp = async (user: IUser, purpose: PhoneOtpPurpose) => {
-  const code = createPhoneOtp();
-  const now = new Date();
-  const codeHash = hashPhoneOtp(user._id.toString(), purpose, code);
-  user.phoneVerificationCodeHash = codeHash;
-  user.phoneVerificationPurpose = purpose;
-  user.phoneVerificationExpiresAt = new Date(now.getTime() + PHONE_OTP_TTL_MS);
-  user.phoneVerificationAttempts = 0;
-  user.phoneVerificationResends = 0;
-  user.phoneVerificationSentAt = now;
-  await user.save();
-  try {
-    return await sendPhoneOtp(user.phone!, code);
-  } catch (error) {
-    await User.updateOne(
-      { _id: user._id, phoneVerificationCodeHash: codeHash },
-      { $unset: {
-        phoneVerificationCodeHash: 1,
-        phoneVerificationPurpose: 1,
-        phoneVerificationExpiresAt: 1,
-        phoneVerificationAttempts: 1,
-        phoneVerificationSentAt: 1,
-      }, $set: { phoneVerificationResends: 0 } },
-    );
-    throw error;
-  }
-};
-
-const sendAccountPhoneOtp = async (userId: string, purpose: PhoneOtpPurpose) => {
-  const now = new Date();
-  await User.updateOne(
-    { _id: userId, phoneVerificationExpiresAt: { $lte: now } },
-    { $set: { phoneVerificationResends: 0 } },
-  );
-  const code = createPhoneOtp();
-  const codeHash = hashPhoneOtpForUserCode(userId, code, purpose);
-  const updated = await User.findOneAndUpdate({
-    _id: userId,
-    $and: [
-      { $or: [
-        { phoneVerificationResends: { $exists: false } },
-        { phoneVerificationResends: { $lt: 3 } },
-      ] },
-      { $or: [
-        { phoneVerificationSentAt: { $exists: false } },
-        { phoneVerificationSentAt: { $lte: new Date(now.getTime() - PHONE_OTP_COOLDOWN_MS) } },
-      ] },
-    ],
-  }, {
-    $set: {
-      phoneVerificationCodeHash: codeHash,
-      phoneVerificationPurpose: purpose,
-      phoneVerificationExpiresAt: new Date(now.getTime() + PHONE_OTP_TTL_MS),
-      phoneVerificationAttempts: 0,
-      phoneVerificationSentAt: now,
-    },
-    $inc: { phoneVerificationResends: 1 },
-  }, { new: true }).select('phone');
-  if (!updated?.phone) return null;
-  try {
-    return await sendPhoneOtp(updated.phone, code);
-  } catch (error) {
-    await User.updateOne(
-      { _id: updated._id, phoneVerificationCodeHash: codeHash },
-      { $unset: {
-        phoneVerificationCodeHash: 1,
-        phoneVerificationPurpose: 1,
-        phoneVerificationExpiresAt: 1,
-        phoneVerificationAttempts: 1,
-        phoneVerificationSentAt: 1,
-      }, $set: { phoneVerificationResends: 0 } },
-    );
-    throw error;
-  }
-};
-
-const hashPhoneOtpForUserCode = (userId: string, code: string, purpose: PhoneOtpPurpose) =>
-  hashPhoneOtp(userId, purpose, code);
 
 export const sessionForUser = async (user: IUser) => {
   const tokens = issue(user._id.toString(), user.companyId?.toString() || '', user.role);
@@ -152,7 +56,6 @@ export const sessionForUser = async (user: IUser) => {
       jobTitle: user.jobTitle,
       department: user.department,
       phone: user.phone,
-      phoneVerified: user.phoneVerified,
       bio: user.bio,
       skills: user.skills,
       notificationPreferences: user.notificationPreferences,
@@ -171,17 +74,16 @@ export const register = async (req: Request, res: Response): Promise<void> => {
   try {
     const fullName = typeof req.body?.fullName === 'string' ? req.body.fullName.trim() : '';
     const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
-    const phone = normalizePhoneNumber(req.body?.phone);
     const password = typeof req.body?.password === 'string' ? req.body.password : '';
     const genericResponse = {
       success: true,
       message: 'If these details can be registered, an email verification code will be sent.',
     };
 
-    if (!fullName || fullName.length > 100 || !phone || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
+    if (!fullName || fullName.length > 100 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
         password.length < 8 || !/[A-Z]/.test(password) || !/[a-z]/.test(password) ||
         !/[0-9]/.test(password) || !/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
-      res.status(400).json({ success: false, message: 'Enter a valid name, email, international mobile number, and password with at least 8 characters including uppercase, lowercase, a number, and a symbol.' });
+      res.status(400).json({ success: false, message: 'Enter a valid name, email, and password with at least 8 characters including uppercase, lowercase, a number, and a symbol.' });
       return;
     }
 
@@ -189,12 +91,6 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       res.status(202).json(genericResponse);
       return;
     }
-    if (await User.exists({ phone }) ||
-        await PendingRegistration.exists({ phone, email: { $ne: email }, expiresAt: { $gt: new Date() } })) {
-      res.status(202).json(genericResponse);
-      return;
-    }
-
     const now = new Date();
     const pending = await PendingRegistration.findOne({ email });
     if (pending && pending.expiresAt.getTime() > now.getTime() &&
@@ -208,7 +104,6 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     const encryptedPassword = encryptPendingPassword(password);
     const pendingData = {
       fullName,
-      phone,
       ...encryptedPassword,
       verificationCodeHash: hashVerificationCode(email, code),
       verificationExpiresAt,
@@ -260,10 +155,6 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     if (!user?.password || !(await user.comparePassword(password))) { res.status(401).json({ success: false, message: 'Invalid credentials' }); return; }
     if (!user.isActive || user.isDeleted) { res.status(403).json({ success: false, message: 'Account disabled' }); return; }
     if (!user.isVerified) { res.status(403).json({ success: false, code: 'EMAIL_NOT_VERIFIED', message: 'Verify your email address before signing in.' }); return; }
-    if (user.phone && !user.phoneVerified) {
-      res.status(403).json({ success: false, code: 'PHONE_NOT_VERIFIED', message: 'Verify your mobile number before signing in.' });
-      return;
-    }
     const cid = user.companyId?.toString() || '';
     const tokens = issue(user._id.toString(), cid, user.role);
     user.refreshTokens = [...normalizeRefreshTokenStore(user.refreshTokens), hashRefreshToken(tokens.refreshToken)];
@@ -284,7 +175,6 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       jobTitle: user.jobTitle,
       department: user.department,
       phone: user.phone,
-      phoneVerified: user.phoneVerified,
       bio: user.bio,
       skills: user.skills,
       notificationPreferences: user.notificationPreferences,
@@ -297,316 +187,6 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       status: user.status,
     } });
   } catch (e: any) { res.status(500).json({ success: false, message: e.message }); }
-};
-
-export const requestPhoneOtp = async (req: Request, res: Response): Promise<void> => {
-  const genericResponse = {
-    success: true,
-    message: phoneOtpMessage,
-  };
-  try {
-    const purpose = req.body?.purpose as PhoneOtpPurpose;
-    let user: IUser | null = null;
-    if (purpose === 'signup') {
-      const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
-      if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        user = await User.findOne({ email, isVerified: true, phoneVerified: false, isActive: true, isDeleted: { $ne: true } });
-      }
-    } else if (purpose === 'login' || purpose === 'recovery') {
-      const phone = normalizePhoneNumber(req.body?.phone);
-      if (phone) {
-        user = await User.findOne({
-          phone,
-          phoneVerified: true,
-          isVerified: true,
-          isActive: true,
-          isDeleted: { $ne: true },
-        });
-      }
-    } else if (purpose === 'change') {
-      const authRequest = req as AuthRequest;
-      if (authRequest.user?.userId) {
-        user = await User.findOne({
-          _id: authRequest.user.userId,
-          phone: { $exists: true, $ne: null },
-          phoneVerified: false,
-          isVerified: true,
-          isActive: true,
-          isDeleted: { $ne: true },
-        });
-      }
-    }
-
-    if (!user?.phone) {
-      res.status(202).json(genericResponse);
-      return;
-    }
-    const delivery = await sendAccountPhoneOtp(user._id.toString(), purpose);
-    res.status(202).json({
-      ...genericResponse,
-      ...(delivery?.developmentCode ? { developmentCode: delivery.developmentCode } : {}),
-    });
-  } catch (error) {
-    if (error instanceof PhoneOtpDeliveryError) {
-      console.error('[Phone OTP] Delivery failed.', {
-        reason: error.diagnosticCode,
-        ...(error.httpStatus ? { httpStatus: error.httpStatus } : {}),
-        ...(error.providerCode ? { providerCode: error.providerCode } : {}),
-      });
-      res.status(503).json({
-        success: false,
-        code: error.diagnosticCode.toUpperCase(),
-        message: error.diagnosticCode === 'sms_provider_unconfigured' ||
-          error.diagnosticCode === 'sms_provider_configuration_incomplete' ||
-          error.diagnosticCode === 'whatsapp_provider_configuration_incomplete'
-          ? 'Phone verification is not configured on this server.'
-          : 'We could not deliver a verification code. Please try again shortly.',
-      });
-      return;
-    }
-    console.error('[Phone OTP] Request failed.', { reason: 'unexpected_error' });
-    res.status(503).json({
-      success: false,
-      message: 'We could not send a verification code right now. Please try again shortly.',
-    });
-  }
-};
-
-export const requestPhoneChangeOtp = async (req: AuthRequest, res: Response): Promise<void> => {
-  req.body = { ...req.body, purpose: 'change' };
-  await requestPhoneOtp(req, res);
-};
-
-export const startSocialPhoneVerification = async (req: AuthRequest, res: Response): Promise<void> => {
-  const userId = req.user?.userId;
-  const requestedPhone = normalizePhoneNumber(req.body?.phone);
-  if (!userId || (req.body?.phone && (!requestedPhone || !isE164PhoneNumber(requestedPhone)))) {
-    res.status(400).json({ success: false, message: 'Enter a valid mobile number with its international country code.' });
-    return;
-  }
-  try {
-    const user = await User.findOne({
-      _id: userId,
-      isVerified: true,
-      isActive: true,
-      isDeleted: { $ne: true },
-      phoneVerified: false,
-      $or: [{ googleId: { $type: 'string', $ne: '' } }, { appleId: { $type: 'string', $ne: '' } }],
-    });
-    if (!user) {
-      res.status(403).json({ success: false, message: 'This account cannot verify a mobile number right now.' });
-      return;
-    }
-    if (user.phoneVerified) {
-      res.status(409).json({ success: false, message: 'This mobile number is already verified.' });
-      return;
-    }
-    if (user.phone && requestedPhone && user.phone !== requestedPhone) {
-      res.status(409).json({ success: false, message: 'A mobile number is already associated with this account.' });
-      return;
-    }
-    const phone = user.phone || requestedPhone;
-    if (!phone) {
-      res.status(400).json({ success: false, message: 'Enter a mobile number to continue.' });
-      return;
-    }
-    if (!user.phone && await User.exists({ phone, _id: { $ne: user._id } })) {
-      res.status(409).json({ success: false, message: 'That mobile number cannot be used. Try a different number.' });
-      return;
-    }
-    if (!user.phone) {
-      user.phone = phone;
-      await user.save();
-    }
-    const delivery = await sendAccountPhoneOtp(userId, 'signup');
-    res.status(202).json({
-      success: true,
-      phone: maskPhone(phone),
-      message: phoneOtpMessage,
-      ...(delivery?.developmentCode ? { developmentCode: delivery.developmentCode } : {}),
-    });
-  } catch (error) {
-    if (error instanceof PhoneOtpDeliveryError) {
-      console.error('[Phone OTP] Social verification delivery failed.', {
-        context: 'start-social-signup',
-        provider: error.diagnosticCode.startsWith('whatsapp_') ? 'whatsapp' : 'sms',
-        reason: error.diagnosticCode,
-        ...(error.httpStatus !== undefined ? { httpStatus: error.httpStatus } : {}),
-        ...(error.providerCode !== undefined ? { providerCode: error.providerCode } : {}),
-        ...(error.providerSubcode !== undefined ? { providerSubcode: error.providerSubcode } : {}),
-        ...(error.providerType ? { providerType: error.providerType } : {}),
-        ...(error.providerMessage ? { providerMessage: error.providerMessage } : {}),
-      });
-    } else {
-      console.error('[Phone OTP] Social verification request failed.', { reason: 'unexpected_error' });
-    }
-    res.status(503).json({
-      success: false,
-      code: error instanceof PhoneOtpDeliveryError ? error.diagnosticCode.toUpperCase() : 'PHONE_OTP_UNAVAILABLE',
-      message: error instanceof PhoneOtpDeliveryError &&
-        [
-          'sms_provider_unconfigured',
-          'sms_provider_configuration_incomplete',
-          'whatsapp_provider_configuration_incomplete',
-        ].includes(error.diagnosticCode)
-        ? 'Phone verification is not configured on this server.'
-        : 'We could not send a verification code right now. Please try again shortly.',
-    });
-  }
-};
-
-export const verifyPhoneOtp = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const purpose = req.body?.purpose as string;
-    const socialSignup = purpose === 'social-signup';
-    const otpPurpose: PhoneOtpPurpose = socialSignup ? 'signup' : purpose as PhoneOtpPurpose;
-    const code = typeof req.body?.code === 'string' ? req.body.code.replace(/\s/g, '') : '';
-    const authRequest = req as AuthRequest;
-    const identifier = socialSignup
-      ? authRequest.user?.userId || ''
-      : purpose === 'signup'
-      ? (typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '')
-      : purpose === 'change'
-        ? authRequest.user?.userId || ''
-        : (normalizePhoneNumber(req.body?.phone) || '');
-    if (!['signup', 'social-signup', 'login', 'change'].includes(purpose) ||
-        (purpose === 'signup' ? !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier)
-          : socialSignup ? !mongoose.isValidObjectId(identifier)
-          : purpose === 'change' ? !mongoose.isValidObjectId(identifier) : !isE164PhoneNumber(identifier)) ||
-        ((purpose === 'change' || socialSignup) && !authRequest.user?.userId) ||
-        !/^\d{6}$/.test(code)) {
-      res.status(400).json({ success: false, message: invalidPhoneOtpMessage });
-      return;
-    }
-
-    const now = new Date();
-    const account = await User.findOneAndUpdate({
-      [socialSignup || purpose === 'change' ? '_id' : purpose === 'signup' ? 'email' : 'phone']: identifier,
-      phoneVerified: purpose === 'login' ? true : false,
-      isVerified: true,
-      isActive: true,
-      isDeleted: { $ne: true },
-      phoneVerificationPurpose: socialSignup ? 'signup' : purpose,
-      phoneVerificationExpiresAt: { $gt: now },
-      phoneVerificationAttempts: { $lt: PHONE_OTP_MAX_ATTEMPTS },
-      phoneVerificationCodeHash: { $exists: true },
-    }, { $inc: { phoneVerificationAttempts: 1 } }, { new: true })
-      .select('+phoneVerificationCodeHash +phoneVerificationAttempts +phoneVerificationPurpose');
-    const hashIdentifier = account?._id.toString();
-    if (!account?.phone || !account.phoneVerificationCodeHash || !hashIdentifier ||
-        !phoneOtpMatches(hashIdentifier, otpPurpose, code, account.phoneVerificationCodeHash)) {
-      res.status(400).json({ success: false, message: invalidPhoneOtpMessage });
-      return;
-    }
-
-    const consumeQuery: Record<string, unknown> = {
-      _id: account._id,
-      phoneVerificationCodeHash: account.phoneVerificationCodeHash,
-      phoneVerificationAttempts: account.phoneVerificationAttempts,
-      phoneVerificationPurpose: socialSignup ? 'signup' : purpose,
-      phoneVerificationExpiresAt: { $gt: now },
-      isActive: true,
-      isDeleted: { $ne: true },
-    };
-    const consumeUpdate: Record<string, unknown> = {
-      $unset: {
-        phoneVerificationCodeHash: 1,
-        phoneVerificationPurpose: 1,
-        phoneVerificationExpiresAt: 1,
-        phoneVerificationAttempts: 1,
-        phoneVerificationResends: 1,
-        phoneVerificationSentAt: 1,
-      },
-    };
-    if (purpose === 'signup' || socialSignup || purpose === 'change') (consumeUpdate.$set = { phoneVerified: true });
-    const consumed = await User.findOneAndUpdate(consumeQuery, consumeUpdate, { new: true })
-      .select('+phoneVerificationCodeHash +phoneVerificationAttempts +phoneVerificationPurpose');
-    if (!consumed) {
-      res.status(400).json({ success: false, message: invalidPhoneOtpMessage });
-      return;
-    }
-
-    const session = await sessionForUser(consumed);
-    res.json({ success: true, ...session });
-  } catch {
-    res.status(400).json({ success: false, message: invalidPhoneOtpMessage });
-  }
-};
-
-export const verifyPhoneChangeOtp = async (req: AuthRequest, res: Response): Promise<void> => {
-  req.body = { ...req.body, purpose: 'change' };
-  await verifyPhoneOtp(req, res);
-};
-
-export const verifySocialPhoneOtp = async (req: AuthRequest, res: Response): Promise<void> => {
-  req.body = { ...req.body, purpose: 'social-signup' };
-  await verifyPhoneOtp(req, res);
-};
-
-export const recoverPasswordByPhone = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const phone = normalizePhoneNumber(req.body?.phone) || '';
-    const code = typeof req.body?.code === 'string' ? req.body.code.replace(/\s/g, '') : '';
-    const password = typeof req.body?.password === 'string' ? req.body.password : '';
-    if (!isE164PhoneNumber(phone) || !/^\d{6}$/.test(code) || !validPassword(password)) {
-      res.status(400).json({ success: false, message: 'Enter a valid code and a strong new password.' });
-      return;
-    }
-
-    const now = new Date();
-    const account = await User.findOneAndUpdate({
-      phone,
-      phoneVerified: true,
-      isVerified: true,
-      isActive: true,
-      isDeleted: { $ne: true },
-      phoneVerificationPurpose: 'recovery',
-      phoneVerificationExpiresAt: { $gt: now },
-      phoneVerificationAttempts: { $lt: PHONE_OTP_MAX_ATTEMPTS },
-      phoneVerificationCodeHash: { $exists: true },
-    }, { $inc: { phoneVerificationAttempts: 1 } }, { new: true })
-      .select('+phoneVerificationCodeHash +phoneVerificationAttempts +phoneVerificationPurpose');
-    if (!account?.phoneVerificationCodeHash ||
-        !phoneOtpMatches(account._id.toString(), 'recovery', code, account.phoneVerificationCodeHash)) {
-      res.status(400).json({ success: false, message: invalidPhoneOtpMessage });
-      return;
-    }
-    const consumed = await User.findOneAndUpdate({
-      _id: account._id,
-      phoneVerificationCodeHash: account.phoneVerificationCodeHash,
-      phoneVerificationAttempts: account.phoneVerificationAttempts,
-      phoneVerificationPurpose: 'recovery',
-      phoneVerificationExpiresAt: { $gt: now },
-    }, {
-      $unset: {
-        phoneVerificationCodeHash: 1,
-        phoneVerificationPurpose: 1,
-        phoneVerificationExpiresAt: 1,
-        phoneVerificationAttempts: 1,
-        phoneVerificationResends: 1,
-        phoneVerificationSentAt: 1,
-      },
-    });
-    if (!consumed) {
-      res.status(400).json({ success: false, message: invalidPhoneOtpMessage });
-      return;
-    }
-
-    const user = await User.findById(account._id).select('+password');
-    if (!user) {
-      res.status(400).json({ success: false, message: invalidPhoneOtpMessage });
-      return;
-    }
-    user.password = password;
-    user.refreshTokens = [];
-    user.resetPasswordToken = undefined;
-    user.resetPasswordExpiry = undefined;
-    await user.save();
-    void sendPasswordChangedNotificationEmail(user.email, user.fullName).catch(() => undefined);
-    res.json({ success: true, message: 'Password reset successfully. Please sign in with your new password.' });
-  } catch {
-    res.status(400).json({ success: false, message: 'Unable to reset your password. Request a new code and try again.' });
-  }
 };
 
 export const refresh = async (req: Request, res: Response): Promise<void> => {
@@ -685,10 +265,6 @@ export const verifyRegistrationCode = async (req: Request, res: Response): Promi
       { $inc: { attempts: 1 } },
       { new: true },
     );
-    if (pending && !isE164PhoneNumber(pending.phone)) {
-      res.status(400).json({ success: false, message: 'Restart signup to add and verify your mobile number.' });
-      return;
-    }
     if (!pending) {
       const legacyUser = await User.findOneAndUpdate(
         { email, isVerified: false, verificationCodeExpiry: { $gt: now }, verificationCodeAttempts: { $lt: 5 } },
@@ -763,8 +339,8 @@ export const verifyRegistrationCode = async (req: Request, res: Response): Promi
       return;
     }
 
-    if (await User.exists({ email }) || (pending.phone && await User.exists({ phone: pending.phone }))) {
-      res.status(400).json({ success: false, message: invalidPhoneOtpMessage });
+    if (await User.exists({ email })) {
+      res.status(400).json({ success: false, message: 'That code is invalid or expired. Request a new code and try again.' });
       return;
     }
 
@@ -773,7 +349,7 @@ export const verifyRegistrationCode = async (req: Request, res: Response): Promi
     const user = await createWorkGrindUser({
       fullName: pending.fullName,
       email,
-      ...(pending.phone ? { phone: pending.phone, phoneVerified: false } : {}),
+      ...(pending.phone ? { phone: pending.phone } : {}),
       password: decryptPendingPassword(pending),
       isVerified: true,
       isSuperAdmin: false,
@@ -782,33 +358,11 @@ export const verifyRegistrationCode = async (req: Request, res: Response): Promi
       trialStartDate,
       trialEndDate,
     });
-    if (!user.phone) {
-      const session = await sessionForUser(user);
-      void sendWelcomeEmail(user.email, user.fullName).then((result) => {
-        if (!result.success) console.error('[Auth] Welcome email delivery failed.');
-      });
-      res.json({ success: true, ...session });
-      return;
-    }
-    let developmentCode: string | undefined;
-    let phoneCodeSent = true;
-    try {
-      ({ developmentCode } = await sendInitialPhoneOtp(user, 'signup'));
-    } catch {
-      // The account remains recoverable; the verification page can safely request another code.
-      phoneCodeSent = false;
-    }
+    const session = await sessionForUser(user);
     void sendWelcomeEmail(user.email, user.fullName).then((result) => {
       if (!result.success) console.error('[Auth] Welcome email delivery failed.');
     });
-
-    res.json({
-      success: true,
-      nextStep: 'verify-phone',
-      phone: maskPhone(user.phone!),
-      phoneCodeSent,
-      ...(developmentCode ? { developmentCode } : {}),
-    });
+    res.json({ success: true, ...session });
   } catch (error) {
     console.error('[Auth] Email verification failed:', error);
     res.status(500).json({ success: false, message: 'Unable to verify this code. Please try again.' });
@@ -1391,4 +945,3 @@ export const getMe = async (req: AuthRequest, res: Response): Promise<void> => {
     res.json({ success: true, user: await refreshAvatarUrls(user.toObject()), trialDaysRemaining });
   } catch (e: any) { res.status(500).json({ success: false, message: e.message }); }
 };
-import { PhoneOtpDeliveryError } from '../services/phoneVerification';

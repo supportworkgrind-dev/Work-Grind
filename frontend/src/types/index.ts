@@ -12,7 +12,6 @@ export interface User {
   jobTitle?: string;
   department?: string;
   phone?: string;
-  phoneVerified?: boolean;
   country?: string;
   timeZone?: string;
   bio?: string;
