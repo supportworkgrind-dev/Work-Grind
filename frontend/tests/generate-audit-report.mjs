@@ -58,6 +58,12 @@ const severityOf = (issue) => {
   if (/button without accessible name|horizontal overflow|broken internal link|broken image|hydration|failed:|console error|websocket/i.test(issue)) return 'MEDIUM';
   return 'LOW';
 };
+const readableIssue = (issue) => {
+  if (issue.startsWith('Button without accessible name: ')) {
+    return `Button lacks an accessible name; DOM snippet: \`${issue.slice('Button without accessible name: '.length)}\``;
+  }
+  return issue;
+};
 const bySeverity = (severity) => allIssues.filter((item) => severityOf(item.issue) === severity);
 const statusLabel = (status) =>
   status === 'expected' ? 'PASS' : status === 'skipped' ? 'SKIPPED' : status === 'unexpected' ? 'FAIL' : status.toUpperCase();
@@ -67,14 +73,14 @@ const publicPagePaths = ['/', '/about', '/features', '/demo', '/contact', '/pric
 const pageByPath = new Map(publicPages.map((page) => [page.path, page]));
 const publicTable = publicPagePaths.map((pagePath) => {
   const page = pageByPath.get(pagePath);
-  const details = page?.issues?.length ? page.issues.join('; ') : 'No collected issues';
+  const details = page?.issues?.length ? page.issues.map(readableIssue).join('; ') : 'No collected issues';
   return `| \`${pagePath}\` | ${page ? pageStatus(page) : 'NOT TESTED'} | ${details} |`;
 });
 const routeRows = protectedRoutes.map((route) =>
   `| ${route.path} | ${route.status ?? 'n/a'} | ${route.landedAt} |`
 );
 const issueRows = allIssues.map(({ path: route, issue }) =>
-  `| \`${route}\` | ${severityOf(issue)} | ${issue.replaceAll('|', '\\|')} |`
+  `| \`${route}\` | ${severityOf(issue)} | ${readableIssue(issue).replaceAll('|', '\\|')} |`
 );
 const total = tests.length;
 const passed = tests.filter((test) => test.status === 'expected').length;
@@ -91,7 +97,7 @@ const report = `# WorkGrind A–Z Automated Audit
 
 ## Executive Summary
 
-- Overall result: ${failed ? 'FAIL — public-site issues detected; authenticated feature audit blocked by missing environment credentials.' : 'PASS'}.
+- Overall result: ${failed ? 'FAIL — public-site issues detected; authenticated feature audit blocked by missing environment credentials' : 'PASS'}.
 - Target: \`https://workgrind.vercel.app\`
 - Pages tested: ${publicPagePaths.length} public pages plus ${protectedRoutes.length} unauthenticated protected-route checks.
 - Passed: ${passed}
@@ -208,7 +214,7 @@ ${bySeverity('CRITICAL').map((item) => `- \`${item.path}\`: ${item.issue}`).join
 ${[
   bySeverity('CRITICAL').length ? '1. Critical: remediate exposed secret findings.' : '1. Critical: none identified.',
   bySeverity('HIGH').length ? '2. High: fix server/runtime failures.' : '2. High: none identified.',
-  bySeverity('MEDIUM').length ? `3. Medium: fix ${bySeverity('MEDIUM').map((item) => item.issue).join('; ')}.` : '3. Medium: none identified.',
+  bySeverity('MEDIUM').length ? `3. Medium: fix ${bySeverity('MEDIUM').map((item) => readableIssue(item.issue)).join('; ')}.` : '3. Medium: none identified.',
   bySeverity('LOW').length ? `4. Low: remove legacy brand references on ${[...new Set(bySeverity('LOW').map((item) => item.path))].join(', ')}.` : '4. Low: none identified.',
 ].join('\n')}
 

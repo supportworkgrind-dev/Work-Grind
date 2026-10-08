@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-- Overall result: FAIL — public-site issues detected; authenticated feature audit blocked by missing environment credentials..
+- Overall result: FAIL — public-site issues detected; authenticated feature audit blocked by missing environment credentials.
 - Target: `https://workgrind.vercel.app`
 - Pages tested: 10 public pages plus 24 unauthenticated protected-route checks.
 - Passed: 11
@@ -23,7 +23,7 @@
 
 | Page | Status | Issues |
 |---|---|---|
-| `/` | FAIL | Button without accessible name: <button class="h-7 w-7 rounded-lg bg-indigo-600 flex items-center justify-center hover:bg-indigo-500 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str; Button without accessible name: <button class="text-slate-600 hover:text-slate-400 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejo; Old-brand text: TF |
+| `/` | FAIL | Button lacks an accessible name; DOM snippet: `<button class="h-7 w-7 rounded-lg bg-indigo-600 flex items-center justify-center hover:bg-indigo-500 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str`; Button lacks an accessible name; DOM snippet: `<button class="text-slate-600 hover:text-slate-400 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejo`; Old-brand text: TF |
 | `/about` | PASS | No collected issues |
 | `/features` | PASS | No collected issues |
 | `/demo` | PASS | No collected issues |
@@ -154,15 +154,15 @@ Navigation stabilization times include waiting for network idle and are not serv
 
 1. Critical: none identified.
 2. High: none identified.
-3. Medium: fix Button without accessible name: <button class="h-7 w-7 rounded-lg bg-indigo-600 flex items-center justify-center hover:bg-indigo-500 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str; Button without accessible name: <button class="text-slate-600 hover:text-slate-400 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejo.
+3. Medium: fix Button lacks an accessible name; DOM snippet: `<button class="h-7 w-7 rounded-lg bg-indigo-600 flex items-center justify-center hover:bg-indigo-500 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str`; Button lacks an accessible name; DOM snippet: `<button class="text-slate-600 hover:text-slate-400 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejo`.
 4. Low: remove legacy brand references on /, /pricing.
 
 ## Complete Findings
 
 | Page | Severity | Finding |
 |---|---|---|
-| `/` | MEDIUM | Button without accessible name: <button class="h-7 w-7 rounded-lg bg-indigo-600 flex items-center justify-center hover:bg-indigo-500 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str |
-| `/` | MEDIUM | Button without accessible name: <button class="text-slate-600 hover:text-slate-400 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejo |
+| `/` | MEDIUM | Button lacks an accessible name; DOM snippet: `<button class="h-7 w-7 rounded-lg bg-indigo-600 flex items-center justify-center hover:bg-indigo-500 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str` |
+| `/` | MEDIUM | Button lacks an accessible name; DOM snippet: `<button class="text-slate-600 hover:text-slate-400 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejo` |
 | `/` | LOW | Old-brand text: TF |
 | `/pricing` | LOW | Old-brand text: TF |
 
