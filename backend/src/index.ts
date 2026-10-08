@@ -126,6 +126,7 @@ import developerRoutes from './routes/developer';
 import connectApiRoutes from './routes/connectApi';
 import callingRoutes from './routes/calls';
 import rtcRoutes from './routes/rtc';
+import whatsappRoutes from './routes/whatsapp';
 
 const app = express();
 const server = http.createServer(app);
@@ -163,7 +164,11 @@ async function ensureServerlessInitialization(): Promise<boolean> {
 }
 
 if (isVercelRuntime) {
-  app.use(async (_req, res, next) => {
+  app.use(async (req, res, next) => {
+    if (req.path === '/api/whatsapp/webhook') {
+      next();
+      return;
+    }
     if (await ensureServerlessInitialization()) {
       next();
       return;
@@ -271,7 +276,8 @@ app.use(
 app.use((req, res, next) => {
   if (
     req.path === '/health' ||
-    req.path === '/api/health'
+    req.path === '/api/health' ||
+    req.path === '/api/whatsapp/webhook'
   ) {
     return next(); // always allow health checks through
   }
@@ -309,6 +315,7 @@ app.use('/api',                     rateLimiter(15, 600, { skip: (req) => req.or
 
 // API Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/whatsapp', whatsappRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/companies', companyRoutes);
 app.use('/api/channels', channelRoutes);

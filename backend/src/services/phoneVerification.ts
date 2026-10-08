@@ -43,10 +43,22 @@ export class PhoneOtpDeliveryError extends Error {
       'whatsapp_provider_unavailable',
     readonly httpStatus?: number,
     readonly providerCode?: number,
+    readonly providerType?: string,
+    readonly providerMessage?: string,
+    readonly providerSubcode?: number,
   ) {
     super(diagnosticCode);
   }
 }
+
+const safeProviderText = (value: unknown, secrets: string[], maxLength: number): string | undefined => {
+  if (typeof value !== 'string') return undefined;
+  let sanitized = value.replace(/[\r\n\t]+/g, ' ').slice(0, maxLength);
+  for (const secret of secrets) {
+    if (secret) sanitized = sanitized.split(secret).join('[REDACTED]');
+  }
+  return sanitized;
+};
 
 export const sendPhoneOtp = async (phone: string, code: string): Promise<{ developmentCode?: never }> => {
   const isDevelopment = process.env.NODE_ENV === 'development';
@@ -106,18 +118,29 @@ export const sendPhoneOtp = async (phone: string, code: string): Promise<{ devel
     }
     if (!response.ok) {
       let providerCode: number | undefined;
+      let providerSubcode: number | undefined;
+      let providerType: string | undefined;
+      let providerMessage: string | undefined;
       try {
-        const result = await response.json() as { error?: { code?: unknown } };
+        const result = await response.json() as {
+          error?: { code?: unknown; error_subcode?: unknown; type?: unknown; message?: unknown };
+        };
         if (typeof result.error?.code === 'number') providerCode = result.error.code;
+        if (typeof result.error?.error_subcode === 'number') providerSubcode = result.error.error_subcode;
+        const sensitiveValues = [whatsappAccessToken, code, phone, phone.replace(/^\+/, '')];
+        providerType = safeProviderText(result.error?.type, sensitiveValues, 100);
+        providerMessage = safeProviderText(result.error?.message, sensitiveValues, 500);
       } catch {
         // Status is sufficient when the provider response body is absent or not JSON.
       }
-      console.error('[Phone OTP] WhatsApp provider rejected delivery.', {
-        provider: 'whatsapp',
-        httpStatus: response.status,
-        ...(providerCode ? { providerCode } : {}),
-      });
-      throw new PhoneOtpDeliveryError('whatsapp_provider_rejected', response.status, providerCode);
+      throw new PhoneOtpDeliveryError(
+        'whatsapp_provider_rejected',
+        response.status,
+        providerCode,
+        providerType,
+        providerMessage,
+        providerSubcode,
+      );
     }
     return {};
   }

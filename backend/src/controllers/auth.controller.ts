@@ -429,9 +429,14 @@ export const startSocialPhoneVerification = async (req: AuthRequest, res: Respon
   } catch (error) {
     if (error instanceof PhoneOtpDeliveryError) {
       console.error('[Phone OTP] Social verification delivery failed.', {
+        context: 'start-social-signup',
+        provider: error.diagnosticCode.startsWith('whatsapp_') ? 'whatsapp' : 'sms',
         reason: error.diagnosticCode,
-        ...(error.httpStatus ? { httpStatus: error.httpStatus } : {}),
-        ...(error.providerCode ? { providerCode: error.providerCode } : {}),
+        ...(error.httpStatus !== undefined ? { httpStatus: error.httpStatus } : {}),
+        ...(error.providerCode !== undefined ? { providerCode: error.providerCode } : {}),
+        ...(error.providerSubcode !== undefined ? { providerSubcode: error.providerSubcode } : {}),
+        ...(error.providerType ? { providerType: error.providerType } : {}),
+        ...(error.providerMessage ? { providerMessage: error.providerMessage } : {}),
       });
     } else {
       console.error('[Phone OTP] Social verification request failed.', { reason: 'unexpected_error' });

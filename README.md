@@ -632,6 +632,7 @@ redeploy both projects so build-time and runtime configuration is applied:
 | Backend | `SMS_PROVIDER` | `whatsapp` or `twilio` (production phone OTP); WhatsApp is auto-detected if this is unset and WhatsApp settings exist |
 | Backend | `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID` | Meta WhatsApp Cloud API server-side configuration |
 | Backend | `WHATSAPP_BUSINESS_ACCOUNT_ID` | Optional for OTP delivery; needed when managing WhatsApp message templates |
+| Backend | `WAAPI_WEBHOOK_SECRET` | Secret used to verify `POST /api/whatsapp/webhook` signatures |
 | Backend | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER` | Optional Twilio server-side SMS configuration |
 
 WhatsApp OTP delivery uses the approved authentication template `verification_code`
