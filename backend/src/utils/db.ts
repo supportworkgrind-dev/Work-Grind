@@ -112,7 +112,13 @@ export const connectDB = async (): Promise<typeof mongoose | null> => {
       }
     }
     const errorName = error instanceof Error ? error.name : 'UnknownError';
-    console.error('❌ MongoDB connection failed.', { errorName });
+    const reason = error instanceof Error
+      ? error.message
+        .replace(/mongodb(?:\+srv)?:\/\/[^\s"'`]+/gi, '[MongoDB URI redacted]')
+        .replace(/\b(password|passwd|pwd|token|secret)\s*[:=]\s*[^\s,;]+/gi, '$1=[redacted]')
+        .slice(0, 300)
+      : 'Unknown database connection failure';
+    console.error('❌ MongoDB connection failed.', { errorName, reason });
     throw error;
   }
 };

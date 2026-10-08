@@ -1,6 +1,8 @@
 import crypto from 'crypto';
-import { generateSecret, generateURI, verifySync } from 'otplib';
+import { authenticator, totp } from 'otplib';
 import QRCode from 'qrcode';
+
+const driftTolerantTotp = totp.clone({ window: 1 });
 
 // Derive 32-byte AES key from environment secret
 const getEncryptionKey = (): Buffer => {
@@ -58,7 +60,7 @@ export const decryptSecret = (encryptedPayload: string): string => {
  * Generates a standard base32 TOTP secret.
  */
 export const generateTotpSecret = (): string => {
-  return generateSecret();
+  return authenticator.generateSecret();
 };
 
 /**
@@ -69,11 +71,7 @@ export const generateTotpProvisioning = async (
   secret: string
 ): Promise<{ otpauthUrl: string; qrCodeDataUrl: string }> => {
   const issuer = 'WorkGrind Admin';
-  const otpauthUrl = generateURI({
-    issuer,
-    label: email,
-    secret,
-  });
+  const otpauthUrl = authenticator.keyuri(email, issuer, secret);
 
   const qrCodeDataUrl = await QRCode.toDataURL(otpauthUrl, {
     margin: 2,
@@ -96,8 +94,7 @@ export const verifyTotp = (token: string, secret: string): boolean => {
     return false;
   }
   try {
-    const result = verifySync({ token: cleaned, secret, epochTolerance: 30 });
-    return Boolean(result && (result as any).valid);
+    return driftTolerantTotp.check(cleaned, secret);
   } catch {
     return false;
   }
