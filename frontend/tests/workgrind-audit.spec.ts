@@ -115,7 +115,10 @@ async function inspectPage(page: Page, path: string) {
   const pageText = await page.locator('body').innerText({ timeout: 10_000 }).catch(() => '');
   const imageFailures = await page.locator('img').evaluateAll((images) =>
     images
-      .filter((image) => !image.complete || image.naturalWidth === 0)
+      .filter(
+        (image): image is HTMLImageElement =>
+          image instanceof HTMLImageElement && (!image.complete || image.naturalWidth === 0)
+      )
       .map((image) => image.getAttribute('src') || image.getAttribute('alt') || '[image without source]')
   );
   const overflow = await page.evaluate(() => ({
