@@ -1,0 +1,394 @@
+{
+  "config": {
+    "argv": [
+      "C:\\Program Files\\nodejs\\node.exe",
+      "C:\\workgrind\\frontend\\node_modules\\@playwright\\test\\cli.js",
+      "test",
+      "--list",
+      "--config=playwright.config.ts"
+    ],
+    "configFile": "C:\\workgrind\\frontend\\playwright.config.ts",
+    "rootDir": "C:/workgrind/frontend/tests",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": true,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {},
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "C:/workgrind/artifacts/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {},
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "C:/workgrind/frontend/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      }
+    ],
+    "filteredProjects": [
+      {
+        "grep": {},
+        "grepInvert": null,
+        "outputDir": "C:\\workgrind\\artifacts\\test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {},
+        "name": "chromium",
+        "testDir": "C:\\workgrind\\frontend\\tests",
+        "snapshotDir": "C:\\workgrind\\frontend\\tests",
+        "testIgnore": [],
+        "testMatch": "**/*.@(spec|test).?(c|m)[jt]s?(x)",
+        "timeout": 60000,
+        "use": {
+          "baseURL": "https://workgrind.vercel.app",
+          "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.8078.4 Safari/537.36",
+          "viewport": {
+            "width": 1280,
+            "height": 720
+          },
+          "screen": {
+            "width": 1920,
+            "height": 1080
+          },
+          "deviceScaleFactor": 1,
+          "isMobile": false,
+          "hasTouch": false,
+          "defaultBrowserType": "chromium",
+          "trace": "off",
+          "screenshot": "only-on-failure",
+          "video": "off"
+        },
+        "dependencies": [],
+        "ignoreSnapshots": false,
+        "__projectId": "chromium"
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "html",
+        {
+          "outputFolder": "../artifacts/playwright-report",
+          "open": "never"
+        }
+      ],
+      [
+        "json",
+        {
+          "outputFile": "../artifacts/playwright-results.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "default",
+    "updateSourceMethod": "patch",
+    "version": "1.64.0",
+    "workers": 4,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "workgrind-audit.spec.ts",
+      "file": "workgrind-audit.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "responsive layouts on key public pages",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "2aae5247a7454980396a-e7bd1d6a51e69aeedfa4",
+          "file": "workgrind-audit.spec.ts",
+          "line": 223,
+          "column": 5
+        },
+        {
+          "title": "authenticated routes and read-only feature audit",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "2aae5247a7454980396a-3c9ef85307d5ea494580",
+          "file": "workgrind-audit.spec.ts",
+          "line": 246,
+          "column": 5
+        },
+        {
+          "title": "logout returns to the login screen when a logout control is available",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "2aae5247a7454980396a-ee5c79a9feda4e3bd845",
+          "file": "workgrind-audit.spec.ts",
+          "line": 322,
+          "column": 5
+        }
+      ],
+      "suites": [
+        {
+          "title": "WorkGrind public-site audit",
+          "file": "workgrind-audit.spec.ts",
+          "line": 199,
+          "column": 6,
+          "specs": [
+            {
+              "title": "public page /",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "2aae5247a7454980396a-376ff0e51771ab9d5ac0",
+              "file": "workgrind-audit.spec.ts",
+              "line": 201,
+              "column": 9
+            },
+            {
+              "title": "public page /about",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "2aae5247a7454980396a-84ddd1c4469e897651f5",
+              "file": "workgrind-audit.spec.ts",
+              "line": 201,
+              "column": 9
+            },
+            {
+              "title": "public page /features",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "2aae5247a7454980396a-edb4efe8490e1513f0c9",
+              "file": "workgrind-audit.spec.ts",
+              "line": 201,
+              "column": 9
+            },
+            {
+              "title": "public page /demo",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "2aae5247a7454980396a-5db2e059ed12195a70c2",
+              "file": "workgrind-audit.spec.ts",
+              "line": 201,
+              "column": 9
+            },
+            {
+              "title": "public page /contact",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "2aae5247a7454980396a-313eedc694fe00b30ece",
+              "file": "workgrind-audit.spec.ts",
+              "line": 201,
+              "column": 9
+            },
+            {
+              "title": "public page /pricing",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "2aae5247a7454980396a-e944d0e49a7d12da7e1e",
+              "file": "workgrind-audit.spec.ts",
+              "line": 201,
+              "column": 9
+            },
+            {
+              "title": "public page /privacy",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "2aae5247a7454980396a-b1d4f7f9614e5af496d1",
+              "file": "workgrind-audit.spec.ts",
+              "line": 201,
+              "column": 9
+            },
+            {
+              "title": "public page /terms",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "2aae5247a7454980396a-9ca28fcca5fd1c3c141b",
+              "file": "workgrind-audit.spec.ts",
+              "line": 201,
+              "column": 9
+            },
+            {
+              "title": "public page /signup",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "2aae5247a7454980396a-f274e394f137bdf7ad29",
+              "file": "workgrind-audit.spec.ts",
+              "line": 201,
+              "column": 9
+            },
+            {
+              "title": "public page /login",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "2aae5247a7454980396a-ef429edf7af88c139840",
+              "file": "workgrind-audit.spec.ts",
+              "line": 201,
+              "column": 9
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-10-08T17:28:48.463Z",
+    "duration": 162.9910000000002,
+    "expected": 0,
+    "skipped": 13,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}
