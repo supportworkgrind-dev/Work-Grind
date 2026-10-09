@@ -1,15 +1,12 @@
 import { fileURLToPath } from 'node:url';
 import dotenv from 'dotenv';
 import {
-  AgentServer,
   ServerOptions,
-  TurnHandlingOptions,
   cli,
   defineAgent,
   inference,
   voice,
   type JobContext,
-  type JobRequest,
 } from '@livekit/agents';
 import * as google from '@livekit/agents-plugin-google';
 
@@ -32,13 +29,6 @@ if (missingEnvironment.length > 0) {
 
 const GEMINI_MODEL = process.env.GEMINI_MODEL?.trim() || 'gemini-3-flash-preview';
 const AGENT_NAME = 'tavro-voice';
-const AGENT_DISPLAY_NAME = 'Tavro AI';
-
-const server = new AgentServer();
-
-async function acceptVoiceSession(request: JobRequest): Promise<void> {
-  await request.accept(AGENT_DISPLAY_NAME);
-}
 
 function createTavroAgent(): ReturnType<typeof voice.Agent.create> {
   return voice.Agent.create({
@@ -62,7 +52,7 @@ export default defineAgent({
       }),
       turnHandling: {
         turnDetection: new inference.TurnDetector(),
-      } satisfies TurnHandlingOptions,
+      },
     });
 
     try {

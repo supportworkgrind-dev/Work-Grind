@@ -27,7 +27,7 @@ function validLiveKitUrl(value: string | undefined): value is string {
 }
 
 function getMissingVoiceConfiguration(): string[] {
-  const missing = LIVEKIT_ENV_KEYS.filter((key) => !process.env[key]?.trim());
+  const missing: string[] = LIVEKIT_ENV_KEYS.filter((key) => !process.env[key]?.trim());
   if (!validLiveKitUrl(process.env.LIVEKIT_URL?.trim())) {
     if (!missing.includes('LIVEKIT_URL')) missing.push('LIVEKIT_URL');
   }
