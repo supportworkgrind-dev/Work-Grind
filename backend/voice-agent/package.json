@@ -13,7 +13,6 @@
   },
   "dependencies": {
     "@livekit/agents": "^1.9.1",
-    "@livekit/agents-plugin-google": "^1.9.1",
     "dotenv": "^16.4.5"
   },
   "devDependencies": {

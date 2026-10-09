@@ -306,7 +306,9 @@ app.use('/api/auth/login',          rateLimiter(15, 10));   // 10 login attempts
 app.use('/api/auth/forgot-password', rateLimiter(60, 5));   // 5 resets per hour
     app.use('/api/calls', callingRoutes);
     app.use('/api/rtc', rtcRoutes);
-app.use('/api/ai',                  rateLimiter(60, 30));   // 30 AI requests per hour (cost protection)
+app.use('/api/ai',                  rateLimiter(60, 30, {
+  skip: (req) => req.originalUrl.split('?')[0] === '/api/ai/voice/turn',
+}));   // 30 AI requests per hour (cost protection; voice turns have session-bound limiting)
 app.use('/api/super-admin/auth',    rateLimiter(15, 5));    // 5 super-admin login attempts
 app.use('/api/client-portal/auth',  rateLimiter(15, 10));   // 10 client login attempts per 15 min
 app.use('/api/analytics',           rateLimiter(15, 60));   // 60 analytics requests per 15 min

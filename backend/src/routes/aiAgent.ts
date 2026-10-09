@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { createHash } from 'node:crypto';
 import { authenticate, requireCompany, requireEntitlement } from '../middleware/auth';
 import { rateLimiter } from '../middleware/rateLimiter';
 import {
@@ -8,9 +9,17 @@ import {
   deleteConversation,
   getTools,
 } from '../controllers/aiAgent.controller';
-import { createVoiceSession } from '../controllers/aiVoice.controller';
+import { createVoiceSession, runVoiceTurn } from '../controllers/aiVoice.controller';
 
 const router = Router();
+
+// The worker authenticates this route with a short-lived credential delivered only
+// through LiveKit's server-side agent dispatch metadata.
+router.post('/voice/turn', rateLimiter(60, 30, {
+  keyGenerator: (req) => createHash('sha256')
+    .update(req.get('authorization') ?? req.ip ?? 'unknown')
+    .digest('hex'),
+}), runVoiceTurn);
 
 router.use(authenticate, requireEntitlement('aiAssistant'));
 

@@ -47,6 +47,7 @@ export interface AgentTurnOptions {
     toolName: string;
     args: Record<string, unknown>;
   };
+  validateVoiceAction?: () => Promise<ToolContext | null>;
 }
 
 export class AIProviderUnavailableError extends Error {
@@ -169,19 +170,31 @@ async function executeToolCall(
   toolArgs: Record<string, any>,
   ctx: ToolContext,
   toolSteps: AgentToolStep[],
-  options: Pick<AgentTurnOptions, 'voiceMode' | 'voiceConfirmation'> = {},
+  options: Pick<AgentTurnOptions, 'voiceMode' | 'voiceConfirmation' | 'validateVoiceAction'> = {},
 ): Promise<ToolResult> {
-  if (!ctx.companyId) {
+  let actionContext = ctx;
+  if (options.voiceMode && options.validateVoiceAction) {
+    try {
+      const freshContext = await options.validateVoiceAction();
+      if (!freshContext) {
+        return { success: false, error: 'Workspace access or AI entitlement is no longer available.' };
+      }
+      actionContext = freshContext;
+    } catch {
+      return { success: false, error: 'Workspace permissions could not be revalidated. Please try again.' };
+    }
+  }
+  if (!actionContext.companyId) {
     return { success: false, error: 'Join a WorkGrind workspace to access workspace records or perform workspace actions.' };
   }
   const tool = getTool(toolName);
   if (!tool) return { success: false, error: 'Unknown workspace tool.' };
-  if (!isToolAvailable(toolName, ctx)) {
+  if (!isToolAvailable(toolName, actionContext)) {
     return { success: false, error: 'Your current plan does not include this WorkGrind feature.' };
   }
 
   const managerTools = new Set(['createProject', 'createDeal', 'updateDeal', 'assignTask']);
-  if (managerTools.has(toolName) && !canManageWorkspace(ctx)) {
+  if (managerTools.has(toolName) && !canManageWorkspace(actionContext)) {
     return { success: false, error: 'Your workspace role does not allow that action. Ask an owner, admin, or manager.' };
   }
 
@@ -201,14 +214,14 @@ async function executeToolCall(
     };
   } else {
     try {
-      result = await tool.execute(toolArgs, ctx);
+      result = await tool.execute(toolArgs, actionContext);
     } catch (error: any) {
       result = { success: false, error: error?.message ?? 'Workspace tool failed.' };
     }
   }
   const durationMs = Date.now() - startedAt;
   toolSteps.push({ toolName, toolArgs: sanitize(toolArgs), toolResult: result, durationMs });
-  await logToolAction(ctx, toolName, toolArgs, result, durationMs);
+  await logToolAction(actionContext, toolName, toolArgs, result, durationMs);
   return result;
 }
 
@@ -288,6 +301,7 @@ async function runGeminiTurn(
   onText?: (text: string) => void,
   voiceMode = false,
   voiceConfirmation?: AgentTurnOptions['voiceConfirmation'],
+  validateVoiceAction?: AgentTurnOptions['validateVoiceAction'],
 ): Promise<string> {
   const systemInstruction = buildSystemPrompt(ctx, voiceMode);
   const functionDeclarations = getGeminiFunctionDeclarations(getAvailableTools(ctx));
@@ -344,7 +358,7 @@ async function runGeminiTurn(
       }
       toolCallCount++;
       const args = functionCall.args && typeof functionCall.args === 'object' ? functionCall.args : {};
-      const result = await executeToolCall(functionCall.name, args, ctx, toolSteps, { voiceMode, voiceConfirmation });
+      const result = await executeToolCall(functionCall.name, args, ctx, toolSteps, { voiceMode, voiceConfirmation, validateVoiceAction });
       pendingParts.push({ functionResponse: { name: functionCall.name, response: sanitize(result) } });
     }
     if (toolCallCount >= MAX_TOOL_CALLS) {
@@ -363,6 +377,7 @@ async function runOpenAITurn(
   onText?: (text: string) => void,
   voiceMode = false,
   voiceConfirmation?: AgentTurnOptions['voiceConfirmation'],
+  validateVoiceAction?: AgentTurnOptions['validateVoiceAction'],
 ): Promise<string> {
   const messages: any[] = [
     { role: 'system', content: buildSystemPrompt(ctx, voiceMode) },
@@ -435,7 +450,7 @@ async function runOpenAITurn(
       }
       toolCallCount++;
       const args = parseToolArgs(call.function.arguments ?? '{}');
-      const result = await executeToolCall(call.function.name, args, ctx, toolSteps, { voiceMode, voiceConfirmation });
+      const result = await executeToolCall(call.function.name, args, ctx, toolSteps, { voiceMode, voiceConfirmation, validateVoiceAction });
       messages.push({ role: 'tool', tool_call_id: call.id, content: toolResultForModel(result) });
     }
     if (toolCallCount >= MAX_TOOL_CALLS) {
@@ -471,8 +486,8 @@ export async function runAgentTurn(
           }
         : undefined;
       reply = provider === 'gemini'
-        ? await runGeminiTurn(userMessage, history, ctx, toolSteps, providerSignal, onText, options.voiceMode, options.voiceConfirmation)
-        : await runOpenAITurn(userMessage, history, ctx, toolSteps, providerSignal, provider, onText, options.voiceMode, options.voiceConfirmation);
+        ? await runGeminiTurn(userMessage, history, ctx, toolSteps, providerSignal, onText, options.voiceMode, options.voiceConfirmation, options.validateVoiceAction)
+        : await runOpenAITurn(userMessage, history, ctx, toolSteps, providerSignal, provider, onText, options.voiceMode, options.voiceConfirmation, options.validateVoiceAction);
     } catch (error: any) {
       providerError = error;
     }
