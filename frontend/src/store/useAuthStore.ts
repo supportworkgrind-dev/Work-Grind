@@ -32,6 +32,7 @@ interface AuthState {
 
 export const useAuthStore = create<AuthState>((set, get) => {
   let currentUserRequest: { token: string; promise: Promise<void> } | null = null;
+  let subscriptionRequest: { token: string; promise: Promise<void> } | null = null;
 
   // Pin the legacy shared session into this tab before other accounts can switch it.
   let hasAccessToken = false;
@@ -71,35 +72,47 @@ export const useAuthStore = create<AuthState>((set, get) => {
             : subscription.usage.aiRequests;
           return usage >= limit;
         },
-    refreshSubscription: async () => {
+    refreshSubscription: () => {
       const token = getAuthValue('workgrind_access_token');
       if (!token) {
         disconnectSocket();
         set({ subscription: null, subscriptionLoading: false, subscriptionError: null, trialDaysRemaining: null });
-        return;
+        return Promise.resolve();
       }
-      set({ subscriptionLoading: true, subscriptionError: null });
-      try {
-        const res = await api.get('/subscription/status');
-        if (res.data.success && getAuthValue('workgrind_access_token') === token) {
-          const subscription = res.data.subscription as SubscriptionInfo;
-          setAuthValue('workgrind_subscription', JSON.stringify(subscription));
-          set({ subscription, subscriptionLoading: false, subscriptionError: null, trialDaysRemaining: subscription.trialDaysRemaining });
-          if (subscription.hasActiveAccess) getSocket();
-          else disconnectSocket();
-        } else if (getAuthValue('workgrind_access_token') === token) {
-          throw new Error('Subscription status response was invalid.');
+      if (subscriptionRequest?.token === token) return subscriptionRequest.promise;
+
+      const request = { token, promise: Promise.resolve() };
+      subscriptionRequest = request;
+      request.promise = (async () => {
+        set({ subscriptionLoading: true, subscriptionError: null });
+        try {
+          const res = await api.get('/subscription/status');
+          if (res.data.success && getAuthValue('workgrind_access_token') === token) {
+            const subscription = res.data.subscription as SubscriptionInfo;
+            if (!subscription || typeof subscription.hasActiveAccess !== 'boolean') {
+              throw new Error('Subscription status response was invalid.');
+            }
+            setAuthValue('workgrind_subscription', JSON.stringify(subscription));
+            set({ subscription, subscriptionLoading: false, subscriptionError: null, trialDaysRemaining: subscription.trialDaysRemaining });
+            if (subscription.hasActiveAccess) getSocket();
+            else disconnectSocket();
+          } else if (getAuthValue('workgrind_access_token') === token) {
+            throw new Error('Subscription status response was invalid.');
+          }
+        } catch (err) {
+          if (getAuthValue('workgrind_access_token') !== token) return;
+          console.error('Failed to refresh subscription:', err);
+          if (!get().subscription) disconnectSocket();
+          set({
+            subscription: get().subscription,
+            subscriptionLoading: false,
+            subscriptionError: 'Unable to verify your subscription. Please try again.',
+          });
+        } finally {
+          if (subscriptionRequest === request) subscriptionRequest = null;
         }
-      } catch (err) {
-        if (getAuthValue('workgrind_access_token') !== token) return;
-        console.error('Failed to refresh subscription:', err);
-        disconnectSocket();
-        set({
-          subscription: null,
-          subscriptionLoading: false,
-          subscriptionError: 'Unable to verify your subscription. Please try again.',
-        });
-      }
+      })();
+      return request.promise;
     },
 
     hasActiveAccess: () => {

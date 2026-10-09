@@ -194,7 +194,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return <>{children}</>;
   }
 
-  if (subscriptionLoading || (!subscription && !subscriptionError)) {
+  if (!subscription && (subscriptionLoading || !subscriptionError)) {
     return (
       <div className="flex h-screen w-full items-center justify-center" style={{ background: 'var(--wg-bg, #f5f2e9)' }}>
         <ThemeAwareLogo size="md" surface="light" />
@@ -202,7 +202,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (subscriptionError) {
+  if (subscriptionError && !subscription) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4 px-6 text-center" style={{ background: 'var(--wg-bg, #f5f2e9)' }}>
         <ThemeAwareLogo size="md" surface="light" />

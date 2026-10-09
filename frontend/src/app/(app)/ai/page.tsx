@@ -39,12 +39,20 @@ interface ChatMessage {
   createdAt:  Date;
   /** Which AI provider handled this message (backend returns this) */
   provider?:  AIProvider;
+  requestStatus?: 'pending' | 'complete' | 'failed';
 }
 
 interface ConversationSummary {
   _id:       string;
   title:     string;
   updatedAt: string;
+}
+
+interface ConversationHistoryMessage {
+  _id?: string;
+  role: 'user' | 'assistant';
+  content: string;
+  createdAt: string;
 }
 
 interface AgentCompletion {
@@ -258,31 +266,30 @@ function MessageBubble({ msg, user }: { msg: ChatMessage; user: any }) {
 export default function AIAgentPage() {
   const { user, subscription, isAtLimit, refreshSubscription } = useAuthStore();
   const aiLimitReached = isAtLimit('aiRequests');
-  const [messages,        setMessages]        = useState<ChatMessage[]>([]);
+  const [messages,        setMessages]        = useState<ChatMessage[]>(() => [{
+    id:        'welcome',
+    role:      'assistant',
+    content:   `Hello ${user?.fullName?.split(' ')[0] ?? 'there'}! 👋 I'm Tavro AI, built into WorkGrind.\n\nI can help you find information, create tasks and meetings, analyze your CRM, and much more — all from your workspace.`,
+    createdAt: new Date(0),
+  }]);
   const [input,           setInput]           = useState('');
   const [isLoading,       setIsLoading]       = useState(false);
   const [conversationId,  setConversationId]  = useState<string | null>(null);
   const [showHistory,     setShowHistory]     = useState(false);
   const [history,         setHistory]         = useState<ConversationSummary[]>([]);
   const [historyLoading,  setHistoryLoading]  = useState(false);
+  const [requestError,    setRequestError]    = useState('');
+  const [retryPrompt,     setRetryPrompt]     = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef       = useRef<HTMLTextAreaElement>(null);
+  const requestInFlight = useRef(false);
+  const conversationStorageKey = user?._id ? `workgrind:ai:active-conversation:${user._id}` : null;
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, []);
 
   useEffect(() => { scrollToBottom(); }, [messages, scrollToBottom]);
-
-  // Show welcome on mount
-  useEffect(() => {
-    setMessages([{
-      id:        'welcome',
-      role:      'assistant',
-      content:   `Hello ${user?.fullName?.split(' ')[0] ?? 'there'}! 👋 I'm Tavro AI, built into WorkGrind.\n\nI can help you find information, create tasks and meetings, analyze your CRM, and much more — all from your workspace.\n\nWhat would you like to do?`,
-      createdAt: new Date(),
-    }]);
-  }, [user?.fullName]);
 
   const loadHistory = async () => {
     setHistoryLoading(true);
@@ -298,22 +305,41 @@ export default function AIAgentPage() {
     loadHistory();
   };
 
-  const loadConversation = async (id: string) => {
+  const loadConversation = useCallback(async (id: string) => {
     try {
-      const res = await api.get(`/ai/agent/conversations/${id}`);
+      const res = await api.get<{
+        success: boolean;
+        message?: string;
+        conversation: { messages: ConversationHistoryMessage[] };
+      }>(`/ai/agent/conversations/${id}`);
       if (res.data.success) {
-        const msgs: ChatMessage[] = res.data.conversation.messages.map((m: any) => ({
-          id:        m._id ?? Math.random().toString(),
+        const msgs: ChatMessage[] = res.data.conversation.messages.map((m, index) => ({
+          id:        m._id ?? `${m.role}-${new Date(m.createdAt).getTime()}-${index}`,
           role:      m.role,
           content:   m.content,
           createdAt: new Date(m.createdAt),
+          requestStatus: 'complete',
         }));
         setMessages(msgs);
         setConversationId(id);
+        if (conversationStorageKey) sessionStorage.setItem(conversationStorageKey, id);
+        setRequestError('');
         setShowHistory(false);
+      } else {
+        setRequestError(res.data.message || 'Could not load this conversation. Please try again.');
       }
-    } catch { /* silent */ }
-  };
+    } catch {
+      setRequestError('Could not load this conversation. Check your connection and retry.');
+    }
+  }, [conversationStorageKey]);
+
+  useEffect(() => {
+    if (!conversationStorageKey) return;
+    const activeConversationId = sessionStorage.getItem(conversationStorageKey);
+    if (!activeConversationId) return;
+    const restoreTimer = window.setTimeout(() => void loadConversation(activeConversationId), 0);
+    return () => window.clearTimeout(restoreTimer);
+  }, [conversationStorageKey, loadConversation]);
 
   const deleteConversation = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -324,6 +350,9 @@ export default function AIAgentPage() {
 
   const startNewConversation = () => {
     setConversationId(null);
+    if (conversationStorageKey) sessionStorage.removeItem(conversationStorageKey);
+    setRequestError('');
+    setRetryPrompt('');
     setMessages([{
       id:        'welcome-new',
       role:      'assistant',
@@ -335,7 +364,10 @@ export default function AIAgentPage() {
 
   const send = async (text?: string) => {
     const prompt = (text ?? input).trim();
-    if (!prompt || isLoading || aiLimitReached) return;
+    if (!prompt || requestInFlight.current || isLoading || aiLimitReached) return;
+    requestInFlight.current = true;
+    setRequestError('');
+    setRetryPrompt('');
     setInput('');
 
     const userMsg: ChatMessage = {
@@ -343,6 +375,7 @@ export default function AIAgentPage() {
       role:      'user',
       content:   prompt,
       createdAt: new Date(),
+      requestStatus: 'pending',
     };
 
     const loadingMsg: ChatMessage = {
@@ -363,6 +396,18 @@ export default function AIAgentPage() {
       let eventBuffer = '';
       let completion: AgentCompletion | null = null;
       let streamError = '';
+      const activeConversationId = conversationId;
+      const history = messages
+        .filter((message) =>
+          (message.role === 'user' || message.role === 'assistant') &&
+          message.requestStatus !== 'failed' &&
+          message.requestStatus !== 'pending' &&
+          !message.id.startsWith('welcome') &&
+          !message.id.startsWith('err-') &&
+          message.content.trim()
+        )
+        .map(({ role, content }) => ({ role, content }));
+
       const applyEvent = (frame: string) => {
         let eventName = 'message';
         const dataLines: string[] = [];
@@ -378,7 +423,10 @@ export default function AIAgentPage() {
           return;
         }
 
-        if (eventName === 'delta' && typeof data.text === 'string') {
+        if (eventName === 'ready' && typeof data.conversationId === 'string') {
+          setConversationId(data.conversationId);
+          if (conversationStorageKey) sessionStorage.setItem(conversationStorageKey, data.conversationId);
+        } else if (eventName === 'delta' && typeof data.text === 'string') {
           streamedReply += data.text;
           setMessages(prev => prev.map(message => message.id === 'loading'
             ? { ...message, content: streamedReply, isLoading: false }
@@ -402,7 +450,8 @@ export default function AIAgentPage() {
       };
       const res = await api.post('/ai/agent', {
         message:        prompt,
-        conversationId: conversationId ?? undefined,
+        conversationId: activeConversationId ?? undefined,
+        history,
         stream: true,
       }, {
         timeout: 60_000,
@@ -431,6 +480,9 @@ export default function AIAgentPage() {
       if (!completion) throw new Error('Tavro AI closed the response before completing the answer.');
       void refreshSubscription();
       setConversationId(completion.conversationId ?? null);
+      if (completion.conversationId && conversationStorageKey) {
+        sessionStorage.setItem(conversationStorageKey, completion.conversationId);
+      }
       const assistantMsg: ChatMessage = {
         id:        Date.now().toString() + '-a',
         role:      'assistant',
@@ -440,7 +492,12 @@ export default function AIAgentPage() {
         provider:  (completion.provider ?? 'gemini') as AIProvider,
         createdAt: new Date(),
       };
-      setMessages(prev => [...prev.filter(m => m.id !== 'loading'), assistantMsg]);
+      setMessages(prev => [
+        ...prev.filter(m => m.id !== 'loading').map((message) =>
+          message.id === userMsg.id ? { ...message, requestStatus: 'complete' as const } : message
+        ),
+        assistantMsg,
+      ]);
     } catch (err: unknown) {
       const failure = err && typeof err === 'object'
         ? err as { response?: { data?: unknown }; code?: string; message?: string }
@@ -460,14 +517,14 @@ export default function AIAgentPage() {
             ? failure.message
             : 'Tavro AI could not reach the service. Check your connection and try again.'
       );
-      setMessages(prev => [...prev.filter(m => m.id !== 'loading'), {
-        id:        'err-' + Date.now(),
-        role:      'assistant',
-        content:   errMsg,
-        createdAt: new Date(),
-      }]);
+      setMessages(prev => prev
+        .filter(m => m.id !== 'loading')
+        .map((message) => message.id === userMsg.id ? { ...message, requestStatus: 'failed' as const } : message));
+      setRequestError(errMsg);
+      setRetryPrompt(prompt);
     } finally {
       setIsLoading(false);
+      requestInFlight.current = false;
       inputRef.current?.focus();
     }
   };
@@ -496,7 +553,7 @@ export default function AIAgentPage() {
             </button>
           </div>
 
-          <button onClick={startNewConversation}
+          <button onClick={startNewConversation} disabled={isLoading}
             className="flex items-center gap-2 px-4 py-2.5 text-[12px] font-semibold border-b transition-colors hover:bg-[var(--bg-hover)]"
             style={{ borderColor: 'var(--border-subtle)', color: 'var(--accent)' }}>
             <Plus className="h-3.5 w-3.5" />New conversation
@@ -513,7 +570,8 @@ export default function AIAgentPage() {
               history.map(c => (
                 <div key={c._id}
                   onClick={() => loadConversation(c._id)}
-                  className={`group flex items-center justify-between px-4 py-2.5 cursor-pointer transition-colors hover:bg-[var(--bg-hover)] ${
+                  aria-disabled={isLoading}
+                  className={`group flex items-center justify-between px-4 py-2.5 ${isLoading ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'} transition-colors hover:bg-[var(--bg-hover)] ${
                     c._id === conversationId ? 'bg-[var(--bg-active)]' : ''
                   }`}>
                   <div className="min-w-0 flex-1">
@@ -524,6 +582,7 @@ export default function AIAgentPage() {
                   </div>
                   <button
                     onClick={(e) => deleteConversation(c._id, e)}
+                    disabled={isLoading}
                     className="opacity-0 group-hover:opacity-100 btn-ghost h-5 w-5 p-0 rounded text-rose-500 transition-opacity"
                     aria-label="Delete">
                     <Trash2 className="h-3 w-3" />
@@ -559,11 +618,13 @@ export default function AIAgentPage() {
             <span className="badge badge-emerald text-[10px]">Active</span>
             {hasMessages && (
               <button onClick={startNewConversation} title="New conversation"
+                disabled={isLoading}
                 className="btn-ghost h-7 w-7 p-0 rounded-lg" aria-label="New conversation">
                 <Plus className="h-3.5 w-3.5" />
               </button>
             )}
             <button onClick={openHistory} title="Conversation history"
+              disabled={isLoading}
               className="btn-ghost h-7 w-7 p-0 rounded-lg" aria-label="History">
               <History className="h-3.5 w-3.5" />
             </button>
@@ -571,6 +632,22 @@ export default function AIAgentPage() {
         </div>
 
         {/* Messages */}
+        {requestError && (
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-700"
+            role="alert">
+            <span>{requestError}</span>
+            <div className="flex shrink-0 items-center gap-2">
+              {retryPrompt && (
+                <button type="button" onClick={() => void send(retryPrompt)} disabled={isLoading || aiLimitReached}
+                  className="rounded-lg border border-rose-300 px-3 py-1.5 text-xs font-semibold disabled:opacity-50">
+                  Retry
+                </button>
+              )}
+              <button type="button" onClick={() => setRequestError('')} aria-label="Dismiss error"
+                className="rounded-lg px-2 py-1.5 text-xs font-semibold">Dismiss</button>
+            </div>
+          </div>
+        )}
         <div className="flex-1 overflow-y-auto p-5 space-y-5 min-h-0">
           {messages.map(msg => (
             <MessageBubble key={msg.id} msg={msg} user={user} />

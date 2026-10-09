@@ -117,7 +117,7 @@ const PLAN_RANK: Record<string, number> = { free: 0, starter: 1, pro: 2 };
 /* ═══════════════════════════════════════════════════════════════════════ */
 
 export default function BillingPage() {
-  const { user, company, fetchCurrentUser, refreshSubscription } = useAuthStore();
+  const { user, company, fetchCurrentUser } = useAuthStore();
 
   const [sub,          setSub]          = useState<SubscriptionInfo | null>(null);
   const [plans,        setPlans]        = useState<PlanConfig[]>([]);
@@ -134,21 +134,37 @@ export default function BillingPage() {
 
   const loadData = useCallback(async () => {
     setLoadingSub(true);
+    setError('');
     try {
-      const [subRes, planRes] = await Promise.all([
+      const [subResult, planResult] = await Promise.allSettled([
         api.get('/subscription/status'),
         api.get('/subscription/plans'),
       ]);
-      if (subRes.data.success) {
-        setSub(subRes.data.subscription);
-        void refreshSubscription();
+      const errors: string[] = [];
+      if (subResult.status === 'fulfilled' && subResult.value.data?.success &&
+          (subResult.value.data.subscription === null || typeof subResult.value.data.subscription === 'object')) {
+        setSub(subResult.value.data.subscription ?? null);
+      } else {
+        errors.push(
+          subResult.status === 'rejected'
+            ? 'Could not load the current subscription state.'
+            : subResult.value.data?.message || 'The subscription response was invalid.'
+        );
       }
-      if (planRes.data.success) setPlans(planRes.data.plans);
-    } catch (error) {
-      console.error('Failed to load subscription billing data:', error);
-      setError('Could not load the current subscription state. Refresh the page or try again.');
+      if (planResult.status === 'fulfilled' && planResult.value.data?.success &&
+          Array.isArray(planResult.value.data.plans)) {
+        setPlans(planResult.value.data.plans);
+      } else {
+        errors.push(
+          planResult.status === 'rejected'
+            ? 'Could not load available plans.'
+            : planResult.value.data?.message || 'The available plans response was invalid.'
+        );
+      }
+      setError(errors.join(' '));
+    } finally {
+      setLoadingSub(false);
     }
-    finally { setLoadingSub(false); }
   }, []);
 
   useEffect(() => { loadData(); }, [loadData]);
@@ -269,13 +285,22 @@ export default function BillingPage() {
 
       {/* Alerts */}
       {error && (
-        <div className="alert-danger">
-          <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />{error}
+        <div className="alert-danger flex items-center justify-between gap-3" role="alert">
+          <span className="flex items-start gap-2"><AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />{error}</span>
+          <button type="button" onClick={() => void loadData()} disabled={loadingSub}
+            className="btn-ghost shrink-0" aria-label="Retry loading billing data">
+            {loadingSub ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Retry'}
+          </button>
         </div>
       )}
       {success && (
         <div className="flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
           <CheckCircle2 className="h-4 w-4 shrink-0" />{success}
+        </div>
+      )}
+      {!sub && !error && (
+        <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600" role="status">
+          No subscription record is associated with this workspace yet. Available plans are listed below.
         </div>
       )}
 
@@ -395,11 +420,11 @@ export default function BillingPage() {
           <div className="p-5 grid grid-cols-2 sm:grid-cols-4 gap-4">
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>Plan</p>
-              <p className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{displayPlanName ?? '—'}</p>
+              <p className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{displayPlanName ?? 'No subscription'}</p>
             </div>
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>Status</p>
-              {sub ? <StatusBadge status={sub.status} /> : <span className="text-sm" style={{ color: 'var(--text-muted)' }}>—</span>}
+              {sub ? <StatusBadge status={sub.status} /> : <StatusBadge status="none" />}
             </div>
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>Price</p>
@@ -470,6 +495,11 @@ export default function BillingPage() {
               />
             ))}
           </div>
+          {!plans.length && !error && (
+            <p className="mt-4 text-sm text-center" style={{ color: 'var(--text-muted)' }}>
+              No subscription plans are currently available.
+            </p>
+          )}
           <p className="mt-3 text-[11px] text-center" style={{ color: 'var(--text-muted)' }}>
             Payments processed securely by Polar. No card stored on our servers.
             Your workspace pays once — all members are covered.

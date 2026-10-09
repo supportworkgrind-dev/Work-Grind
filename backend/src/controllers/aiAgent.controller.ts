@@ -120,7 +120,7 @@ export const runAgent = async (req: AuthRequest, res: Response): Promise<void> =
         'X-Accel-Buffering': 'no',
       });
       res.flushHeaders();
-      sendEvent('ready', {});
+      sendEvent('ready', { conversationId: conversation?._id.toString() ?? null });
       req.once('aborted', abortIfDisconnected);
       res.once('close', abortIfDisconnected);
     }
