@@ -945,13 +945,17 @@ export const joinCompany = async (req: AuthRequest, res: Response): Promise<void
 };
 
 export const getMe = async (req: AuthRequest, res: Response): Promise<void> => {
+  let failureStage = 'user_lookup';
   try {
     const user = await User.findById(req.user!.userId).populate(
       'companyId',
       'name logo plan inviteCode accountType industry size country timeZone settings'
     );
     if (!user) { res.status(404).json({ success: false, message: 'User not found' }); return; }
-    if (!user.callingId) user.callingId = await ensureUserCallingId(user._id);
+    if (!user.callingId) {
+      failureStage = 'calling_id_allocation';
+      user.callingId = await ensureUserCallingId(user._id);
+    }
 
     // Auto-expire trial inline on every /auth/me call
     if (
@@ -959,6 +963,7 @@ export const getMe = async (req: AuthRequest, res: Response): Promise<void> => {
       user.trialEndDate &&
       new Date() > user.trialEndDate
     ) {
+      failureStage = 'trial_expiry_update';
       user.subscriptionStatus = 'expired';
       await user.save();
     }
@@ -970,10 +975,29 @@ export const getMe = async (req: AuthRequest, res: Response): Promise<void> => {
       trialDaysRemaining = Math.max(0, Math.ceil(msLeft / (1000 * 60 * 60 * 24)));
     }
 
+    failureStage = 'avatar_url_refresh';
     res.set({
       'Cache-Control': 'private, no-store, no-cache, must-revalidate',
       Vary: 'Authorization',
     });
     res.json({ success: true, user: await refreshAvatarUrls(user.toObject()), trialDaysRemaining });
-  } catch (e: any) { res.status(500).json({ success: false, message: e.message }); }
+  } catch (error) {
+    const errorCode = (error as { code?: unknown })?.code;
+    const safeErrorCode = typeof errorCode === 'number'
+      ? errorCode
+      : typeof errorCode === 'string' && /^[\w.-]{1,40}$/.test(errorCode)
+        ? errorCode
+        : undefined;
+    console.error('[Auth] GET /api/auth/me failed.', {
+      requestId: req.get('x-request-id')?.replace(/[^\w.-]/g, '').slice(0, 128),
+      stage: failureStage,
+      errorName: error instanceof Error ? error.name : 'UnknownError',
+      ...(safeErrorCode !== undefined ? { errorCode: safeErrorCode } : {}),
+      httpStatus: 500,
+    });
+    res.status(500).json({
+      success: false,
+      message: 'Unable to load your account right now. Please try again.',
+    });
+  }
 };
