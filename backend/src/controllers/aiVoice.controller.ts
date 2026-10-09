@@ -139,6 +139,7 @@ export const createVoiceSession = async (req: AuthRequest, res: Response): Promi
     return;
   }
 
+  let failureStage = 'user_lookup';
   try {
     const user = await User.findById(req.user!.userId)
       .select('companyId role isActive isVerified isDeleted')
@@ -164,6 +165,7 @@ export const createVoiceSession = async (req: AuthRequest, res: Response): Promi
       return;
     }
 
+    failureStage = 'company_lookup';
     const company = await Company.findById(companyId).select('isActive').lean();
     if (!company?.isActive) {
       res.status(403).json({
@@ -174,6 +176,7 @@ export const createVoiceSession = async (req: AuthRequest, res: Response): Promi
       return;
     }
 
+    failureStage = 'session_token_creation';
     const roomName = `tavro-${randomUUID()}`;
     const accessToken = new AccessToken(
       process.env.LIVEKIT_API_KEY!.trim(),
@@ -207,6 +210,7 @@ export const createVoiceSession = async (req: AuthRequest, res: Response): Promi
         expiresIn: VOICE_CREDENTIAL_TTL,
       },
     );
+    failureStage = 'livekit_client_initialization';
     const token = await accessToken.toJwt();
     const livekitHost = liveKitApiHost();
     const roomService = new RoomServiceClient(
@@ -220,7 +224,9 @@ export const createVoiceSession = async (req: AuthRequest, res: Response): Promi
       process.env.LIVEKIT_API_SECRET!.trim(),
     );
 
+    failureStage = 'livekit_room_creation';
     await roomService.createRoom({ name: roomName, emptyTimeout: 300, maxParticipants: 2 });
+    failureStage = 'livekit_agent_dispatch';
     try {
       await dispatchService.createDispatch(roomName, AGENT_NAME, {
         metadata: JSON.stringify({ voiceTurnToken }),
@@ -250,8 +256,25 @@ export const createVoiceSession = async (req: AuthRequest, res: Response): Promi
       expiresInSeconds: TOKEN_TTL_SECONDS,
     });
   } catch (error) {
+    const candidate = error as {
+      code?: unknown;
+      status?: unknown;
+      statusCode?: unknown;
+      $metadata?: { httpStatusCode?: unknown };
+    };
+    const rawCode = candidate?.code;
+    const errorCode = typeof rawCode === 'number'
+      ? rawCode
+      : typeof rawCode === 'string' && /^[\w.-]{1,40}$/.test(rawCode)
+        ? rawCode
+        : undefined;
+    const rawStatus = candidate?.statusCode ?? candidate?.status ?? candidate?.$metadata?.httpStatusCode;
     console.error('[Tavro Voice] Session dispatch failed.', {
+      requestId: req.get('x-request-id')?.replace(/[^\w.-]/g, '').slice(0, 128),
+      stage: failureStage,
       errorName: error instanceof Error ? error.name : 'UnknownError',
+      ...(errorCode !== undefined ? { errorCode } : {}),
+      ...(typeof rawStatus === 'number' ? { providerStatus: rawStatus } : {}),
       httpStatus: 503,
     });
     res.status(503).json({

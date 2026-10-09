@@ -630,8 +630,10 @@ redeploy both projects so build-time and runtime configuration is applied:
 | Project | Variable | Production value |
 | --- | --- | --- |
 | Frontend | `NEXT_PUBLIC_API_URL` | `https://backend-rho-vert-59.vercel.app` |
+| Frontend | `NEXT_PUBLIC_LIVEKIT_URL` | The same LiveKit Cloud WSS URL configured as backend `LIVEKIT_URL` |
 | Backend | `BACKEND_URL` | `https://backend-rho-vert-59.vercel.app` |
 | Backend | `CLIENT_URL` | `https://frontend-mu-rosy-fb41u8nrz0.vercel.app` |
+| Backend | `TAVRO_VOICE_AGENT_SECRET` | Unique random secret with at least 32 characters |
 | Backend | `GOOGLE_REDIRECT_URI` | `https://backend-rho-vert-59.vercel.app/api/auth/oauth/google/callback` |
 | Backend | `MONGODB_URI` | MongoDB connection string (secret) |
 | Backend | `JWT_SECRET` | Production access-token signing key (secret) |
@@ -647,6 +649,11 @@ in the frontend build; it may be set to the backend origin (recommended) or its
 `/api` URL. The legacy `NEXT_PUBLIC_API_BASE_URL` alias is also accepted; if
 both public variables are set, they must use the same backend origin. Remove
 any conflicting value and redeploy. OAuth client secrets must remain backend-only.
+Set `NEXT_PUBLIC_LIVEKIT_URL` to the same public `wss://` LiveKit project URL as
+the backend's `LIVEKIT_URL`; the frontend uses it to allow only that LiveKit
+origin in its production CSP. The backend voice-session endpoint also requires
+`TAVRO_VOICE_AGENT_SECRET`; generate a unique value and configure it only as a
+backend secret. Redeploy the frontend and backend after applying these settings.
 
 ### Realtime Socket.IO deployment
 

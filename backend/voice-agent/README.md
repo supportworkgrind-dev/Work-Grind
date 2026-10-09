@@ -17,6 +17,9 @@ Create a LiveKit Cloud project and configure:
 
 Configure `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`, and
 `TAVRO_VOICE_AGENT_SECRET` in the WorkGrind backend environment as well.
+Configure the same public `LIVEKIT_URL` as the frontend's
+`NEXT_PUBLIC_LIVEKIT_URL`; this allows the production Content Security Policy
+to permit the voice signaling connection to that LiveKit project.
 `TAVRO_VOICE_AGENT_SECRET` must be a unique random value with at least 32
 characters. The backend signs a short-lived credential bound to the user,
 workspace, and LiveKit room, then sends it to the worker only through
