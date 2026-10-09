@@ -43,6 +43,9 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
     const responseData = error.response?.data;
+    const failedPath = typeof originalRequest?.url === 'string'
+      ? new URL(originalRequest.url, typeof window === 'undefined' ? 'http://localhost' : window.location.origin).pathname
+      : '';
     if (
       typeof window !== 'undefined' &&
       (responseData?.requiresUpgrade || responseData?.code === 'PLAN_UPGRADE_REQUIRED')
@@ -65,9 +68,20 @@ api.interceptors.response.use(
       const requestToken = originalRequest.headers?.Authorization;
       const currentToken = getAuthValue('workgrind_access_token');
       if (!currentToken || requestToken !== `Bearer ${currentToken}`) {
+        if (failedPath.endsWith('/auth/me')) {
+          console.warn('[Auth] Current-user request rejected; refresh was not attempted.', {
+            path: failedPath,
+            reason: !currentToken ? 'access_token_missing' : 'session_token_changed',
+          });
+        }
         return Promise.reject(error);
       }
       originalRequest._retry = true;
+      if (failedPath.endsWith('/auth/me')) {
+        console.info('[Auth] Refreshing an access token after current-user request was rejected.', {
+          path: failedPath,
+        });
+      }
       try {
         const { accessToken } = await refreshAuthTokens(currentToken);
         if (getAuthValue('workgrind_access_token') !== accessToken) {
@@ -75,8 +89,19 @@ api.interceptors.response.use(
         }
         refreshSocketAuth(accessToken);
         originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+        if (failedPath.endsWith('/auth/me')) {
+          console.info('[Auth] Access token refreshed; retrying current-user request.', {
+            path: failedPath,
+          });
+        }
         return api(originalRequest);
       } catch (refreshError) {
+        if (failedPath.endsWith('/auth/me')) {
+          console.warn('[Auth] Current-user token refresh failed.', {
+            path: failedPath,
+            refreshStatus: axios.isAxiosError(refreshError) ? refreshError.response?.status : undefined,
+          });
+        }
         if (
           axios.isAxiosError(refreshError) &&
           refreshError.response?.status === 401 &&

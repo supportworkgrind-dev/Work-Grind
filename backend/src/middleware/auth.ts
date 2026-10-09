@@ -45,7 +45,12 @@ function sendSubscriptionRequired(res: Response, sub: Awaited<ReturnType<typeof 
 export const authenticate = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   const token = getBearerToken(req.headers.authorization);
   if (!token) {
-    console.error(`[Auth] 401 No token provided for ${req.method} ${req.originalUrl}`);
+    console.warn('[Auth] Request rejected because the access token is missing.', {
+      method: req.method,
+      path: req.path,
+      reason: 'access_token_missing',
+      httpStatus: 401,
+    });
     res.status(401).json({ success: false, message: 'No token provided' });
     return;
   }
@@ -62,8 +67,12 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
     }
     req.user = payload;
   } catch (err) {
-    const errorMessage = err instanceof Error ? err.message : String(err);
-    console.error(`[Auth] 401 Invalid or expired token for ${req.method} ${req.originalUrl}: ${errorMessage}`);
+    console.warn('[Auth] Request rejected because the access token is invalid.', {
+      method: req.method,
+      path: req.path,
+      errorName: err instanceof Error ? err.name : 'UnknownError',
+      httpStatus: 401,
+    });
     res.status(401).json({ success: false, message: 'Invalid or expired token' });
     return;
   }

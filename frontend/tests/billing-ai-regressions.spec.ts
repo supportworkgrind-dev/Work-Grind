@@ -62,6 +62,7 @@ async function mockApi(
     failFirstAgentRequest?: boolean;
     failSubscriptionRequestAt?: number;
     noSubscriptionRecord?: boolean;
+    expireCurrentUserOnce?: { value: boolean };
   }
 ) {
   const request = route.request();
@@ -80,6 +81,16 @@ async function mockApi(
     return;
   }
   if (pathname.endsWith('/auth/me')) {
+    if (options.expireCurrentUserOnce && !options.expireCurrentUserOnce.value) {
+      options.expireCurrentUserOnce.value = true;
+      await route.fulfill({
+        status: 401,
+        headers,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: false, message: 'Invalid or expired token' }),
+      });
+      return;
+    }
     await route.fulfill({
       status: 200,
       headers,
@@ -96,6 +107,15 @@ async function mockApi(
           preferredLanguage: 'en',
         },
       }),
+    });
+    return;
+  }
+  if (pathname.endsWith('/auth/refresh')) {
+    await route.fulfill({
+      status: 200,
+      headers,
+      contentType: 'application/json',
+      body: JSON.stringify({ success: true, accessToken: 'playwright-refreshed-access' }),
     });
     return;
   }
@@ -301,6 +321,30 @@ test('Tavro keeps the same conversation through the subscription refresh and res
   await expect(page.getByText('Continue in this same conversation.')).toBeVisible();
   await expect(page.getByText('OK response').last()).toBeVisible();
   await expect(page).toHaveURL(/\/ai$/);
+});
+
+test('Tavro remains on the same route when /auth/me recovers through refresh', async ({ page }) => {
+  const state = makeApiState();
+  const currentUser401 = { value: false };
+  const refreshRequests: number[] = [];
+  await setSessionAuth(page);
+  await page.route('**/api/**', async (route) => {
+    if (new URL(route.request().url()).pathname.endsWith('/auth/refresh')) {
+      refreshRequests.push(Date.now());
+    }
+    await mockApi(route, {
+      ...state,
+      failSubscriptionRequestAt: undefined,
+      failFirstAgentRequest: false,
+      expireCurrentUserOnce: currentUser401,
+    });
+  });
+  await page.goto('/ai');
+
+  await expect(page.getByPlaceholder(/Ask me to find tasks/)).toBeVisible();
+  await expect(page).toHaveURL(/\/ai$/);
+  expect(refreshRequests).toHaveLength(1);
+  expect(currentUser401.value).toBe(true);
 });
 
 test('Tavro shows retry controls when the agent API returns a server error', async ({ page }) => {

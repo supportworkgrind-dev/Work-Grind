@@ -141,6 +141,28 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
     }
   }, [clearAgentJoinTimer]);
 
+  useEffect(() => {
+    const handleSecurityPolicyViolation = (event: SecurityPolicyViolationEvent) => {
+      if (event.effectiveDirective !== 'connect-src') return;
+      let blockedUrl = event.blockedURI;
+      try {
+        const url = new URL(event.blockedURI);
+        blockedUrl = `${url.origin}${url.pathname}`;
+      } catch {
+        // CSP can report non-URL sources such as inline or eval.
+      }
+      console.error('[Tavro Voice] CSP blocked a connection.', {
+        directive: event.effectiveDirective,
+        blockedUrl,
+        disposition: event.disposition,
+        roomId: roomRef.current?.name,
+      });
+    };
+
+    document.addEventListener('securitypolicyviolation', handleSecurityPolicyViolation);
+    return () => document.removeEventListener('securitypolicyviolation', handleSecurityPolicyViolation);
+  }, []);
+
   const startConversation = async () => {
     if (startInProgressRef.current || roomRef.current) return;
     startInProgressRef.current = true;
@@ -262,6 +284,16 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
       connectTimeoutId = null;
 
       console.info('[Tavro Voice] LiveKit room connected.', { roomId: response.data.roomName });
+      try {
+        console.info('[Tavro Voice] LiveKit signaling origin.', {
+          roomId: response.data.roomName,
+          origin: new URL(response.data.serverUrl).origin,
+        });
+      } catch {
+        console.warn('[Tavro Voice] LiveKit session returned an invalid signaling URL.', {
+          roomId: response.data.roomName,
+        });
+      }
       await room.localParticipant.setMicrophoneEnabled(true);
       console.info('[Tavro Voice] Microphone published.', { roomId: response.data.roomName });
       setIsMuted(false);
@@ -318,8 +350,12 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
     }
   };
 
-  const endConversation = async () => {
+  const endConversation = async (source: 'close_button' | 'end_button' | 'error_close_button') => {
     setErrorMessage('');
+    console.info('[Tavro Voice] User requested voice session end.', {
+      roomId: roomRef.current?.name,
+      source,
+    });
     await disconnectRoom(false, 'user_ended_session');
     setRoomName('');
   };
@@ -359,7 +395,7 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
         </div>
         <button
           type="button"
-          onClick={() => void endConversation().then(onClose)}
+          onClick={() => void endConversation('close_button').then(onClose)}
           className="btn-ghost h-8 w-8 shrink-0 rounded-lg p-0"
           aria-label="Close voice assistant"
           title="Close voice assistant"
@@ -440,7 +476,7 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
             </button>
             <button
               type="button"
-              onClick={() => void endConversation()}
+              onClick={() => void endConversation('end_button')}
               className="flex h-12 items-center gap-2 rounded-full bg-rose-600 px-5 text-sm font-semibold text-white shadow-md transition hover:bg-rose-700"
             >
               <PhoneOff className="h-4 w-4" />
@@ -451,7 +487,7 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
           <>
             <button
               type="button"
-              onClick={() => void endConversation()}
+              onClick={() => void endConversation('error_close_button')}
               className="btn-ghost h-11 rounded-xl px-4 text-sm"
             >
               Close

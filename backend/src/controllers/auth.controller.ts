@@ -192,23 +192,42 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 };
 
 export const refresh = async (req: Request, res: Response): Promise<void> => {
+  let failureStage = 'refresh_token_lookup';
   try {
-    const refreshToken = getRefreshCookie(req) ||
-      (typeof req.body?.refreshToken === 'string' ? req.body.refreshToken : '');
+    const cookieRefreshToken = getRefreshCookie(req);
+    const bodyRefreshToken = typeof req.body?.refreshToken === 'string' ? req.body.refreshToken : '';
+    const refreshToken = cookieRefreshToken || bodyRefreshToken;
     if (!refreshToken) {
+      console.warn('[Auth] Refresh rejected because no refresh credential was supplied.', {
+        path: req.path,
+        refreshCookiePresent: false,
+        legacyBodyTokenPresent: false,
+        httpStatus: 401,
+      });
       clearRefreshCookie(res);
       res.status(401).json({ success: false, message: 'Refresh token required' });
       return;
     }
+    failureStage = 'refresh_token_verification';
     const decoded = verifyRefreshToken(refreshToken);
+    failureStage = 'user_lookup';
     const user = await User.findById(decoded.userId);
+    failureStage = 'refresh_token_validation';
     const tokenHash = hashRefreshToken(refreshToken);
     const storedToken = user?.refreshTokens.find((stored) => stored === tokenHash || stored === refreshToken);
     if (!user || !storedToken || !user.isVerified || !user.isActive || user.isDeleted) {
+      console.warn('[Auth] Refresh rejected because the credential is invalid or revoked.', {
+        path: req.path,
+        refreshCookiePresent: Boolean(cookieRefreshToken),
+        legacyBodyTokenPresent: Boolean(bodyRefreshToken),
+        userFound: Boolean(user),
+        httpStatus: 401,
+      });
       clearRefreshCookie(res);
       res.status(401).json({ success: false, message: 'Invalid refresh token' });
       return;
     }
+    failureStage = 'refresh_token_rotation';
     const tokens = issue(user._id.toString(), user.companyId?.toString() || '', user.role);
     const remainingTokens = normalizeRefreshTokenStore(user.refreshTokens)
       .filter((stored) => stored !== tokenHash && stored !== storedToken);
@@ -218,13 +237,24 @@ export const refresh = async (req: Request, res: Response): Promise<void> => {
       { new: true },
     );
     if (!updated) {
+      console.warn('[Auth] Refresh rejected because token rotation did not match the stored session.', {
+        path: req.path,
+        refreshCookiePresent: Boolean(cookieRefreshToken),
+        httpStatus: 401,
+      });
       clearRefreshCookie(res);
       res.status(401).json({ success: false, message: 'Invalid refresh token' });
       return;
     }
     setRefreshCookie(res, tokens.refreshToken);
     res.json({ success: true, accessToken: tokens.accessToken });
-  } catch {
+  } catch (error) {
+    console.warn('[Auth] Refresh request failed.', {
+      path: req.path,
+      stage: failureStage,
+      errorName: error instanceof Error ? error.name : 'UnknownError',
+      httpStatus: 401,
+    });
     clearRefreshCookie(res);
     res.status(401).json({ success: false, message: 'Invalid or expired refresh token' });
   }
