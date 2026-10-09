@@ -10,7 +10,7 @@ import User from '../models/User';
 import { createCallSessionToken } from '../services/callSessionToken';
 import { ensureUserCallingId, isValidCallingId, normalizeCallingId } from '../services/callingId';
 import { refreshAvatarUrls } from '../services/avatarUrls';
-import { emitToUser, getOnlineUsers, hasCallSessionSockets, publishUserPresence, terminateGlobalCall } from '../utils/socket';
+import { emitToUser, hasCallSessionSockets, isUserOnline, publishUserPresence, terminateGlobalCall } from '../utils/socket';
 
 const RING_TIMEOUT_MS = 45_000;
 const callExpiryTimers = new Map<string, NodeJS.Timeout>();
@@ -101,7 +101,7 @@ export async function createGlobalCall(req: Request, res: Response): Promise<voi
     res.status(403).json({ success: false, code: 'CALL_BLOCKED', message: 'This call cannot be placed.' });
     return;
   }
-  if (!getOnlineUsers().includes(receiver._id.toString())) {
+  if (!await isUserOnline(receiver._id.toString())) {
     res.status(409).json({ success: false, code: 'CALL_RECIPIENT_OFFLINE', message: 'This WorkGrind user is not available right now.' });
     return;
   }

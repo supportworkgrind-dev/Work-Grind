@@ -648,6 +648,24 @@ in the frontend build; it may be set to the backend origin (recommended) or its
 both public variables are set, they must use the same backend origin. Remove
 any conflicting value and redeploy. OAuth client secrets must remain backend-only.
 
+### Realtime Socket.IO deployment
+
+The backend Socket.IO endpoint is the dedicated Vercel function
+`/api/socket-io/socket.io` and uses websocket transport.
+The MongoDB Socket.IO adapter coordinates events across Vercel function
+instances, while short-lived presence leases are stored separately from user
+records. The first backend request creates the adapter's capped
+`socket.io-adapter-events` collection; MongoDB also creates the
+`realtimepresences` collection and its lease indexes on first use.
+
+The configured MongoDB deployment must be a replica set or sharded cluster with
+change-stream support, and the database user must be allowed to create the
+adapter collection and presence indexes. Vercel must have WebSocket support
+enabled for the backend project. No additional secret or environment variable
+is introduced. If those infrastructure prerequisites are unavailable, the
+backend logs a safe realtime initialization error and rejects Socket.IO
+connections rather than silently treating another function instance as local.
+
 ---
 
 # 🔐 Authentication Flow

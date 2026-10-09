@@ -145,7 +145,7 @@ export const getActiveMeetings = async (req: AuthRequest, res: Response): Promis
       .exec();
 
     const enriched = await Promise.all(meetings.map(async (meeting) => {
-      const activeSockets = getMeetingParticipants(meeting.meetingLink);
+      const activeSockets = await getMeetingParticipants(meeting.meetingLink);
       return {
         ...await getMeetingSafeView(meeting, req.user!.userId),
         activeParticipantCount: Math.max(activeSockets.length, 1),

@@ -20,6 +20,7 @@
     "@google/genai": "^2.22.0",
     "@livekit/protocol": "^1.52.1",
     "@polar-sh/sdk": "^0.49.0",
+    "@socket.io/mongo-adapter": "^0.4.0",
     "agents": "^0.24.0",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",

@@ -11,7 +11,9 @@ let _dbConfigMissing = false;
 export function setDbConfigMissing() { _dbConfigMissing = true; }
 export function isDbConfigMissing() { return _dbConfigMissing; }
 
-export const connectDB = async (): Promise<typeof mongoose | null> => {
+let connectionAttempt: Promise<typeof mongoose | null> | null = null;
+
+const connectDBInternal = async (): Promise<typeof mongoose | null> => {
   if (mongoose.connection.readyState === 1) {
     return mongoose;
   }
@@ -121,4 +123,14 @@ export const connectDB = async (): Promise<typeof mongoose | null> => {
     console.error('❌ MongoDB connection failed.', { errorName, reason });
     throw error;
   }
+};
+
+export const connectDB = (): Promise<typeof mongoose | null> => {
+  if (mongoose.connection.readyState === 1) return Promise.resolve(mongoose);
+  if (!connectionAttempt) {
+    connectionAttempt = connectDBInternal().finally(() => {
+      connectionAttempt = null;
+    });
+  }
+  return connectionAttempt;
 };

@@ -80,7 +80,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 
 import { connectDB, isDbConfigMissing } from './utils/db';
-import { initSocket } from './utils/socket';
+import { ensureSocketAdapterReady, initSocket } from './utils/socket';
 import { errorHandler } from './middleware/errorHandler';
 import { rateLimiter } from './middleware/rateLimiter';
 import { logPolarConfig } from './config/subscription';
@@ -147,6 +147,7 @@ async function ensureServerlessInitialization(): Promise<boolean> {
       if (!serverlessInitialized) {
         await migrateRefreshTokensAtRest();
         await cleanupExpiredVerificationCodes();
+        await ensureSocketAdapterReady();
         serverlessInitialized = true;
       }
       return true;
@@ -381,6 +382,7 @@ async function startServer(): Promise<void> {
     }
 
     initSocket(server);
+    await ensureSocketAdapterReady();
 
     const runDueReminderSweep = () => {
       if (mongoose.connection.readyState !== 1) return;
@@ -426,3 +428,4 @@ async function startServer(): Promise<void> {
 if (!isVercelRuntime) void startServer();
 
 export default app;
+export { server };

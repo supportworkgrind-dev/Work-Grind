@@ -4,9 +4,17 @@
     {
       "src": "api/index.ts",
       "use": "@vercel/node"
+    },
+    {
+      "src": "api/socket-io.ts",
+      "use": "@vercel/node"
     }
   ],
   "routes": [
+    {
+      "src": "/api/socket-io(?:/.*)?",
+      "dest": "/api/socket-io.ts"
+    },
     {
       "src": "/api/(.*)",
       "dest": "/api/index.ts"

@@ -140,12 +140,12 @@ export const getSocket = (): Socket | null => {
       && SOCKET_URL === window.location.origin;
 
     socket = io(SOCKET_URL, {
-      path: '/socket.io',
+      path: '/api/socket-io/socket.io',
       addTrailingSlash: !isProxiedDevTunnel,
       // Socket.IO receives the raw access JWT; the backend validates it with
       // the same verifier used for Bearer tokens on authenticated API routes.
       auth: { token },
-      transports: ['polling', 'websocket'],
+      transports: ['websocket'],
       reconnection: true,
       reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,

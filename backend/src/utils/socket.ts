@@ -1,11 +1,14 @@
 import { Server as HTTPServer } from 'http';
 import { Server as SocketServer, Socket } from 'socket.io';
+import { createAdapter } from '@socket.io/mongo-adapter';
 import { createHash } from 'crypto';
+import { connectDB } from './db';
 import { getBearerToken, verifyAccessToken } from './jwt';
 import CallSession from '../models/CallSession';
 import Meeting from '../models/Meeting';
 import MeetingAccessGrant from '../models/MeetingAccessGrant';
 import Conversation from '../models/Conversation';
+import RealtimePresence from '../models/RealtimePresence';
 import { generateSignedAvatarUrl, isR2Configured } from '../services/r2Storage';
 import User from '../models/User';
 import { getAllowedClientOrigins } from './clientOrigins';
@@ -13,8 +16,10 @@ import { verifyCallSessionToken } from '../services/callSessionToken';
 import { getEffectiveSubscription } from '../services/companySubscription';
 
 let io: SocketServer;
-const onlineUsers = new Map<string, Set<string>>();
-const onlineUserCompanies = new Map<string, string>();
+let adapterReady: Promise<void> | null = null;
+const ADAPTER_COLLECTION = 'socket.io-adapter-events';
+const PRESENCE_LEASE_MS = 90_000;
+const PRESENCE_HEARTBEAT_MS = 30_000;
 
 export interface MeetingParticipant {
   socketId: string;
@@ -36,9 +41,45 @@ export interface MeetingParticipant {
 type GlobalCallTerminalStatus = 'completed' | 'missed' | 'rejected' | 'cancelled';
 type PresenceStatus = 'online' | 'away' | 'busy' | 'offline';
 
-// Map: meetingId (or meetingLink) -> Map of socketId -> MeetingParticipant
-const meetingRooms = new Map<string, Map<string, MeetingParticipant>>();
 const MEETING_LINK_TTL_MS = 24 * 60 * 60 * 1000;
+
+const userRoom = (userId: string) => `user:${userId}`;
+const meetingParticipantFor = (socket: Pick<Socket, 'data'>, meetingId: string) =>
+  (socket.data.meetingParticipants as Record<string, MeetingParticipant> | undefined)?.[meetingId];
+
+export async function ensureSocketAdapterReady(): Promise<void> {
+  if (!io) throw new Error('Socket.IO has not been initialized.');
+  if (!adapterReady) {
+    adapterReady = (async () => {
+      const connection = await connectDB();
+      const db = connection?.connection.db;
+      if (!db) throw new Error('MongoDB is unavailable for realtime coordination.');
+
+      try {
+        await db.createCollection(ADAPTER_COLLECTION, { capped: true, size: 10 * 1024 * 1024 });
+      } catch (error) {
+        const mongoError = error as { code?: number };
+        if (mongoError.code !== 48) throw error;
+      }
+
+      const metadata = await db.listCollections({ name: ADAPTER_COLLECTION }, { nameOnly: false }).next();
+      if (!metadata?.options?.capped) {
+        throw new Error('The Socket.IO adapter collection must be capped.');
+      }
+      io!.adapter(createAdapter(db.collection(ADAPTER_COLLECTION), { addCreatedAtField: true }));
+      console.info('[Socket] Shared MongoDB realtime adapter ready.');
+    })().catch((error: unknown) => {
+      adapterReady = null;
+      const errorName = error instanceof Error ? error.name : 'UnknownError';
+      const errorCode = typeof error === 'object' && error !== null && 'code' in error
+        ? (error as { code?: unknown }).code
+        : undefined;
+      console.error('[Socket] Shared realtime adapter initialization failed.', { errorName, errorCode });
+      throw error;
+    });
+  }
+  return adapterReady;
+}
 
 export async function terminateGlobalCall(
   sessionId: string,
@@ -80,11 +121,48 @@ function toCallingAvailability(status: PresenceStatus): 'offline' | 'busy' | 'aw
   return 'available';
 }
 
-function isInActiveMeeting(userId: string): boolean {
-  for (const room of meetingRooms.values()) {
-    if (Array.from(room.values()).some((participant) => participant.userId === userId)) return true;
+async function sendPendingIncomingCalls(socket: Socket, userId: string): Promise<void> {
+  try {
+    const pendingCalls = await CallSession.find({
+      calleeId: userId,
+      status: 'ringing',
+      expiresAt: { $gt: new Date() },
+    }).select('sessionId callerId expiresAt').lean();
+
+    for (const call of pendingCalls) {
+      const caller = await User.findOne({
+        _id: call.callerId,
+        isActive: true,
+        isDeleted: { $ne: true },
+      }).select('callingId fullName avatar avatarStorageKey').lean();
+      if (!caller) continue;
+      const avatar = isR2Configured() && caller.avatarStorageKey
+        ? await generateSignedAvatarUrl(caller.avatarStorageKey)
+        : caller.avatar;
+      socket.emit('call:incoming', {
+        sessionId: call.sessionId,
+        caller: {
+          callingId: caller.callingId,
+          displayName: caller.fullName,
+          avatar: avatar || null,
+        },
+        expiresAt: call.expiresAt,
+      });
+    }
+  } catch (error) {
+    const errorName = error instanceof Error ? error.name : 'UnknownError';
+    console.error('[Socket] Pending incoming call recovery failed.', { userId, errorName });
   }
-  return false;
+}
+
+async function isInActiveMeeting(userId: string): Promise<boolean> {
+  return Boolean(await Meeting.exists({
+    status: 'active',
+    $or: [
+      { hostId: userId },
+      { participants: { $elemMatch: { userId, status: 'joined' } } },
+    ],
+  }));
 }
 
 export async function getUserPresence(userId: string): Promise<{
@@ -99,8 +177,11 @@ export async function getUserPresence(userId: string): Promise<{
     .lean();
   if (!user) return null;
 
-  const connected = Boolean(onlineUsers.get(userId)?.size);
-  const inMeeting = connected && isInActiveMeeting(userId);
+  const connected = Boolean(await RealtimePresence.exists({
+    userId,
+    expiresAt: { $gt: new Date() },
+  }));
+  const inMeeting = connected && await isInActiveMeeting(userId);
   const inCall = connected && Boolean(await CallSession.exists({
     status: { $in: ['ringing', 'accepted'] },
     $or: [{ callerId: userId }, { calleeId: userId }],
@@ -199,14 +280,7 @@ async function sendPresenceSnapshot(socket: Socket, userId: string, companyId: s
       ...visiblePeers.map((user) => [user._id.toString(), user] as const),
     ]);
     const users = (await Promise.all(Array.from(relevantUsers, async ([id, user]) => {
-      if (onlineUsers.get(id)?.size) return getUserPresence(id);
-      return {
-        userId: id,
-        status: 'offline' as const,
-        availability: 'offline' as const,
-        inCall: false,
-        inMeeting: false,
-      };
+      return getUserPresence(id);
     })))
       .filter((presence): presence is NonNullable<typeof presence> => presence !== null);
     socket.emit('presence:snapshot', { users });
@@ -219,11 +293,11 @@ export async function broadcastCallingAvailability(userId: string): Promise<void
   await publishUserPresence(userId);
 }
 
-const authorizeMeetingSocket = async (socket: Socket, meetingLink: unknown) => {
+const authorizeMeetingSocket = async (socket: Pick<Socket, 'data'>, meetingLink: unknown) => {
   if (typeof meetingLink !== 'string' || meetingLink.length < 20 || meetingLink.length > 128) return null;
-  const grants = socket.data.meetingGrants as Map<string, string> | undefined;
-  const grant = grants?.get(meetingLink);
-  const userId = (socket as any).userId as string;
+  const grants = socket.data.meetingGrants as Record<string, string> | undefined;
+  const grant = grants?.[meetingLink];
+  const userId = socket.data.userId as string;
   if (!grant) return null;
   try {
     const meeting = await Meeting.findOne({ meetingLink, status: 'active' }).select('_id companyId hostId startedAt scheduledAt');
@@ -254,7 +328,12 @@ const authorizeMeetingSocket = async (socket: Socket, meetingLink: unknown) => {
 };
 
 export const initSocket = (server: HTTPServer) => {
-  io = new SocketServer(server, { cors: { origin: getAllowedClientOrigins(), credentials: true } });
+  if (io) return io;
+  io = new SocketServer(server, {
+    path: process.env.VERCEL === '1' ? '/socket.io' : '/api/socket-io/socket.io',
+    cors: { origin: getAllowedClientOrigins(), credentials: true },
+    transports: ['websocket'],
+  });
 
   io.use(async (socket: Socket, next) => {
     let decoded: ReturnType<typeof verifyAccessToken>;
@@ -282,15 +361,37 @@ export const initSocket = (server: HTTPServer) => {
     }
 
     try {
+      await ensureSocketAdapterReady();
+      const user = await User.findOne({
+        _id: decoded.userId,
+        companyId: decoded.companyId,
+        isActive: true,
+        isDeleted: { $ne: true },
+      }).select('_id companyId role').lean();
+      if (!user) return next(new Error('Invalid user session'));
       const subscription = await getEffectiveSubscription(decoded.userId);
       if (!subscription.hasActiveAccess) return next(new Error('subscription_required'));
       socket.data.subscriptionStatus = subscription.status;
       socket.data.subscriptionEndDate = subscription.status === 'trialing'
         ? subscription.trialEndDate
         : subscription.status === 'past_due' ? undefined : subscription.subscriptionEndDate;
-      (socket as any).userId = decoded.userId;
-      (socket as any).companyId = decoded.companyId;
-      (socket as any).userRole = decoded.role;
+      socket.data.userId = decoded.userId;
+      socket.data.companyId = decoded.companyId;
+      socket.data.userRole = user.role || decoded.role;
+      socket.data.wasOnline = await RealtimePresence.exists({
+        userId: decoded.userId,
+        expiresAt: { $gt: new Date() },
+      }).then(Boolean);
+      await RealtimePresence.findOneAndUpdate(
+        { socketId: socket.id },
+        {
+          userId: decoded.userId,
+          companyId: decoded.companyId,
+          socketId: socket.id,
+          expiresAt: new Date(Date.now() + PRESENCE_LEASE_MS),
+        },
+        { upsert: true, new: true, setDefaultsOnInsert: true },
+      );
       next();
     } catch (err) {
       console.error(`[Socket] Subscription access check failed for socket ${socket.id}:`, err);
@@ -299,9 +400,9 @@ export const initSocket = (server: HTTPServer) => {
   });
 
   io.on('connection', (socket: Socket) => {
-    const userId = (socket as any).userId as string;
-    const companyId = (socket as any).companyId as string;
-    const userRole = (socket as any).userRole as string;
+    const userId = socket.data.userId as string;
+    const companyId = socket.data.companyId as string;
+    const userRole = socket.data.userRole as string;
     let callSignalQueue = Promise.resolve();
     let subscriptionExpiryTimer: NodeJS.Timeout | undefined;
 
@@ -360,12 +461,24 @@ export const initSocket = (server: HTTPServer) => {
       });
     });
 
-    const userSockets = onlineUsers.get(userId);
-    const wasOnline = Boolean(userSockets?.size);
-    if (!userSockets) onlineUsers.set(userId, new Set([socket.id]));
-    else userSockets.add(socket.id);
-    onlineUserCompanies.set(userId, companyId);
+    const wasOnline = Boolean(socket.data.wasOnline);
+    if (!wasOnline) io.to(`company:${companyId}`).emit('user:online', { userId });
+    socket.join(userRoom(userId));
     socket.join(`company:${companyId}`);
+    void sendPresenceSnapshot(socket, userId, companyId);
+    void publishUserPresence(userId);
+    void sendPendingIncomingCalls(socket, userId);
+
+    const presenceHeartbeat = setInterval(() => {
+      void RealtimePresence.updateOne(
+        { socketId: socket.id, userId },
+        { $set: { expiresAt: new Date(Date.now() + PRESENCE_LEASE_MS) } },
+      ).catch((error: unknown) => {
+        const errorName = error instanceof Error ? error.name : 'UnknownError';
+        console.error('[Socket] Presence heartbeat failed.', { userId, errorName });
+      });
+    }, PRESENCE_HEARTBEAT_MS);
+    presenceHeartbeat.unref();
 
     socket.on('board:join', async (boardId: unknown) => {
       if (typeof boardId !== 'string' || !/^[a-f\d]{24}$/i.test(boardId)) return;
@@ -380,7 +493,7 @@ export const initSocket = (server: HTTPServer) => {
         const participant = { userId, fullName: member.fullName, avatar: member.avatar };
         socket.to(room).emit('board:collaborator-joined', participant);
         const peers = await io.in(room).fetchSockets();
-        const peerIds = Array.from(new Set(peers.map((peer) => (peer as any).userId as string)));
+        const peerIds = Array.from(new Set(peers.map((peer) => peer.data.userId as string)));
         const peerUsers = await User.find({ _id: { $in: peerIds }, companyId, isActive: true }).select('fullName avatar').lean();
         socket.emit('board:presence', peerUsers.map((peer) => ({ userId: peer._id.toString(), fullName: peer.fullName, avatar: peer.avatar })));
       } catch {
@@ -409,13 +522,16 @@ export const initSocket = (server: HTTPServer) => {
       socket.to(room).emit('board:cursor', { userId, x, y });
     });
     
-    // Broadcast online status to company and send current online list to connecting user
-    if (!wasOnline) {
-      io.to(`company:${companyId}`).emit('user:online', { userId });
-    }
-    socket.emit('users:online-list', Array.from(onlineUsers.keys()).filter((id) => onlineUserCompanies.get(id) === companyId));
-    void sendPresenceSnapshot(socket, userId, companyId);
-    void publishUserPresence(userId);
+    void (async () => {
+      const onlineLeases = await RealtimePresence.find({
+        companyId,
+        expiresAt: { $gt: new Date() },
+      }).distinct('userId');
+      socket.emit('users:online-list', onlineLeases.map((id) => id.toString()));
+    })().catch((error: unknown) => {
+      const errorName = error instanceof Error ? error.name : 'UnknownError';
+      console.error('[Socket] Online-user snapshot failed.', { userId, errorName });
+    });
 
     socket.on('channel:join', async (id: string) => {
       // SECURITY: Verify the socket's company owns this channel before joining.
@@ -499,24 +615,18 @@ export const initSocket = (server: HTTPServer) => {
       const meetingId = payload?.meetingId;
       const grant = payload?.meetingGrant;
       if (typeof meetingId !== 'string' || typeof grant !== 'string' || grant.length > 256) return;
-      const grantMap = (socket.data.meetingGrants ??= new Map<string, string>()) as Map<string, string>;
-      grantMap.set(meetingId, grant);
+      const grantMap = (socket.data.meetingGrants ??= {}) as Record<string, string>;
+      grantMap[meetingId] = grant;
       const access = await authorizeMeetingSocket(socket, meetingId);
       if (!access) {
-        grantMap.delete(meetingId);
-        const existingRoom = meetingRooms.get(meetingId);
-        if (existingRoom) {
-          const wasParticipant = existingRoom.delete(socket.id);
-          if (existingRoom.size === 0) meetingRooms.delete(meetingId);
-          if (wasParticipant) socket.to(`meeting:${meetingId}`).emit('meeting:user-left', { socketId: socket.id, userId });
-        }
+        delete grantMap[meetingId];
+        socket.leave(`meeting:${meetingId}`);
+        delete (socket.data.meetingParticipants as Record<string, MeetingParticipant> | undefined)?.[meetingId];
         socket.emit('meeting:error', { message: 'This meeting link or access grant is no longer valid.' });
         return;
       }
       await socket.join(`meeting:${meetingId}`);
       const roomKey = `meeting:${meetingId}`;
-      const room = meetingRooms.get(meetingId) ?? new Map<string, MeetingParticipant>();
-      meetingRooms.set(meetingId, room);
 
       const participant: MeetingParticipant = {
         socketId: socket.id,
@@ -528,9 +638,13 @@ export const initSocket = (server: HTTPServer) => {
         isHandRaised: false,
         joinedAt: new Date(),
       };
-      room.set(socket.id, participant);
-
-      const existingParticipants = Array.from(room.values()).filter((p) => p.socketId !== socket.id);
+      const meetingParticipants = (socket.data.meetingParticipants ??= {}) as Record<string, MeetingParticipant>;
+      meetingParticipants[meetingId] = participant;
+      const roomSockets = await io.in(roomKey).fetchSockets();
+      const existingParticipants = roomSockets
+        .filter((peer) => peer.id !== socket.id)
+        .map((peer) => meetingParticipantFor(peer, meetingId))
+        .filter((peer): peer is MeetingParticipant => Boolean(peer));
       socket.emit('meeting:room-users', { meetingId, participants: existingParticipants });
       socket.to(roomKey).emit('meeting:user-joined', participant);
       void publishUserPresence(userId);
@@ -541,10 +655,11 @@ export const initSocket = (server: HTTPServer) => {
       const { meetingId, targetSocketId, signal } = payload || {};
       if (typeof targetSocketId !== 'string' || !signal || typeof signal !== 'object' || JSON.stringify(signal).length > 250_000) return;
       const access = await authorizeMeetingSocket(socket, meetingId);
-      const target = io.sockets.sockets.get(targetSocketId);
-      const room = typeof meetingId === 'string' ? meetingRooms.get(meetingId) : undefined;
+      const room = typeof meetingId === 'string' ? `meeting:${meetingId}` : '';
+      const roomSockets = room ? await io.in(room).fetchSockets() : [];
+      const target = roomSockets.find((peer) => peer.id === targetSocketId);
       if (!access || typeof meetingId !== 'string' || !socket.rooms.has(`meeting:${meetingId}`) ||
-          !target || !room?.has(targetSocketId) || !await authorizeMeetingSocket(target, meetingId)) return;
+          !target || !await authorizeMeetingSocket(target, meetingId)) return;
       let safeSignal: any = null;
       if ((signal.type === 'offer' || signal.type === 'answer') && typeof signal.sdp === 'string' && signal.sdp.length <= 200_000) {
         safeSignal = { type: signal.type, sdp: signal.sdp };
@@ -593,7 +708,7 @@ export const initSocket = (server: HTTPServer) => {
         const room = `call:${sessionId}`;
         const existingSockets = await io.in(room).fetchSockets();
         const allowedPeerId = isCaller ? session.calleeId.toString() : session.callerId.toString();
-        if (existingSockets.length > 1 || existingSockets.some((peer) => (peer as any).userId !== allowedPeerId)) return;
+        if (existingSockets.length > 1 || existingSockets.some((peer) => peer.data.userId !== allowedPeerId)) return;
         await socket.join(room);
         socket.data.callSessionIds ??= new Set<string>();
         (socket.data.callSessionIds as Set<string>).add(sessionId);
@@ -659,8 +774,8 @@ export const initSocket = (server: HTTPServer) => {
     socket.on('meeting:media-state', async (payload: any) => {
       const { meetingId, isMicOn, isCamOn, isScreenSharing } = payload || {};
       const access = await authorizeMeetingSocket(socket, meetingId);
-      const room = typeof meetingId === 'string' ? meetingRooms.get(meetingId) : undefined;
-      const p = room?.get(socket.id);
+      const p = typeof meetingId === 'string' ? meetingParticipantFor(socket, meetingId) : undefined;
+      if (p && p.userId !== userId) return;
       if (!access || !p) return;
       if (typeof isMicOn === 'boolean') p.isMicOn = isMicOn;
       if (typeof isCamOn === 'boolean') p.isCamOn = isCamOn;
@@ -675,8 +790,8 @@ export const initSocket = (server: HTTPServer) => {
     socket.on('meeting:hand-raise', async (payload: any) => {
       const { meetingId, isHandRaised } = payload || {};
       const access = await authorizeMeetingSocket(socket, meetingId);
-      const room = typeof meetingId === 'string' ? meetingRooms.get(meetingId) : undefined;
-      const p = room?.get(socket.id);
+      const p = typeof meetingId === 'string' ? meetingParticipantFor(socket, meetingId) : undefined;
+      if (p && p.userId !== userId) return;
       if (!access || !p || typeof isHandRaised !== 'boolean') return;
       p.isHandRaised = isHandRaised;
       io.to(`meeting:${meetingId}`).emit('meeting:hand-raise-changed', {
@@ -688,8 +803,8 @@ export const initSocket = (server: HTTPServer) => {
     socket.on('meeting:chat-message', async (payload: any) => {
       const { meetingId, text } = payload || {};
       const access = await authorizeMeetingSocket(socket, meetingId);
-      const room = typeof meetingId === 'string' ? meetingRooms.get(meetingId) : undefined;
-      const participant = room?.get(socket.id);
+      const participant = typeof meetingId === 'string' ? meetingParticipantFor(socket, meetingId) : undefined;
+      if (participant && participant.userId !== userId) return;
       if (!access || !participant || typeof text !== 'string' || !text.trim()) return;
       const safeText = text.trim().slice(0, 2000);
       io.to(`meeting:${meetingId}`).emit('meeting:chat-message', {
@@ -705,15 +820,9 @@ export const initSocket = (server: HTTPServer) => {
       const meetingId = payload.meetingId;
       if (typeof meetingId !== 'string') return;
       const access = await authorizeMeetingSocket(socket, meetingId);
-      const room = meetingRooms.get(meetingId);
-      if (room) {
-        room.delete(socket.id);
-        if (room.size === 0) {
-          meetingRooms.delete(meetingId);
-        }
-      }
       socket.leave(`meeting:${meetingId}`);
-      (socket.data.meetingGrants as Map<string, string> | undefined)?.delete(meetingId);
+      delete (socket.data.meetingGrants as Record<string, string> | undefined)?.[meetingId];
+      delete (socket.data.meetingParticipants as Record<string, MeetingParticipant> | undefined)?.[meetingId];
       if (access) socket.to(`meeting:${meetingId}`).emit('meeting:user-left', { socketId: socket.id, userId });
       void publishUserPresence(userId);
     });
@@ -737,14 +846,14 @@ export const initSocket = (server: HTTPServer) => {
         { new: true },
       ).select('hostId participants.userId');
       if (!meeting) return;
+      const roomSockets = await io.in(`meeting:${meetingId}`).fetchSockets();
       const participantUserIds = new Set(
         [
           meeting.hostId.toString(),
           ...meeting.participants.map((participant) => participant.userId.toString()),
-          ...Array.from(meetingRooms.get(meetingId)?.values() ?? []).map((participant) => participant.userId),
+          ...roomSockets.map((participant) => participant.data.userId as string),
         ],
       );
-      meetingRooms.delete(meetingId);
       io.to(`meeting:${meetingId}`).emit('meeting:ended', { meetingId, meetingLink: meetingId });
       for (const participantUserId of participantUserIds) {
         emitToUser(participantUserId, 'meeting:ended', { meetingId, meetingLink: meetingId });
@@ -755,24 +864,17 @@ export const initSocket = (server: HTTPServer) => {
     // Disconnect cleanup
     socket.on('disconnect', async () => {
       if (subscriptionExpiryTimer) clearTimeout(subscriptionExpiryTimer);
-      const affectedMeetingUsers = new Set<string>();
-      meetingRooms.forEach((room, meetingId) => {
-        if (!room.has(socket.id)) return;
-        affectedMeetingUsers.add(userId);
-        room.delete(socket.id);
-        socket.to(`meeting:${meetingId}`).emit('meeting:user-left', { socketId: socket.id, userId });
-        if (room.size === 0) meetingRooms.delete(meetingId);
-      });
-
-      const socks = onlineUsers.get(userId);
-      if (socks) {
-        socks.delete(socket.id);
-        if (!socks.size) {
-          onlineUsers.delete(userId);
-          onlineUserCompanies.delete(userId);
-          io.to(`company:${companyId}`).emit('user:offline', { userId });
+      if (presenceHeartbeat) clearInterval(presenceHeartbeat);
+      for (const room of socket.rooms) {
+        if (!room.startsWith('meeting:')) continue;
+        const meetingId = room.slice('meeting:'.length);
+        if (meetingParticipantFor(socket, meetingId)) {
+          socket.to(room).emit('meeting:user-left', { socketId: socket.id, userId });
         }
       }
+      await RealtimePresence.deleteOne({ socketId: socket.id, userId });
+      const stillOnline = await RealtimePresence.exists({ userId, expiresAt: { $gt: new Date() } });
+      if (!stillOnline) io.to(`company:${companyId}`).emit('user:offline', { userId });
 
       const callSessionIds = socket.data.callSessionIds instanceof Set
         ? Array.from(socket.data.callSessionIds as Set<string>)
@@ -781,7 +883,7 @@ export const initSocket = (server: HTTPServer) => {
         try {
           const room = `call:${sessionId}`;
           const peers = await io.in(room).fetchSockets();
-          if (peers.some((peer) => (peer as any).userId === userId)) continue;
+          if (peers.some((peer) => peer.data.userId === userId)) continue;
           const session = await CallSession.findOne({
             sessionId,
             status: { $in: ['ringing', 'accepted'] },
@@ -795,9 +897,6 @@ export const initSocket = (server: HTTPServer) => {
           console.error('[Socket] Failed to finalize disconnected call:', error);
         }
       }
-      for (const affectedUserId of affectedMeetingUsers) {
-        void publishUserPresence(affectedUserId);
-      }
       void publishUserPresence(userId);
     });
   });
@@ -805,7 +904,10 @@ export const initSocket = (server: HTTPServer) => {
 };
 
 export const getIO = () => io;
-export const getOnlineUsers = () => Array.from(onlineUsers.keys());
+
+export async function isUserOnline(userId: string): Promise<boolean> {
+  return Boolean(await RealtimePresence.exists({ userId, expiresAt: { $gt: new Date() } }));
+}
 
 export function disconnectCompanySockets(companyId: string): void {
   if (!io) return;
@@ -820,14 +922,14 @@ export async function hasCallSessionSockets(sessionId: string): Promise<boolean>
   const sockets = await io.in(`call:${sessionId}`).fetchSockets();
   return sockets.length > 0;
 }
-export const getMeetingParticipants = (meetingId: string): MeetingParticipant[] => {
-  const room = meetingRooms.get(meetingId);
-  return room ? Array.from(room.values()) : [];
-};
+export async function getMeetingParticipants(meetingId: string): Promise<MeetingParticipant[]> {
+  if (!io) return [];
+  const sockets = await io.in(`meeting:${meetingId}`).fetchSockets();
+  return sockets
+    .map((socket) => meetingParticipantFor(socket, meetingId))
+    .filter((participant): participant is MeetingParticipant => Boolean(participant));
+}
 export const emitToCompany = (cid: string, ev: string, data: any) => io?.to(`company:${cid}`).emit(ev, data);
 export const emitToChannel = (cid: string, ev: string, data: any) => io?.to(`channel:${cid}`).emit(ev, data);
 export const emitToDM = (cid: string, ev: string, data: any) => io?.to(`dm:${cid}`).emit(ev, data);
-export const emitToUser = (uid: string, ev: string, data: any) => {
-  const socks = onlineUsers.get(uid);
-  if (socks) socks.forEach(sid => io?.to(sid).emit(ev, data));
-};
+export const emitToUser = (uid: string, ev: string, data: any) => io?.to(userRoom(uid)).emit(ev, data);
