@@ -116,6 +116,14 @@ const PLAN_RANK: Record<string, number> = { free: 0, starter: 1, pro: 2 };
 
 /* ═══════════════════════════════════════════════════════════════════════ */
 
+type ApiErrorShape = {
+  response?: {
+    data?: {
+      message?: string;
+    };
+  };
+};
+
 export default function BillingPage() {
   const { user, company, fetchCurrentUser } = useAuthStore();
 
@@ -167,7 +175,9 @@ export default function BillingPage() {
     }
   }, []);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  // Initial fetch is intentionally triggered from an effect; the effect only schedules the async request.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { void loadData(); }, [loadData]);
 
   const handleUpgrade = async (planId: string) => {
     setCheckoutPlan(planId); setError(''); setSuccess('');
@@ -189,8 +199,10 @@ export default function BillingPage() {
       } else {
         setError(res.data.message || 'Failed to create checkout session.');
       }
-    } catch (e: any) { setError(e.response?.data?.message || 'Failed to create checkout session.'); }
-    finally { setCheckoutPlan(null); }
+    } catch (e: unknown) {
+      const apiError = e as ApiErrorShape;
+      setError(apiError.response?.data?.message || 'Failed to create checkout session.');
+    } finally { setCheckoutPlan(null); }
   };
 
   const handleCancel = async () => {
@@ -202,8 +214,10 @@ export default function BillingPage() {
         setSuccess("Subscription cancelled. Your workspace keeps access until the billing period ends.");
         await loadData(); await fetchCurrentUser();
       } else { setError(res.data.message); }
-    } catch (e: any) { setError(e.response?.data?.message || 'Cancellation failed.'); }
-    finally { setCancelling(false); }
+    } catch (e: unknown) {
+      const apiError = e as ApiErrorShape;
+      setError(apiError.response?.data?.message || 'Cancellation failed.');
+    } finally { setCancelling(false); }
   };
 
   const handleReactivate = async () => {
@@ -214,8 +228,10 @@ export default function BillingPage() {
         setSuccess('Subscription reactivated!');
         await loadData(); await fetchCurrentUser();
       } else { setError(res.data.message); }
-    } catch (e: any) { setError(e.response?.data?.message || 'Reactivation failed.'); }
-    finally { setReactivating(false); }
+    } catch (e: unknown) {
+      const apiError = e as ApiErrorShape;
+      setError(apiError.response?.data?.message || 'Reactivation failed.');
+    } finally { setReactivating(false); }
   };
 
   const handleCoupon = async (e: React.FormEvent) => {
@@ -229,9 +245,13 @@ export default function BillingPage() {
         setCouponCode('');
         await loadData(); await fetchCurrentUser();
       } else { setError(res.data.message); }
-    } catch (e: any) { setError(e.response?.data?.message || 'Coupon redemption failed.'); }
-    finally { setCouponLoading(false); }
+    } catch (e: unknown) {
+      const apiError = e as ApiErrorShape;
+      setError(apiError.response?.data?.message || 'Coupon redemption failed.');
+    } finally { setCouponLoading(false); }
   };
+
+  const initialNow = useState(() => Date.now())[0];
 
   if (loadingSub) {
     return (
@@ -240,7 +260,6 @@ export default function BillingPage() {
       </div>
     );
   }
-
   const isTrialing  = sub?.status === 'trialing';
   const isPastDue   = sub?.status === 'past_due' && sub.hasActiveAccess;
   const isCancelledActive = sub?.status === 'cancelled' && sub.hasActiveAccess;
@@ -248,7 +267,7 @@ export default function BillingPage() {
     sub?.status === 'cancelled' &&
     !!sub.cancelAtPeriodEnd &&
     !!sub.subscriptionEndDate &&
-    new Date(sub.subscriptionEndDate).getTime() > Date.now()
+    new Date(sub.subscriptionEndDate).getTime() > initialNow
   );
   const isLifetime  = sub?.status === 'lifetime' || sub?.isLifetime;
   const isExpiredOrCancelled = Boolean(

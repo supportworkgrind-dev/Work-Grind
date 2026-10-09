@@ -191,7 +191,7 @@ function ToolStepBadge({ step }: { step: ToolStep }) {
 
 // ── Message bubble ────────────────────────────────────────────────────────────
 
-function MessageBubble({ msg, user }: { msg: ChatMessage; user: any }) {
+function MessageBubble({ msg, user }: { msg: ChatMessage; user?: { fullName?: string } | null }) {
   if (msg.isLoading) {
     return (
       <div className="flex items-start gap-3">
