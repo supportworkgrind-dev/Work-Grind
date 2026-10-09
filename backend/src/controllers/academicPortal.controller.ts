@@ -10,6 +10,7 @@ import AcademicAssignment from '../models/AcademicAssignment';
 import AcademicAttendance from '../models/AcademicAttendance';
 import AcademicResult from '../models/AcademicResult';
 import AcademicFeeCharge from '../models/AcademicFeeCharge';
+import AcademicTeachingAssignment from '../models/AcademicTeachingAssignment';
 
 export const getAcademicPortal = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -25,36 +26,54 @@ export const getAcademicPortal = async (req: AuthRequest, res: Response): Promis
     }
 
     let studentIds: mongoose.Types.ObjectId[];
+    let classIds: mongoose.Types.ObjectId[] = [];
+    let teachingAssignments: Array<Record<string, unknown>> = [];
+    let students: Array<Record<string, unknown>> = [];
     if (person.type === 'student') {
       studentIds = [person._id];
     } else if (person.type === 'parent') {
       const links = await AcademicGuardianLink.find({ companyId, guardianId: person._id }).select('studentId');
       studentIds = links.map((link) => link.studentId);
+      students = await AcademicPerson.find({ _id: { $in: studentIds }, companyId, type: 'student', status: 'active' })
+        .select('_id firstName lastName externalId')
+        .lean();
     } else {
-      res.status(403).json({ success: false, message: 'The teacher portal is not available until teaching assignments are configured.' });
-      return;
-    }
-
-    const [students, enrollments] = await Promise.all([
-      person.type === 'parent'
-        ? AcademicPerson.find({ _id: { $in: studentIds }, companyId, type: 'student', status: 'active' })
+      const assignments = await AcademicTeachingAssignment.find({ companyId, teacherId: person._id })
+        .populate({ path: 'classId', match: { companyId }, select: 'name academicYear' })
+        .lean();
+      teachingAssignments = assignments.filter((assignment) => assignment.classId) as Array<Record<string, unknown>>;
+      classIds = assignments
+        .map((assignment) => assignment.classId)
+        .filter((classItem): classItem is mongoose.Types.ObjectId => !!classItem)
+        .map((classItem) => (classItem as unknown as { _id: mongoose.Types.ObjectId })._id);
+      const classEnrollments = classIds.length
+        ? await AcademicEnrollment.find({ companyId, classId: { $in: classIds }, status: 'active' }).select('studentId')
+        : [];
+      studentIds = classEnrollments.map((enrollment) => enrollment.studentId);
+      students = studentIds.length
+        ? await AcademicPerson.find({ _id: { $in: studentIds }, companyId, type: 'student', status: 'active' })
             .select('_id firstName lastName externalId')
             .lean()
-        : Promise.resolve([{ _id: person._id, firstName: person.firstName, lastName: person.lastName, externalId: undefined }]),
-      AcademicEnrollment.find({ companyId, studentId: { $in: studentIds }, status: 'active' })
-        .populate({
-          path: 'classId',
-          match: { companyId },
-          select: 'name academicYear departmentId courseIds',
-          populate: { path: 'departmentId', match: { companyId }, select: 'name code' },
-        })
-        .lean(),
-    ]);
+        : [];
+    }
 
-    const classIds = enrollments
-      .map((enrollment) => enrollment.classId)
-      .filter((classItem): classItem is mongoose.Types.ObjectId => !!classItem)
-      .map((classItem) => classItem._id);
+    const enrollmentFilter = person.type === 'teacher'
+      ? { companyId, classId: { $in: classIds }, status: 'active' as const }
+      : { companyId, studentId: { $in: studentIds }, status: 'active' as const };
+    const enrollments = await AcademicEnrollment.find(enrollmentFilter)
+      .populate({
+        path: 'classId',
+        match: { companyId },
+        select: 'name academicYear departmentId courseIds',
+        populate: { path: 'departmentId', match: { companyId }, select: 'name code' },
+      })
+      .lean();
+    if (person.type !== 'teacher') {
+      classIds = enrollments
+        .map((enrollment) => enrollment.classId)
+        .filter((classItem): classItem is mongoose.Types.ObjectId => !!classItem)
+        .map((classItem) => (classItem as unknown as { _id: mongoose.Types.ObjectId })._id);
+    }
     const [schedules, assignments, attendance, results, feeCharges] = await Promise.all([
       classIds.length
         ? AcademicSchedule.find({ companyId, classId: { $in: classIds } })
@@ -83,7 +102,7 @@ export const getAcademicPortal = async (req: AuthRequest, res: Response): Promis
             .populate({ path: 'studentId', match: { companyId, type: 'student' }, select: 'firstName lastName' })
             .lean()
         : [],
-      studentIds.length
+      person.type !== 'teacher' && studentIds.length
         ? AcademicFeeCharge.find({ companyId, studentId: { $in: studentIds }, isVoided: false })
             .sort({ dueAt: 1 })
             .limit(100)
@@ -91,11 +110,15 @@ export const getAcademicPortal = async (req: AuthRequest, res: Response): Promis
             .lean()
         : [],
     ]);
+    if (person.type === 'student') {
+      students = [{ _id: person._id, firstName: person.firstName, lastName: person.lastName, externalId: undefined }];
+    }
 
     res.json({
       success: true,
       profile: person,
       students,
+      teachingAssignments,
       enrollments: enrollments.filter((enrollment) => enrollment.classId),
       schedules: schedules.filter((schedule) => schedule.classId),
       assignments: assignments.filter((assignment) => assignment.classId),

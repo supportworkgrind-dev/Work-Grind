@@ -8,6 +8,7 @@ const AcademicClass = require('../dist/models/AcademicClass').default;
 const AcademicGuardianLink = require('../dist/models/AcademicGuardianLink').default;
 const AcademicEnrollment = require('../dist/models/AcademicEnrollment').default;
 const AcademicFeeCharge = require('../dist/models/AcademicFeeCharge').default;
+const AcademicTeachingAssignment = require('../dist/models/AcademicTeachingAssignment').default;
 const AcademicAttendance = require('../dist/models/AcademicAttendance').default;
 const AcademicResult = require('../dist/models/AcademicResult').default;
 const AuditLog = require('../dist/models/AuditLog').default;
@@ -83,6 +84,7 @@ test('departments, courses, classes, and guardian links require tenant ownership
   assert.equal(new AcademicCourse({ name: 'Biology', code: 'BIO', departmentId: recordId }).validateSync().errors.companyId.kind, 'required');
   assert.equal(new AcademicClass({ name: 'Year 1', academicYear: '2025-2026', departmentId: recordId }).validateSync().errors.companyId.kind, 'required');
   assert.equal(new AcademicGuardianLink({ studentId: recordId, guardianId: new mongoose.Types.ObjectId(), relationship: 'parent' }).validateSync().errors.companyId.kind, 'required');
+  assert.equal(new AcademicTeachingAssignment({ teacherId: recordId, classId: new mongoose.Types.ObjectId(), createdBy: recordId }).validateSync().errors.companyId.kind, 'required');
 });
 
 test('fee charges keep financial amounts in validated minor currency units', () => {
@@ -293,6 +295,117 @@ test('enrollment creation rejects student or class records outside the tenant', 
   } finally {
     AcademicPerson.findOne = originalPersonFindOne;
     AcademicClass.findOne = originalClassFindOne;
+  }
+});
+
+test('teacher assignment creation validates both records inside the current tenant', async () => {
+  const originalPersonFindOne = AcademicPerson.findOne;
+  const originalClassFindOne = AcademicClass.findOne;
+  const originalCreate = AcademicTeachingAssignment.create;
+  const originalAuditCreate = AuditLog.create;
+  const filters = [];
+  let createdRecord;
+  AcademicPerson.findOne = (filter) => {
+    filters.push(filter);
+    return { select: async () => ({ _id: recordId }) };
+  };
+  AcademicClass.findOne = (filter) => {
+    filters.push(filter);
+    return { select: async () => ({ _id: filter._id }) };
+  };
+  AcademicTeachingAssignment.create = async (record) => {
+    createdRecord = record;
+    return { _id: recordId };
+  };
+  AuditLog.create = async () => ({});
+  try {
+    const res = makeResponse();
+    await academicController.createTeachingAssignment({
+      user: { companyId: companyId.toString(), userId: recordId.toString(), role: 'admin' },
+      body: { teacherId: recordId.toString(), classId: new mongoose.Types.ObjectId().toString() },
+    }, res);
+    assert.equal(res.statusCode, 201);
+    assert.equal(filters.length, 2);
+    assert.ok(filters.every((filter) => filter.companyId.toString() === companyId.toString()));
+    assert.equal(filters[0].type, 'teacher');
+    assert.equal(createdRecord.companyId.toString(), companyId.toString());
+    assert.equal(createdRecord.createdBy.toString(), recordId.toString());
+  } finally {
+    AcademicPerson.findOne = originalPersonFindOne;
+    AcademicClass.findOne = originalClassFindOne;
+    AcademicTeachingAssignment.create = originalCreate;
+    AuditLog.create = originalAuditCreate;
+  }
+});
+
+test('teacher portal is limited to assigned classes and never returns learner fee data', async () => {
+  const AcademicSchedule = require('../dist/models/AcademicSchedule').default;
+  const AcademicAssignment = require('../dist/models/AcademicAssignment').default;
+  const originalPersonFindOne = AcademicPerson.findOne;
+  const originalPersonFind = AcademicPerson.find;
+  const originalTeachingFind = AcademicTeachingAssignment.find;
+  const originalEnrollmentFind = AcademicEnrollment.find;
+  const originalScheduleFind = AcademicSchedule.find;
+  const originalAssignmentFind = AcademicAssignment.find;
+  const originalAttendanceFind = AcademicAttendance.find;
+  const originalResultFind = AcademicResult.find;
+  const originalFeeFind = AcademicFeeCharge.find;
+  const assignedClassId = new mongoose.Types.ObjectId();
+  const studentId = new mongoose.Types.ObjectId();
+  let enrollmentClassFilter;
+  let enrollmentFindCount = 0;
+  AcademicPerson.findOne = () => ({
+    select: async () => ({ _id: recordId, type: 'teacher', firstName: 'T', lastName: 'Teacher' }),
+  });
+  AcademicTeachingAssignment.find = (filter) => {
+    assert.equal(filter.companyId.toString(), companyId.toString());
+    assert.equal(filter.teacherId.toString(), recordId.toString());
+    return {
+      populate() { return this; },
+      lean: async () => [{ classId: { _id: assignedClassId, name: 'Class A' } }],
+    };
+  };
+  AcademicEnrollment.find = (filter) => {
+    enrollmentClassFilter = filter;
+    enrollmentFindCount += 1;
+    if (enrollmentFindCount === 1) return { select: async () => [{ studentId }] };
+    return { populate() { return this; }, lean: async () => [] };
+  };
+  AcademicPerson.find = (filter) => {
+    assert.equal(filter.companyId.toString(), companyId.toString());
+    assert.deepEqual(filter._id.$in.map((id) => id.toString()), [studentId.toString()]);
+    return { select() { return this; }, lean: async () => [{ _id: studentId, firstName: 'S', lastName: 'Student' }] };
+  };
+  for (const model of [AcademicSchedule, AcademicAssignment, AcademicAttendance, AcademicResult]) {
+    model.find = (filter) => {
+      assert.equal(filter.companyId.toString(), companyId.toString());
+      assert.deepEqual(filter.classId?.$in?.map((id) => id.toString()), [assignedClassId.toString()]);
+      return makeFindQuery();
+    };
+  }
+  AcademicFeeCharge.find = () => { throw new Error('Teacher portal must not query or expose fee records'); };
+  try {
+    const res = makeResponse();
+    await academicPortalController.getAcademicPortal({
+      user: { companyId: companyId.toString(), userId: recordId.toString(), role: 'employee' },
+    }, res);
+    assert.equal(enrollmentClassFilter.companyId.toString(), companyId.toString());
+    assert.deepEqual(enrollmentClassFilter.classId.$in.map((id) => id.toString()), [assignedClassId.toString()]);
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.body.profile.type, 'teacher');
+    assert.equal(res.body.students.length, 1);
+    assert.equal(res.body.teachingAssignments.length, 1);
+    assert.deepEqual(res.body.feeCharges, []);
+  } finally {
+    AcademicPerson.findOne = originalPersonFindOne;
+    AcademicPerson.find = originalPersonFind;
+    AcademicTeachingAssignment.find = originalTeachingFind;
+    AcademicEnrollment.find = originalEnrollmentFind;
+    AcademicSchedule.find = originalScheduleFind;
+    AcademicAssignment.find = originalAssignmentFind;
+    AcademicAttendance.find = originalAttendanceFind;
+    AcademicResult.find = originalResultFind;
+    AcademicFeeCharge.find = originalFeeFind;
   }
 });
 

@@ -13,6 +13,7 @@ import AcademicAttendance, { AttendanceStatus } from '../models/AcademicAttendan
 import AcademicAssessment, { AssessmentType } from '../models/AcademicAssessment';
 import AcademicResult from '../models/AcademicResult';
 import AcademicFeeCharge, { FeePaymentMethod } from '../models/AcademicFeeCharge';
+import AcademicTeachingAssignment from '../models/AcademicTeachingAssignment';
 import AcademicPerson, { AcademicPersonType } from '../models/AcademicPerson';
 import { GuardianRelationshipType } from '../models/AcademicGuardianLink';
 import User from '../models/User';
@@ -365,6 +366,62 @@ export const createEnrollment = async (req: AuthRequest, res: Response): Promise
     res.status(201).json({ success: true, enrollment });
   } catch (error) {
     handleOperationError(res, error, 'enrollment');
+  }
+};
+
+export const listTeachingAssignments = async (req: AuthRequest, res: Response): Promise<void> => {
+  const { skip, limit } = listOptions(req);
+  const companyId = getCompanyId(req);
+  try {
+    const [teachingAssignments, total] = await Promise.all([
+      AcademicTeachingAssignment.find({ companyId })
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate({ path: 'teacherId', match: { companyId, type: 'teacher' }, select: 'firstName lastName' })
+        .populate({ path: 'classId', match: { companyId }, select: 'name academicYear' })
+        .lean(),
+      AcademicTeachingAssignment.countDocuments({ companyId }),
+    ]);
+    res.json({
+      success: true,
+      teachingAssignments: teachingAssignments.filter((assignment) => assignment.teacherId && assignment.classId),
+      total,
+      page: Math.floor(skip / limit) + 1,
+      pageSize: limit,
+    });
+  } catch (error) {
+    handleOperationError(res, error, 'teaching assignments');
+  }
+};
+
+export const createTeachingAssignment = async (req: AuthRequest, res: Response): Promise<void> => {
+  const { teacherId, classId } = req.body ?? {};
+  if (!isObjectId(teacherId) || !isObjectId(classId)) {
+    res.status(400).json({ success: false, message: 'Valid teacher and class records are required.' });
+    return;
+  }
+  const companyId = getCompanyId(req);
+  try {
+    const [teacher, academicClass] = await Promise.all([
+      AcademicPerson.findOne({ _id: teacherId, companyId, type: 'teacher', status: 'active' }).select('_id'),
+      AcademicClass.findOne({ _id: classId, companyId }).select('_id'),
+    ]);
+    if (!teacher || !academicClass) {
+      res.status(400).json({ success: false, message: 'Teacher and class must both belong to this organization and be active.' });
+      return;
+    }
+
+    const teachingAssignment = await AcademicTeachingAssignment.create({
+      companyId,
+      teacherId,
+      classId,
+      createdBy: new mongoose.Types.ObjectId(req.user!.userId),
+    });
+    await recordAcademicAudit(req, 'teaching_assignment', teachingAssignment._id);
+    res.status(201).json({ success: true, teachingAssignment });
+  } catch (error) {
+    handleOperationError(res, error, 'teaching assignment');
   }
 };
 

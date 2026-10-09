@@ -5,6 +5,7 @@ import {
   createDepartment,
   createGuardianLink,
   createEnrollment,
+  createTeachingAssignment,
   createPerson,
   createSchedule,
   createAssignment,
@@ -18,6 +19,7 @@ import {
   listDepartments,
   listGuardianLinks,
   listEnrollments,
+  listTeachingAssignments,
   listPeople,
   listSchedules,
   listAssignments,
@@ -45,6 +47,8 @@ router.get('/guardians', listGuardianLinks);
 router.post('/guardians', createGuardianLink);
 router.get('/enrollments', listEnrollments);
 router.post('/enrollments', createEnrollment);
+router.get('/teaching-assignments', listTeachingAssignments);
+router.post('/teaching-assignments', createTeachingAssignment);
 router.get('/schedules', listSchedules);
 router.post('/schedules', createSchedule);
 router.get('/assignments', listAssignments);

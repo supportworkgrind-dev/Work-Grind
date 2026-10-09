@@ -23,6 +23,11 @@ type AcademicEnrollment = {
   classId: AcademicClass | string | null;
   enrolledAt: string;
 };
+type AcademicTeachingAssignment = {
+  _id: string;
+  teacherId: AcademicPerson | string | null;
+  classId: AcademicClass | string | null;
+};
 type AcademicSchedule = {
   _id: string;
   dayOfWeek: number;
@@ -79,6 +84,7 @@ type AcademicPortal = {
   attendance: AcademicAttendance[];
   results: AcademicResult[];
   feeCharges: AcademicFeeCharge[];
+  teachingAssignments: AcademicTeachingAssignment[];
 };
 
 function getPopulatedName<T extends { _id: string }>(value: T | string | null, fallback: string): string {
@@ -109,6 +115,7 @@ export default function AcademicPage() {
   const [departments, setDepartments] = useState<AcademicDepartment[]>([]);
   const [classes, setClasses] = useState<AcademicClass[]>([]);
   const [enrollments, setEnrollments] = useState<AcademicEnrollment[]>([]);
+  const [teachingAssignments, setTeachingAssignments] = useState<AcademicTeachingAssignment[]>([]);
   const [schedules, setSchedules] = useState<AcademicSchedule[]>([]);
   const [assignments, setAssignments] = useState<AcademicAssignment[]>([]);
   const [attendance, setAttendance] = useState<AcademicAttendance[]>([]);
@@ -126,6 +133,8 @@ export default function AcademicPage() {
   const [classDepartmentId, setClassDepartmentId] = useState('');
   const [enrollmentStudentId, setEnrollmentStudentId] = useState('');
   const [enrollmentClassId, setEnrollmentClassId] = useState('');
+  const [teachingTeacherId, setTeachingTeacherId] = useState('');
+  const [teachingClassId, setTeachingClassId] = useState('');
   const [scheduleClassId, setScheduleClassId] = useState('');
   const [scheduleDay, setScheduleDay] = useState('1');
   const [scheduleStart, setScheduleStart] = useState('09:00');
@@ -155,11 +164,12 @@ export default function AcademicPage() {
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'bank_transfer' | 'other'>('bank_transfer');
 
   const loadAdminData = useCallback(async () => {
-    const [peopleResponse, departmentsResponse, classesResponse, enrollmentResponse, schedulesResponse, assignmentsResponse, attendanceResponse, assessmentsResponse, resultsResponse, feesResponse] = await Promise.all([
+    const [peopleResponse, departmentsResponse, classesResponse, enrollmentResponse, teachingResponse, schedulesResponse, assignmentsResponse, attendanceResponse, assessmentsResponse, resultsResponse, feesResponse] = await Promise.all([
       api.get('/academic/people'),
       api.get('/academic/departments'),
       api.get('/academic/classes'),
       api.get('/academic/enrollments'),
+      api.get('/academic/teaching-assignments'),
       api.get('/academic/schedules'),
       api.get('/academic/assignments'),
       api.get('/academic/attendance'),
@@ -171,6 +181,7 @@ export default function AcademicPage() {
     setDepartments(departmentsResponse.data.departments);
     setClasses(classesResponse.data.classes);
     setEnrollments(enrollmentResponse.data.enrollments);
+    setTeachingAssignments(teachingResponse.data.teachingAssignments);
     setSchedules(schedulesResponse.data.schedules);
     setAssignments(assignmentsResponse.data.assignments);
     setAttendance(attendanceResponse.data.attendance);
@@ -301,6 +312,20 @@ export default function AcademicPage() {
             </section>
 
             <section className="academic-card">
+              <h2 className="academic-heading">Assign a teacher to a class</h2>
+              <form className="academic-form" onSubmit={(event) => submit(event, async () => {
+                await api.post('/academic/teaching-assignments', { teacherId: teachingTeacherId, classId: teachingClassId });
+                setTeachingTeacherId('');
+                setTeachingClassId('');
+              })}>
+                <label>Teacher<select required value={teachingTeacherId} onChange={(event) => setTeachingTeacherId(event.target.value)}><option value="">Select teacher</option>{people.filter((person) => person.type === 'teacher').map((person) => <option key={person._id} value={person._id}>{person.firstName} {person.lastName}</option>)}</select></label>
+                <label>Class<select required value={teachingClassId} onChange={(event) => setTeachingClassId(event.target.value)}><option value="">Select class</option>{classes.map((academicClass) => <option key={academicClass._id} value={academicClass._id}>{academicClass.name} · {academicClass.academicYear}</option>)}</select></label>
+                <SubmitButton saving={saving || !people.some((person) => person.type === 'teacher') || classes.length === 0} label="Assign teacher" />
+              </form>
+              <div className="mt-5 space-y-2">{teachingAssignments.map((assignment) => <RecordRow key={assignment._id} title={getPopulatedName(assignment.teacherId, 'Teacher')} detail={getPopulatedName(assignment.classId, 'Class')} />)}</div>
+            </section>
+
+            <section className="academic-card">
               <h2 className="academic-heading">Add timetable session</h2>
               <form className="academic-form" onSubmit={(event) => submit(event, async () => {
                 await api.post('/academic/schedules', { classId: scheduleClassId, dayOfWeek: Number(scheduleDay), startTime: scheduleStart, endTime: scheduleEnd, location: scheduleLocation });
@@ -418,7 +443,7 @@ export default function AcademicPage() {
         <>
           <div className="academic-card">
             <h2 className="academic-heading">Welcome, {portal.profile.firstName}</h2>
-            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{portal.profile.type === 'parent' ? 'Linked student records' : 'Your enrolled classes'}</p>
+            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{portal.profile.type === 'parent' ? 'Linked student records' : portal.profile.type === 'teacher' ? 'Students in your assigned classes' : 'Your student profile'}</p>
             {portal.students.map((student) => <RecordRow key={student._id} title={`${student.firstName} ${student.lastName}`} detail={student.externalId ?? student.type} />)}
           </div>
           <section className="academic-card">
@@ -430,7 +455,7 @@ export default function AcademicPage() {
             <section className="academic-card"><h2 className="academic-heading">Assignments</h2>{portal.assignments.length ? portal.assignments.map((assignment) => <RecordRow key={assignment._id} title={assignment.title} detail={`${getPopulatedName(assignment.classId, 'Class')} · ${assignment.pointsPossible} pts`} />) : <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No assignments are available.</p>}</section>
             <section className="academic-card"><h2 className="academic-heading">Attendance</h2>{portal.attendance.length ? portal.attendance.map((entry) => <RecordRow key={entry._id} title={getPopulatedName(entry.classId, 'Class')} detail={`${new Date(entry.date).toLocaleDateString()} · ${entry.status}`} />) : <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No attendance records are available.</p>}</section>
             <section className="academic-card"><h2 className="academic-heading">Results</h2>{portal.results.length ? portal.results.map((result) => <RecordRow key={result._id} title={getPopulatedName(result.assessmentId, 'Assessment')} detail={`${result.pointsEarned} pts`} />) : <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No results are available.</p>}</section>
-            <section className="academic-card"><h2 className="academic-heading">Fees</h2>{portal.feeCharges.length ? portal.feeCharges.map((charge) => <RecordRow key={charge._id} title={`${charge.invoiceNumber} · ${charge.description}`} detail={`${formatMinorCurrency(charge.paidAmountMinor, charge.currency)} / ${formatMinorCurrency(charge.amountMinor, charge.currency)} paid`} />) : <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No fee charges are available.</p>}</section>
+            {portal.profile.type !== 'teacher' && <section className="academic-card"><h2 className="academic-heading">Fees</h2>{portal.feeCharges.length ? portal.feeCharges.map((charge) => <RecordRow key={charge._id} title={`${charge.invoiceNumber} · ${charge.description}`} detail={`${formatMinorCurrency(charge.paidAmountMinor, charge.currency)} / ${formatMinorCurrency(charge.amountMinor, charge.currency)} paid`} />) : <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No fee charges are available.</p>}</section>}
           </div>
         </>
       ) : (
