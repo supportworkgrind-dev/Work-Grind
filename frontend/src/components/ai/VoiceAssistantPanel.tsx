@@ -36,7 +36,8 @@ type VoiceAssistantPanelProps = {
   onClose: () => void;
 };
 
-const AGENT_DISPLAY_NAME = 'Tavro AI';
+const AGENT_NAME_ATTRIBUTE = 'lk.agent.name';
+const AGENT_NAME = 'tavro-voice';
 const CONNECT_TIMEOUT_MS = 20_000;
 const AGENT_JOIN_TIMEOUT_MS = 30_000;
 const ROOM_OPTIONS: RoomOptions = {
@@ -77,7 +78,7 @@ function getSafeErrorMessage(error: unknown): string {
 }
 
 function isTavro(participant: Participant): boolean {
-  return participant.name === AGENT_DISPLAY_NAME;
+  return participant.isAgent || participant.attributes[AGENT_NAME_ATTRIBUTE] === AGENT_NAME;
 }
 
 export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProps) {
@@ -103,7 +104,7 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
     }
   }, []);
 
-  const disconnectRoom = useCallback(async (showError: boolean) => {
+  const disconnectRoom = useCallback(async (showError: boolean, reason = 'disconnect_requested') => {
     intentionalDisconnectRef.current = true;
     clearAgentJoinTimer();
     requestAbortRef.current?.abort();
@@ -111,6 +112,7 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
     const room = roomRef.current;
     roomRef.current = null;
     if (room) {
+      console.info('[Tavro Voice] Disconnecting room.', { roomId: room.name, reason });
       try {
         await room.disconnect();
       } catch {
@@ -133,7 +135,10 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
     requestAbortRef.current?.abort();
     const room = roomRef.current;
     roomRef.current = null;
-    if (room) void room.disconnect();
+    if (room) {
+      console.info('[Tavro Voice] Voice panel unmounted.', { roomId: room.name, reason: 'component_unmount' });
+      void room.disconnect();
+    }
   }, [clearAgentJoinTimer]);
 
   const startConversation = async () => {
@@ -181,6 +186,10 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
       };
       const onParticipantConnected = (participant: RemoteParticipant) => {
         if (!isTavro(participant)) return;
+        console.info('[Tavro Voice] Agent participant joined.', {
+          roomId: response.data.roomName,
+          participantKind: participant.kind,
+        });
         agentReadyRef.current = true;
         clearAgentJoinTimer();
         setIsAgentReady(true);
@@ -188,11 +197,16 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
       };
       const onParticipantDisconnected = (participant: RemoteParticipant) => {
         if (!isTavro(participant) || intentionalDisconnectRef.current) return;
+        console.warn('[Tavro Voice] Agent participant disconnected.', {
+          roomId: response.data.roomName,
+          participantKind: participant.kind,
+          reason: 'agent_participant_disconnected',
+        });
         agentReadyRef.current = false;
         setIsAgentReady(false);
         setErrorMessage('Tavro left the voice session. End the call and retry to reconnect.');
         setStatus('error');
-        void disconnectRoom(true);
+        void disconnectRoom(true, 'agent_participant_disconnected');
       };
       const onActiveSpeakersChanged = (speakers: Participant[]) => {
         const localIdentity = room?.localParticipant.identity;
@@ -210,7 +224,12 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
       const onConnectionStateChanged = (state: ConnectionState) => {
         if (state === ConnectionState.Connected) setStatus('connected');
       };
-      const onDisconnected = () => {
+      const onDisconnected = (reason?: unknown) => {
+        console.warn('[Tavro Voice] LiveKit room disconnected.', {
+          roomId: response.data.roomName,
+          reason: reason ?? 'unspecified',
+          intentional: intentionalDisconnectRef.current,
+        });
         if (intentionalDisconnectRef.current) return;
         clearAgentJoinTimer();
         roomRef.current = null;
@@ -242,7 +261,9 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
       if (connectTimeoutId !== null) window.clearTimeout(connectTimeoutId);
       connectTimeoutId = null;
 
+      console.info('[Tavro Voice] LiveKit room connected.', { roomId: response.data.roomName });
       await room.localParticipant.setMicrophoneEnabled(true);
+      console.info('[Tavro Voice] Microphone published.', { roomId: response.data.roomName });
       setIsMuted(false);
       await room.startAudio();
       setStatus('connected');
@@ -255,9 +276,13 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
       } else {
         agentJoinTimerRef.current = window.setTimeout(() => {
           if (agentReadyRef.current || intentionalDisconnectRef.current) return;
+          console.error('[Tavro Voice] Agent join timed out.', {
+            roomId: response.data.roomName,
+            timeoutMs: AGENT_JOIN_TIMEOUT_MS,
+          });
           setErrorMessage('Tavro did not join the voice session. Check that the LiveKit Agent is running, then retry.');
           setStatus('error');
-          void disconnectRoom(true);
+          void disconnectRoom(true, 'agent_join_timeout');
         }, AGENT_JOIN_TIMEOUT_MS);
       }
     } catch (error) {
@@ -295,7 +320,7 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
 
   const endConversation = async () => {
     setErrorMessage('');
-    await disconnectRoom(false);
+    await disconnectRoom(false, 'user_ended_session');
     setRoomName('');
   };
 

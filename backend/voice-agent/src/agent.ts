@@ -45,10 +45,12 @@ function readVoiceTurnToken(ctx: JobContext): string {
 export default defineAgent({
   entry: async (ctx: JobContext) => {
     let session: voice.AgentSession | undefined;
+    let stage = 'dispatch_credential_validation';
     try {
       const voiceTurnToken = readVoiceTurnToken(ctx);
       const roomName = ctx.room.name;
       if (!roomName) throw new Error('Tavro voice dispatch is missing its room name.');
+      stage = 'provider_setup';
       session = new voice.AgentSession({
         stt: new inference.STT({
           model: 'assemblyai/universal-3-6-pro',
@@ -67,23 +69,44 @@ export default defineAgent({
         },
       });
 
+      session.on(AgentSessionEventTypes.Error, (event) => {
+        console.warn('[Tavro Voice Agent] Session operation failed.', {
+          roomId: roomName,
+          stage: 'session_operation',
+          errorName: event.error instanceof Error ? event.error.name : 'UnknownError',
+        });
+      });
+      session.on(AgentSessionEventTypes.Close, (event) => {
+        console.info('[Tavro Voice Agent] Session closed.', {
+          roomId: roomName,
+          reason: event.reason,
+          errorName: event.error instanceof Error ? event.error.name : undefined,
+        });
+      });
+
+      stage = 'session_initialization';
       await session.start({
         agent: voice.Agent.create({
           instructions: 'You are Tavro AI. Listen to the user and let the WorkGrind Tavro backend answer. Do not use a separate model or claim workspace actions outside backend confirmation.',
         }),
         room: ctx.room,
       });
-      session.on(AgentSessionEventTypes.Error, (event) => {
-        console.warn('[Tavro Voice Agent] Session operation failed.', {
-          roomId: roomName,
-          errorName: event.error instanceof Error ? event.error.name : 'UnknownError',
-        });
+      console.info('[Tavro Voice Agent] Session initialized.', {
+        roomId: roomName,
+        stage: 'session_initialization',
       });
+      stage = 'agent_room_connect';
       await ctx.connect();
+      console.info('[Tavro Voice Agent] Agent joined room.', {
+        roomId: roomName,
+        stage: 'agent_room_connect',
+      });
+      stage = 'greeting';
       await session.say('Hello, I am Tavro AI. How can I help you?');
     } catch (error) {
       console.error('[Tavro Voice Agent] Session failed.', {
         roomId: ctx.room.name,
+        stage,
         errorName: error instanceof Error ? error.name : 'UnknownError',
       });
       if (session) await session.close();
