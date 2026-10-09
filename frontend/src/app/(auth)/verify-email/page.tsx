@@ -127,7 +127,7 @@ function VerifyEmailContent() {
           <p className="auth-kicker !mb-3 !text-[9px]">ONE LAST STEP</p>
           <h1 className="auth-form-title">Check your inbox.</h1>
           <p className="auth-form-subtitle">
-            Enter the six-digit code sent to <strong className="font-semibold text-stone-800">{email}</strong>. It expires in 10 minutes. If no code arrives, request another after the cooldown.
+            If your signup is eligible, a six-digit code will be sent to <strong className="font-semibold text-stone-800">{email}</strong>. It expires in 10 minutes. If no code arrives, request another after the cooldown.
           </p>
           {error && <div className="auth-error" role="alert"><AlertCircle size={15} className="mr-2 inline align-[-2px]" />{error}</div>}
           {notice && <p className="mb-4 text-sm text-stone-600" role="status">{notice}</p>}

@@ -5,7 +5,7 @@ const email = require('../dist/utils/email');
 
 const originalCreateTransport = nodemailer.createTransport;
 const savedEnv = {};
-const mailEnvKeys = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'EMAIL_USER', 'EMAIL_PASS', 'FROM_EMAIL', 'FROM_NAME'];
+const mailEnvKeys = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'EMAIL_USER', 'EMAIL_PASS', 'FROM_EMAIL', 'FROM_NAME', 'CLIENT_URL', 'NODE_ENV'];
 
 function setMailEnv() {
   Object.assign(process.env, {
@@ -123,6 +123,24 @@ test('SMTP authentication errors are safely logged without credentials or recipi
     assert.doesNotMatch(logs, new RegExp(secretMarker));
     assert.doesNotMatch(logs, /private-recipient@example\.test/);
     assert.doesNotMatch(logs, /987654/);
+  } finally {
+    captured.restore();
+  }
+});
+
+test('production password-reset email requires a configured HTTPS frontend origin', async () => {
+  setMailEnv();
+  process.env.NODE_ENV = 'production';
+  delete process.env.CLIENT_URL;
+  nodemailer.createTransport = () => {
+    throw new Error('A transport must not be created when the reset link origin is missing');
+  };
+  const captured = captureLogs();
+  try {
+    const result = await email.sendPasswordResetEmail('person@example.test', 'Test User', 'private-reset-token');
+    assert.equal(result.success, false);
+    assert.match(captured.lines.join('\n'), /CLIENT_URL/);
+    assert.doesNotMatch(captured.lines.join('\n'), /private-reset-token/);
   } finally {
     captured.restore();
   }

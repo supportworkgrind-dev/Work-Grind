@@ -43,6 +43,20 @@ Workspaces support five primary roles:
 
 Existing email/password authentication remains available alongside social authentication.
 
+### Backend transactional email configuration
+
+The backend sends verification codes and password reset messages over SMTP. Configure these variables in the backend's Vercel project environment (Production and any Preview environments that need email), then redeploy:
+
+* `SMTP_HOST`
+* `SMTP_PORT` (`587` uses STARTTLS; `465` uses implicit TLS)
+* `SMTP_USER`
+* `SMTP_PASS` (for Gmail, use an App Password)
+* `FROM_EMAIL` (must be an address accepted by the provider; use a verified sender/domain)
+* `FROM_NAME`
+* `CLIENT_URL` (the public HTTPS frontend origin used to construct email links)
+
+`EMAIL_USER` and `EMAIL_PASS` are supported as legacy credential aliases. Do not configure fake/test transports for production. A successful API response for a verification-email request means the SMTP server accepted the recipient; it cannot guarantee inbox placement or that the recipient read the message. Provider delivery logs and a real mailbox test are required to confirm final delivery.
+
 ---
 
 ## 2. 💬 Workplace Chat

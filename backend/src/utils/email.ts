@@ -72,7 +72,25 @@ const getFromAddress = () => {
   return `"${fromName}" <${fromEmail}>`;
 };
 
-const getBaseUrl = () => process.env.CLIENT_URL || 'http://localhost:3000';
+const getBaseUrl = () => {
+  const configured = process.env.CLIENT_URL?.trim();
+  if (!configured) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new EmailProviderConfigurationError(['CLIENT_URL']);
+    }
+    return 'http://localhost:3000';
+  }
+  let url: URL;
+  try {
+    url = new URL(configured);
+  } catch {
+    throw new EmailProviderConfigurationError(['CLIENT_URL (valid absolute URL)']);
+  }
+  if (process.env.NODE_ENV === 'production' && url.protocol !== 'https:') {
+    throw new EmailProviderConfigurationError(['CLIENT_URL (HTTPS required in production)']);
+  }
+  return url.origin;
+};
 
 const logEmailError = (messageType: string, stage: string, error: unknown) => {
   const fields = error && typeof error === 'object' ? error as Record<string, unknown> : {};
@@ -230,9 +248,10 @@ export const sendVerificationCodeEmail = async (email: string, name: string, cod
 
 // ─── 2. Welcome Email (after signup) ────────────────────────────────────────
 export const sendWelcomeEmail = async (email: string, name: string) => {
-  const safeName = escapeHtml(name);
-  const dashboardLink = `${getBaseUrl()}/dashboard`;
-  const html = emailWrapper(`
+  try {
+    const safeName = escapeHtml(name);
+    const dashboardLink = `${getBaseUrl()}/dashboard`;
+    const html = emailWrapper(`
     <h2 style="margin:0 0 8px;color:#0f172a;font-size:24px;font-weight:800;">Welcome to WorkGrind, ${safeName}! 🎉</h2>
     <p style="margin:0 0 20px;color:#64748b;font-size:15px;line-height:1.7;">
       We're thrilled to have you on board. WorkGrind is your all-in-one team workspace — bringing together <strong>chat</strong>, <strong>project management</strong>, <strong>tasks</strong>, <strong>files</strong>, and <strong>meetings</strong> in one place so your team can move faster and stay aligned.
@@ -253,8 +272,12 @@ export const sendWelcomeEmail = async (email: string, name: string) => {
     <p style="margin:0;color:#94a3b8;font-size:13px;">
       Need help? Use the <a href="${getBaseUrl()}/contact" style="color:#3b82f6;">WorkGrind contact form</a>.
     </p>
-  `);
-  return safeSend(email, 'Welcome to WorkGrind 🎉', html);
+    `);
+    return safeSend(email, 'Welcome to WorkGrind 🎉', html, undefined, 'welcome');
+  } catch (error) {
+    logEmailError('welcome', 'configuration', error);
+    return { success: false, error: 'Email delivery failed.' };
+  }
 };
 
 // ─── 3. Password Reset Request ───────────────────────────────────────────────
@@ -288,9 +311,10 @@ export const sendPasswordResetEmail = async (email: string, name: string, rawTok
 
 // ─── 4. Password Changed Notification ───────────────────────────────────────
 export const sendPasswordChangedNotificationEmail = async (email: string, name: string) => {
-  const safeName = escapeHtml(name);
-  const time = new Date().toLocaleString('en-PK', { timeZone: 'Asia/Karachi', dateStyle: 'medium', timeStyle: 'short' });
-  const html = emailWrapper(`
+  try {
+    const safeName = escapeHtml(name);
+    const time = new Date().toLocaleString('en-PK', { timeZone: 'Asia/Karachi', dateStyle: 'medium', timeStyle: 'short' });
+    const html = emailWrapper(`
     <h2 style="margin:0 0 8px;color:#0f172a;font-size:24px;font-weight:800;">Password changed 🔒</h2>
     <p style="margin:0 0 20px;color:#64748b;font-size:15px;">Hi <strong>${safeName}</strong>, your WorkGrind account password was successfully updated on <strong>${time} (PKT)</strong>.</p>
     <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:16px 20px;margin:0 0 20px;">
@@ -307,8 +331,12 @@ export const sendPasswordChangedNotificationEmail = async (email: string, name: 
     <p style="margin:0;color:#94a3b8;font-size:13px;">
       Questions? Use the <a href="${getBaseUrl()}/contact" style="color:#3b82f6;">WorkGrind contact form</a>.
     </p>
-  `);
-  return safeSend(email, 'Security Alert: Your WorkGrind password was changed', html);
+    `);
+    return safeSend(email, 'Security Alert: Your WorkGrind password was changed', html, undefined, 'password_changed_notification');
+  } catch (error) {
+    logEmailError('password_changed_notification', 'configuration', error);
+    return { success: false, error: 'Email delivery failed.' };
+  }
 };
 
 // ─── 5. Team / Workspace Invite ──────────────────────────────────────────────

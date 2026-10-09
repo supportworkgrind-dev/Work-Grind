@@ -68,7 +68,10 @@ dotenv.config();
 
   const missingEmailSettings: string[] = [];
   if (!process.env.SMTP_HOST?.trim()) missingEmailSettings.push('SMTP_HOST');
-  if (!process.env.SMTP_PORT?.trim()) missingEmailSettings.push('SMTP_PORT');
+  const smtpPort = Number(process.env.SMTP_PORT);
+  if (!process.env.SMTP_PORT?.trim() || !Number.isInteger(smtpPort) || smtpPort < 1 || smtpPort > 65535) {
+    missingEmailSettings.push('SMTP_PORT (valid TCP port)');
+  }
   if (!(process.env.SMTP_USER?.trim() || process.env.EMAIL_USER?.trim())) {
     missingEmailSettings.push('SMTP_USER or EMAIL_USER');
   }
@@ -77,6 +80,13 @@ dotenv.config();
   }
   if (!(process.env.FROM_EMAIL?.trim() || process.env.SMTP_USER?.trim() || process.env.EMAIL_USER?.trim())) {
     missingEmailSettings.push('FROM_EMAIL (or SMTP_USER)');
+  }
+  const sender = process.env.FROM_EMAIL?.trim() || process.env.SMTP_USER?.trim() || process.env.EMAIL_USER?.trim() || '';
+  if (sender && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(sender)) {
+    missingEmailSettings.push('FROM_EMAIL (valid email address)');
+  }
+  if (process.env.NODE_ENV === 'production' && !process.env.CLIENT_URL?.trim()) {
+    missingEmailSettings.push('CLIENT_URL (HTTPS frontend origin)');
   }
   if (missingEmailSettings.length) {
     console.warn('[Email] SMTP delivery is not configured.', { missingVariables: missingEmailSettings });

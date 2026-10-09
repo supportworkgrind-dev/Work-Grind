@@ -242,9 +242,13 @@ async function findOrCreateSocialUser(
       trialStartDate: now,
       trialEndDate: new Date(now.getTime() + TRIAL_DAYS * 24 * 60 * 60 * 1000),
     });
-    void sendWelcomeEmail(user.email, user.fullName).then((result) => {
-      if (!result.success) console.error('[Auth] Welcome email delivery failed.');
-    });
+    void sendWelcomeEmail(user.email, user.fullName)
+      .then((result) => {
+        if (!result.success) console.error('[Auth] Welcome email delivery failed.');
+      })
+      .catch((error) => console.error('[Auth] Welcome email delivery failed.', {
+        errorName: error instanceof Error ? error.name : 'UnknownError',
+      }));
     return user;
   } catch (error: any) {
     // A parallel first sign-in may have won the unique email/provider index race.

@@ -438,9 +438,13 @@ export const verifyRegistrationCode = async (req: Request, res: Response): Promi
     });
     const session = await sessionForUser(user);
     setRefreshCookie(res, session.refreshToken);
-    void sendWelcomeEmail(user.email, user.fullName).then((result) => {
-      if (!result.success) console.error('[Auth] Welcome email delivery failed.');
-    });
+    void sendWelcomeEmail(user.email, user.fullName)
+      .then((result) => {
+        if (!result.success) console.error('[Auth] Welcome email delivery failed.');
+      })
+      .catch((error) => console.error('[Auth] Welcome email delivery failed.', {
+        errorName: error instanceof Error ? error.name : 'UnknownError',
+      }));
     res.json({
       success: true,
       accessToken: session.accessToken,
@@ -459,7 +463,7 @@ export const resendRegistrationCode = async (req: Request, res: Response): Promi
     const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
     const genericResponse = {
       success: true,
-      message: 'If a pending signup exists for this address, a new verification code will be sent.',
+      message: 'If a pending signup exists for this address, the verification request will be processed.',
     };
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       res.status(202).json(genericResponse);
