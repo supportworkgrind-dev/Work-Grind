@@ -96,7 +96,7 @@ secrets in the backend's runtime separately. Follow LiveKit's
 ## Operations
 
 - Tokens expire after five minutes if not used to connect.
-- Voice session creation is rate limited, and each issued session consumes one
+- Voice session creation is rate limited, and each voice turn consumes one
   monthly AI request.
 - The browser disconnects the room and stops microphone capture when the user
   ends the session or leaves the page. LiveKit reconnect events are surfaced in
