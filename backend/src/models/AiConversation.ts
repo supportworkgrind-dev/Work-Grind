@@ -18,6 +18,11 @@ export interface IAiConversation extends Document {
   userId:    mongoose.Types.ObjectId;
   title?:    string;
   messages:  IAgentMessage[];
+  pendingVoiceAction?: {
+    toolName: string;
+    toolArgs: Record<string, unknown>;
+    createdAt: Date;
+  };
   createdAt: Date;
   updatedAt: Date;
 }
@@ -39,6 +44,11 @@ const AiConversationSchema = new Schema<IAiConversation>(
     userId:    { type: Schema.Types.ObjectId, ref: 'User',    required: true, index: true },
     title:     { type: String, maxlength: 200 },
     messages:  { type: [AgentMessageSchema], default: [] },
+    pendingVoiceAction: {
+      toolName: { type: String },
+      toolArgs: { type: Schema.Types.Mixed },
+      createdAt: { type: Date },
+    },
   },
   { timestamps: true }
 );

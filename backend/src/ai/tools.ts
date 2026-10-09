@@ -83,6 +83,7 @@ export interface AgentTool {
   name:        string;
   description: string;
   parameters:  Record<string, any>; // JSON Schema
+  requiresVoiceConfirmation?: boolean;
   execute:     (args: Record<string, any>, ctx: ToolContext) => Promise<ToolResult>;
 }
 
@@ -132,6 +133,7 @@ export const TOOLS: AgentTool[] = [
   {
     name: 'createTask',
     description: 'Create a new task in the workspace.',
+    requiresVoiceConfirmation: true,
     parameters: {
       type: 'object',
       required: ['title'],
@@ -183,6 +185,7 @@ export const TOOLS: AgentTool[] = [
   {
     name: 'updateTask',
     description: 'Update a task by its ID. Can change status, priority, due date, or title.',
+    requiresVoiceConfirmation: true,
     parameters: {
       type: 'object',
       required: ['taskId'],
@@ -251,6 +254,7 @@ export const TOOLS: AgentTool[] = [
   {
     name: 'createProject',
     description: 'Create a new project in the workspace.',
+    requiresVoiceConfirmation: true,
     parameters: {
       type: 'object',
       required: ['name'],
@@ -358,6 +362,7 @@ export const TOOLS: AgentTool[] = [
   {
     name: 'createMeeting',
     description: 'Schedule a new meeting. Always show a confirmation before creating.',
+    requiresVoiceConfirmation: true,
     parameters: {
       type: 'object',
       required: ['title','scheduledAt'],
@@ -489,6 +494,7 @@ export const TOOLS: AgentTool[] = [
   {
     name: 'createDeal',
     description: 'Create a new CRM deal.',
+    requiresVoiceConfirmation: true,
     parameters: {
       type: 'object',
       required: ['title'],
@@ -767,6 +773,7 @@ const EXTRA_TOOLS: AgentTool[] = [
   {
     name: 'updateDeal',
     description: 'Update a CRM deal stage, value, or close date.',
+    requiresVoiceConfirmation: true,
     parameters: {
       type: 'object',
       required: ['dealId'],
@@ -807,6 +814,7 @@ const EXTRA_TOOLS: AgentTool[] = [
   {
     name: 'completeTask',
     description: 'Mark a task as completed.',
+    requiresVoiceConfirmation: true,
     parameters: {
       type: 'object',
       required: ['taskId'],
@@ -832,6 +840,7 @@ const EXTRA_TOOLS: AgentTool[] = [
   {
     name: 'assignTask',
     description: 'Assign or re-assign a task to a team member by their email.',
+    requiresVoiceConfirmation: true,
     parameters: {
       type: 'object',
       required: ['taskId', 'assigneeEmail'],
@@ -895,6 +904,7 @@ const EXTRA_TOOLS: AgentTool[] = [
   {
     name: 'createContact',
     description: 'Create a new CRM contact.',
+    requiresVoiceConfirmation: true,
     parameters: {
       type: 'object',
       required: ['firstName', 'email'],
