@@ -127,6 +127,7 @@ export const createVoiceSession = async (req: AuthRequest, res: Response): Promi
   const missingConfiguration = getMissingVoiceConfiguration();
   if (missingConfiguration.length > 0) {
     console.warn('[Tavro Voice] Session request rejected: configuration is incomplete.', {
+      requestId: req.get('x-request-id')?.replace(/[^\w.-]/g, '').slice(0, 128),
       missingConfiguration,
       httpStatus: 503,
     });

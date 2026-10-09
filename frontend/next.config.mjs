@@ -46,6 +46,23 @@ const nextConfig = {
   async rewrites() {
     const configuredApiUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
     const configuredApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
+    const configuredLiveKitUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL?.trim();
+    if (isProduction) {
+      if (!configuredLiveKitUrl) {
+        throw new Error('NEXT_PUBLIC_LIVEKIT_URL must be configured for production deployments.');
+      }
+      let liveKitUrl;
+      try {
+        liveKitUrl = new URL(configuredLiveKitUrl);
+      } catch {
+        throw new Error('NEXT_PUBLIC_LIVEKIT_URL must be a secure LiveKit WSS origin.');
+      }
+      if (liveKitUrl.protocol !== 'wss:' ||
+          liveKitUrl.username || liveKitUrl.password || liveKitUrl.search || liveKitUrl.hash ||
+          (liveKitUrl.pathname !== '' && liveKitUrl.pathname !== '/')) {
+        throw new Error('NEXT_PUBLIC_LIVEKIT_URL must be a secure LiveKit WSS origin.');
+      }
+    }
     if (configuredApiUrl && configuredApiBaseUrl) {
       let apiUrl;
       let apiBaseUrl;
