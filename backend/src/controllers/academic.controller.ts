@@ -1,11 +1,13 @@
 import mongoose from 'mongoose';
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth';
+import AuditLog from '../models/AuditLog';
 import AcademicClass from '../models/AcademicClass';
 import AcademicCourse from '../models/AcademicCourse';
 import AcademicDepartment from '../models/AcademicDepartment';
 import AcademicGuardianLink from '../models/AcademicGuardianLink';
-import AcademicPerson, { AcademicPersonType, GuardianRelationshipType } from '../models/AcademicPerson';
+import AcademicPerson, { AcademicPersonType } from '../models/AcademicPerson';
+import { GuardianRelationshipType } from '../models/AcademicGuardianLink';
 import User from '../models/User';
 
 const PAGE_SIZE = 100;
@@ -32,7 +34,7 @@ function isObjectId(value: unknown): value is string {
   return typeof value === 'string' && mongoose.isValidObjectId(value);
 }
 
-function handleCreateError(res: Response, error: unknown, resource: string): void {
+function handleOperationError(res: Response, error: unknown, resource: string): void {
   if (error instanceof mongoose.Error.ValidationError) {
     res.status(400).json({ success: false, message: 'Invalid academic record.' });
     return;
@@ -47,6 +49,29 @@ function handleCreateError(res: Response, error: unknown, resource: string): voi
   res.status(500).json({ success: false, message: 'Unable to complete the academic record operation.' });
 }
 
+async function recordAcademicAudit(
+  req: AuthRequest,
+  resource: string,
+  resourceId: mongoose.Types.ObjectId,
+  details?: Record<string, string>
+): Promise<void> {
+  try {
+    await AuditLog.create({
+      companyId: getCompanyId(req),
+      userId: new mongoose.Types.ObjectId(req.user!.userId),
+      action: 'create',
+      resource: `academic.${resource}`,
+      resourceId: resourceId.toString(),
+      details,
+    });
+  } catch (error) {
+    console.error('[Academic] Record created but audit log persistence failed.', {
+      resource: `academic.${resource}`,
+      errorName: error instanceof Error ? error.name : 'UnknownError',
+    });
+  }
+}
+
 export const listPeople = async (req: AuthRequest, res: Response): Promise<void> => {
   const { skip, limit } = listOptions(req);
   const filter: { companyId: mongoose.Types.ObjectId; type?: AcademicPersonType } = { companyId: getCompanyId(req) };
@@ -57,11 +82,15 @@ export const listPeople = async (req: AuthRequest, res: Response): Promise<void>
     }
     filter.type = req.query.type as AcademicPersonType;
   }
-  const [people, total] = await Promise.all([
-    AcademicPerson.find(filter).sort({ lastName: 1, firstName: 1 }).skip(skip).limit(limit).lean(),
-    AcademicPerson.countDocuments(filter),
-  ]);
-  res.json({ success: true, people, total, page: Math.floor(skip / limit) + 1, pageSize: limit });
+  try {
+    const [people, total] = await Promise.all([
+      AcademicPerson.find(filter).sort({ lastName: 1, firstName: 1 }).skip(skip).limit(limit).lean(),
+      AcademicPerson.countDocuments(filter),
+    ]);
+    res.json({ success: true, people, total, page: Math.floor(skip / limit) + 1, pageSize: limit });
+  } catch (error) {
+    handleOperationError(res, error, 'people');
+  }
 };
 
 export const createPerson = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -103,20 +132,25 @@ export const createPerson = async (req: AuthRequest, res: Response): Promise<voi
       ...(externalId !== undefined ? { externalId: externalId.trim() } : {}),
       ...(userId ? { userId } : {}),
     });
+    await recordAcademicAudit(req, 'person', person._id, { type: person.type });
     res.status(201).json({ success: true, person });
   } catch (error) {
-    handleCreateError(res, error, 'person');
+    handleOperationError(res, error, 'person');
   }
 };
 
 export const listDepartments = async (req: AuthRequest, res: Response): Promise<void> => {
   const { skip, limit } = listOptions(req);
   const companyId = getCompanyId(req);
-  const [departments, total] = await Promise.all([
-    AcademicDepartment.find({ companyId }).sort({ name: 1 }).skip(skip).limit(limit).lean(),
-    AcademicDepartment.countDocuments({ companyId }),
-  ]);
-  res.json({ success: true, departments, total, page: Math.floor(skip / limit) + 1, pageSize: limit });
+  try {
+    const [departments, total] = await Promise.all([
+      AcademicDepartment.find({ companyId }).sort({ name: 1 }).skip(skip).limit(limit).lean(),
+      AcademicDepartment.countDocuments({ companyId }),
+    ]);
+    res.json({ success: true, departments, total, page: Math.floor(skip / limit) + 1, pageSize: limit });
+  } catch (error) {
+    handleOperationError(res, error, 'departments');
+  }
 };
 
 export const createDepartment = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -132,20 +166,25 @@ export const createDepartment = async (req: AuthRequest, res: Response): Promise
       code: code.trim(),
       ...(description !== undefined ? { description: description.trim() } : {}),
     });
+    await recordAcademicAudit(req, 'department', department._id);
     res.status(201).json({ success: true, department });
   } catch (error) {
-    handleCreateError(res, error, 'department');
+    handleOperationError(res, error, 'department');
   }
 };
 
 export const listCourses = async (req: AuthRequest, res: Response): Promise<void> => {
   const { skip, limit } = listOptions(req);
   const companyId = getCompanyId(req);
-  const [courses, total] = await Promise.all([
-    AcademicCourse.find({ companyId }).sort({ name: 1 }).skip(skip).limit(limit).lean(),
-    AcademicCourse.countDocuments({ companyId }),
-  ]);
-  res.json({ success: true, courses, total, page: Math.floor(skip / limit) + 1, pageSize: limit });
+  try {
+    const [courses, total] = await Promise.all([
+      AcademicCourse.find({ companyId }).sort({ name: 1 }).skip(skip).limit(limit).lean(),
+      AcademicCourse.countDocuments({ companyId }),
+    ]);
+    res.json({ success: true, courses, total, page: Math.floor(skip / limit) + 1, pageSize: limit });
+  } catch (error) {
+    handleOperationError(res, error, 'courses');
+  }
 };
 
 export const createCourse = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -175,20 +214,25 @@ export const createCourse = async (req: AuthRequest, res: Response): Promise<voi
       ...(description !== undefined ? { description: description.trim() } : {}),
       ...(credits !== undefined ? { credits } : {}),
     });
+    await recordAcademicAudit(req, 'course', course._id);
     res.status(201).json({ success: true, course });
   } catch (error) {
-    handleCreateError(res, error, 'course');
+    handleOperationError(res, error, 'course');
   }
 };
 
 export const listClasses = async (req: AuthRequest, res: Response): Promise<void> => {
   const { skip, limit } = listOptions(req);
   const companyId = getCompanyId(req);
-  const [classes, total] = await Promise.all([
-    AcademicClass.find({ companyId }).sort({ academicYear: -1, name: 1 }).skip(skip).limit(limit).lean(),
-    AcademicClass.countDocuments({ companyId }),
-  ]);
-  res.json({ success: true, classes, total, page: Math.floor(skip / limit) + 1, pageSize: limit });
+  try {
+    const [classes, total] = await Promise.all([
+      AcademicClass.find({ companyId }).sort({ academicYear: -1, name: 1 }).skip(skip).limit(limit).lean(),
+      AcademicClass.countDocuments({ companyId }),
+    ]);
+    res.json({ success: true, classes, total, page: Math.floor(skip / limit) + 1, pageSize: limit });
+  } catch (error) {
+    handleOperationError(res, error, 'classes');
+  }
 };
 
 export const createClass = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -223,20 +267,25 @@ export const createClass = async (req: AuthRequest, res: Response): Promise<void
       departmentId,
       courseIds,
     });
+    await recordAcademicAudit(req, 'class', academicClass._id);
     res.status(201).json({ success: true, class: academicClass });
   } catch (error) {
-    handleCreateError(res, error, 'class');
+    handleOperationError(res, error, 'class');
   }
 };
 
 export const listGuardianLinks = async (req: AuthRequest, res: Response): Promise<void> => {
   const { skip, limit } = listOptions(req);
   const companyId = getCompanyId(req);
-  const [links, total] = await Promise.all([
-    AcademicGuardianLink.find({ companyId }).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
-    AcademicGuardianLink.countDocuments({ companyId }),
-  ]);
-  res.json({ success: true, links, total, page: Math.floor(skip / limit) + 1, pageSize: limit });
+  try {
+    const [links, total] = await Promise.all([
+      AcademicGuardianLink.find({ companyId }).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+      AcademicGuardianLink.countDocuments({ companyId }),
+    ]);
+    res.json({ success: true, links, total, page: Math.floor(skip / limit) + 1, pageSize: limit });
+  } catch (error) {
+    handleOperationError(res, error, 'guardian relationships');
+  }
 };
 
 export const createGuardianLink = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -256,8 +305,9 @@ export const createGuardianLink = async (req: AuthRequest, res: Response): Promi
       return;
     }
     const link = await AcademicGuardianLink.create({ companyId, studentId, guardianId, relationship });
+    await recordAcademicAudit(req, 'guardian_link', link._id, { relationship });
     res.status(201).json({ success: true, link });
   } catch (error) {
-    handleCreateError(res, error, 'guardian relationship');
+    handleOperationError(res, error, 'guardian relationship');
   }
 };

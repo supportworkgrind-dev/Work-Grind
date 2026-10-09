@@ -23,7 +23,7 @@ const AcademicPersonSchema = new Schema<IAcademicPerson>(
     type: { type: String, enum: ['student', 'teacher', 'parent'], required: true },
     firstName: { type: String, required: true, trim: true, maxlength: 100 },
     lastName: { type: String, required: true, trim: true, maxlength: 100 },
-    email: { type: String, trim: true, lowercase: true, maxlength: 254 },
+    email: { type: String, trim: true, lowercase: true, maxlength: 254, match: /^[^\s@]+@[^\s@]+\.[^\s@]+$/ },
     externalId: { type: String, trim: true, maxlength: 100 },
     status: { type: String, enum: ['active', 'inactive'], default: 'active', required: true },
   },

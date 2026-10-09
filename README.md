@@ -27,7 +27,7 @@ WorkGrind provides secure authentication and isolated multi-tenant workspaces.
 * Multi-tenant data isolation
 * Role-Based Access Control
 
-New organization workspaces can be classified as `business`, `school`, `college`, or `university`. This classification is stored on the existing tenant (`Company`) record and does not change the existing account type or workspace roles. Academic records, academic permissions, and education dashboards are not included yet; they are planned as subsequent tenant-scoped phases rather than being represented by existing business tasks or CRM data.
+New organization workspaces can be classified as `business`, `school`, `college`, or `university`. This classification is stored on the existing tenant (`Company`) record and does not change the existing account type or workspace roles. The initial academic directory API at `/api/academic` supports listing and creating people, departments, courses, classes, and explicit guardian links in education organizations; access is currently limited to verified organization owners and admins. Optional linked accounts and related academic records are checked against the same tenant. Student/parent self-service, teacher permissions, class enrollments, schedules, assignments, attendance, grading, fees, localization settings, and education dashboards remain subsequent phases.
 
 ### Workspace Roles
 

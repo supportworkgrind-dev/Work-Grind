@@ -11,12 +11,12 @@ import {
   listGuardianLinks,
   listPeople,
 } from '../controllers/academic.controller';
-import { authenticate, requireCompany, requireRole } from '../middleware/auth';
-import { requireAcademicOrganization } from '../middleware/academicOrganization';
+import { authenticate } from '../middleware/auth';
+import { requireAcademicAdmin } from '../middleware/academicOrganization';
 
 const router = Router();
 
-router.use(authenticate, requireCompany, requireRole('owner', 'admin'), requireAcademicOrganization);
+router.use(authenticate, requireAcademicAdmin);
 
 router.get('/people', listPeople);
 router.post('/people', createPerson);
