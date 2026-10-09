@@ -28,7 +28,7 @@ function makeTransport(sendMail) {
 function captureLogs() {
   const original = console.error;
   const lines = [];
-  console.error = (...args) => lines.push(args.map(String).join(' '));
+  console.error = (...args) => lines.push(`${args[0]} ${JSON.stringify(args[1])}`);
   return {
     lines,
     restore() { console.error = original; },

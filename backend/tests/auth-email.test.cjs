@@ -94,7 +94,7 @@ test('signup returns a delivery error and invalidates pending code when provider
 test('expired signup verification codes are rejected without creating an account', async () => {
   let filter;
   PendingRegistration.findOneAndUpdate = async (query) => { filter = query; return null; };
-  User.findOneAndUpdate = async () => null;
+  User.findOneAndUpdate = () => ({ select: async () => null });
   const response = makeResponse();
 
   await authController.verifyRegistrationCode({

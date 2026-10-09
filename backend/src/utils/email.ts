@@ -169,7 +169,7 @@ const safeSend = async (
     const from = getFromAddress();
     const t = await getTransporter();
     const info = await t.sendMail({ from, to, subject, html, replyTo });
-    const accepted = Array.isArray(info.accepted) && info.accepted.some((recipient) => {
+    const accepted = Array.isArray(info.accepted) && info.accepted.some((recipient: string | { address: string }) => {
       const address = typeof recipient === 'string' ? recipient : recipient.address;
       return address.toLowerCase() === to.toLowerCase();
     });
