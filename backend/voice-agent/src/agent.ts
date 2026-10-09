@@ -27,7 +27,7 @@ if (missingEnvironment.length > 0) {
   process.exit(1);
 }
 
-const GEMINI_MODEL = process.env.GEMINI_MODEL?.trim() || 'gemini-3-flash-preview';
+const GEMINI_MODEL = process.env.GEMINI_MODEL?.trim() || 'gemini-2.5-flash';
 const AGENT_NAME = 'tavro-voice';
 
 function createTavroAgent(): ReturnType<typeof voice.Agent.create> {
