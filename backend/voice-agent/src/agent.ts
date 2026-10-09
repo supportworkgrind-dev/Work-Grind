@@ -6,6 +6,7 @@ import {
   cli,
   defineAgent,
   inference,
+  logMetrics,
   voice,
   type JobContext,
 } from '@livekit/agents';
@@ -98,6 +99,15 @@ export default defineAgent({
           reason: event.reason,
           errorName: event.error instanceof Error ? event.error.name : undefined,
         });
+      });
+      session.on(AgentSessionEventTypes.MetricsCollected, (event) => {
+        console.info('[Tavro Voice Agent] Agent metrics collected.', {
+          roomId: roomName,
+          jobId,
+          dispatchId,
+          metricType: event.metrics.type,
+        });
+        logMetrics(event.metrics);
       });
 
       stage = 'session_initialization';
