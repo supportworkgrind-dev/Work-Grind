@@ -27,6 +27,7 @@ export function getAuthValue(key: AuthStorageKey): string | null {
 export function setAuthValue(key: AuthStorageKey, value: string): void {
   if (typeof window === 'undefined') return;
   removeLegacyAuthValues();
+  if (key === 'workgrind_refresh_token') return;
   sessionStorage.setItem(key, value);
 }
 

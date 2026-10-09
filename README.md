@@ -672,6 +672,14 @@ connections rather than silently treating another function instance as local.
 
 WorkGrind supports multiple authentication methods.
 
+The browser keeps only the short-lived access token in tab-scoped
+`sessionStorage`. The rotating refresh token is issued only as an `HttpOnly`,
+`Secure` (production), `SameSite=Lax` cookie scoped to `/api/auth`. Frontend
+API requests use the same-origin `/api` rewrite so the browser can persist and
+send this cookie across reloads and browser restarts without exposing it to
+JavaScript. Startup refreshes and validates the session before protected-route
+redirects; refresh failures caused by connectivity remain retryable.
+
 ### Email & Password
 
 ```text
