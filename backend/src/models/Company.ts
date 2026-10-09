@@ -1,4 +1,5 @@
 import mongoose, { Document, Schema } from 'mongoose';
+import { ORGANIZATION_TYPES, OrganizationType } from '../config/organization';
 
 export type CompanySubscriptionStatus =
   | 'trialing'
@@ -44,6 +45,7 @@ export interface ICompany extends Document {
   settings: { allowGuestAccess: boolean; defaultRole: string };
   isActive: boolean;
   accountType: 'company' | 'individual';
+  organizationType: OrganizationType;
 
   // ── Company subscription (Polar-based) ────────────────────────────────────
   subscriptionStatus:     CompanySubscriptionStatus;
@@ -120,6 +122,7 @@ const CompanySchema = new Schema<ICompany>(
       defaultRole:      { type: String, default: 'employee' },
     },
     accountType: { type: String, enum: ['company', 'individual'], default: 'company' },
+    organizationType: { type: String, enum: ORGANIZATION_TYPES, default: 'business', required: true },
     isActive:    { type: Boolean, default: true },
 
     // ── Subscription ──────────────────────────────────────────────────────────

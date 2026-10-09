@@ -26,6 +26,7 @@ import { sendVerificationEmail, sendVerificationCodeEmail, sendPasswordResetEmai
 import { AuthRequest } from '../middleware/auth';
 import { refreshAvatarUrls } from '../services/avatarUrls';
 import { clearRefreshCookie, getRefreshCookie, setRefreshCookie } from '../utils/authCookie';
+import { isOrganizationType } from '../config/organization';
 const issue = (userId: string, companyId: string, role: string) => ({
   accessToken: generateAccessToken({ userId, companyId, role }),
   refreshToken: generateRefreshToken({ userId, companyId, role }),
@@ -654,7 +655,11 @@ export const changePassword = async (req: AuthRequest, res: Response): Promise<v
 export const createCompany = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const uid = req.user!.userId;
-    const { name, industry, size, country, timeZone, accountType = 'company' } = req.body;
+    const { name, industry, size, country, timeZone, accountType = 'company', organizationType = 'business' } = req.body;
+    if (!isOrganizationType(organizationType)) {
+      res.status(400).json({ success: false, message: 'Organization type must be business, school, college, or university.' });
+      return;
+    }
     const user = await User.findById(uid);
     if (!user) { res.status(404).json({ success: false, message: 'User not found' }); return; }
 
@@ -702,6 +707,7 @@ export const createCompany = async (req: AuthRequest, res: Response): Promise<vo
       timeZone: timeZone || 'UTC',
       ownerId: uid,
       accountType: isIndividual ? 'individual' : 'company',
+      organizationType,
       inviteCode: uuidv4().split('-')[0].toUpperCase(),
       subscriptionStatus: 'trialing',
       subscriptionPlan: 'free',

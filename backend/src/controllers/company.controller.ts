@@ -6,6 +6,7 @@ import Task from '../models/Task';
 import { AuthRequest } from '../middleware/auth';
 import { sendInviteEmail } from '../utils/email';
 import { v4 as uuidv4 } from 'uuid';
+import { isOrganizationType } from '../config/organization';
 
 export const getCompany = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -22,7 +23,11 @@ export const getCompany = async (req: AuthRequest, res: Response): Promise<void>
 
 export const updateCompany = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const allowed = ['name', 'logo', 'industry', 'size', 'country', 'timeZone', 'settings', 'accountType'];
+    if (req.body.organizationType !== undefined && !isOrganizationType(req.body.organizationType)) {
+      res.status(400).json({ success: false, message: 'Organization type must be business, school, college, or university.' });
+      return;
+    }
+    const allowed = ['name', 'logo', 'industry', 'size', 'country', 'timeZone', 'settings', 'accountType', 'organizationType'];
     const updates: any = {};
     allowed.forEach((field) => {
       if (req.body[field] !== undefined) updates[field] = req.body[field];

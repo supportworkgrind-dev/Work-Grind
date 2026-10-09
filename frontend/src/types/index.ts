@@ -1,6 +1,7 @@
 export type UserStatus = 'online' | 'away' | 'busy' | 'offline';
 export type UserRole = 'owner' | 'admin' | 'manager' | 'employee' | 'guest';
 export type WorkspaceProfile = 'developer' | 'creative' | 'marketing' | 'sales' | 'project_manager' | 'freelancer' | 'executive' | 'student' | 'professional';
+export type OrganizationType = 'business' | 'school' | 'college' | 'university';
 export type WorkGrindTheme = 'original' | 'midnight' | 'slate' | 'forest' | 'ocean' | 'sand' | 'plum' | 'high-contrast' | 'light' | 'aurora' | 'graphite' | 'dark' | 'neutral' | WorkspaceProfile;
 
 export interface User {
@@ -83,6 +84,7 @@ export interface Company {
   ownerId: string;
   inviteCode?: string;
   accountType?: 'company' | 'individual';
+  organizationType?: OrganizationType;
   /** Legacy plan field */
   plan: 'free' | 'starter' | 'pro';
   storage: {

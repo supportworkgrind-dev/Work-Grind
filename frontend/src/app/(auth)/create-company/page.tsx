@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import axios from 'axios';
 import { api } from '@/lib/api';
 import { getAuthValue, updateAuthTokens } from '@/lib/authSession';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -29,6 +30,7 @@ export default function CreateCompanyPage() {
   // Step 1: Account Type selection | Step 2: Workspace details
   const [step, setStep] = useState<1 | 2>(1);
   const [accountType, setAccountType] = useState<'company' | 'individual' | null>(null);
+  const [organizationType, setOrganizationType] = useState<'business' | 'school' | 'college' | 'university'>('business');
 
   // Form Fields
   const [name, setName] = useState('');
@@ -52,6 +54,11 @@ export default function CreateCompanyPage() {
       setIndustry('Technology');
       setSize('11-50');
     }
+  };
+
+  const handleOrganizationTypeChange = (value: typeof organizationType) => {
+    setOrganizationType(value);
+    setIndustry(value === 'business' ? 'Technology' : 'Education');
   };
 
   const handleContinueToDetails = () => {
@@ -78,6 +85,7 @@ export default function CreateCompanyPage() {
         country,
         timeZone,
         accountType: accountType || 'company',
+        organizationType: accountType === 'company' ? organizationType : 'business',
       });
 
       if (res.data.success) {
@@ -91,8 +99,10 @@ export default function CreateCompanyPage() {
         }
         router.push('/onboarding');
       }
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to create workspace. Please try again.');
+    } catch (err: unknown) {
+      setError(axios.isAxiosError<{ message?: string }>(err)
+        ? err.response?.data?.message || 'Failed to create workspace. Please try again.'
+        : 'Failed to create workspace. Please try again.');
       setIsLoading(false);
     }
   };
@@ -289,12 +299,12 @@ export default function CreateCompanyPage() {
                   <h2 className="text-xl font-bold tracking-tight text-slate-900">
                     {accountType === 'individual'
                       ? 'Personal Workspace Setup'
-                      : 'Set Up Your Company Workspace'}
+                      : 'Set Up Your Organization Workspace'}
                   </h2>
                   <p className="mt-1 text-xs text-slate-500">
                     {accountType === 'individual'
                       ? 'Customize your solo environment for projects, tasks, and notes.'
-                      : 'Create your digital headquarters for team collaboration.'}
+                      : 'Create a workspace for your business or educational organization.'}
                   </p>
                 </div>
                 <button
@@ -310,7 +320,7 @@ export default function CreateCompanyPage() {
               {/* Workspace / Company Name */}
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700">
-                  {accountType === 'individual' ? 'Workspace Display Name' : 'Company / Organization Name'}
+                  {accountType === 'individual' ? 'Workspace Display Name' : 'Organization Name'}
                 </label>
                 <div className="relative mt-1.5 rounded-xl shadow-2xs">
                   <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5">
@@ -333,6 +343,24 @@ export default function CreateCompanyPage() {
 
               {/* Industry / Work Focus */}
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                {accountType === 'company' && (
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700">
+                      Organization Type
+                    </label>
+                    <select
+                      value={organizationType}
+                      disabled={isLoading || isRedirecting}
+                      onChange={(e) => handleOrganizationTypeChange(e.target.value as typeof organizationType)}
+                      className="mt-1.5 block w-full rounded-xl border border-slate-200 py-2.5 px-3 text-slate-900 focus:ring-2 focus:ring-indigo-600 text-xs transition-all disabled:opacity-60"
+                    >
+                      <option value="business">Business</option>
+                      <option value="school">School</option>
+                      <option value="college">College</option>
+                      <option value="university">University</option>
+                    </select>
+                  </div>
+                )}
                 <div>
                   <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700">
                     {accountType === 'individual' ? 'Primary Focus' : 'Industry'}
