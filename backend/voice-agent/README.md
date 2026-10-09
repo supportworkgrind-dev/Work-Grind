@@ -104,9 +104,9 @@ secrets in the backend's runtime separately. Follow LiveKit's
 - The browser disconnects the room and stops microphone capture when the user
   ends the session or leaves the page. LiveKit reconnect events are surfaced in
   the UI; users can end and restart a failed connection.
-- Backend and agent logs include status, room correlation ID, provider category,
-  and error class only. They do not log credentials, access tokens, audio, or
-  transcripts.
+- Backend, agent, and browser voice-panel logs include lifecycle stage, room
+  correlation ID, participant kind, timeout/disconnect reason, and error class.
+  They do not log credentials, access tokens, audio, or transcripts.
 - Voice mode is optional; existing Tavro text chat and its workspace tools are
   unchanged.
 - The configured LiveKit STT/TTS providers determine language support.
