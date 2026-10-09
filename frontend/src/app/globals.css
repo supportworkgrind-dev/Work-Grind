@@ -921,6 +921,27 @@ body {
     ring-color: var(--border-focus);
     box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
   }
+  .academic-card {
+    @apply rounded-2xl border p-5;
+    border-color: var(--border-color);
+    background: var(--bg-card);
+    box-shadow: var(--shadow-card);
+  }
+  .academic-heading {
+    @apply mb-4 text-base font-semibold;
+    color: var(--text-primary);
+  }
+  .academic-form {
+    @apply grid gap-3;
+  }
+  .academic-form label {
+    @apply grid gap-1.5 text-xs font-medium;
+    color: var(--text-secondary);
+  }
+  .academic-form input,
+  .academic-form select {
+    @apply input-base;
+  }
 
   .task-filter-select {
     box-sizing: border-box;

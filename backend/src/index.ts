@@ -128,6 +128,7 @@ import callingRoutes from './routes/calls';
 import rtcRoutes from './routes/rtc';
 import whatsappRoutes from './routes/whatsapp';
 import academicRoutes from './routes/academic';
+import academicPortalRoutes from './routes/academicPortal';
 
 const app = express();
 const server = http.createServer(app);
@@ -323,6 +324,7 @@ app.use('/api/whatsapp', whatsappRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/companies', companyRoutes);
 app.use('/api/academic', academicRoutes);
+app.use('/api/academic/portal', academicPortalRoutes);
 app.use('/api/channels', channelRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/direct-messages', dmRoutes);

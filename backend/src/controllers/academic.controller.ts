@@ -6,6 +6,7 @@ import AcademicClass from '../models/AcademicClass';
 import AcademicCourse from '../models/AcademicCourse';
 import AcademicDepartment from '../models/AcademicDepartment';
 import AcademicGuardianLink from '../models/AcademicGuardianLink';
+import AcademicEnrollment from '../models/AcademicEnrollment';
 import AcademicPerson, { AcademicPersonType } from '../models/AcademicPerson';
 import { GuardianRelationshipType } from '../models/AcademicGuardianLink';
 import User from '../models/User';
@@ -309,5 +310,51 @@ export const createGuardianLink = async (req: AuthRequest, res: Response): Promi
     res.status(201).json({ success: true, link });
   } catch (error) {
     handleOperationError(res, error, 'guardian relationship');
+  }
+};
+
+export const listEnrollments = async (req: AuthRequest, res: Response): Promise<void> => {
+  const { skip, limit } = listOptions(req);
+  const companyId = getCompanyId(req);
+  try {
+    const [enrollments, total] = await Promise.all([
+      AcademicEnrollment.find({ companyId })
+        .sort({ enrolledAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate({ path: 'studentId', match: { companyId }, select: 'firstName lastName externalId type' })
+        .populate({ path: 'classId', match: { companyId }, select: 'name academicYear departmentId' })
+        .lean(),
+      AcademicEnrollment.countDocuments({ companyId }),
+    ]);
+    res.json({ success: true, enrollments, total, page: Math.floor(skip / limit) + 1, pageSize: limit });
+  } catch (error) {
+    handleOperationError(res, error, 'enrollments');
+  }
+};
+
+export const createEnrollment = async (req: AuthRequest, res: Response): Promise<void> => {
+  const { studentId, classId } = req.body ?? {};
+  if (!isObjectId(studentId) || !isObjectId(classId)) {
+    res.status(400).json({ success: false, message: 'Valid student and class records are required.' });
+    return;
+  }
+
+  const companyId = getCompanyId(req);
+  try {
+    const [student, academicClass] = await Promise.all([
+      AcademicPerson.findOne({ _id: studentId, companyId, type: 'student', status: 'active' }).select('_id'),
+      AcademicClass.findOne({ _id: classId, companyId }).select('_id'),
+    ]);
+    if (!student || !academicClass) {
+      res.status(400).json({ success: false, message: 'Student and class must both belong to this organization and be active.' });
+      return;
+    }
+
+    const enrollment = await AcademicEnrollment.create({ companyId, studentId, classId });
+    await recordAcademicAudit(req, 'enrollment', enrollment._id);
+    res.status(201).json({ success: true, enrollment });
+  } catch (error) {
+    handleOperationError(res, error, 'enrollment');
   }
 };

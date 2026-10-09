@@ -4,11 +4,13 @@ import {
   createCourse,
   createDepartment,
   createGuardianLink,
+  createEnrollment,
   createPerson,
   listClasses,
   listCourses,
   listDepartments,
   listGuardianLinks,
+  listEnrollments,
   listPeople,
 } from '../controllers/academic.controller';
 import { authenticate } from '../middleware/auth';
@@ -28,5 +30,7 @@ router.get('/classes', listClasses);
 router.post('/classes', createClass);
 router.get('/guardians', listGuardianLinks);
 router.post('/guardians', createGuardianLink);
+router.get('/enrollments', listEnrollments);
+router.post('/enrollments', createEnrollment);
 
 export default router;

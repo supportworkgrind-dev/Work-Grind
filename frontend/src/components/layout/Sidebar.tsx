@@ -54,6 +54,7 @@ const navSections: readonly SidebarSection[] = [
     name: 'WORKSPACE',
     items: [
       { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
+      { name: 'Academic', href: '/academic', icon: Users2 },
       { name: 'Daily Focus', href: '/daily-focus', icon: Target, entitlement: 'aiAssistant' },
       { name: 'Tasks', href: '/tasks', icon: CheckSquare, entitlement: 'tasksProjects' },
       { name: 'Projects', href: '/projects', icon: FolderKanban, entitlement: 'tasksProjects' },
@@ -154,11 +155,14 @@ export const Sidebar = memo(function Sidebar() {
       .map((section) => ({
         ...section,
         items: section.items.filter((item) =>
-          (!item.managerOrAbove || canManageClientPortal) && (!item.ownerOrAdmin || ['owner', 'admin'].includes(user?.role ?? '')) && (!item.entitlement || canUse(item.entitlement)),
+          (item.href !== '/academic' || (!!company?.organizationType && company.organizationType !== 'business')) &&
+          (!item.managerOrAbove || canManageClientPortal) &&
+          (!item.ownerOrAdmin || ['owner', 'admin'].includes(user?.role ?? '')) &&
+          (!item.entitlement || canUse(item.entitlement)),
         ),
       }))
       .filter((section) => section.items.length > 0),
-    [canManageClientPortal, canUse, subscription, user?.role],
+    [canManageClientPortal, canUse, company?.organizationType, subscription, user?.role],
   );
 
   const handleStatusChange = useCallback(
