@@ -54,12 +54,14 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
     res.status(401).json({ success: false, message: 'No token provided' });
     return;
   }
+  let failureStage = 'access_token_verification';
   try {
     const payload = verifyAccessToken(token);
     if (payload.mfaPending) {
       res.status(401).json({ success: false, message: 'Complete the required authentication step first.' });
       return;
     }
+    failureStage = 'user_lookup';
     const user = await User.findById(payload.userId).select('isVerified isActive isDeleted');
     if (!user || !user.isVerified || !user.isActive || user.isDeleted) {
       res.status(403).json({ success: false, message: 'Account verification is required.' });
@@ -70,6 +72,7 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
     console.warn('[Auth] Request rejected because the access token is invalid.', {
       method: req.method,
       path: req.path,
+      stage: failureStage,
       errorName: err instanceof Error ? err.name : 'UnknownError',
       httpStatus: 401,
     });
