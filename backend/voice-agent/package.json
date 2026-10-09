@@ -1,0 +1,24 @@
+{
+  "name": "workgrind-tavro-voice-agent",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "tsx src/agent.ts dev",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/agent.js start"
+  },
+  "dependencies": {
+    "@livekit/agents": "^1.9.1",
+    "@livekit/agents-plugin-google": "^1.9.1",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.10",
+    "tsx": "^4.20.6",
+    "typescript": "^5.5.3"
+  }
+}

@@ -259,6 +259,15 @@ Tavro AI is designed to respect existing authentication, permissions, workspace 
 
 AI provider failures should be handled gracefully without exposing internal errors to users.
 
+Tavro also offers an optional LiveKit voice mode. The voice worker uses LiveKit
+Inference for speech recognition/synthesis and the configured Gemini model for
+responses. Voice sessions are authenticated against the current WorkGrind
+workspace and consume one existing monthly AI request when a session starts.
+Voice mode does not currently access workspace records or perform actions; use
+Tavro text chat for workspace-aware requests. See
+[the Tavro Voice setup guide](./backend/voice-agent/README.md) for required
+LiveKit configuration and local/deployment commands.
+
 ---
 
 # 11. 🔎 Global Search

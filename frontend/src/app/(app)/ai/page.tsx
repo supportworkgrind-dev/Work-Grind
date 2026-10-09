@@ -8,6 +8,7 @@
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react';
+import dynamic from 'next/dynamic';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/store/useAuthStore';
 import Link from 'next/link';
@@ -17,9 +18,20 @@ import {
   ChevronRight, Zap, Search, BarChart2,
   CheckSquare, Briefcase, Users, Building2,
   Clock, Trash2, History, X, RefreshCw,
+  Mic, MessageSquareText,
 } from 'lucide-react';
 import { AIStatusBadge } from '@/components/common/AIStatusBadge';
 import type { AIProvider } from '@/components/common/AIStatusBadge';
+
+const VoiceAssistantPanel = dynamic(() => import('@/components/ai/VoiceAssistantPanel'), {
+  ssr: false,
+  loading: () => (
+    <div className="flex flex-1 items-center justify-center rounded-2xl border"
+      style={{ borderColor: 'var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-muted)' }}>
+      <Loader2 className="mr-2 h-4 w-4 animate-spin" />Loading voice controls…
+    </div>
+  ),
+});
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -280,6 +292,7 @@ export default function AIAgentPage() {
   const [historyLoading,  setHistoryLoading]  = useState(false);
   const [requestError,    setRequestError]    = useState('');
   const [retryPrompt,     setRetryPrompt]     = useState('');
+  const [showVoiceAssistant, setShowVoiceAssistant] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef       = useRef<HTMLTextAreaElement>(null);
   const requestInFlight = useRef(false);
@@ -616,6 +629,16 @@ export default function AIAgentPage() {
 
           <div className="flex items-center gap-1.5">
             <span className="badge badge-emerald text-[10px]">Active</span>
+            <button
+              type="button"
+              onClick={() => setShowVoiceAssistant((visible) => !visible)}
+              disabled={aiLimitReached}
+              title={aiLimitReached ? 'Monthly AI limit reached' : showVoiceAssistant ? 'Return to text chat' : 'Start a voice conversation'}
+              className="btn-ghost flex h-8 items-center gap-1.5 rounded-lg px-2 text-[11px] font-semibold disabled:opacity-50 sm:px-2.5"
+            >
+              {showVoiceAssistant ? <MessageSquareText className="h-3.5 w-3.5" /> : <Mic className="h-3.5 w-3.5" />}
+              <span className="hidden sm:inline">{showVoiceAssistant ? 'Text chat' : 'Voice'}</span>
+            </button>
             {hasMessages && (
               <button onClick={startNewConversation} title="New conversation"
                 disabled={isLoading}
@@ -631,6 +654,10 @@ export default function AIAgentPage() {
           </div>
         </div>
 
+        {showVoiceAssistant ? (
+          <VoiceAssistantPanel onClose={() => setShowVoiceAssistant(false)} />
+        ) : (
+          <>
         {/* Messages */}
         {requestError && (
           <div className="flex items-center justify-between gap-3 rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-700"
@@ -719,6 +746,8 @@ export default function AIAgentPage() {
             {aiLimitReached && <Link href="/billing" className="ml-1 font-semibold underline">Upgrade</Link>}
           </p>
         </div>
+          </>
+        )}
       </div>
     </div>
   );
