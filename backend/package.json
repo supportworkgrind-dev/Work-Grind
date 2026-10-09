@@ -10,6 +10,7 @@
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "dev:mem": "cross-env NODE_OPTIONS=--max-old-space-size=1024 ts-node-dev --respawn --transpile-only src/index.ts",
     "build": "tsc",
+    "test:auth-refresh": "npm run build && node --test tests/auth-refresh.test.cjs",
     "start": "node dist/index.js",
     "calling-id:backfill": "node dist/scripts/backfillCallingIds.js",
     "make-super-admin": "node dist/scripts/makeSuperAdmin.js"

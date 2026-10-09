@@ -1,4 +1,6 @@
 import { expect, test, type Route } from '@playwright/test';
+import { getTrustedConnectionSources } from '../src/lib/cspSources';
+import { resolveSocketUrl, SOCKET_IO_PATH } from '../src/lib/socket';
 
 const conversationId = 'regression-conversation-001';
 
@@ -63,6 +65,9 @@ async function mockApi(
     failSubscriptionRequestAt?: number;
     noSubscriptionRecord?: boolean;
     expireCurrentUserOnce?: { value: boolean };
+    refreshStatus?: number;
+    refreshRequests?: number[];
+    currentUserTokens?: string[];
   }
 ) {
   const request = route.request();
@@ -81,6 +86,7 @@ async function mockApi(
     return;
   }
   if (pathname.endsWith('/auth/me')) {
+    options.currentUserTokens?.push(request.headers().authorization ?? '');
     if (options.expireCurrentUserOnce && !options.expireCurrentUserOnce.value) {
       options.expireCurrentUserOnce.value = true;
       await route.fulfill({
@@ -111,11 +117,14 @@ async function mockApi(
     return;
   }
   if (pathname.endsWith('/auth/refresh')) {
+    options.refreshRequests?.push(Date.now());
     await route.fulfill({
-      status: 200,
+      status: options.refreshStatus ?? 200,
       headers,
       contentType: 'application/json',
-      body: JSON.stringify({ success: true, accessToken: 'playwright-refreshed-access' }),
+      body: JSON.stringify(options.refreshStatus
+        ? { success: false, message: 'Invalid or expired refresh token' }
+        : { success: true, accessToken: 'playwright-refreshed-access' }),
     });
     return;
   }
@@ -327,16 +336,16 @@ test('Tavro remains on the same route when /auth/me recovers through refresh', a
   const state = makeApiState();
   const currentUser401 = { value: false };
   const refreshRequests: number[] = [];
+  const currentUserTokens: string[] = [];
   await setSessionAuth(page);
   await page.route('**/api/**', async (route) => {
-    if (new URL(route.request().url()).pathname.endsWith('/auth/refresh')) {
-      refreshRequests.push(Date.now());
-    }
     await mockApi(route, {
       ...state,
       failSubscriptionRequestAt: undefined,
       failFirstAgentRequest: false,
       expireCurrentUserOnce: currentUser401,
+      currentUserTokens,
+      refreshRequests,
     });
   });
   await page.goto('/ai');
@@ -345,6 +354,99 @@ test('Tavro remains on the same route when /auth/me recovers through refresh', a
   await expect(page).toHaveURL(/\/ai$/);
   expect(refreshRequests).toHaveLength(1);
   expect(currentUser401.value).toBe(true);
+  expect(currentUserTokens[0]).toBe('Bearer playwright-regression-access');
+  expect(currentUserTokens.slice(1).length).toBeGreaterThan(0);
+  expect(currentUserTokens.slice(1).every((token) => token === 'Bearer playwright-refreshed-access')).toBe(true);
+});
+
+test('an expired or revoked refresh credential leaves a logged-out visitor on the public landing page', async ({ page }) => {
+  const refreshRequests: number[] = [];
+  await page.route('**/api/**', (route) => mockApi(route, {
+    ...makeApiState(),
+    failSubscriptionRequestAt: undefined,
+    failFirstAgentRequest: false,
+    refreshStatus: 401,
+    refreshRequests,
+  }));
+
+  await page.goto('/');
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByRole('link', { name: /sign in|log in/i }).first()).toBeVisible();
+  expect(refreshRequests).toHaveLength(1);
+});
+
+test('refresh requests from two tabs are serialized while refresh-token cookies rotate', async ({ browser }) => {
+  const context = await browser.newContext();
+  const firstPage = await context.newPage();
+  const secondPage = await context.newPage();
+  const activeRefreshRequests = { count: 0, maximum: 0 };
+  const refreshCount = { count: 0 };
+  const createPageHandler = (page401: { value: boolean }) => async (route: Route) => {
+    const pathname = new URL(route.request().url()).pathname;
+    if (pathname.endsWith('/auth/refresh')) {
+      refreshCount.count += 1;
+      activeRefreshRequests.count += 1;
+      activeRefreshRequests.maximum = Math.max(activeRefreshRequests.maximum, activeRefreshRequests.count);
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      const responseNumber = refreshCount.count;
+      await route.fulfill({
+        status: 200,
+        headers: {
+          'set-cookie': `wg_refresh=rotated-${responseNumber}; Path=/api/auth; HttpOnly; Secure; SameSite=Lax`,
+        },
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true, accessToken: `playwright-rotated-access-${responseNumber}` }),
+      });
+      activeRefreshRequests.count -= 1;
+      return;
+    }
+    await mockApi(route, {
+      ...makeApiState(),
+      failSubscriptionRequestAt: undefined,
+      failFirstAgentRequest: false,
+      expireCurrentUserOnce: page401,
+    });
+  };
+
+  await Promise.all([firstPage, secondPage].map((page) => page.addInitScript(() => {
+    sessionStorage.setItem('workgrind_access_token', 'playwright-regression-access');
+  })));
+  await firstPage.route('**/api/**', createPageHandler({ value: false }));
+  await secondPage.route('**/api/**', createPageHandler({ value: false }));
+  await Promise.all([firstPage.goto('/ai'), secondPage.goto('/ai')]);
+  await Promise.all([
+    expect(firstPage.getByPlaceholder(/Ask me to find tasks/)).toBeVisible(),
+    expect(secondPage.getByPlaceholder(/Ask me to find tasks/)).toBeVisible(),
+  ]);
+
+  expect(refreshCount.count).toBe(2);
+  expect(activeRefreshRequests.maximum).toBe(1);
+  await context.close();
+});
+
+test('production CSP connection sources include only the configured API and LiveKit origins plus ICE schemes', () => {
+  expect(getTrustedConnectionSources(
+    'https://backend-rho-vert-59.vercel.app/api',
+    'wss://work-grind-bjshvbs1.livekit.cloud',
+  )).toEqual([
+    'https://backend-rho-vert-59.vercel.app',
+    'wss://backend-rho-vert-59.vercel.app',
+    'wss://work-grind-bjshvbs1.livekit.cloud',
+    'https://work-grind-bjshvbs1.livekit.cloud',
+    'stun:',
+    'turn:',
+    'turns:',
+  ]);
+});
+
+test('Socket.IO targets the configured backend and uses the Vercel function socket path', () => {
+  expect(resolveSocketUrl(
+    undefined,
+    'https://backend-rho-vert-59.vercel.app/api',
+    'https://workgrind.vercel.app',
+    false,
+  )).toBe('https://backend-rho-vert-59.vercel.app');
+  expect(SOCKET_IO_PATH).toBe('/api/socket-io/socket.io');
 });
 
 test('Tavro shows retry controls when the agent API returns a server error', async ({ page }) => {

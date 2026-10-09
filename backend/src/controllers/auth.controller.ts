@@ -229,20 +229,33 @@ export const refresh = async (req: Request, res: Response): Promise<void> => {
     }
     failureStage = 'refresh_token_rotation';
     const tokens = issue(user._id.toString(), user.companyId?.toString() || '', user.role);
-    const remainingTokens = normalizeRefreshTokenStore(user.refreshTokens)
-      .filter((stored) => stored !== tokenHash && stored !== storedToken);
     const updated = await User.findOneAndUpdate(
-      { _id: user._id, refreshTokens: user.refreshTokens },
-      { $set: { refreshTokens: [...remainingTokens, hashRefreshToken(tokens.refreshToken)] } },
+      { _id: user._id, refreshTokens: { $in: [tokenHash, refreshToken] } },
+      [{
+        $set: {
+          refreshTokens: {
+            $concatArrays: [
+              {
+                $filter: {
+                  input: { $ifNull: ['$refreshTokens', []] },
+                  as: 'storedToken',
+                  cond: { $not: [{ $in: ['$$storedToken', [tokenHash, refreshToken]] }] },
+                },
+              },
+              [hashRefreshToken(tokens.refreshToken)],
+            ],
+          },
+        },
+      }],
       { new: true },
     );
     if (!updated) {
       console.warn('[Auth] Refresh rejected because token rotation did not match the stored session.', {
         path: req.path,
         refreshCookiePresent: Boolean(cookieRefreshToken),
+        reason: 'refresh_token_rotated_concurrently',
         httpStatus: 401,
       });
-      clearRefreshCookie(res);
       res.status(401).json({ success: false, message: 'Invalid refresh token' });
       return;
     }

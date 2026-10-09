@@ -1,35 +1,14 @@
 import { randomBytes } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
+import { getTrustedConnectionSources } from './lib/cspSources';
 
-function getTrustedConnectionSources(): string[] {
+function getConnectionSourcesFromEnvironment(): string[] {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
   const liveKitUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL?.trim();
   if (!apiUrl || !liveKitUrl) {
     throw new Error('Production CSP requires NEXT_PUBLIC_API_URL and NEXT_PUBLIC_LIVEKIT_URL.');
   }
-
-  const api = new URL(apiUrl);
-  const liveKit = new URL(liveKitUrl);
-  if (
-    api.protocol !== 'https:' ||
-    liveKit.protocol !== 'wss:' ||
-    liveKit.username ||
-    liveKit.password ||
-    liveKit.search ||
-    liveKit.hash ||
-    (liveKit.pathname !== '' && liveKit.pathname !== '/')
-  ) {
-    throw new Error('Production CSP API and LiveKit URLs must use HTTPS/WSS origins.');
-  }
-
-  return [
-    api.origin,
-    liveKit.origin,
-    `https://${liveKit.host}`,
-    'stun:',
-    'turn:',
-    'turns:',
-  ];
+  return getTrustedConnectionSources(apiUrl, liveKitUrl);
 }
 
 function createContentSecurityPolicy(nonce: string): string {
@@ -40,7 +19,7 @@ function createContentSecurityPolicy(nonce: string): string {
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob: https:",
     "font-src 'self' data:",
-    `connect-src 'self' ${getTrustedConnectionSources().join(' ')}`,
+    `connect-src 'self' ${getConnectionSourcesFromEnvironment().join(' ')}`,
     "media-src 'self' blob: data:",
     "worker-src 'self' blob:",
     "frame-src 'self'",

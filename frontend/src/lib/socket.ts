@@ -37,22 +37,34 @@ let socket = state.socket ?? null;
 let currentSocketToken = state.token ?? null;
 let authRecoveryAttempted = false;
 const pendingRooms = state.pendingRooms;
+export const SOCKET_IO_PATH = '/api/socket-io/socket.io';
 
-const getSocketUrl = (): string => {
-  const configuredSocket = process.env.NEXT_PUBLIC_SOCKET_URL?.replace(/\/$/, '');
-  const configuredApi = process.env.NEXT_PUBLIC_API_URL?.replace(/\/api\/?$/, '');
+export function resolveSocketUrl(
+  socketUrl: string | undefined,
+  apiUrl: string | undefined,
+  browserOrigin: string,
+  isDevTunnel: boolean,
+): string {
+  const configuredSocket = socketUrl?.replace(/\/$/, '');
+  const configuredApi = apiUrl?.replace(/\/api\/?$/, '');
   const isLocalServiceUrl = (url: string | undefined): boolean =>
     Boolean(url && /^(https?:\/\/)?(localhost|127\.0\.0\.1)(:\d+)?$/i.test(url));
-  const isDevTunnel = window.location.hostname.endsWith('.devtunnels.ms');
 
   if (isDevTunnel) {
     if (configuredSocket && !isLocalServiceUrl(configuredSocket)) return configuredSocket;
     if (configuredApi && !isLocalServiceUrl(configuredApi)) return configuredApi;
-    return window.location.origin;
+    return browserOrigin;
   }
 
-  return configuredSocket || configuredApi || window.location.origin;
-};
+  return configuredSocket || configuredApi || browserOrigin;
+}
+
+const getSocketUrl = (): string => resolveSocketUrl(
+  process.env.NEXT_PUBLIC_SOCKET_URL,
+  process.env.NEXT_PUBLIC_API_URL,
+  window.location.origin,
+  window.location.hostname.endsWith('.devtunnels.ms'),
+);
 
 const makeRoomKey = (event: RoomEvent, id: string): string => `${event}::${id}`;
 
@@ -140,7 +152,7 @@ export const getSocket = (): Socket | null => {
       && SOCKET_URL === window.location.origin;
 
     socket = io(SOCKET_URL, {
-      path: '/api/socket-io/socket.io',
+      path: SOCKET_IO_PATH,
       addTrailingSlash: !isProxiedDevTunnel,
       // Socket.IO receives the raw access JWT; the backend validates it with
       // the same verifier used for Bearer tokens on authenticated API routes.
