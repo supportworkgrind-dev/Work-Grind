@@ -13,11 +13,11 @@ import { api } from '@/lib/api';
 import { useAuthStore } from '@/store/useAuthStore';
 import Link from 'next/link';
 import {
-  Sparkles, Send, Bot, User as UserIcon,
+  Sparkles, Send, Bot,
   CheckCircle2, AlertCircle, Loader2, Plus,
-  ChevronRight, Zap, Search, BarChart2,
+  Search, BarChart2,
   CheckSquare, Briefcase, Users, Building2,
-  Clock, Trash2, History, X, RefreshCw,
+  Clock, Trash2, History, X,
   Mic, MessageSquareText,
 } from 'lucide-react';
 import { AIStatusBadge } from '@/components/common/AIStatusBadge';
