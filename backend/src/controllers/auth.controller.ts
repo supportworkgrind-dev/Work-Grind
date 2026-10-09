@@ -138,10 +138,13 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     }
     const delivery = await sendVerificationCodeEmail(email, fullName, code);
     if (!delivery.success) {
-      await PendingRegistration.deleteOne({
-        email,
-        verificationCodeHash: hashVerificationCode(email, code),
-      });
+      await PendingRegistration.updateOne(
+        { email, verificationCodeHash: hashVerificationCode(email, code) },
+        {
+          $unset: { verificationCodeHash: 1, verificationExpiresAt: 1 },
+          $set: { attempts: 0 },
+        },
+      );
       res.status(503).json({
         success: false,
         message: 'We could not deliver the verification email. Please try again later.',
@@ -514,12 +517,10 @@ export const resendRegistrationCode = async (req: Request, res: Response): Promi
         if (!delivery.success) {
           await User.updateOne(
             { _id: existingUser._id, verificationCodeHash: codeHash },
-            { $unset: {
+            {             $unset: {
               verificationCodeHash: 1,
               verificationCodeExpiry: 1,
               verificationCodeAttempts: 1,
-              verificationCodeResends: 1,
-              verificationCodeSentAt: 1,
             } },
           );
           res.status(503).json({

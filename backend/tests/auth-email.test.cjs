@@ -19,6 +19,7 @@ const original = {
   pendingCreate: PendingRegistration.create,
   pendingFindOneAndUpdate: PendingRegistration.findOneAndUpdate,
   pendingDeleteOne: PendingRegistration.deleteOne,
+  pendingUpdateOne: PendingRegistration.updateOne,
   sendVerificationCodeEmail: email.sendVerificationCodeEmail,
   sendPasswordResetEmail: email.sendPasswordResetEmail,
 };
@@ -49,6 +50,7 @@ test.afterEach(() => {
   PendingRegistration.create = original.pendingCreate;
   PendingRegistration.findOneAndUpdate = original.pendingFindOneAndUpdate;
   PendingRegistration.deleteOne = original.pendingDeleteOne;
+  PendingRegistration.updateOne = original.pendingUpdateOne;
   email.sendVerificationCodeEmail = original.sendVerificationCodeEmail;
   email.sendPasswordResetEmail = original.sendPasswordResetEmail;
 });
@@ -74,11 +76,16 @@ test('signup returns accepted only after the SMTP provider confirms email accept
 
 test('signup returns a delivery error and invalidates pending code when provider rejects delivery', async () => {
   let savedHash;
-  let deletedFilter;
+  let clearFilter;
+  let clearUpdate;
   User.exists = async () => false;
   PendingRegistration.findOne = async () => null;
   PendingRegistration.create = async (record) => { savedHash = record.verificationCodeHash; return record; };
-  PendingRegistration.deleteOne = async (filter) => { deletedFilter = filter; return { deletedCount: 1 }; };
+  PendingRegistration.updateOne = async (filter, update) => {
+    clearFilter = filter;
+    clearUpdate = update;
+    return { modifiedCount: 1 };
+  };
   email.sendVerificationCodeEmail = async () => ({ success: false, error: 'Email delivery failed.' });
 
   const response = makeResponse();
@@ -87,8 +94,9 @@ test('signup returns a delivery error and invalidates pending code when provider
   assert.equal(response.statusCode, 503);
   assert.equal(response.body.success, false);
   assert.match(response.body.message, /could not deliver/i);
-  assert.equal(deletedFilter.email, 'signup@example.test');
-  assert.equal(deletedFilter.verificationCodeHash, savedHash);
+  assert.equal(clearFilter.email, 'signup@example.test');
+  assert.equal(clearFilter.verificationCodeHash, savedHash);
+  assert.deepEqual(clearUpdate.$unset, { verificationCodeHash: 1, verificationExpiresAt: 1 });
 });
 
 test('expired signup verification codes are rejected without creating an account', async () => {
