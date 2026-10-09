@@ -30,11 +30,6 @@ dotenv.config();
     { key: 'R2_SECRET_ACCESS_KEY',     service: 'Cloudflare R2 Storage' },
     { key: 'R2_BUCKET_NAME',           service: 'Cloudflare R2 Storage' },
     { key: 'R2_ENDPOINT',              service: 'Cloudflare R2 Storage' },
-    { key: 'SMTP_HOST',                service: 'Email (SMTP)',               note: 'Email delivery disabled if unset' },
-    { key: 'SMTP_USER',                service: 'Email (SMTP)' },
-    { key: 'SMTP_PASS',                service: 'Email (SMTP)' },
-    { key: 'FROM_EMAIL',               service: 'Email sender address' },
-    { key: 'FROM_NAME',                service: 'Email sender name' },
     { key: 'MFA_ENCRYPTION_KEY',       service: 'MFA secret encryption',     note: 'Falls back to JWT_SECRET if unset (less secure)' },
     { key: 'CLIENT_URL',               service: 'CORS / frontend URL' },
   ];
@@ -69,6 +64,29 @@ dotenv.config();
     }
     console.warn('⚠️  Replace placeholders with real values in backend/.env');
     console.warn('');
+  }
+
+  const missingEmailSettings: string[] = [];
+  if (!process.env.SMTP_HOST?.trim()) missingEmailSettings.push('SMTP_HOST');
+  if (!process.env.SMTP_PORT?.trim()) missingEmailSettings.push('SMTP_PORT');
+  if (!(process.env.SMTP_USER?.trim() || process.env.EMAIL_USER?.trim())) {
+    missingEmailSettings.push('SMTP_USER or EMAIL_USER');
+  }
+  if (!(process.env.SMTP_PASS || process.env.EMAIL_PASS)) {
+    missingEmailSettings.push('SMTP_PASS or EMAIL_PASS');
+  }
+  if (!(process.env.FROM_EMAIL?.trim() || process.env.SMTP_USER?.trim() || process.env.EMAIL_USER?.trim())) {
+    missingEmailSettings.push('FROM_EMAIL (or SMTP_USER)');
+  }
+  if (missingEmailSettings.length) {
+    console.warn('[Email] SMTP delivery is not configured.', { missingVariables: missingEmailSettings });
+  } else {
+    console.info('[Email] SMTP variables are present.', {
+      hostConfigured: true,
+      portConfigured: true,
+      credentialsConfigured: true,
+      senderConfigured: true,
+    });
   }
 
 })();

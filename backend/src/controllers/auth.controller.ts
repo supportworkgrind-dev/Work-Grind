@@ -79,7 +79,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     const password = typeof req.body?.password === 'string' ? req.body.password : '';
     const genericResponse = {
       success: true,
-      message: 'If these details can be registered, an email verification code will be sent.',
+      message: 'If these details can be registered, the verification request will be processed.',
     };
 
     if (!fullName || fullName.length > 100 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
@@ -136,16 +136,28 @@ export const register = async (req: Request, res: Response): Promise<void> => {
         return;
       }
     }
-    void sendVerificationCodeEmail(email, fullName, code).then((result) => {
-      if (!result.success) console.error('[Auth] Verification code email delivery failed.');
-    });
+    const delivery = await sendVerificationCodeEmail(email, fullName, code);
+    if (!delivery.success) {
+      await PendingRegistration.deleteOne({
+        email,
+        verificationCodeHash: hashVerificationCode(email, code),
+      });
+      res.status(503).json({
+        success: false,
+        message: 'We could not deliver the verification email. Please try again later.',
+      });
+      return;
+    }
     res.status(202).json(genericResponse);
   } catch (error) {
     if ((error as any)?.code === 11000) {
-      res.status(202).json({ success: true, message: 'If this address can be registered, a verification code will be sent.' });
+      res.status(202).json({ success: true, message: 'If these details can be registered, the verification request will be processed.' });
       return;
     }
-    console.error('[Auth] Registration request failed:', error);
+    console.error('[Auth] Registration request failed.', {
+      errorName: error instanceof Error ? error.name : 'UnknownError',
+      ...(error && typeof error === 'object' && 'code' in error && error.code === 11000 ? { duplicateKey: true } : {}),
+    });
     res.status(500).json({ success: false, message: 'Unable to process registration. Please try again.' });
   }
 };
@@ -435,7 +447,9 @@ export const verifyRegistrationCode = async (req: Request, res: Response): Promi
       user: session.user,
     });
   } catch (error) {
-    console.error('[Auth] Email verification failed:', error);
+    console.error('[Auth] Email verification failed.', {
+      errorName: error instanceof Error ? error.name : 'UnknownError',
+    });
     res.status(500).json({ success: false, message: 'Unable to verify this code. Please try again.' });
   }
 };
@@ -491,19 +505,44 @@ export const resendRegistrationCode = async (req: Request, res: Response): Promi
         { new: true },
       );
       if (existingUser) {
-        void sendVerificationCodeEmail(email, existingUser.fullName, code).then((result) => {
-          if (!result.success) console.error('[Auth] Verification code email delivery failed.');
-        });
+        const codeHash = hashVerificationCode(email, code);
+        const delivery = await sendVerificationCodeEmail(email, existingUser.fullName, code);
+        if (!delivery.success) {
+          await User.updateOne(
+            { _id: existingUser._id, verificationCodeHash: codeHash },
+            { $unset: {
+              verificationCodeHash: 1,
+              verificationCodeExpiry: 1,
+              verificationCodeAttempts: 1,
+              verificationCodeResends: 1,
+              verificationCodeSentAt: 1,
+            } },
+          );
+          res.status(503).json({
+            success: false,
+            message: 'We could not deliver a verification email. Please try again later.',
+          });
+          return;
+        }
       }
       res.status(202).json(genericResponse);
       return;
     }
-    void sendVerificationCodeEmail(email, pending.fullName, code).then((result) => {
-      if (!result.success) console.error('[Auth] Verification code email delivery failed.');
-    });
+    const codeHash = hashVerificationCode(email, code);
+    const delivery = await sendVerificationCodeEmail(email, pending.fullName, code);
+    if (!delivery.success) {
+      await PendingRegistration.deleteOne({ _id: pending._id, verificationCodeHash: codeHash });
+      res.status(503).json({
+        success: false,
+        message: 'We could not deliver a verification email. Please try again later.',
+      });
+      return;
+    }
     res.status(202).json(genericResponse);
   } catch (error) {
-    console.error('[Auth] Verification code resend failed:', error);
+    console.error('[Auth] Verification code resend failed.', {
+      errorName: error instanceof Error ? error.name : 'UnknownError',
+    });
     res.status(500).json({ success: false, message: 'Unable to resend a verification code. Please try again.' });
   }
 };
@@ -519,14 +558,25 @@ export const forgotPassword = async (req: Request, res: Response): Promise<void>
       user.resetPasswordToken = hashedToken;
       user.resetPasswordExpiry = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
       await user.save();
-      // Non-blocking email send so API responds instantly without waiting for network/SMTP
-      sendPasswordResetEmail(user.email, user.fullName, rawToken).catch((err) =>
-        console.error('❌ Error sending password reset email:', err)
-      );
+      const delivery = await sendPasswordResetEmail(user.email, user.fullName, rawToken);
+      if (!delivery.success) {
+        await User.updateOne(
+          { _id: user._id, resetPasswordToken: hashedToken },
+          { $unset: { resetPasswordToken: 1, resetPasswordExpiry: 1 } },
+        );
+      }
     }
-    // Always return the same message (security: don't reveal if email exists)
-    res.json({ success: true, message: 'If that email is registered, a reset link was sent.' });
-  } catch (e: any) { res.status(500).json({ success: false, message: e.message }); }
+    // Keep the response identical for unknown accounts to avoid account enumeration.
+    res.json({
+      success: true,
+      message: 'If the address is registered, follow any reset instructions you receive. This response does not confirm whether an email was sent.',
+    });
+  } catch (error) {
+    console.error('[Auth] Password reset email request failed.', {
+      errorName: error instanceof Error ? error.name : 'UnknownError',
+    });
+    res.status(500).json({ success: false, message: 'Unable to process the password reset request.' });
+  }
 };
 
 export const resetPassword = async (req: Request, res: Response): Promise<void> => {
@@ -544,19 +594,7 @@ export const resetPassword = async (req: Request, res: Response): Promise<void> 
       resetPasswordToken: hashedToken,
     }).select('+password');
 
-    const issuedAt = user && user.resetPasswordExpiry ? new Date(user.resetPasswordExpiry.getTime() - 30 * 60 * 1000) : null;
-    console.log('[resetPassword debug]', {
-      issuedAt: issuedAt?.toISOString() ?? null,
-      expiry: user?.resetPasswordExpiry ? user.resetPasswordExpiry.toISOString() : null,
-      now: new Date().toISOString(),
-    });
-
     if (!user || !user.resetPasswordExpiry || user.resetPasswordExpiry.getTime() <= Date.now()) {
-      res.status(400).json({ success: false, message: 'Reset link is invalid or has expired. Please request a new one.' });
-      return;
-    }
-
-    if (!user) {
       res.status(400).json({ success: false, message: 'Reset link is invalid or has expired. Please request a new one.' });
       return;
     }
@@ -578,10 +616,8 @@ export const resetPassword = async (req: Request, res: Response): Promise<void> 
     user.refreshTokens = []; // revoke all active sessions
     await user.save();
 
-    // Send confirmation email (non-blocking)
-    sendPasswordChangedNotificationEmail(user.email, user.fullName).catch(err =>
-      console.error('❌ Post-reset notification email failed:', err)
-    );
+    const notification = await sendPasswordChangedNotificationEmail(user.email, user.fullName);
+    if (!notification.success) console.warn('[Auth] Password-change notification delivery failed.');
 
     res.json({ success: true, message: 'Password reset successfully. Please sign in with your new password.' });
   } catch (e: any) { res.status(500).json({ success: false, message: e.message }); }

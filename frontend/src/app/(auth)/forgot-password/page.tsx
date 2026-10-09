@@ -36,7 +36,7 @@ export default function ForgotPasswordPage() {
           <div className="mb-5 grid h-11 w-11 place-items-center border border-[#cbd5c2] bg-[#edf1e9] text-[#526b58]"><Check size={20} /></div>
           <h1 className="auth-form-title">Check your inbox.</h1>
           <p className="auth-form-subtitle">
-            If an account exists for <strong className="font-semibold text-stone-800">{email}</strong>, a secure password reset link is on its way.
+            If an account exists for <strong className="font-semibold text-stone-800">{email}</strong>, check for a reset message. For account security, this page does not confirm whether an email was sent.
           </p>
           <Link href="/login" className="auth-primary no-underline"><ArrowLeft size={15} /> Back to sign in</Link>
         </>
@@ -44,7 +44,7 @@ export default function ForgotPasswordPage() {
         <>
           <p className="auth-kicker !mb-3 !text-[9px]">ACCOUNT RECOVERY</p>
           <h1 className="auth-form-title">Let’s get you back in.</h1>
-          <p className="auth-form-subtitle">Enter the address on your account. We’ll email you a secure reset link.</p>
+          <p className="auth-form-subtitle">Enter the address on your account. If it is registered, we’ll process a secure reset email request.</p>
           {error && <div className="auth-error" role="alert"><AlertCircle size={15} className="mr-2 inline" />{error}</div>}
           <form onSubmit={handleSubmit}>
             <div className="auth-field">

@@ -20,6 +20,7 @@ function VerifyEmailContent() {
   const [code, setCode] = useState('');
   const [status, setStatus] = useState<'entry' | 'checking' | 'success' | 'legacy' | 'error'>(legacyToken ? 'checking' : 'entry');
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const [seconds, setSeconds] = useState(60);
   const [resending, setResending] = useState(false);
 
@@ -78,10 +79,12 @@ function VerifyEmailContent() {
     if (!email || seconds > 0 || resending) return;
     setResending(true);
     setError('');
+    setNotice('');
     try {
       await api.post('/auth/resend-registration-code', { email });
       setSeconds(60);
       setCode('');
+      setNotice('If this signup is eligible, the request was processed. If no new code arrives, restart signup or try again after the cooldown.');
     } catch (requestError: unknown) {
       setError((requestError as AxiosError<{ message?: string }>).response?.data?.message || 'A new code could not be sent. Please try again shortly.');
     } finally {
@@ -124,9 +127,10 @@ function VerifyEmailContent() {
           <p className="auth-kicker !mb-3 !text-[9px]">ONE LAST STEP</p>
           <h1 className="auth-form-title">Check your inbox.</h1>
           <p className="auth-form-subtitle">
-            We sent a six-digit code to <strong className="font-semibold text-stone-800">{email}</strong>. It expires in 10 minutes.
+            Enter the six-digit code sent to <strong className="font-semibold text-stone-800">{email}</strong>. It expires in 10 minutes. If no code arrives, request another after the cooldown.
           </p>
           {error && <div className="auth-error" role="alert"><AlertCircle size={15} className="mr-2 inline align-[-2px]" />{error}</div>}
+          {notice && <p className="mb-4 text-sm text-stone-600" role="status">{notice}</p>}
 
           <form onSubmit={handleVerify}>
             <p className="auth-label">Verification code</p>

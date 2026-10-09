@@ -3,46 +3,99 @@ import { escapeHtml } from '../services/pendingRegistration';
 
 let transporter: nodemailer.Transporter | null = null;
 
+export interface EmailSendResult {
+  success: boolean;
+  messageId?: string;
+  error?: string;
+}
+
+export class EmailProviderConfigurationError extends Error {
+  readonly missingVariables: string[];
+
+  constructor(missingVariables: string[]) {
+    super('Email provider configuration is incomplete or invalid.');
+    this.name = 'EmailProviderConfigurationError';
+    this.missingVariables = missingVariables;
+  }
+}
+
+export const createSmtpTransporter = (
+  env: NodeJS.ProcessEnv = process.env,
+): nodemailer.Transporter => {
+  const host = env.SMTP_HOST?.trim();
+  const portValue = env.SMTP_PORT?.trim();
+  const port = portValue ? Number(portValue) : NaN;
+  const user = env.SMTP_USER?.trim() || env.EMAIL_USER?.trim();
+  const pass = env.SMTP_PASS || env.EMAIL_PASS;
+  const missingVariables: string[] = [];
+
+  if (!host) missingVariables.push('SMTP_HOST');
+  if (!portValue || !Number.isInteger(port) || port < 1 || port > 65535) missingVariables.push('SMTP_PORT');
+  if (!user) missingVariables.push('SMTP_USER or EMAIL_USER');
+  if (!pass) missingVariables.push('SMTP_PASS or EMAIL_PASS');
+
+  const fromEmail = env.FROM_EMAIL?.trim() || user || '';
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fromEmail)) missingVariables.push('FROM_EMAIL (or a valid SMTP_USER)');
+  if (missingVariables.length) throw new EmailProviderConfigurationError(missingVariables);
+
+  return nodemailer.createTransport({
+    host,
+    port,
+    secure: port === 465,
+    requireTLS: port !== 465,
+    auth: { user, pass },
+    connectionTimeout: 15_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 20_000,
+    tls: { minVersion: 'TLSv1.2', rejectUnauthorized: true },
+  });
+};
+
 export const getTransporter = async (): Promise<nodemailer.Transporter> => {
   if (transporter) return transporter;
-
-  const host = process.env.SMTP_HOST || 'smtp.gmail.com';
-  const port = Number(process.env.SMTP_PORT) || 587;
-  const user = process.env.SMTP_USER || process.env.EMAIL_USER;
-  const pass = process.env.SMTP_PASS || process.env.EMAIL_PASS;
-
-  if (user && pass) {
-    transporter = nodemailer.createTransport({
-      host,
-      port,
-      secure: port === 465, // true for 465, false for 587
-      auth: { user, pass },
-    });
-  } else {
-    // Development fallback if credentials not configured
-    try {
-      const t = await nodemailer.createTestAccount();
-      transporter = nodemailer.createTransport({
-        host: 'smtp.ethereal.email',
-        port: 587,
-        secure: false,
-        auth: { user: t.user, pass: t.pass },
-      });
-    } catch {
-      transporter = nodemailer.createTransport({ jsonTransport: true });
-    }
-  }
-
+  transporter = createSmtpTransporter();
   return transporter;
 };
 
+export const closeEmailTransporter = (): void => {
+  transporter?.close();
+  transporter = null;
+};
+
 const getFromAddress = () => {
-  const fromName  = process.env.FROM_NAME  || 'WorkGrind';
-  const fromEmail = process.env.FROM_EMAIL || process.env.SMTP_USER || process.env.EMAIL_USER || 'noreply@workgrind.app';
+  const fromName = (process.env.FROM_NAME || 'WorkGrind').replace(/[\r\n"]/g, '').trim();
+  const fromEmail = process.env.FROM_EMAIL?.trim() || process.env.SMTP_USER?.trim() ||
+    process.env.EMAIL_USER?.trim();
+  if (!fromEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fromEmail)) {
+    throw new EmailProviderConfigurationError(['FROM_EMAIL (or a valid SMTP_USER)']);
+  }
   return `"${fromName}" <${fromEmail}>`;
 };
 
 const getBaseUrl = () => process.env.CLIENT_URL || 'http://localhost:3000';
+
+const logEmailError = (messageType: string, stage: string, error: unknown) => {
+  const fields = error && typeof error === 'object' ? error as Record<string, unknown> : {};
+  const code = typeof fields.code === 'string' && /^[A-Z0-9_]+$/i.test(fields.code)
+    ? fields.code
+    : undefined;
+  const command = typeof fields.command === 'string' && /^[A-Z_]+$/i.test(fields.command)
+    ? fields.command
+    : undefined;
+  const responseCode = Number.isInteger(fields.responseCode) ? fields.responseCode : undefined;
+  const missingVariables = error instanceof EmailProviderConfigurationError
+    ? error.missingVariables
+    : undefined;
+  console.error('[Email Service] Email delivery failed.', {
+    messageType,
+    provider: 'smtp',
+    stage,
+    ...(code ? { code } : {}),
+    ...(command ? { command } : {}),
+    ...(responseCode ? { responseCode } : {}),
+    ...(missingVariables ? { missingVariables } : {}),
+  });
+};
 
 // ─── Branded HTML Wrapper ──────────────────────────────────────────────────
 const emailWrapper = (content: string) => `
@@ -105,23 +158,47 @@ const emailWrapper = (content: string) => `
 `;
 
 // ─── Safe Internal Dispatcher (Never logs credentials) ────────────────────────
-const safeSend = async (to: string, subject: string, html: string, replyTo?: string) => {
-  const from = getFromAddress();
+const safeSend = async (
+  to: string,
+  subject: string,
+  html: string,
+  replyTo?: string,
+  messageType = 'transactional',
+): Promise<EmailSendResult> => {
   try {
+    const from = getFromAddress();
     const t = await getTransporter();
     const info = await t.sendMail({ from, to, subject, html, replyTo });
+    const accepted = Array.isArray(info.accepted) && info.accepted.some((recipient) => {
+      const address = typeof recipient === 'string' ? recipient : recipient.address;
+      return address.toLowerCase() === to.toLowerCase();
+    });
+    if (!accepted) {
+      console.error('[Email Service] Provider did not accept the recipient.', {
+        messageType,
+        provider: 'smtp',
+        stage: 'recipient_acceptance',
+        rejectedRecipientCount: Array.isArray(info.rejected) ? info.rejected.length : undefined,
+      });
+      return { success: false, error: 'Email provider did not accept the recipient.' };
+    }
     return { success: true, messageId: info.messageId };
-  } catch (err: any) {
-    console.error(`[Email Service] Delivery to ${to} failed: ${err?.message || 'Unknown error'}`);
-    return { success: false, error: err?.message || 'Failed to send email' };
+  } catch (error) {
+    logEmailError(
+      messageType,
+      error instanceof EmailProviderConfigurationError ? 'configuration' : 'send',
+      error,
+    );
+    return { success: false, error: 'Email delivery failed.' };
   }
 };
 
 // ─── 1. Email Verification ───────────────────────────────────────────────────
 export const sendVerificationEmail = async (email: string, name: string, token: string) => {
-  const safeName = escapeHtml(name);
-  const link = `${getBaseUrl()}/verify-email?token=${token}`;
-  const html = emailWrapper(`
+  try {
+    const safeName = escapeHtml(name);
+    const link = `${getBaseUrl()}/verify-email?token=${encodeURIComponent(token)}`;
+    const html = emailWrapper(`
     <h2 style="margin:0 0 8px;color:#0f172a;font-size:24px;font-weight:800;">Verify your email ✉️</h2>
     <p style="margin:0 0 24px;color:#64748b;font-size:15px;">Hi <strong>${safeName}</strong>, welcome to WorkGrind! Click the button below to verify your email address.</p>
     <div style="text-align:center;margin:32px 0;">
@@ -130,8 +207,12 @@ export const sendVerificationEmail = async (email: string, name: string, token: 
       </a>
     </div>
     <p style="margin:0;color:#94a3b8;font-size:13px;">This link expires in <strong>24 hours</strong>. If you didn't create an account, you can safely ignore this email.</p>
-  `);
-  return safeSend(email, 'Verify your WorkGrind account', html);
+    `);
+    return safeSend(email, 'Verify your WorkGrind account', html, undefined, 'email_verification');
+  } catch (error) {
+    logEmailError('email_verification', 'configuration', error);
+    return { success: false, error: 'Email delivery failed.' };
+  }
 };
 
 export const sendVerificationCodeEmail = async (email: string, name: string, code: string) => {
@@ -144,7 +225,7 @@ export const sendVerificationCodeEmail = async (email: string, name: string, cod
     </div>
     <p style="margin:0;color:#64748b;font-size:13px;">This code expires in <strong>10 minutes</strong>. If you didn't request it, you can safely ignore this email.</p>
   `);
-  return safeSend(email, 'Your WorkGrind verification code', html);
+  return safeSend(email, 'Your WorkGrind verification code', html, undefined, 'registration_verification_code');
 };
 
 // ─── 2. Welcome Email (after signup) ────────────────────────────────────────
@@ -178,9 +259,10 @@ export const sendWelcomeEmail = async (email: string, name: string) => {
 
 // ─── 3. Password Reset Request ───────────────────────────────────────────────
 export const sendPasswordResetEmail = async (email: string, name: string, rawToken: string) => {
-  const safeName = escapeHtml(name);
-  const link = `${getBaseUrl()}/reset-password/${rawToken}`;
-  const html = emailWrapper(`
+  try {
+    const safeName = escapeHtml(name);
+    const link = `${getBaseUrl()}/reset-password/${encodeURIComponent(rawToken)}`;
+    const html = emailWrapper(`
     <h2 style="margin:0 0 8px;color:#0f172a;font-size:24px;font-weight:800;">Reset your password 🔑</h2>
     <p style="margin:0 0 20px;color:#64748b;font-size:15px;">Hi <strong>${safeName}</strong>, we received a request to reset your WorkGrind account password.</p>
     <div style="text-align:center;margin:32px 0;">
@@ -196,8 +278,12 @@ export const sendPasswordResetEmail = async (email: string, name: string, rawTok
       Or copy and paste this URL into your browser:<br/>
       <span style="color:#3b82f6;word-break:break-all;">${link}</span>
     </p>
-  `);
-  return safeSend(email, 'Reset your WorkGrind password', html);
+    `);
+    return safeSend(email, 'Reset your WorkGrind password', html, undefined, 'password_reset');
+  } catch (error) {
+    logEmailError('password_reset', 'configuration', error);
+    return { success: false, error: 'Email delivery failed.' };
+  }
 };
 
 // ─── 4. Password Changed Notification ───────────────────────────────────────
@@ -227,7 +313,7 @@ export const sendPasswordChangedNotificationEmail = async (email: string, name: 
 
 // ─── 5. Team / Workspace Invite ──────────────────────────────────────────────
 export const sendInviteEmail = async (email: string, inviterName: string, companyName: string, token: string) => {
-  const link = `${getBaseUrl()}/join?token=${token}`;
+  const link = `${getBaseUrl()}/join?token=${encodeURIComponent(token)}`;
   const html = emailWrapper(`
     <h2 style="margin:0 0 8px;color:#0f172a;font-size:24px;font-weight:800;">You're invited! 🎊</h2>
     <p style="margin:0 0 20px;color:#64748b;font-size:15px;">
