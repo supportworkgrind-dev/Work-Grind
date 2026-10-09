@@ -16,6 +16,7 @@ const Company = require('../dist/models/Company').default;
 const User = require('../dist/models/User').default;
 const academicController = require('../dist/controllers/academic.controller');
 const academicPortalController = require('../dist/controllers/academicPortal.controller');
+const companyController = require('../dist/controllers/company.controller');
 const { requireAcademicAdmin } = require('../dist/middleware/academicOrganization');
 
 const companyId = new mongoose.Types.ObjectId();
@@ -376,10 +377,17 @@ test('teacher portal is limited to assigned classes and never returns learner fe
     assert.deepEqual(filter._id.$in.map((id) => id.toString()), [studentId.toString()]);
     return { select() { return this; }, lean: async () => [{ _id: studentId, firstName: 'S', lastName: 'Student' }] };
   };
-  for (const model of [AcademicSchedule, AcademicAssignment, AcademicAttendance, AcademicResult]) {
+  for (const model of [AcademicSchedule, AcademicAssignment]) {
     model.find = (filter) => {
       assert.equal(filter.companyId.toString(), companyId.toString());
-      assert.deepEqual(filter.classId?.$in?.map((id) => id.toString()), [assignedClassId.toString()]);
+      assert.deepEqual(filter.classId.$in.map((id) => id.toString()), [assignedClassId.toString()]);
+      return makeFindQuery();
+    };
+  }
+  for (const model of [AcademicAttendance, AcademicResult]) {
+    model.find = (filter) => {
+      assert.equal(filter.companyId.toString(), companyId.toString());
+      assert.deepEqual(filter.studentId.$in.map((id) => id.toString()), [studentId.toString()]);
       return makeFindQuery();
     };
   }
@@ -564,5 +572,60 @@ test('fee payment rejects when atomic balance guard reports overpayment', async 
   } finally {
     AcademicFeeCharge.findOneAndUpdate = originalFindOneAndUpdate;
     AcademicFeeCharge.findOne = originalFindOne;
+  }
+});
+
+test('organization settings reject invalid currency, timezone, and academic preferences', async () => {
+  const originalFindByIdAndUpdate = Company.findByIdAndUpdate;
+  Company.findByIdAndUpdate = () => { throw new Error('Invalid settings must be rejected before persistence'); };
+  const invalidSettings = [
+    { currency: 'US' },
+    { timeZone: 'Not/A_Timezone' },
+    { academicSettings: { academicYearStartMonth: 13 } },
+    { academicSettings: { gradingScale: 'unrecognized' } },
+    { academicSettings: { arbitrarySetting: true } },
+  ];
+  try {
+    for (const body of invalidSettings) {
+      const res = makeResponse();
+      await companyController.updateCompany({
+        user: { companyId: companyId.toString(), userId: recordId.toString(), role: 'owner' },
+        body,
+      }, res);
+      assert.equal(res.statusCode, 400);
+    }
+  } finally {
+    Company.findByIdAndUpdate = originalFindByIdAndUpdate;
+  }
+});
+
+test('organization settings persist validated localization and academic preferences', async () => {
+  const originalFindByIdAndUpdate = Company.findByIdAndUpdate;
+  let filter;
+  let updates;
+  let options;
+  Company.findByIdAndUpdate = async (...args) => {
+    [filter, updates, options] = args;
+    return { _id: companyId, currency: 'GBP', timeZone: 'Europe/London' };
+  };
+  try {
+    const res = makeResponse();
+    await companyController.updateCompany({
+      user: { companyId: companyId.toString(), userId: recordId.toString(), role: 'owner' },
+      body: {
+        currency: 'GBP',
+        timeZone: 'Europe/London',
+        academicSettings: { academicYearStartMonth: 9, gradingScale: 'letter' },
+      },
+    }, res);
+    assert.equal(res.statusCode, 200);
+    assert.equal(filter, companyId.toString());
+    assert.equal(updates.currency, 'GBP');
+    assert.equal(updates.timeZone, 'Europe/London');
+    assert.equal(updates['academicSettings.academicYearStartMonth'], 9);
+    assert.equal(updates['academicSettings.gradingScale'], 'letter');
+    assert.equal(options.runValidators, true);
+  } finally {
+    Company.findByIdAndUpdate = originalFindByIdAndUpdate;
   }
 });
