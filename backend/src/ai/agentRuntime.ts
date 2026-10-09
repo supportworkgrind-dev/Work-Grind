@@ -44,6 +44,7 @@ export interface AgentTurnOptions {
   voiceMode?: boolean;
   voiceConfirmation?: {
     approved: boolean;
+    rejected?: boolean;
     toolName: string;
     args: Record<string, unknown>;
   };
@@ -205,7 +206,14 @@ async function executeToolCall(
     options.voiceConfirmation.toolName === toolName &&
     stableJson(sanitize(options.voiceConfirmation.args)) === stableJson(sanitize(toolArgs)),
   );
-  if (options.voiceMode && tool.requiresVoiceConfirmation && !confirmed) {
+  const declined = Boolean(
+    options.voiceConfirmation?.rejected &&
+    options.voiceConfirmation.toolName === toolName &&
+    stableJson(sanitize(options.voiceConfirmation.args)) === stableJson(sanitize(toolArgs)),
+  );
+  if (options.voiceMode && tool.requiresVoiceConfirmation && declined) {
+    result = { success: false, error: 'The user declined this exact action. Do not perform it.' };
+  } else if (options.voiceMode && tool.requiresVoiceConfirmation && !confirmed) {
     result = {
       success: false,
       requiresConfirmation: true,

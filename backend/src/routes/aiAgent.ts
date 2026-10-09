@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { createHash } from 'node:crypto';
+import { asyncHandler } from '../middleware/asyncHandler';
 import { authenticate, requireCompany, requireEntitlement } from '../middleware/auth';
 import { rateLimiter } from '../middleware/rateLimiter';
 import {
@@ -19,7 +20,7 @@ router.post('/voice/turn', rateLimiter(60, 30, {
   keyGenerator: (req) => createHash('sha256')
     .update(req.get('authorization') ?? req.ip ?? 'unknown')
     .digest('hex'),
-}), runVoiceTurn);
+}), asyncHandler(runVoiceTurn));
 
 router.use(authenticate, requireEntitlement('aiAssistant'));
 

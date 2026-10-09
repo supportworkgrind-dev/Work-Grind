@@ -472,6 +472,7 @@ export const runVoiceTurn = async (req: AuthRequest, res: Response): Promise<voi
       ...(activePendingAction ? {
         voiceConfirmation: {
           approved: confirmation === 'approve',
+          rejected: confirmation === 'reject',
           toolName: activePendingAction.toolName,
           args: activePendingAction.toolArgs,
         },
