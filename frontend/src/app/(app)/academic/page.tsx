@@ -23,11 +23,36 @@ type AcademicEnrollment = {
   classId: AcademicClass | string | null;
   enrolledAt: string;
 };
+type AcademicSchedule = {
+  _id: string;
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+  location?: string;
+  classId: AcademicClass | string | null;
+};
+type AcademicAssignment = {
+  _id: string;
+  title: string;
+  dueAt?: string;
+  pointsPossible: number;
+  classId: AcademicClass | string | null;
+};
+type AcademicAttendance = {
+  _id: string;
+  date: string;
+  status: 'present' | 'absent' | 'late' | 'excused';
+  studentId: AcademicPerson | string | null;
+  classId: AcademicClass | string | null;
+};
 
 type AcademicPortal = {
   profile: AcademicPerson;
   students: AcademicPerson[];
   enrollments: AcademicEnrollment[];
+  schedules: AcademicSchedule[];
+  assignments: AcademicAssignment[];
+  attendance: AcademicAttendance[];
 };
 
 function getPopulatedName<T extends { _id: string }>(value: T | string | null, fallback: string): string {
@@ -47,6 +72,9 @@ export default function AcademicPage() {
   const [departments, setDepartments] = useState<AcademicDepartment[]>([]);
   const [classes, setClasses] = useState<AcademicClass[]>([]);
   const [enrollments, setEnrollments] = useState<AcademicEnrollment[]>([]);
+  const [schedules, setSchedules] = useState<AcademicSchedule[]>([]);
+  const [assignments, setAssignments] = useState<AcademicAssignment[]>([]);
+  const [attendance, setAttendance] = useState<AcademicAttendance[]>([]);
   const [portal, setPortal] = useState<AcademicPortal | null>(null);
   const [departmentName, setDepartmentName] = useState('');
   const [departmentCode, setDepartmentCode] = useState('');
@@ -58,18 +86,36 @@ export default function AcademicPage() {
   const [classDepartmentId, setClassDepartmentId] = useState('');
   const [enrollmentStudentId, setEnrollmentStudentId] = useState('');
   const [enrollmentClassId, setEnrollmentClassId] = useState('');
+  const [scheduleClassId, setScheduleClassId] = useState('');
+  const [scheduleDay, setScheduleDay] = useState('1');
+  const [scheduleStart, setScheduleStart] = useState('09:00');
+  const [scheduleEnd, setScheduleEnd] = useState('10:00');
+  const [scheduleLocation, setScheduleLocation] = useState('');
+  const [assignmentClassId, setAssignmentClassId] = useState('');
+  const [assignmentTitle, setAssignmentTitle] = useState('');
+  const [assignmentPoints, setAssignmentPoints] = useState('100');
+  const [attendanceClassId, setAttendanceClassId] = useState('');
+  const [attendanceStudentId, setAttendanceStudentId] = useState('');
+  const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().slice(0, 10));
+  const [attendanceStatus, setAttendanceStatus] = useState<AcademicAttendance['status']>('present');
 
   const loadAdminData = useCallback(async () => {
-    const [peopleResponse, departmentsResponse, classesResponse, enrollmentResponse] = await Promise.all([
+    const [peopleResponse, departmentsResponse, classesResponse, enrollmentResponse, schedulesResponse, assignmentsResponse, attendanceResponse] = await Promise.all([
       api.get('/academic/people'),
       api.get('/academic/departments'),
       api.get('/academic/classes'),
       api.get('/academic/enrollments'),
+      api.get('/academic/schedules'),
+      api.get('/academic/assignments'),
+      api.get('/academic/attendance'),
     ]);
     setPeople(peopleResponse.data.people);
     setDepartments(departmentsResponse.data.departments);
     setClasses(classesResponse.data.classes);
     setEnrollments(enrollmentResponse.data.enrollments);
+    setSchedules(schedulesResponse.data.schedules);
+    setAssignments(assignmentsResponse.data.assignments);
+    setAttendance(attendanceResponse.data.attendance);
   }, []);
 
   useEffect(() => {
@@ -191,6 +237,49 @@ export default function AcademicPage() {
               </form>
               <div className="mt-5 space-y-2">{enrollments.map((enrollment) => <RecordRow key={enrollment._id} title={getPopulatedName(enrollment.studentId, 'Student')} detail={getPopulatedName(enrollment.classId, 'Class')} />)}</div>
             </section>
+
+            <section className="academic-card">
+              <h2 className="academic-heading">Add timetable session</h2>
+              <form className="academic-form" onSubmit={(event) => submit(event, async () => {
+                await api.post('/academic/schedules', { classId: scheduleClassId, dayOfWeek: Number(scheduleDay), startTime: scheduleStart, endTime: scheduleEnd, location: scheduleLocation });
+                setScheduleLocation('');
+              })}>
+                <label>Class<select required value={scheduleClassId} onChange={(event) => setScheduleClassId(event.target.value)}><option value="">Select class</option>{classes.map((academicClass) => <option key={academicClass._id} value={academicClass._id}>{academicClass.name} · {academicClass.academicYear}</option>)}</select></label>
+                <label>Weekday<select value={scheduleDay} onChange={(event) => setScheduleDay(event.target.value)}>{['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day, index) => <option key={day} value={index + 1}>{day}</option>)}</select></label>
+                <div className="grid grid-cols-2 gap-3"><label>Start<input type="time" required value={scheduleStart} onChange={(event) => setScheduleStart(event.target.value)} /></label><label>End<input type="time" required value={scheduleEnd} onChange={(event) => setScheduleEnd(event.target.value)} /></label></div>
+                <label>Location<input maxLength={160} value={scheduleLocation} onChange={(event) => setScheduleLocation(event.target.value)} /></label>
+                <SubmitButton saving={saving || classes.length === 0} label="Add timetable session" />
+              </form>
+              <div className="mt-5 space-y-2">{schedules.map((schedule) => <RecordRow key={schedule._id} title={getPopulatedName(schedule.classId, 'Class')} detail={`${['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][schedule.dayOfWeek - 1]} · ${schedule.startTime}–${schedule.endTime}`} />)}</div>
+            </section>
+
+            <section className="academic-card">
+              <h2 className="academic-heading">Create assignment</h2>
+              <form className="academic-form" onSubmit={(event) => submit(event, async () => {
+                await api.post('/academic/assignments', { classId: assignmentClassId, title: assignmentTitle, pointsPossible: Number(assignmentPoints) });
+                setAssignmentTitle('');
+              })}>
+                <label>Class<select required value={assignmentClassId} onChange={(event) => setAssignmentClassId(event.target.value)}><option value="">Select class</option>{classes.map((academicClass) => <option key={academicClass._id} value={academicClass._id}>{academicClass.name} · {academicClass.academicYear}</option>)}</select></label>
+                <label>Title<input required maxLength={180} value={assignmentTitle} onChange={(event) => setAssignmentTitle(event.target.value)} /></label>
+                <label>Points possible<input required type="number" min="0" max="100000" value={assignmentPoints} onChange={(event) => setAssignmentPoints(event.target.value)} /></label>
+                <SubmitButton saving={saving || classes.length === 0} label="Create assignment" />
+              </form>
+              <div className="mt-5 space-y-2">{assignments.map((assignment) => <RecordRow key={assignment._id} title={assignment.title} detail={`${getPopulatedName(assignment.classId, 'Class')} · ${assignment.pointsPossible} pts`} />)}</div>
+            </section>
+
+            <section className="academic-card">
+              <h2 className="academic-heading">Record attendance</h2>
+              <form className="academic-form" onSubmit={(event) => submit(event, async () => {
+                await api.put('/academic/attendance', { classId: attendanceClassId, studentId: attendanceStudentId, date: attendanceDate, status: attendanceStatus });
+              })}>
+                <label>Class<select required value={attendanceClassId} onChange={(event) => { setAttendanceClassId(event.target.value); setAttendanceStudentId(''); }}><option value="">Select class</option>{classes.map((academicClass) => <option key={academicClass._id} value={academicClass._id}>{academicClass.name}</option>)}</select></label>
+                <label>Student<select required value={attendanceStudentId} onChange={(event) => setAttendanceStudentId(event.target.value)}><option value="">Select student</option>{people.filter((person) => person.type === 'student' && enrollments.some((enrollment) => typeof enrollment.studentId === 'object' && enrollment.studentId._id === person._id && typeof enrollment.classId === 'object' && enrollment.classId._id === attendanceClassId)).map((person) => <option key={person._id} value={person._id}>{person.firstName} {person.lastName}</option>)}</select></label>
+                <label>Date<input required type="date" value={attendanceDate} onChange={(event) => setAttendanceDate(event.target.value)} /></label>
+                <label>Status<select value={attendanceStatus} onChange={(event) => setAttendanceStatus(event.target.value as AcademicAttendance['status'])}><option value="present">Present</option><option value="absent">Absent</option><option value="late">Late</option><option value="excused">Excused</option></select></label>
+                <SubmitButton saving={saving || classes.length === 0} label="Save attendance" />
+              </form>
+              <div className="mt-5 space-y-2">{attendance.slice(0, 8).map((entry) => <RecordRow key={entry._id} title={getPopulatedName(entry.studentId, 'Student')} detail={`${new Date(entry.date).toLocaleDateString()} · ${entry.status}`} />)}</div>
+            </section>
           </div>
         </>
       ) : portal ? (
@@ -204,6 +293,11 @@ export default function AcademicPage() {
             <h2 className="academic-heading">Current enrollments</h2>
             {portal.enrollments.length ? portal.enrollments.map((enrollment) => <RecordRow key={enrollment._id} title={getPopulatedName(enrollment.classId, 'Class')} detail={portal.profile.type === 'parent' ? getPopulatedName(enrollment.studentId, 'Student') : ''} />) : <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No active class enrollments are available.</p>}
           </section>
+          <div className="grid gap-6 xl:grid-cols-2">
+            <section className="academic-card"><h2 className="academic-heading">Timetable</h2>{portal.schedules.length ? portal.schedules.map((schedule) => <RecordRow key={schedule._id} title={getPopulatedName(schedule.classId, 'Class')} detail={`${['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][schedule.dayOfWeek - 1]} · ${schedule.startTime}–${schedule.endTime}`} />) : <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No timetable sessions are published.</p>}</section>
+            <section className="academic-card"><h2 className="academic-heading">Assignments</h2>{portal.assignments.length ? portal.assignments.map((assignment) => <RecordRow key={assignment._id} title={assignment.title} detail={`${getPopulatedName(assignment.classId, 'Class')} · ${assignment.pointsPossible} pts`} />) : <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No assignments are available.</p>}</section>
+            <section className="academic-card"><h2 className="academic-heading">Attendance</h2>{portal.attendance.length ? portal.attendance.map((entry) => <RecordRow key={entry._id} title={getPopulatedName(entry.classId, 'Class')} detail={`${new Date(entry.date).toLocaleDateString()} · ${entry.status}`} />) : <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No attendance records are available.</p>}</section>
+          </div>
         </>
       ) : (
         <div className="academic-card"><p className="text-sm" style={{ color: 'var(--text-muted)' }}>{error || 'This account does not have an academic profile linked yet.'}</p></div>

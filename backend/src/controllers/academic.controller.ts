@@ -7,6 +7,9 @@ import AcademicCourse from '../models/AcademicCourse';
 import AcademicDepartment from '../models/AcademicDepartment';
 import AcademicGuardianLink from '../models/AcademicGuardianLink';
 import AcademicEnrollment from '../models/AcademicEnrollment';
+import AcademicSchedule from '../models/AcademicSchedule';
+import AcademicAssignment from '../models/AcademicAssignment';
+import AcademicAttendance, { AttendanceStatus } from '../models/AcademicAttendance';
 import AcademicPerson, { AcademicPersonType } from '../models/AcademicPerson';
 import { GuardianRelationshipType } from '../models/AcademicGuardianLink';
 import User from '../models/User';
@@ -14,6 +17,7 @@ import User from '../models/User';
 const PAGE_SIZE = 100;
 const ACADEMIC_PERSON_TYPES: AcademicPersonType[] = ['student', 'teacher', 'parent'];
 const GUARDIAN_RELATIONSHIPS: GuardianRelationshipType[] = ['parent', 'guardian', 'other'];
+const ATTENDANCE_STATUSES: AttendanceStatus[] = ['present', 'absent', 'late', 'excused'];
 
 function getCompanyId(req: AuthRequest): mongoose.Types.ObjectId {
   return new mongoose.Types.ObjectId(req.user!.companyId);
@@ -356,5 +360,196 @@ export const createEnrollment = async (req: AuthRequest, res: Response): Promise
     res.status(201).json({ success: true, enrollment });
   } catch (error) {
     handleOperationError(res, error, 'enrollment');
+  }
+};
+
+export const listSchedules = async (req: AuthRequest, res: Response): Promise<void> => {
+  const { skip, limit } = listOptions(req);
+  const companyId = getCompanyId(req);
+  try {
+    const [schedules, total] = await Promise.all([
+      AcademicSchedule.find({ companyId }).sort({ dayOfWeek: 1, startTime: 1 }).skip(skip).limit(limit)
+        .populate({ path: 'classId', match: { companyId }, select: 'name academicYear' })
+        .populate({ path: 'courseId', match: { companyId }, select: 'name code' })
+        .lean(),
+      AcademicSchedule.countDocuments({ companyId }),
+    ]);
+    res.json({ success: true, schedules: schedules.filter((schedule) => schedule.classId), total, page: Math.floor(skip / limit) + 1, pageSize: limit });
+  } catch (error) {
+    handleOperationError(res, error, 'schedules');
+  }
+};
+
+export const createSchedule = async (req: AuthRequest, res: Response): Promise<void> => {
+  const { classId, courseId, dayOfWeek, startTime, endTime, location, validFrom, validUntil } = req.body ?? {};
+  if (
+    !isObjectId(classId) ||
+    (courseId !== undefined && !isObjectId(courseId)) ||
+    !Number.isInteger(dayOfWeek) ||
+    dayOfWeek < 1 ||
+    dayOfWeek > 7 ||
+    typeof startTime !== 'string' ||
+    !/^([01]\d|2[0-3]):[0-5]\d$/.test(startTime) ||
+    typeof endTime !== 'string' ||
+    !/^([01]\d|2[0-3]):[0-5]\d$/.test(endTime) ||
+    startTime >= endTime ||
+    (location !== undefined && typeof location !== 'string') ||
+    (validFrom !== undefined && !Number.isFinite(Date.parse(validFrom))) ||
+    (validUntil !== undefined && !Number.isFinite(Date.parse(validUntil))) ||
+    (validFrom !== undefined && validUntil !== undefined && Date.parse(validFrom) > Date.parse(validUntil))
+  ) {
+    res.status(400).json({ success: false, message: 'Provide a valid class, weekday, time range, and optional date range.' });
+    return;
+  }
+
+  const companyId = getCompanyId(req);
+  try {
+    const academicClass = await AcademicClass.findOne({ _id: classId, companyId }).select('courseIds');
+    if (!academicClass || (courseId && !academicClass.courseIds.some((id) => id.toString() === courseId))) {
+      res.status(400).json({ success: false, message: 'The class and optional course must belong to this organization.' });
+      return;
+    }
+    const schedule = await AcademicSchedule.create({
+      companyId,
+      classId,
+      ...(courseId ? { courseId } : {}),
+      dayOfWeek,
+      startTime,
+      endTime,
+      ...(location !== undefined ? { location: location.trim() } : {}),
+      ...(validFrom ? { validFrom: new Date(validFrom) } : {}),
+      ...(validUntil ? { validUntil: new Date(validUntil) } : {}),
+    });
+    await recordAcademicAudit(req, 'schedule', schedule._id);
+    res.status(201).json({ success: true, schedule });
+  } catch (error) {
+    handleOperationError(res, error, 'schedule');
+  }
+};
+
+export const listAssignments = async (req: AuthRequest, res: Response): Promise<void> => {
+  const { skip, limit } = listOptions(req);
+  const companyId = getCompanyId(req);
+  try {
+    const [assignments, total] = await Promise.all([
+      AcademicAssignment.find({ companyId }).sort({ dueAt: 1, createdAt: -1 }).skip(skip).limit(limit)
+        .populate({ path: 'classId', match: { companyId }, select: 'name academicYear' })
+        .populate({ path: 'courseId', match: { companyId }, select: 'name code' })
+        .lean(),
+      AcademicAssignment.countDocuments({ companyId }),
+    ]);
+    res.json({ success: true, assignments: assignments.filter((assignment) => assignment.classId), total, page: Math.floor(skip / limit) + 1, pageSize: limit });
+  } catch (error) {
+    handleOperationError(res, error, 'assignments');
+  }
+};
+
+export const createAssignment = async (req: AuthRequest, res: Response): Promise<void> => {
+  const { classId, courseId, title, instructions, dueAt, pointsPossible } = req.body ?? {};
+  if (
+    !isObjectId(classId) ||
+    (courseId !== undefined && !isObjectId(courseId)) ||
+    !isNonEmptyString(title) ||
+    title.trim().length > 180 ||
+    (instructions !== undefined && (typeof instructions !== 'string' || instructions.length > 10000)) ||
+    (dueAt !== undefined && !Number.isFinite(Date.parse(dueAt))) ||
+    typeof pointsPossible !== 'number' ||
+    !Number.isFinite(pointsPossible) ||
+    pointsPossible < 0 ||
+    pointsPossible > 100000
+  ) {
+    res.status(400).json({ success: false, message: 'Provide a valid class, title, due date, and maximum points.' });
+    return;
+  }
+  const companyId = getCompanyId(req);
+  try {
+    const academicClass = await AcademicClass.findOne({ _id: classId, companyId }).select('courseIds');
+    if (!academicClass || (courseId && !academicClass.courseIds.some((id) => id.toString() === courseId))) {
+      res.status(400).json({ success: false, message: 'The class and optional course must belong to this organization.' });
+      return;
+    }
+    const assignment = await AcademicAssignment.create({
+      companyId,
+      classId,
+      ...(courseId ? { courseId } : {}),
+      createdBy: new mongoose.Types.ObjectId(req.user!.userId),
+      title: title.trim(),
+      ...(instructions !== undefined ? { instructions: instructions.trim() } : {}),
+      ...(dueAt ? { dueAt: new Date(dueAt) } : {}),
+      pointsPossible,
+    });
+    await recordAcademicAudit(req, 'assignment', assignment._id);
+    res.status(201).json({ success: true, assignment });
+  } catch (error) {
+    handleOperationError(res, error, 'assignment');
+  }
+};
+
+export const listAttendance = async (req: AuthRequest, res: Response): Promise<void> => {
+  const { skip, limit } = listOptions(req);
+  const companyId = getCompanyId(req);
+  const filter: { companyId: mongoose.Types.ObjectId; classId?: mongoose.Types.ObjectId } = { companyId };
+  if (typeof req.query.classId === 'string') {
+    if (!isObjectId(req.query.classId)) {
+      res.status(400).json({ success: false, message: 'Invalid class identifier.' });
+      return;
+    }
+    filter.classId = new mongoose.Types.ObjectId(req.query.classId);
+  }
+  try {
+    const [attendance, total] = await Promise.all([
+      AcademicAttendance.find(filter).sort({ date: -1 }).skip(skip).limit(limit)
+        .populate({ path: 'studentId', match: { companyId, type: 'student' }, select: 'firstName lastName externalId' })
+        .populate({ path: 'classId', match: { companyId }, select: 'name academicYear' })
+        .lean(),
+      AcademicAttendance.countDocuments(filter),
+    ]);
+    res.json({ success: true, attendance: attendance.filter((entry) => entry.studentId && entry.classId), total, page: Math.floor(skip / limit) + 1, pageSize: limit });
+  } catch (error) {
+    handleOperationError(res, error, 'attendance');
+  }
+};
+
+export const recordAttendance = async (req: AuthRequest, res: Response): Promise<void> => {
+  const { classId, studentId, date, status, note } = req.body ?? {};
+  const parsedDate = typeof date === 'string' ? new Date(date) : new Date(NaN);
+  if (
+    !isObjectId(classId) ||
+    !isObjectId(studentId) ||
+    !Number.isFinite(parsedDate.getTime()) ||
+    !ATTENDANCE_STATUSES.includes(status) ||
+    (note !== undefined && (typeof note !== 'string' || note.length > 500))
+  ) {
+    res.status(400).json({ success: false, message: 'Provide a valid class, student, attendance date, and status.' });
+    return;
+  }
+  const companyId = getCompanyId(req);
+  parsedDate.setUTCHours(0, 0, 0, 0);
+  try {
+    const [academicClass, student, enrollment] = await Promise.all([
+      AcademicClass.findOne({ _id: classId, companyId }).select('_id'),
+      AcademicPerson.findOne({ _id: studentId, companyId, type: 'student', status: 'active' }).select('_id'),
+      AcademicEnrollment.findOne({ companyId, classId, studentId, status: 'active' }).select('_id'),
+    ]);
+    if (!academicClass || !student || !enrollment) {
+      res.status(400).json({ success: false, message: 'Attendance requires an active student enrollment in this organization and class.' });
+      return;
+    }
+    const attendance = await AcademicAttendance.findOneAndUpdate(
+      { companyId, classId, studentId, date: parsedDate },
+      {
+        $set: {
+          status,
+          recordedBy: new mongoose.Types.ObjectId(req.user!.userId),
+          ...(note !== undefined ? { note: note.trim() } : { note: undefined }),
+        },
+        $setOnInsert: { companyId, classId, studentId, date: parsedDate },
+      },
+      { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true }
+    );
+    await recordAcademicAudit(req, 'attendance', attendance._id, { status });
+    res.status(200).json({ success: true, attendance });
+  } catch (error) {
+    handleOperationError(res, error, 'attendance');
   }
 };

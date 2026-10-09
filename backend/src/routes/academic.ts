@@ -6,12 +6,18 @@ import {
   createGuardianLink,
   createEnrollment,
   createPerson,
+  createSchedule,
+  createAssignment,
+  recordAttendance,
   listClasses,
   listCourses,
   listDepartments,
   listGuardianLinks,
   listEnrollments,
   listPeople,
+  listSchedules,
+  listAssignments,
+  listAttendance,
 } from '../controllers/academic.controller';
 import { authenticate } from '../middleware/auth';
 import { requireAcademicAdmin } from '../middleware/academicOrganization';
@@ -32,5 +38,11 @@ router.get('/guardians', listGuardianLinks);
 router.post('/guardians', createGuardianLink);
 router.get('/enrollments', listEnrollments);
 router.post('/enrollments', createEnrollment);
+router.get('/schedules', listSchedules);
+router.post('/schedules', createSchedule);
+router.get('/assignments', listAssignments);
+router.post('/assignments', createAssignment);
+router.get('/attendance', listAttendance);
+router.put('/attendance', recordAttendance);
 
 export default router;

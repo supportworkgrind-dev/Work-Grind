@@ -5,6 +5,9 @@ import AcademicClass from '../models/AcademicClass';
 import AcademicEnrollment from '../models/AcademicEnrollment';
 import AcademicGuardianLink from '../models/AcademicGuardianLink';
 import AcademicPerson from '../models/AcademicPerson';
+import AcademicSchedule from '../models/AcademicSchedule';
+import AcademicAssignment from '../models/AcademicAssignment';
+import AcademicAttendance from '../models/AcademicAttendance';
 
 export const getAcademicPortal = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -46,11 +49,36 @@ export const getAcademicPortal = async (req: AuthRequest, res: Response): Promis
         .lean(),
     ]);
 
+    const classIds = enrollments
+      .map((enrollment) => enrollment.classId)
+      .filter((classItem): classItem is mongoose.Types.ObjectId => !!classItem)
+      .map((classItem) => classItem._id);
+    const [schedules, assignments, attendance] = classIds.length
+      ? await Promise.all([
+          AcademicSchedule.find({ companyId, classId: { $in: classIds } })
+            .populate({ path: 'classId', match: { companyId }, select: 'name academicYear' })
+            .populate({ path: 'courseId', match: { companyId }, select: 'name code' })
+            .lean(),
+          AcademicAssignment.find({ companyId, classId: { $in: classIds } })
+            .populate({ path: 'classId', match: { companyId }, select: 'name academicYear' })
+            .populate({ path: 'courseId', match: { companyId }, select: 'name code' })
+            .lean(),
+          AcademicAttendance.find({ companyId, studentId: { $in: studentIds } })
+            .sort({ date: -1 })
+            .limit(100)
+            .populate({ path: 'classId', match: { companyId }, select: 'name academicYear' })
+            .lean(),
+        ])
+      : [[], [], []];
+
     res.json({
       success: true,
       profile: person,
       students,
       enrollments: enrollments.filter((enrollment) => enrollment.classId),
+      schedules: schedules.filter((schedule) => schedule.classId),
+      assignments: assignments.filter((assignment) => assignment.classId),
+      attendance: attendance.filter((entry) => entry.classId),
     });
   } catch (error) {
     console.error('[Academic] Portal lookup failed.', {
