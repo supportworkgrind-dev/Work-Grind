@@ -1,5 +1,6 @@
 'use client';
 
+import '@excalidraw/excalidraw/index.css';
 import dynamic from 'next/dynamic';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AppState, BinaryFiles, ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types';

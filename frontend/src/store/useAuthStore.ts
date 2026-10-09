@@ -198,7 +198,6 @@ export const useAuthStore = create<AuthState>((set, get) => {
           const res = await api.get('/auth/me', {
             headers: {
               Authorization: `Bearer ${token}`,
-              'Cache-Control': 'no-cache',
             },
           });
           const latestToken = getAuthValue('workgrind_access_token');
