@@ -82,8 +82,8 @@ export default function CreateCompanyPage() {
 
       if (res.data.success) {
         setIsRedirecting(true);
-        if (res.data.accessToken && res.data.refreshToken && currentToken) {
-          updateAuthTokens(res.data.accessToken, res.data.refreshToken, currentToken);
+        if (res.data.accessToken && currentToken) {
+          updateAuthTokens(res.data.accessToken, currentToken);
         }
         setCompany(res.data.company);
         if (res.data.user) {

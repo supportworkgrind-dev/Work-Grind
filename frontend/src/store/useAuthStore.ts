@@ -3,6 +3,7 @@ import { User, Company, SubscriptionInfo, EntitlementId } from '../types';
 import { api } from '../lib/api';
 import { getSocket, disconnectSocket } from '../lib/socket';
 import { clearAuthValues, getAuthValue, removeAuthValue, setAuthSession, setAuthValue } from '../lib/authSession';
+import { refreshAuthTokens } from '../lib/tokenRefresh';
 import { useCallingStore } from './useCallingStore';
 
 interface AuthState {
@@ -12,13 +13,15 @@ interface AuthState {
   subscriptionLoading: boolean;
   subscriptionError: string | null;
   isLoading: boolean;
+  authError: string | null;
   isAuthenticated: boolean;
   trialDaysRemaining: number | null;
   setUser: (user: User | null) => void;
   setCompany: (company: Company | null) => void;
-  login: (userData: User, accessToken: string, refreshToken: string) => void;
+  login: (userData: User, accessToken: string) => void;
   logout: () => Promise<void>;
   fetchCurrentUser: () => Promise<void>;
+  restoreSession: () => Promise<void>;
   refreshSubscription: () => Promise<void>;
   canUse: (entitlement: EntitlementId) => boolean;
   isAtLimit: (resource: 'members' | 'storage' | 'aiRequests') => boolean;
@@ -33,6 +36,8 @@ interface AuthState {
 export const useAuthStore = create<AuthState>((set, get) => {
   let currentUserRequest: { token: string; promise: Promise<void> } | null = null;
   let subscriptionRequest: { token: string; promise: Promise<void> } | null = null;
+  let restoreRequest: Promise<void> | null = null;
+  let authGeneration = 0;
 
   // Pin the legacy shared session into this tab before other accounts can switch it.
   let hasAccessToken = false;
@@ -46,7 +51,8 @@ export const useAuthStore = create<AuthState>((set, get) => {
     subscription: null,
     subscriptionLoading: hasAccessToken,
     subscriptionError: null,
-    isLoading: hasAccessToken,
+    isLoading: true,
+    authError: null,
     isAuthenticated: false,
     trialDaysRemaining: null,
 
@@ -131,7 +137,8 @@ export const useAuthStore = create<AuthState>((set, get) => {
         (subscription?.status === 'cancelled' && !subscription.hasActiveAccess);
     },
 
-    login: (userData, accessToken, refreshToken) => {
+    login: (userData, accessToken) => {
+      authGeneration += 1;
       const previousToken = getAuthValue('workgrind_access_token');
       const previousUserId = get().user?._id;
       if ((previousToken && previousToken !== accessToken) || (previousUserId && previousUserId !== userData._id)) {
@@ -139,7 +146,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
         useCallingStore.getState().setActiveCall(null);
         useCallingStore.getState().setIncomingCall(null);
       }
-      setAuthSession(accessToken, refreshToken, JSON.stringify(userData));
+      setAuthSession(accessToken, JSON.stringify(userData));
       removeAuthValue('workgrind_subscription');
 
       set({
@@ -150,18 +157,17 @@ export const useAuthStore = create<AuthState>((set, get) => {
         subscriptionError: null,
         isAuthenticated: true,
         isLoading: false,
+        authError: null,
       });
 
       void get().refreshSubscription();
     },
 
     logout: async () => {
+      authGeneration += 1;
       const token = getAuthValue('workgrind_access_token');
       try {
-        const refreshToken = getAuthValue('workgrind_refresh_token');
-        if (refreshToken) {
-          await api.post('/auth/logout', { refreshToken });
-        }
+        await api.post('/auth/logout', {});
       } catch (err) {
         console.error('Logout error:', err);
       } finally {
@@ -170,16 +176,72 @@ export const useAuthStore = create<AuthState>((set, get) => {
         disconnectSocket();
         useCallingStore.getState().setActiveCall(null);
         useCallingStore.getState().setIncomingCall(null);
-        set({ user: null, company: null, subscription: null, subscriptionLoading: false, subscriptionError: null, isAuthenticated: false, isLoading: false });
+        set({ user: null, company: null, subscription: null, subscriptionLoading: false, subscriptionError: null, isAuthenticated: false, isLoading: false, authError: null });
         window.location.href = '/login';
       }
+    },
+
+    restoreSession: () => {
+      if (restoreRequest) return restoreRequest;
+      if (get().user && getAuthValue('workgrind_access_token')) {
+        set({ isLoading: false, authError: null });
+        return Promise.resolve();
+      }
+
+      set({ isLoading: true, authError: null });
+      const generation = authGeneration;
+      restoreRequest = (async () => {
+        try {
+          if (!getAuthValue('workgrind_access_token')) {
+            await refreshAuthTokens(null);
+          }
+          if (generation !== authGeneration) return;
+          if (getAuthValue('workgrind_access_token')) {
+            await get().fetchCurrentUser();
+          } else {
+            set({
+              user: null,
+              company: null,
+              subscription: null,
+              subscriptionLoading: false,
+              subscriptionError: null,
+              isAuthenticated: false,
+              isLoading: false,
+              authError: null,
+            });
+          }
+        } catch (error) {
+          if (generation !== authGeneration) return;
+          const status = (error as { response?: { status?: number } })?.response?.status;
+          if (status === 401) {
+            clearAuthValues();
+            set({
+              user: null,
+              company: null,
+              subscription: null,
+              subscriptionLoading: false,
+              subscriptionError: null,
+              isAuthenticated: false,
+              isLoading: false,
+              authError: null,
+            });
+          } else {
+            set({
+              isLoading: false,
+              authError: 'Unable to restore your session. Check your connection and retry.',
+            });
+          }
+        } finally {
+          restoreRequest = null;
+        }
+      })();
+      return restoreRequest;
     },
 
     fetchCurrentUser: async () => {
       const token = getAuthValue('workgrind_access_token');
       if (!token) {
-        clearAuthValues();
-        set({ user: null, company: null, subscription: null, subscriptionLoading: false, subscriptionError: null, isAuthenticated: false, isLoading: false });
+        await get().restoreSession();
         return;
       }
 
@@ -225,6 +287,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
             company: typeof resolvedUser.companyId === 'object' ? resolvedUser.companyId : null,
             isAuthenticated: true,
             isLoading: false,
+            authError: null,
             trialDaysRemaining: res.data.trialDaysRemaining ?? null,
           });
           await get().refreshSubscription();
@@ -253,9 +316,14 @@ export const useAuthStore = create<AuthState>((set, get) => {
             });
             return;
           }
-          if (err?.response?.status === 401 || !get().user) {
-            if (err?.response?.status === 401) clearAuthValues();
-            set({ user: null, company: null, subscription: null, subscriptionLoading: false, subscriptionError: null, isAuthenticated: false, isLoading: false });
+          if (err?.response?.status === 401) {
+            clearAuthValues();
+            set({ user: null, company: null, subscription: null, subscriptionLoading: false, subscriptionError: null, isAuthenticated: false, isLoading: false, authError: null });
+          } else if (!get().user) {
+            set({
+              isLoading: false,
+              authError: 'Unable to restore your session. Check your connection and retry.',
+            });
           } else {
             set({ isLoading: false });
           }

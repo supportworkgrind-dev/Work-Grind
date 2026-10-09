@@ -68,21 +68,22 @@ api.interceptors.response.use(
         return Promise.reject(error);
       }
       originalRequest._retry = true;
-      const refreshToken = getAuthValue('workgrind_refresh_token');
-      if (refreshToken) {
-        try {
-          const { accessToken } = await refreshAuthTokens(currentToken);
-          if (getAuthValue('workgrind_access_token') !== accessToken) {
-            return Promise.reject(error);
-          }
-          refreshSocketAuth(accessToken);
-          originalRequest.headers.Authorization = `Bearer ${accessToken}`;
-          return api(originalRequest);
-        } catch {
-          if (getAuthValue('workgrind_access_token') === currentToken) clearAuthSession();
+      try {
+        const { accessToken } = await refreshAuthTokens(currentToken);
+        if (getAuthValue('workgrind_access_token') !== accessToken) {
+          return Promise.reject(error);
         }
-      } else if (getAuthValue('workgrind_access_token') === currentToken) {
-        clearAuthSession();
+        refreshSocketAuth(accessToken);
+        originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+        return api(originalRequest);
+      } catch (refreshError) {
+        if (
+          axios.isAxiosError(refreshError) &&
+          refreshError.response?.status === 401 &&
+          getAuthValue('workgrind_access_token') === currentToken
+        ) {
+          clearAuthSession();
+        }
       }
     }
     return Promise.reject(error);

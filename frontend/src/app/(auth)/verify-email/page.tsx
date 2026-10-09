@@ -50,7 +50,7 @@ function VerifyEmailContent() {
     setStatus('checking');
     try {
       const response = await api.post('/auth/verify-registration-code', { email, code });
-      login(response.data.user, response.data.accessToken, response.data.refreshToken);
+      login(response.data.user, response.data.accessToken);
       if (invite) {
         try {
           const joined = await api.post('/auth/join-company', { inviteToken: invite, inviteCode: invite });
@@ -58,7 +58,6 @@ function VerifyEmailContent() {
           login(
             { ...response.data.user, companyId: joined.data.company, role: joined.data.role },
             joined.data.accessToken,
-            joined.data.refreshToken,
           );
           setStatus('success');
           window.setTimeout(() => router.push('/dashboard'), 700);

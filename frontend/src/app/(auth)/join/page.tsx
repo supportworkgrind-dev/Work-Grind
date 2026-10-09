@@ -94,8 +94,8 @@ function JoinWorkspaceContent() {
 
       if (res.data.success) {
         setCompany(res.data.company);
-        if (res.data.accessToken && res.data.refreshToken) {
-          login({ ...user!, companyId: res.data.company, role: res.data.role }, res.data.accessToken, res.data.refreshToken);
+        if (res.data.accessToken) {
+          login({ ...user!, companyId: res.data.company, role: res.data.role }, res.data.accessToken);
         }
         setSuccess(true);
         setTimeout(() => {

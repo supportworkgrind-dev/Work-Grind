@@ -25,6 +25,7 @@ import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from '.
 import { sendVerificationEmail, sendVerificationCodeEmail, sendPasswordResetEmail, sendPasswordChangedNotificationEmail, sendWelcomeEmail } from '../utils/email';
 import { AuthRequest } from '../middleware/auth';
 import { refreshAvatarUrls } from '../services/avatarUrls';
+import { clearRefreshCookie, getRefreshCookie, setRefreshCookie } from '../utils/authCookie';
 const issue = (userId: string, companyId: string, role: string) => ({
   accessToken: generateAccessToken({ userId, companyId, role }),
   refreshToken: generateRefreshToken({ userId, companyId, role }),
@@ -166,7 +167,8 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       avatar: user.avatar,
       avatarStorageKey: user.avatarStorageKey,
     });
-    res.json({ success: true, ...tokens, user: {
+    setRefreshCookie(res, tokens.refreshToken);
+    res.json({ success: true, accessToken: tokens.accessToken, user: {
       _id: user._id,
       callingId: user.callingId,
       fullName: user.fullName,
@@ -191,13 +193,19 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 
 export const refresh = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { refreshToken } = req.body;
-    if (!refreshToken) { res.status(401).json({ success: false, message: 'Refresh token required' }); return; }
+    const refreshToken = getRefreshCookie(req) ||
+      (typeof req.body?.refreshToken === 'string' ? req.body.refreshToken : '');
+    if (!refreshToken) {
+      clearRefreshCookie(res);
+      res.status(401).json({ success: false, message: 'Refresh token required' });
+      return;
+    }
     const decoded = verifyRefreshToken(refreshToken);
     const user = await User.findById(decoded.userId);
     const tokenHash = hashRefreshToken(refreshToken);
     const storedToken = user?.refreshTokens.find((stored) => stored === tokenHash || stored === refreshToken);
     if (!user || !storedToken || !user.isVerified || !user.isActive || user.isDeleted) {
+      clearRefreshCookie(res);
       res.status(401).json({ success: false, message: 'Invalid refresh token' });
       return;
     }
@@ -209,14 +217,23 @@ export const refresh = async (req: Request, res: Response): Promise<void> => {
       { $set: { refreshTokens: [...remainingTokens, hashRefreshToken(tokens.refreshToken)] } },
       { new: true },
     );
-    if (!updated) { res.status(401).json({ success: false, message: 'Invalid refresh token' }); return; }
-    res.json({ success: true, ...tokens });
-  } catch { res.status(401).json({ success: false, message: 'Invalid or expired refresh token' }); }
+    if (!updated) {
+      clearRefreshCookie(res);
+      res.status(401).json({ success: false, message: 'Invalid refresh token' });
+      return;
+    }
+    setRefreshCookie(res, tokens.refreshToken);
+    res.json({ success: true, accessToken: tokens.accessToken });
+  } catch {
+    clearRefreshCookie(res);
+    res.status(401).json({ success: false, message: 'Invalid or expired refresh token' });
+  }
 };
 
 export const logout = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { refreshToken } = req.body;
+    const refreshToken = getRefreshCookie(req) ||
+      (typeof req.body?.refreshToken === 'string' ? req.body.refreshToken : '');
     if (req.user && refreshToken) {
       const user = await User.findById(req.user.userId);
       if (user) {
@@ -228,8 +245,12 @@ export const logout = async (req: AuthRequest, res: Response): Promise<void> => 
         await user.save();
       }
     }
+    clearRefreshCookie(res);
     res.json({ success: true });
-  } catch (e: any) { res.status(500).json({ success: false, message: e.message }); }
+  } catch (e: any) {
+    clearRefreshCookie(res);
+    res.status(500).json({ success: false, message: e.message });
+  }
 };
 
 export const verifyEmail = async (req: Request, res: Response): Promise<void> => {
@@ -305,9 +326,10 @@ export const verifyRegistrationCode = async (req: Request, res: Response): Promi
         hashRefreshToken(tokens.refreshToken),
       ];
       await verifiedUser.save();
+      setRefreshCookie(res, tokens.refreshToken);
       res.json({
         success: true,
-        ...tokens,
+        accessToken: tokens.accessToken,
         user: {
           _id: verifiedUser._id,
           fullName: verifiedUser.fullName,
@@ -359,10 +381,15 @@ export const verifyRegistrationCode = async (req: Request, res: Response): Promi
       trialEndDate,
     });
     const session = await sessionForUser(user);
+    setRefreshCookie(res, session.refreshToken);
     void sendWelcomeEmail(user.email, user.fullName).then((result) => {
       if (!result.success) console.error('[Auth] Welcome email delivery failed.');
     });
-    res.json({ success: true, ...session });
+    res.json({
+      success: true,
+      accessToken: session.accessToken,
+      user: session.user,
+    });
   } catch (error) {
     console.error('[Auth] Email verification failed:', error);
     res.status(500).json({ success: false, message: 'Unable to verify this code. Please try again.' });
@@ -593,6 +620,9 @@ export const createCompany = async (req: AuthRequest, res: Response): Promise<vo
       const existingCompany = await Company.findById(user.companyId);
       if (existingCompany) {
         const tokens = issue(uid, existingCompany._id.toString(), user.role || 'owner');
+        user.refreshTokens = [...normalizeRefreshTokenStore(user.refreshTokens), hashRefreshToken(tokens.refreshToken)];
+        await user.save();
+        setRefreshCookie(res, tokens.refreshToken);
         res.status(200).json({
           success: true,
           message: 'Workspace already exists for this account',
@@ -608,7 +638,7 @@ export const createCompany = async (req: AuthRequest, res: Response): Promise<vo
             theme: user.theme,
             workspaceProfile: user.workspaceProfile,
           },
-          ...tokens,
+          accessToken: tokens.accessToken,
         });
         return;
       }
@@ -741,6 +771,7 @@ export const createCompany = async (req: AuthRequest, res: Response): Promise<vo
     user.refreshTokens = [hashRefreshToken(tokens.refreshToken)];
     await user.save();
 
+    setRefreshCookie(res, tokens.refreshToken);
     res.status(201).json({
       success: true,
       company,
@@ -755,7 +786,7 @@ export const createCompany = async (req: AuthRequest, res: Response): Promise<vo
         theme: user.theme,
         workspaceProfile: user.workspaceProfile,
       },
-      ...tokens,
+      accessToken: tokens.accessToken,
     });
   } catch (e: any) { res.status(500).json({ success: false, message: e.message }); }
 };
@@ -906,7 +937,8 @@ export const joinCompany = async (req: AuthRequest, res: Response): Promise<void
     joiningUser.refreshTokens = [hashRefreshToken(tokens.refreshToken)];
     await joiningUser.save();
 
-    res.json({ success: true, company, role: joiningUser.role, ...tokens });
+    setRefreshCookie(res, tokens.refreshToken);
+    res.json({ success: true, company, role: joiningUser.role, accessToken: tokens.accessToken });
   } catch (e: any) {
     res.status(500).json({ success: false, message: e.message });
   }

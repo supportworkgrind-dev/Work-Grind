@@ -8,6 +8,7 @@ import { createWorkGrindUser } from '../services/callingId';
 import { TRIAL_DAYS } from '../config/subscription';
 import { sendWelcomeEmail } from '../utils/email';
 import { sessionForUser } from './auth.controller';
+import { setRefreshCookie } from '../utils/authCookie';
 import {
   buildAuthorizationUrl,
   createOAuthToken,
@@ -404,9 +405,11 @@ export const exchangeOAuthSession = async (req: Request, res: Response): Promise
     }
     stage = 'workgrind_session_creation';
     const session = await sessionForUser(user);
+    setRefreshCookie(res, session.refreshToken);
     res.json({
       success: true,
-      ...session,
+      accessToken: session.accessToken,
+      user: session.user,
       returnTo: exchange.returnTo,
     });
   } catch (error) {

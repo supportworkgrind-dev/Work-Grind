@@ -40,10 +40,10 @@ function CallbackContent() {
     void api.post('/auth/oauth/exchange', { code })
       .then((response) => {
         const data = response.data;
-        if (!data?.success || !data.user?._id || !data.accessToken || !data.refreshToken) {
+        if (!data?.success || !data.user?._id || !data.accessToken) {
           throw new Error('Sign-in response was incomplete.');
         }
-        login(data.user, data.accessToken, data.refreshToken);
+        login(data.user, data.accessToken);
         const returnTo = typeof data.returnTo === 'string' &&
           data.returnTo.startsWith('/') &&
           !data.returnTo.startsWith('//') &&

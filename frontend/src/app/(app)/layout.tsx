@@ -67,6 +67,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   // Read user + isLoading with a selector to avoid re-rendering on unrelated store changes
   const user      = useAuthStore((s) => s.user);
   const isLoading = useAuthStore((s) => s.isLoading);
+  const authError = useAuthStore((s) => s.authError);
   const subscription = useAuthStore((s) => s.subscription);
   const subscriptionLoading = useAuthStore((s) => s.subscriptionLoading);
   const subscriptionError = useAuthStore((s) => s.subscriptionError);
@@ -100,10 +101,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   // Redirect unauthenticated users after auth state is resolved
   useEffect(() => {
-    if (!isLoading && !user) {
+    if (!isLoading && !authError && !user) {
       router.replace('/login');
     }
-  }, [isLoading, user, router]);
+  }, [authError, isLoading, user, router]);
 
   useEffect(() => {
     if (user && !subscription && !subscriptionLoading && !subscriptionError) {
@@ -181,6 +182,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
           </div>
         </div>
+      </div>
+    );
+  }
+
+  if (authError && !user) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 px-6 text-center">
+        <ThemeAwareLogo size="md" surface="light" />
+        <p className="max-w-md text-sm" style={{ color: 'var(--wg-text-secondary)' }}>{authError}</p>
+        <button onClick={() => void useAuthStore.getState().restoreSession()} className="theme-primary-action px-4 py-2 text-sm font-semibold">
+          Retry session restore
+        </button>
       </div>
     );
   }

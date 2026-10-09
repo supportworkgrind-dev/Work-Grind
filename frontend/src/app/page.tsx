@@ -6,6 +6,7 @@
 ───────────────────────────────────────────────────────────────────────────── */
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/useAuthStore';
 import styles from './landing.module.css';
 
@@ -28,10 +29,33 @@ function useMounted() {
 }
 
 export default function LandingPage() {
-  const { user, isAuthenticated } = useAuthStore();
+  const router = useRouter();
+  const { user, isAuthenticated, isLoading, authError, restoreSession } = useAuthStore();
   const mounted = useMounted();
 
-  /* Auth state is only safe to read client-side (localStorage) */
+  useEffect(() => {
+    if (isLoading || !isAuthenticated || !user) return;
+    router.replace(user.companyId ? '/dashboard' : '/create-company');
+  }, [isAuthenticated, isLoading, router, user]);
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center" role="status" aria-label="Restoring your session">
+        <span className="h-8 w-8 animate-spin rounded-full border-2 border-current border-t-transparent" />
+      </div>
+    );
+  }
+
+  if (authError) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 px-6 text-center">
+        <p>{authError}</p>
+        <button className="theme-primary-action px-4 py-2" onClick={() => void restoreSession()}>Retry</button>
+      </div>
+    );
+  }
+
+  /* Auth state is only safe to read client-side. */
   const authed = mounted ? isAuthenticated && !!user : false;
 
   return (

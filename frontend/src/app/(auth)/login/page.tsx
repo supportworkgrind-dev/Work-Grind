@@ -20,8 +20,8 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const completeLogin = (response: { data: { user: User; accessToken: string; refreshToken: string } }) => {
-    login(response.data.user, response.data.accessToken, response.data.refreshToken);
+  const completeLogin = (response: { data: { user: User; accessToken: string } }) => {
+    login(response.data.user, response.data.accessToken);
     router.push(response.data.user.companyId ? '/dashboard' : '/create-company');
   };
 

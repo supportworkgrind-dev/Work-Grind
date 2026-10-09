@@ -30,20 +30,20 @@ export function setAuthValue(key: AuthStorageKey, value: string): void {
   sessionStorage.setItem(key, value);
 }
 
-export function setAuthSession(accessToken: string, refreshToken: string, user: string): void {
+export function setAuthSession(accessToken: string, user: string): void {
   if (typeof window === 'undefined') return;
   removeLegacyAuthValues();
   setAuthValue('workgrind_access_token', accessToken);
-  setAuthValue('workgrind_refresh_token', refreshToken);
+  sessionStorage.removeItem('workgrind_refresh_token');
   setAuthValue('workgrind_user', user);
 }
 
-export function updateAuthTokens(accessToken: string, refreshToken: string, previousToken: string): void {
+export function updateAuthTokens(accessToken: string, previousToken: string): void {
   if (typeof window === 'undefined') return;
   removeLegacyAuthValues();
   if (sessionStorage.getItem('workgrind_access_token') !== previousToken) return;
   setAuthValue('workgrind_access_token', accessToken);
-  setAuthValue('workgrind_refresh_token', refreshToken);
+  sessionStorage.removeItem('workgrind_refresh_token');
 }
 
 export function removeAuthValue(key: AuthStorageKey): void {

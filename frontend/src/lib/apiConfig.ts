@@ -47,7 +47,7 @@ const getApiConfiguration = (): ApiConfiguration => {
 
   return {
     backendOrigin: apiUrl.origin,
-    baseUrl: isLocalBackend ? '/api' : `${apiUrl.origin}/api`,
+    baseUrl: '/api',
   };
 };
 

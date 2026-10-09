@@ -84,6 +84,10 @@ export function RootClientProviders({ children }: { children: React.ReactNode })
   }, []);
 
   useEffect(() => {
+    void useAuthStore.getState().restoreSession();
+  }, []);
+
+  useEffect(() => {
     const handleSubscriptionRequired = () => {
       if (window.location.pathname === '/billing' || window.location.pathname === '/subscription-expired') return;
       if (redirectingForSubscription.current) return;
