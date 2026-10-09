@@ -227,9 +227,18 @@ export const createVoiceSession = async (req: AuthRequest, res: Response): Promi
     failureStage = 'livekit_room_creation';
     await roomService.createRoom({ name: roomName, emptyTimeout: 300, maxParticipants: 2 });
     failureStage = 'livekit_agent_dispatch';
+    let dispatchId: string | undefined;
     try {
-      await dispatchService.createDispatch(roomName, AGENT_NAME, {
+      const dispatch = await dispatchService.createDispatch(roomName, AGENT_NAME, {
         metadata: JSON.stringify({ voiceTurnToken }),
+      });
+      dispatchId = dispatch.id;
+      console.info('[Tavro Voice] LiveKit agent dispatch accepted.', {
+        requestId: req.get('x-request-id')?.replace(/[^\w.-]/g, '').slice(0, 128),
+        roomId: roomName,
+        agentName: AGENT_NAME,
+        dispatchId,
+        jobIds: dispatch.state?.jobs.map((job) => job.id) ?? [],
       });
     } catch (error) {
       try {
@@ -245,6 +254,7 @@ export const createVoiceSession = async (req: AuthRequest, res: Response): Promi
     console.info('[Tavro Voice] Session token issued.', {
       requestId: req.get('x-request-id')?.replace(/[^\w.-]/g, '').slice(0, 128),
       roomId: roomName,
+      dispatchId,
       role,
       httpStatus: 200,
     });

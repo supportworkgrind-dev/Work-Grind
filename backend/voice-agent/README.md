@@ -15,6 +15,11 @@ Create a LiveKit Cloud project and configure:
 - `LIVEKIT_API_KEY` and `LIVEKIT_API_SECRET`: project credentials
 - `WORKGRIND_BACKEND_URL`: the HTTPS origin of the WorkGrind backend
 
+The worker exits during startup if any of these four variables are missing.
+`TAVRO_VOICE_AGENT_SECRET` is only required by the backend; the worker receives
+the short-lived room-bound credential through private dispatch metadata and
+forwards it to the backend.
+
 Configure `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`, and
 `TAVRO_VOICE_AGENT_SECRET` in the WorkGrind backend environment as well.
 Configure the same public `LIVEKIT_URL` as the frontend's
