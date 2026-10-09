@@ -8,6 +8,8 @@ import AcademicPerson from '../models/AcademicPerson';
 import AcademicSchedule from '../models/AcademicSchedule';
 import AcademicAssignment from '../models/AcademicAssignment';
 import AcademicAttendance from '../models/AcademicAttendance';
+import AcademicResult from '../models/AcademicResult';
+import AcademicFeeCharge from '../models/AcademicFeeCharge';
 
 export const getAcademicPortal = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -53,23 +55,42 @@ export const getAcademicPortal = async (req: AuthRequest, res: Response): Promis
       .map((enrollment) => enrollment.classId)
       .filter((classItem): classItem is mongoose.Types.ObjectId => !!classItem)
       .map((classItem) => classItem._id);
-    const [schedules, assignments, attendance] = classIds.length
-      ? await Promise.all([
-          AcademicSchedule.find({ companyId, classId: { $in: classIds } })
+    const [schedules, assignments, attendance, results, feeCharges] = await Promise.all([
+      classIds.length
+        ? AcademicSchedule.find({ companyId, classId: { $in: classIds } })
             .populate({ path: 'classId', match: { companyId }, select: 'name academicYear' })
             .populate({ path: 'courseId', match: { companyId }, select: 'name code' })
-            .lean(),
-          AcademicAssignment.find({ companyId, classId: { $in: classIds } })
+            .lean()
+        : [],
+      classIds.length
+        ? AcademicAssignment.find({ companyId, classId: { $in: classIds } })
             .populate({ path: 'classId', match: { companyId }, select: 'name academicYear' })
             .populate({ path: 'courseId', match: { companyId }, select: 'name code' })
-            .lean(),
-          AcademicAttendance.find({ companyId, studentId: { $in: studentIds } })
+            .lean()
+        : [],
+      studentIds.length
+        ? AcademicAttendance.find({ companyId, studentId: { $in: studentIds } })
             .sort({ date: -1 })
             .limit(100)
             .populate({ path: 'classId', match: { companyId }, select: 'name academicYear' })
-            .lean(),
-        ])
-      : [[], [], []];
+            .lean()
+        : [],
+      studentIds.length
+        ? AcademicResult.find({ companyId, studentId: { $in: studentIds } })
+            .sort({ gradedAt: -1 })
+            .limit(100)
+            .populate({ path: 'assessmentId', match: { companyId }, select: 'title type pointsPossible classId' })
+            .populate({ path: 'studentId', match: { companyId, type: 'student' }, select: 'firstName lastName' })
+            .lean()
+        : [],
+      studentIds.length
+        ? AcademicFeeCharge.find({ companyId, studentId: { $in: studentIds }, isVoided: false })
+            .sort({ dueAt: 1 })
+            .limit(100)
+            .select('invoiceNumber description amountMinor paidAmountMinor currency dueAt isVoided studentId')
+            .lean()
+        : [],
+    ]);
 
     res.json({
       success: true,
@@ -79,6 +100,17 @@ export const getAcademicPortal = async (req: AuthRequest, res: Response): Promis
       schedules: schedules.filter((schedule) => schedule.classId),
       assignments: assignments.filter((assignment) => assignment.classId),
       attendance: attendance.filter((entry) => entry.classId),
+      results: results.filter((result) => result.assessmentId && result.studentId),
+      feeCharges: feeCharges.map((charge) => ({
+        _id: charge._id,
+        studentId: charge.studentId,
+        invoiceNumber: charge.invoiceNumber,
+        description: charge.description,
+        amountMinor: charge.amountMinor,
+        paidAmountMinor: charge.paidAmountMinor,
+        currency: charge.currency,
+        dueAt: charge.dueAt,
+      })),
     });
   } catch (error) {
     console.error('[Academic] Portal lookup failed.', {

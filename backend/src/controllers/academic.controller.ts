@@ -10,6 +10,9 @@ import AcademicEnrollment from '../models/AcademicEnrollment';
 import AcademicSchedule from '../models/AcademicSchedule';
 import AcademicAssignment from '../models/AcademicAssignment';
 import AcademicAttendance, { AttendanceStatus } from '../models/AcademicAttendance';
+import AcademicAssessment, { AssessmentType } from '../models/AcademicAssessment';
+import AcademicResult from '../models/AcademicResult';
+import AcademicFeeCharge, { FeePaymentMethod } from '../models/AcademicFeeCharge';
 import AcademicPerson, { AcademicPersonType } from '../models/AcademicPerson';
 import { GuardianRelationshipType } from '../models/AcademicGuardianLink';
 import User from '../models/User';
@@ -18,6 +21,8 @@ const PAGE_SIZE = 100;
 const ACADEMIC_PERSON_TYPES: AcademicPersonType[] = ['student', 'teacher', 'parent'];
 const GUARDIAN_RELATIONSHIPS: GuardianRelationshipType[] = ['parent', 'guardian', 'other'];
 const ATTENDANCE_STATUSES: AttendanceStatus[] = ['present', 'absent', 'late', 'excused'];
+const ASSESSMENT_TYPES: AssessmentType[] = ['exam', 'quiz', 'test', 'project'];
+const FEE_PAYMENT_METHODS: FeePaymentMethod[] = ['cash', 'bank_transfer', 'other'];
 
 function getCompanyId(req: AuthRequest): mongoose.Types.ObjectId {
   return new mongoose.Types.ObjectId(req.user!.companyId);
@@ -551,5 +556,242 @@ export const recordAttendance = async (req: AuthRequest, res: Response): Promise
     res.status(200).json({ success: true, attendance });
   } catch (error) {
     handleOperationError(res, error, 'attendance');
+  }
+};
+
+export const listAssessments = async (req: AuthRequest, res: Response): Promise<void> => {
+  const { skip, limit } = listOptions(req);
+  const companyId = getCompanyId(req);
+  try {
+    const [assessments, total] = await Promise.all([
+      AcademicAssessment.find({ companyId }).sort({ scheduledAt: 1, createdAt: -1 }).skip(skip).limit(limit)
+        .populate({ path: 'classId', match: { companyId }, select: 'name academicYear' })
+        .populate({ path: 'courseId', match: { companyId }, select: 'name code' })
+        .lean(),
+      AcademicAssessment.countDocuments({ companyId }),
+    ]);
+    res.json({ success: true, assessments: assessments.filter((assessment) => assessment.classId), total, page: Math.floor(skip / limit) + 1, pageSize: limit });
+  } catch (error) {
+    handleOperationError(res, error, 'assessments');
+  }
+};
+
+export const createAssessment = async (req: AuthRequest, res: Response): Promise<void> => {
+  const { classId, courseId, title, type, scheduledAt, pointsPossible } = req.body ?? {};
+  if (
+    !isObjectId(classId) ||
+    (courseId !== undefined && !isObjectId(courseId)) ||
+    !isNonEmptyString(title) ||
+    title.trim().length > 180 ||
+    !ASSESSMENT_TYPES.includes(type) ||
+    (scheduledAt !== undefined && !Number.isFinite(Date.parse(scheduledAt))) ||
+    typeof pointsPossible !== 'number' ||
+    !Number.isFinite(pointsPossible) ||
+    pointsPossible < 0 ||
+    pointsPossible > 100000
+  ) {
+    res.status(400).json({ success: false, message: 'Provide a valid class, title, assessment type, and maximum points.' });
+    return;
+  }
+  const companyId = getCompanyId(req);
+  try {
+    const academicClass = await AcademicClass.findOne({ _id: classId, companyId }).select('courseIds');
+    if (!academicClass || (courseId && !academicClass.courseIds.some((id) => id.toString() === courseId))) {
+      res.status(400).json({ success: false, message: 'The class and optional course must belong to this organization.' });
+      return;
+    }
+    const assessment = await AcademicAssessment.create({
+      companyId,
+      classId,
+      ...(courseId ? { courseId } : {}),
+      createdBy: new mongoose.Types.ObjectId(req.user!.userId),
+      title: title.trim(),
+      type,
+      ...(scheduledAt ? { scheduledAt: new Date(scheduledAt) } : {}),
+      pointsPossible,
+    });
+    await recordAcademicAudit(req, 'assessment', assessment._id, { type });
+    res.status(201).json({ success: true, assessment });
+  } catch (error) {
+    handleOperationError(res, error, 'assessment');
+  }
+};
+
+export const listResults = async (req: AuthRequest, res: Response): Promise<void> => {
+  const { skip, limit } = listOptions(req);
+  const companyId = getCompanyId(req);
+  try {
+    const [results, total] = await Promise.all([
+      AcademicResult.find({ companyId }).sort({ gradedAt: -1 }).skip(skip).limit(limit)
+        .populate({ path: 'studentId', match: { companyId, type: 'student' }, select: 'firstName lastName externalId' })
+        .populate({ path: 'assessmentId', match: { companyId }, select: 'title type pointsPossible classId' })
+        .lean(),
+      AcademicResult.countDocuments({ companyId }),
+    ]);
+    res.json({ success: true, results: results.filter((result) => result.studentId && result.assessmentId), total, page: Math.floor(skip / limit) + 1, pageSize: limit });
+  } catch (error) {
+    handleOperationError(res, error, 'results');
+  }
+};
+
+export const recordResult = async (req: AuthRequest, res: Response): Promise<void> => {
+  const { assessmentId, studentId, pointsEarned, feedback } = req.body ?? {};
+  if (
+    !isObjectId(assessmentId) ||
+    !isObjectId(studentId) ||
+    typeof pointsEarned !== 'number' ||
+    !Number.isFinite(pointsEarned) ||
+    pointsEarned < 0 ||
+    (feedback !== undefined && (typeof feedback !== 'string' || feedback.length > 2000))
+  ) {
+    res.status(400).json({ success: false, message: 'Provide a valid assessment, student, score, and optional feedback.' });
+    return;
+  }
+  const companyId = getCompanyId(req);
+  try {
+    const [assessment, student] = await Promise.all([
+      AcademicAssessment.findOne({ _id: assessmentId, companyId }).select('classId pointsPossible'),
+      AcademicPerson.findOne({ _id: studentId, companyId, type: 'student', status: 'active' }).select('_id'),
+    ]);
+    if (!assessment || !student || pointsEarned > assessment.pointsPossible) {
+      res.status(400).json({ success: false, message: 'The assessment, active student, and score must be valid for this organization.' });
+      return;
+    }
+    const enrollment = await AcademicEnrollment.findOne({
+      companyId,
+      classId: assessment.classId,
+      studentId,
+      status: 'active',
+    }).select('_id');
+    if (!enrollment) {
+      res.status(400).json({ success: false, message: 'The student must be actively enrolled in the assessment class.' });
+      return;
+    }
+    const result = await AcademicResult.findOneAndUpdate(
+      { companyId, assessmentId, studentId },
+      {
+        $set: {
+          pointsEarned,
+          gradedBy: new mongoose.Types.ObjectId(req.user!.userId),
+          gradedAt: new Date(),
+          ...(feedback !== undefined ? { feedback: feedback.trim() } : { feedback: undefined }),
+        },
+        $setOnInsert: { companyId, assessmentId, studentId },
+      },
+      { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true }
+    );
+    await recordAcademicAudit(req, 'result', result._id);
+    res.json({ success: true, result });
+  } catch (error) {
+    handleOperationError(res, error, 'result');
+  }
+};
+
+export const listFeeCharges = async (req: AuthRequest, res: Response): Promise<void> => {
+  const { skip, limit } = listOptions(req);
+  const companyId = getCompanyId(req);
+  try {
+    const [charges, total] = await Promise.all([
+      AcademicFeeCharge.find({ companyId }).sort({ dueAt: 1, createdAt: -1 }).skip(skip).limit(limit)
+        .populate({ path: 'studentId', match: { companyId, type: 'student' }, select: 'firstName lastName externalId' })
+        .lean(),
+      AcademicFeeCharge.countDocuments({ companyId }),
+    ]);
+    res.json({ success: true, charges: charges.filter((charge) => charge.studentId), total, page: Math.floor(skip / limit) + 1, pageSize: limit });
+  } catch (error) {
+    handleOperationError(res, error, 'fee charges');
+  }
+};
+
+export const createFeeCharge = async (req: AuthRequest, res: Response): Promise<void> => {
+  const { studentId, invoiceNumber, description, amountMinor, currency, dueAt } = req.body ?? {};
+  if (
+    !isObjectId(studentId) ||
+    !isNonEmptyString(invoiceNumber) ||
+    !/^[A-Za-z0-9-]{1,40}$/.test(invoiceNumber.trim()) ||
+    !isNonEmptyString(description) ||
+    description.trim().length > 180 ||
+    !Number.isSafeInteger(amountMinor) ||
+    amountMinor <= 0 ||
+    amountMinor > 100000000000 ||
+    typeof currency !== 'string' ||
+    !/^[A-Za-z]{3}$/.test(currency) ||
+    (dueAt !== undefined && (typeof dueAt !== 'string' || !Number.isFinite(Date.parse(dueAt))))
+  ) {
+    res.status(400).json({ success: false, message: 'Provide a valid student, invoice number, description, amount in minor units, ISO 4217 currency, and optional due date.' });
+    return;
+  }
+  const companyId = getCompanyId(req);
+  try {
+    const student = await AcademicPerson.findOne({ _id: studentId, companyId, type: 'student', status: 'active' }).select('_id');
+    if (!student) {
+      res.status(400).json({ success: false, message: 'Fee charges require an active student in this organization.' });
+      return;
+    }
+    const charge = await AcademicFeeCharge.create({
+      companyId,
+      studentId,
+      invoiceNumber: invoiceNumber.trim(),
+      description: description.trim(),
+      amountMinor,
+      currency: currency.toUpperCase(),
+      ...(dueAt ? { dueAt: new Date(dueAt) } : {}),
+      createdBy: new mongoose.Types.ObjectId(req.user!.userId),
+    });
+    await recordAcademicAudit(req, 'fee_charge', charge._id, { currency: charge.currency });
+    res.status(201).json({ success: true, charge });
+  } catch (error) {
+    handleOperationError(res, error, 'fee charge');
+  }
+};
+
+export const recordFeePayment = async (req: AuthRequest, res: Response): Promise<void> => {
+  const { chargeId } = req.params;
+  const { amountMinor, method, reference } = req.body ?? {};
+  if (
+    !isObjectId(chargeId) ||
+    !Number.isSafeInteger(amountMinor) ||
+    amountMinor <= 0 ||
+    !FEE_PAYMENT_METHODS.includes(method) ||
+    (reference !== undefined && (typeof reference !== 'string' || reference.length > 120))
+  ) {
+    res.status(400).json({ success: false, message: 'Provide a valid charge, positive payment amount in minor units, and payment method.' });
+    return;
+  }
+  const companyId = getCompanyId(req);
+  try {
+    const updatedCharge = await AcademicFeeCharge.findOneAndUpdate(
+      {
+        _id: chargeId,
+        companyId,
+        isVoided: false,
+        $expr: { $lte: [{ $add: ['$paidAmountMinor', amountMinor] }, '$amountMinor'] },
+      },
+      {
+        $inc: { paidAmountMinor: amountMinor },
+        $push: {
+          payments: {
+            amountMinor,
+            method,
+            ...(reference !== undefined ? { reference: reference.trim() } : {}),
+            receivedAt: new Date(),
+            recordedBy: new mongoose.Types.ObjectId(req.user!.userId),
+          },
+        },
+      },
+      { new: true, runValidators: true }
+    );
+    if (!updatedCharge) {
+      const existingCharge = await AcademicFeeCharge.findOne({ _id: chargeId, companyId, isVoided: false }).select('_id');
+      res.status(existingCharge ? 409 : 404).json({
+        success: false,
+        message: existingCharge ? 'Payment exceeds the outstanding fee balance.' : 'Fee charge not found.',
+      });
+      return;
+    }
+    await recordAcademicAudit(req, 'fee_payment', updatedCharge._id, { method, currency: updatedCharge.currency });
+    res.json({ success: true, charge: updatedCharge });
+  } catch (error) {
+    handleOperationError(res, error, 'fee payment');
   }
 };

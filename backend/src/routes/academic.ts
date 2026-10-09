@@ -8,7 +8,11 @@ import {
   createPerson,
   createSchedule,
   createAssignment,
+  createAssessment,
+  createFeeCharge,
   recordAttendance,
+  recordResult,
+  recordFeePayment,
   listClasses,
   listCourses,
   listDepartments,
@@ -17,6 +21,9 @@ import {
   listPeople,
   listSchedules,
   listAssignments,
+  listAssessments,
+  listResults,
+  listFeeCharges,
   listAttendance,
 } from '../controllers/academic.controller';
 import { authenticate } from '../middleware/auth';
@@ -44,5 +51,12 @@ router.get('/assignments', listAssignments);
 router.post('/assignments', createAssignment);
 router.get('/attendance', listAttendance);
 router.put('/attendance', recordAttendance);
+router.get('/assessments', listAssessments);
+router.post('/assessments', createAssessment);
+router.get('/results', listResults);
+router.put('/results', recordResult);
+router.get('/fees', listFeeCharges);
+router.post('/fees', createFeeCharge);
+router.post('/fees/:chargeId/payments', recordFeePayment);
 
 export default router;
