@@ -81,6 +81,11 @@ export interface Company {
   size?: string;
   country?: string;
   timeZone: string;
+  currency?: string;
+  academicSettings?: {
+    academicYearStartMonth: number;
+    gradingScale: 'percentage' | 'letter' | 'points' | 'pass_fail';
+  };
   ownerId: string;
   inviteCode?: string;
   accountType?: 'company' | 'individual';

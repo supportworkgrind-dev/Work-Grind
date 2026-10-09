@@ -27,13 +27,46 @@ export const updateCompany = async (req: AuthRequest, res: Response): Promise<vo
       res.status(400).json({ success: false, message: 'Organization type must be business, school, college, or university.' });
       return;
     }
-    const allowed = ['name', 'logo', 'industry', 'size', 'country', 'timeZone', 'settings', 'accountType', 'organizationType'];
+    if (req.body.currency !== undefined && (typeof req.body.currency !== 'string' || !/^[A-Za-z]{3}$/.test(req.body.currency))) {
+      res.status(400).json({ success: false, message: 'Currency must be a three-letter ISO currency code.' });
+      return;
+    }
+    if (req.body.timeZone !== undefined) {
+      try {
+        new Intl.DateTimeFormat('en', { timeZone: req.body.timeZone });
+      } catch {
+        res.status(400).json({ success: false, message: 'Time zone must be a valid IANA time zone.' });
+        return;
+      }
+    }
+    if (req.body.academicSettings !== undefined) {
+      const academicSettings = req.body.academicSettings;
+      if (
+        !academicSettings ||
+        typeof academicSettings !== 'object' ||
+        Array.isArray(academicSettings) ||
+        (academicSettings.academicYearStartMonth !== undefined &&
+          (!Number.isInteger(academicSettings.academicYearStartMonth) || academicSettings.academicYearStartMonth < 1 || academicSettings.academicYearStartMonth > 12)) ||
+        (academicSettings.gradingScale !== undefined &&
+          !['percentage', 'letter', 'points', 'pass_fail'].includes(academicSettings.gradingScale)) ||
+        Object.keys(academicSettings).some((key) => !['academicYearStartMonth', 'gradingScale'].includes(key))
+      ) {
+        res.status(400).json({ success: false, message: 'Academic settings contain an unsupported value.' });
+        return;
+      }
+    }
+    const allowed = ['name', 'logo', 'industry', 'size', 'country', 'timeZone', 'currency', 'settings', 'accountType', 'organizationType'];
     const updates: any = {};
     allowed.forEach((field) => {
       if (req.body[field] !== undefined) updates[field] = req.body[field];
     });
+    if (req.body.academicSettings !== undefined) {
+      Object.entries(req.body.academicSettings).forEach(([key, value]) => {
+        updates[`academicSettings.${key}`] = value;
+      });
+    }
 
-    const company = await Company.findByIdAndUpdate(req.user!.companyId, updates, { new: true });
+    const company = await Company.findByIdAndUpdate(req.user!.companyId, updates, { new: true, runValidators: true });
     if (updates.accountType) {
       await User.findByIdAndUpdate(req.user!.userId, { accountType: updates.accountType });
     }

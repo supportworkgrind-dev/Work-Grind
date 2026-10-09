@@ -32,6 +32,11 @@ export interface ICompany extends Document {
   size?: string;
   country?: string;
   timeZone: string;
+  currency: string;
+  academicSettings: {
+    academicYearStartMonth: number;
+    gradingScale: 'percentage' | 'letter' | 'points' | 'pass_fail';
+  };
   ownerId: mongoose.Types.ObjectId;
   inviteCode: string;
   pendingInvites: { email: string; token: string; expiresAt: Date; role: string }[];
@@ -97,6 +102,11 @@ const CompanySchema = new Schema<ICompany>(
     size:     { type: String, enum: ['1-10', '11-50', '51-200', '201-500', '500+'] },
     country:  String,
     timeZone: { type: String, default: 'UTC' },
+    currency: { type: String, default: 'USD', uppercase: true, match: /^[A-Z]{3}$/ },
+    academicSettings: {
+      academicYearStartMonth: { type: Number, default: 8, min: 1, max: 12 },
+      gradingScale: { type: String, enum: ['percentage', 'letter', 'points', 'pass_fail'], default: 'percentage' },
+    },
     ownerId:  { type: Schema.Types.ObjectId, ref: 'User', required: true },
     inviteCode: { type: String, unique: true },
     pendingInvites: [

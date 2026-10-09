@@ -86,6 +86,10 @@ export default function SettingsPage() {
   const [size, setSize] = useState(company?.size || '11-50');
   const [timeZone, setTimeZone] = useState(company?.timeZone || 'UTC');
   const [country, setCountry] = useState(company?.country || 'United States');
+  const [currency, setCurrency] = useState(company?.currency || 'USD');
+  const [organizationType, setOrganizationType] = useState<NonNullable<Company['organizationType']>>(company?.organizationType || 'business');
+  const [academicYearStartMonth, setAcademicYearStartMonth] = useState(company?.academicSettings?.academicYearStartMonth || 8);
+  const [gradingScale, setGradingScale] = useState<NonNullable<Company['academicSettings']>['gradingScale']>(company?.academicSettings?.gradingScale || 'percentage');
   const [allowGuestAccess, setAllowGuestAccess] = useState(company?.settings?.allowGuestAccess || false);
   const [defaultRole, setDefaultRole] = useState(company?.settings?.defaultRole || 'employee');
   const [companySaving, setCompanySaving] = useState(false);
@@ -185,6 +189,10 @@ export default function SettingsPage() {
       setSize(company.size || '11-50');
       setTimeZone(company.timeZone || 'UTC');
       setCountry(company.country || 'United States');
+      setCurrency(company.currency || 'USD');
+      setOrganizationType(company.organizationType || 'business');
+      setAcademicYearStartMonth(company.academicSettings?.academicYearStartMonth || 8);
+      setGradingScale(company.academicSettings?.gradingScale || 'percentage');
       setInviteCode(company.inviteCode || '');
       if (company.settings) {
         setAllowGuestAccess(company.settings.allowGuestAccess || false);
@@ -417,6 +425,12 @@ export default function SettingsPage() {
         size,
         country,
         timeZone,
+        currency,
+        organizationType,
+        academicSettings: {
+          academicYearStartMonth,
+          gradingScale,
+        },
         settings: {
           allowGuestAccess,
           defaultRole,
@@ -1117,21 +1131,54 @@ export default function SettingsPage() {
 
                   <div>
                     <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700">
-                      Default TimeZone
+                      Default time zone (IANA)
                     </label>
-                    <select
+                    <input
+                      type="text"
+                      maxLength={64}
                       value={timeZone}
                       onChange={(e) => setTimeZone(e.target.value)}
+                      placeholder="e.g. Asia/Karachi"
                       className="mt-1.5 block w-full rounded-xl border border-slate-200 py-2.5 px-3 text-xs text-slate-900 focus:ring-2 focus:ring-indigo-600"
-                    >
-                      <option value="UTC">UTC (Coordinated Universal Time)</option>
-                      <option value="Asia/Karachi">Asia/Karachi (PKT +05:00)</option>
-                      <option value="America/New_York">America/New_York (EST/EDT)</option>
-                      <option value="America/Los_Angeles">America/Los_Angeles (PST/PDT)</option>
-                      <option value="Europe/London">Europe/London (GMT/BST)</option>
-                    </select>
+                    />
                   </div>
                 </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700">Organization type</label>
+                    <select value={organizationType} onChange={(e) => setOrganizationType(e.target.value as NonNullable<Company['organizationType']>)} className="mt-1.5 block w-full rounded-xl border border-slate-200 py-2.5 px-3 text-xs text-slate-900 focus:ring-2 focus:ring-indigo-600">
+                      <option value="business">Business</option>
+                      <option value="school">School</option>
+                      <option value="college">College</option>
+                      <option value="university">University</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700">Workspace currency</label>
+                    <input required pattern="[A-Za-z]{3}" minLength={3} maxLength={3} value={currency} onChange={(e) => setCurrency(e.target.value.toUpperCase())} className="mt-1.5 block w-full rounded-xl border border-slate-200 py-2.5 px-3 text-xs text-slate-900 focus:ring-2 focus:ring-indigo-600" />
+                  </div>
+                </div>
+
+                {organizationType !== 'business' && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700">Academic year starts</label>
+                      <select value={academicYearStartMonth} onChange={(e) => setAcademicYearStartMonth(Number(e.target.value))} className="mt-1.5 block w-full rounded-xl border border-slate-200 py-2.5 px-3 text-xs text-slate-900 focus:ring-2 focus:ring-indigo-600">
+                        {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].map((month, index) => <option key={month} value={index + 1}>{month}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700">Default grading scale</label>
+                      <select value={gradingScale} onChange={(e) => setGradingScale(e.target.value as typeof gradingScale)} className="mt-1.5 block w-full rounded-xl border border-slate-200 py-2.5 px-3 text-xs text-slate-900 focus:ring-2 focus:ring-indigo-600">
+                        <option value="percentage">Percentage</option>
+                        <option value="letter">Letter grade</option>
+                        <option value="points">Points</option>
+                        <option value="pass_fail">Pass / fail</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
