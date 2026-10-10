@@ -154,10 +154,10 @@ export default function OnboardingPage() {
         });
       }
       await fetchCurrentUser();
-      router.push('/dashboard');
+      router.push(company?.organizationType && company.organizationType !== 'business' ? '/academic' : '/dashboard');
     } catch (err) {
       console.error(err);
-      router.push('/dashboard');
+      router.push(company?.organizationType && company.organizationType !== 'business' ? '/academic' : '/dashboard');
     } finally {
       setIsCompleting(false);
     }

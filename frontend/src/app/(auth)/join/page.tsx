@@ -99,7 +99,9 @@ function JoinWorkspaceContent() {
         }
         setSuccess(true);
         setTimeout(() => {
-          router.push('/dashboard');
+          router.push(res.data.company.organizationType && res.data.company.organizationType !== 'business'
+            ? '/academic'
+            : '/dashboard');
         }, 1500);
       }
     } catch (err: any) {

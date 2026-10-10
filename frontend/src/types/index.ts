@@ -33,6 +33,7 @@ export interface User {
   role: UserRole;
   isActive: boolean;
   accountType?: 'company' | 'individual';
+  signupOrganizationType?: OrganizationType;
   isSuperAdmin?: boolean;
   mfaEnabled?: boolean;
   lastSeen?: string;

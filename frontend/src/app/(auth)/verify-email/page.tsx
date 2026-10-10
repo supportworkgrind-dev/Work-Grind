@@ -61,7 +61,11 @@ function VerifyEmailContent() {
             joined.data.accessToken,
           );
           setStatus('success');
-          window.setTimeout(() => router.push('/dashboard'), 700);
+          window.setTimeout(() => router.push(
+            joined.data.company.organizationType && joined.data.company.organizationType !== 'business'
+              ? '/academic'
+              : '/dashboard',
+          ), 700);
         } catch {
           router.replace(`/join?token=${encodeURIComponent(invite)}`);
         }

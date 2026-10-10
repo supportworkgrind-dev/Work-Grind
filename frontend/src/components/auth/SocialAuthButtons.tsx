@@ -6,7 +6,8 @@ import { api } from '@/lib/api';
 import { getApiEndpointUrl } from '@/lib/apiConfig';
 
 type SocialAuthButtonsProps = {
-  intent?: 'login' | 'link';
+  intent?: 'login' | 'link' | 'signup';
+  signupSelection?: { accountType: 'company' | 'individual'; organizationType: 'business' | 'school' | 'college' | 'university' } | null;
   className?: string;
 };
 
@@ -14,7 +15,7 @@ const providers = [
   { id: 'google', label: 'Google', className: 'bg-white text-stone-800 hover:bg-stone-50' },
 ] as const;
 
-export function SocialAuthButtons({ intent = 'login', className = '' }: SocialAuthButtonsProps) {
+export function SocialAuthButtons({ intent = 'login', signupSelection, className = '' }: SocialAuthButtonsProps) {
   const [busyProvider, setBusyProvider] = useState<string | null>(null);
   const requestStarted = useRef(false);
   const [error, setError] = useState('');
@@ -48,11 +49,18 @@ export function SocialAuthButtons({ intent = 'login', className = '' }: SocialAu
       const requestedReturnTo = new URLSearchParams(window.location.search).get('redirect');
       const returnTo = intent === 'link'
         ? '/settings?tab=security'
+        : intent === 'signup'
+          ? '/create-company'
         : requestedReturnTo && requestedReturnTo.startsWith('/') && !requestedReturnTo.startsWith('//')
           ? requestedReturnTo
           : '/dashboard';
       if (intent !== 'link') {
-        const startUrl = getApiEndpointUrl(`/auth/oauth/${provider}/start`, { returnTo });
+        const startUrl = getApiEndpointUrl(`/auth/oauth/${provider}/start`, {
+          returnTo,
+          ...(intent === 'signup' && signupSelection
+            ? { intent: 'signup', ...signupSelection }
+            : {}),
+        });
         window.location.assign(startUrl);
         return;
       }
@@ -84,7 +92,7 @@ export function SocialAuthButtons({ intent = 'login', className = '' }: SocialAu
           <button
             key={provider.id}
             type="button"
-            disabled={busyProvider !== null}
+            disabled={busyProvider !== null || (intent === 'signup' && !signupSelection)}
             onClick={() => void connect(provider.id)}
             className={`flex min-h-11 items-center justify-center gap-2 border border-stone-300 px-3 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${provider.className}`}
             aria-label={`${intent === 'link' ? 'Link' : 'Continue with'} ${provider.label}`}
@@ -104,6 +112,9 @@ export function SocialAuthButtons({ intent = 'login', className = '' }: SocialAu
           </button>
         ))}
       </div>
+      {intent === 'signup' && !signupSelection && (
+        <p className="mt-2 text-center text-xs text-stone-500">Choose an account type above to continue.</p>
+      )}
       {notice && <p className="mt-3 text-xs text-emerald-700" role="status">{notice}</p>}
       {error && <p className="auth-error mt-3" role="alert"><AlertCircle size={15} className="mr-2 inline" />{error}</p>}
     </div>

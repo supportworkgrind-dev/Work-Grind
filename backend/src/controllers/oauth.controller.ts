@@ -1,13 +1,15 @@
 import { Request, Response } from 'express';
 import { timingSafeEqual } from 'crypto';
 import User, { IUser } from '../models/User';
+import Company from '../models/Company';
 import OAuthTransaction, { IOAuthTransaction, OAuthProvider } from '../models/OAuthTransaction';
 import OAuthExchange, { IOAuthExchange } from '../models/OAuthExchange';
 import { AuthRequest } from '../middleware/auth';
 import { createWorkGrindUser } from '../services/callingId';
 import { TRIAL_DAYS } from '../config/subscription';
+import { isOrganizationType } from '../config/organization';
 import { sendWelcomeEmail } from '../utils/email';
-import { sessionForUser } from './auth.controller';
+import { restoreWorkspaceCreatorRole, sessionForUser } from './auth.controller';
 import { setRefreshCookie } from '../utils/authCookie';
 import {
   buildAuthorizationUrl,
@@ -28,13 +30,14 @@ const providerField: Record<OAuthProvider, 'googleId' | 'appleId'> = {
 };
 const validEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 const safeError = (value: string) =>
-  ['cancelled', 'mfa_required', 'provider_unavailable', 'invalid_request', 'account_exists',
+  ['cancelled', 'mfa_required', 'provider_unavailable', 'invalid_request', 'account_exists', 'signup_required',
     'identity_in_use', 'verified_email_required', 'try_again'].includes(value)
     ? value
     : 'try_again';
 
 const knownOAuthFailures = new Set([
   'account_exists',
+  'signup_required',
   'account_unavailable',
   'cancelled',
   'invalid_request',
@@ -134,10 +137,26 @@ export const startOAuth = async (req: Request, res: Response): Promise<void> => 
     res.status(404).json({ success: false, code: 'OAUTH_PROVIDER_UNAVAILABLE', message: 'This sign-in provider is unavailable.' });
     return;
   }
-  const intent = req.query.intent === 'link' ? 'link' : 'login';
+  const requestedIntent = req.query.intent;
+  const intent = requestedIntent === 'link' ? 'link' : requestedIntent === 'signup' ? 'signup' : 'login';
   const authRequest = req as AuthRequest;
   const userId = intent === 'link' ? authRequest.user?.userId : undefined;
-  const returnTo = typeof req.query.returnTo === 'string' ? req.query.returnTo : '/dashboard';
+  const requestedAccountType = typeof req.query.accountType === 'string' ? req.query.accountType : '';
+  const requestedOrganizationType = typeof req.query.organizationType === 'string' ? req.query.organizationType : '';
+  if (intent === 'signup' &&
+      (!['company', 'individual'].includes(requestedAccountType) ||
+        !isOrganizationType(requestedOrganizationType) ||
+        (requestedAccountType === 'individual' && requestedOrganizationType !== 'business'))) {
+    res.status(400).json({
+      success: false,
+      code: 'OAUTH_INVALID_REQUEST',
+      message: 'Choose a valid account type before continuing with provider sign-in.',
+    });
+    return;
+  }
+  const returnTo = intent === 'signup'
+    ? `/create-company?accountType=${requestedAccountType}&organizationType=${requestedOrganizationType}`
+    : typeof req.query.returnTo === 'string' ? req.query.returnTo : '/dashboard';
   const redirect = getClientRedirect(returnTo);
   const configuration = getOAuthConfiguration(provider);
   if ((intent === 'link' && !userId) || !redirect || !configuration) {
@@ -165,6 +184,10 @@ export const startOAuth = async (req: Request, res: Response): Promise<void> => 
       codeVerifier,
       returnTo: redirect.pathname + redirect.search,
       intent,
+      ...(intent === 'signup' ? {
+        accountType: requestedAccountType as 'company' | 'individual',
+        organizationType: requestedOrganizationType,
+      } : {}),
       ...(userId ? { userId } : {}),
       expiresAt: new Date(Date.now() + 10 * 60_000),
     });
@@ -203,6 +226,7 @@ async function useExistingSocialUser(user: IUser | null, field: 'googleId' | 'ap
 async function findOrCreateSocialUser(
   provider: OAuthProvider,
   claims: OidcClaims,
+  signup?: { accountType?: 'company' | 'individual'; organizationType?: string },
 ) {
   const field = providerField[provider];
   const existing = await User.findOne({ [field]: claims.sub });
@@ -218,6 +242,11 @@ async function findOrCreateSocialUser(
       throw new Error('identity_in_use');
     }
     return useExistingSocialUser(emailUser, field, claims.sub);
+  }
+
+  if (!signup?.accountType || !isOrganizationType(signup.organizationType) ||
+      (signup.accountType === 'individual' && signup.organizationType !== 'business')) {
+    throw new Error('signup_required');
   }
 
   const now = new Date();
@@ -236,7 +265,8 @@ async function findOrCreateSocialUser(
       isDeleted: false,
       isSuperAdmin: false,
       role: 'owner',
-      accountType: 'individual',
+      accountType: signup.accountType,
+      signupOrganizationType: signup.organizationType,
       subscriptionStatus: 'trialing',
       subscriptionPlan: 'free',
       trialStartDate: now,
@@ -347,13 +377,22 @@ export const completeOAuthCallback = async (req: Request, res: Response): Promis
     }
 
     stage = 'user_lookup_or_creation';
-    const user = await findOrCreateSocialUser(provider, claims);
+    const user = await findOrCreateSocialUser(provider, claims, {
+      accountType: transaction.accountType,
+      organizationType: transaction.organizationType,
+    });
+    const existingCompany = user.companyId
+      ? await Company.findById(user.companyId).select('ownerId accountType organizationType')
+      : null;
+    if (existingCompany) await restoreWorkspaceCreatorRole(user, existingCompany, req.ip);
     const exchangeCode = createOAuthToken();
     stage = 'exchange_code_persistence';
     await OAuthExchange.create({
       codeHash: hashOAuthValue(exchangeCode),
       userId: user._id,
-      returnTo: transaction.returnTo,
+      returnTo: existingCompany?.organizationType && existingCompany.organizationType !== 'business'
+        ? '/academic'
+        : user.companyId ? '/dashboard' : transaction.returnTo,
       expiresAt: new Date(Date.now() + 2 * 60_000),
     });
     const destination = getClientRedirect('/auth/callback');
@@ -367,6 +406,7 @@ export const completeOAuthCallback = async (req: Request, res: Response): Promis
       : undefined;
     const errorCode = error?.message === 'account_exists'
       ? 'account_exists'
+      : error?.message === 'signup_required' ? 'signup_required'
       : error?.message === 'mfa_required' ? 'mfa_required'
       : error?.message === 'identity_in_use' ? 'identity_in_use'
       : error?.message === 'verified_email_required' ? 'verified_email_required'

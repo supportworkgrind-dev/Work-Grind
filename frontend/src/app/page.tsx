@@ -35,7 +35,10 @@ export default function LandingPage() {
 
   useEffect(() => {
     if (isLoading || !isAuthenticated || !user) return;
-    router.replace(user.companyId ? '/dashboard' : '/create-company');
+    const company = typeof user.companyId === 'object' ? user.companyId : undefined;
+    router.replace(company?.organizationType && company.organizationType !== 'business'
+      ? '/academic'
+      : user.companyId ? '/dashboard' : '/create-company');
   }, [isAuthenticated, isLoading, router, user]);
 
   if (isLoading) {

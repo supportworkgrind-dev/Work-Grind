@@ -15,6 +15,7 @@ const errorMessages: Record<string, string> = {
   provider_unavailable: 'This sign-in provider is temporarily unavailable. Please try again later.',
   invalid_request: 'This sign-in link is invalid or expired. Please start again.',
   account_exists: 'An account with this email already exists. Sign in with your existing method instead.',
+  signup_required: 'Choose an account type on the sign-up page before creating a new account with Google.',
   identity_in_use: 'This Google account is already linked to a different WorkGrind account.',
   verified_email_required: 'Google must confirm your email address before WorkGrind can use this account.',
   try_again: 'We could not complete secure sign-in. Please try again.',
@@ -50,7 +51,11 @@ function CallbackContent() {
           !data.returnTo.includes('\\')
           ? data.returnTo
           : (data.user.companyId ? '/dashboard' : '/create-company');
-        router.replace(!data.user.companyId && returnTo === '/dashboard' ? '/create-company' : returnTo);
+        const company = typeof data.user.companyId === 'object' ? data.user.companyId : undefined;
+        const destination = company?.organizationType && company.organizationType !== 'business'
+          ? '/academic'
+          : !data.user.companyId && returnTo === '/dashboard' ? '/create-company' : returnTo;
+        router.replace(destination);
       })
       .catch((requestError: unknown) => {
         const message = (requestError as AxiosError<{ message?: string }>).response?.data?.message;

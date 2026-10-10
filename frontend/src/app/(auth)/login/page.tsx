@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { AxiosError } from 'axios';
@@ -20,9 +20,25 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const completeLogin = (response: { data: { user: User; accessToken: string } }) => {
+  const completeLogin = async (response: { data: { user: User; accessToken: string } }) => {
     login(response.data.user, response.data.accessToken);
-    router.push(response.data.user.companyId ? '/dashboard' : '/create-company');
+    if (!response.data.user.companyId) {
+      router.push('/create-company');
+      return;
+    }
+    try {
+      const current = await api.get('/auth/me');
+      const user = current.data?.user as User | undefined;
+      if (user) {
+        login(user, response.data.accessToken);
+        const company = typeof user.companyId === 'object' ? user.companyId : undefined;
+        router.push(company?.organizationType && company.organizationType !== 'business' ? '/academic' : '/dashboard');
+        return;
+      }
+    } catch {
+      // Authentication succeeded; if profile hydration is temporarily unavailable, keep the standard dashboard entry.
+    }
+    router.push('/dashboard');
   };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -36,7 +52,7 @@ export default function LoginPage() {
         setError('We could not sign you in. Check your details and try again.');
         return;
       }
-      completeLogin(response);
+      await completeLogin(response);
     } catch (requestError: unknown) {
       const response = (requestError as AxiosError<{ code?: string; message?: string }>).response;
       setError(response?.data?.message || 'Email or password is incorrect.');

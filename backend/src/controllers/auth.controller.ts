@@ -14,7 +14,8 @@ import {
   normalizeRefreshTokenStore,
   verificationCodeMatches,
 } from '../services/pendingRegistration';
-import Company from '../models/Company';
+import Company, { ICompany } from '../models/Company';
+import AuditLog from '../models/AuditLog';
 import { TRIAL_DAYS } from '../config/subscription';
 import { checkMemberLimit } from '../utils/planLimits';
 import Channel from '../models/Channel';
@@ -35,6 +36,32 @@ const issue = (userId: string, companyId: string, role: string) => ({
 const validPassword = (password: string) =>
   password.length >= 8 && /[A-Z]/.test(password) && /[a-z]/.test(password) &&
   /[0-9]/.test(password) && /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password);
+
+export async function restoreWorkspaceCreatorRole(
+  user: IUser,
+  company: Pick<ICompany, '_id' | 'ownerId' | 'accountType'>,
+  ipAddress: string,
+): Promise<void> {
+  if (company.ownerId.toString() !== user._id.toString() || user.role === 'owner') return;
+  const previousRole = user.role;
+  user.role = 'owner';
+  user.accountType = company.accountType;
+  await user.save();
+  await AuditLog.create({
+    companyId: company._id,
+    userId: user._id,
+    action: 'restore_owner_role',
+    resource: 'User',
+    resourceId: user._id.toString(),
+    details: { previousRole, role: 'owner', reason: 'company_owner_id_match' },
+    ipAddress,
+  });
+  console.info('[Auth] Restored workspace creator role from company ownership.', {
+    userId: user._id.toString(),
+    companyId: company._id.toString(),
+    previousRole,
+  });
+}
 
 export const sessionForUser = async (user: IUser) => {
   const tokens = issue(user._id.toString(), user.companyId?.toString() || '', user.role);
@@ -64,6 +91,8 @@ export const sessionForUser = async (user: IUser) => {
       preferredLanguage: user.preferredLanguage,
       theme: user.theme,
       workspaceProfile: user.workspaceProfile,
+      accountType: user.accountType,
+      signupOrganizationType: user.signupOrganizationType,
       companyId: user.companyId,
       role: user.role,
       isVerified: user.isVerified,
@@ -77,6 +106,8 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     const fullName = typeof req.body?.fullName === 'string' ? req.body.fullName.trim() : '';
     const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
     const password = typeof req.body?.password === 'string' ? req.body.password : '';
+    const accountType = req.body?.accountType;
+    const organizationType = req.body?.organizationType;
     const genericResponse = {
       success: true,
       message: 'If these details can be registered, the verification request will be processed.',
@@ -84,8 +115,10 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 
     if (!fullName || fullName.length > 100 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
         password.length < 8 || !/[A-Z]/.test(password) || !/[a-z]/.test(password) ||
-        !/[0-9]/.test(password) || !/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
-      res.status(400).json({ success: false, message: 'Enter a valid name, email, and password with at least 8 characters including uppercase, lowercase, a number, and a symbol.' });
+        !/[0-9]/.test(password) || !/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password) ||
+        !['company', 'individual'].includes(accountType) || !isOrganizationType(organizationType) ||
+        (accountType === 'individual' && organizationType !== 'business')) {
+      res.status(400).json({ success: false, message: 'Choose a valid account type and organization, then enter a valid name, email, and password with at least 8 characters including uppercase, lowercase, a number, and a symbol.' });
       return;
     }
 
@@ -106,6 +139,8 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     const encryptedPassword = encryptPendingPassword(password);
     const pendingData = {
       fullName,
+      accountType,
+      organizationType,
       ...encryptedPassword,
       verificationCodeHash: hashVerificationCode(email, code),
       verificationExpiresAt,
@@ -172,6 +207,10 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     if (!user?.password || !(await user.comparePassword(password))) { res.status(401).json({ success: false, message: 'Invalid credentials' }); return; }
     if (!user.isActive || user.isDeleted) { res.status(403).json({ success: false, message: 'Account disabled' }); return; }
     if (!user.isVerified) { res.status(403).json({ success: false, code: 'EMAIL_NOT_VERIFIED', message: 'Verify your email address before signing in.' }); return; }
+    if (user.companyId && user.role !== 'owner') {
+      const company = await Company.findById(user.companyId).select('ownerId accountType');
+      if (company) await restoreWorkspaceCreatorRole(user, company, req.ip);
+    }
     const cid = user.companyId?.toString() || '';
     const tokens = issue(user._id.toString(), cid, user.role);
     user.refreshTokens = [...normalizeRefreshTokenStore(user.refreshTokens), hashRefreshToken(tokens.refreshToken)];
@@ -203,6 +242,8 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       role: user.role,
       isVerified: user.isVerified,
       status: user.status,
+      accountType: user.accountType,
+      signupOrganizationType: user.signupOrganizationType,
     } });
   } catch (e: any) { res.status(500).json({ success: false, message: e.message }); }
 };
@@ -432,6 +473,9 @@ export const verifyRegistrationCode = async (req: Request, res: Response): Promi
       email,
       ...(pending.phone ? { phone: pending.phone } : {}),
       password: decryptPendingPassword(pending),
+      role: 'owner',
+      accountType: pending.accountType || 'company',
+      signupOrganizationType: pending.organizationType || 'business',
       isVerified: true,
       isSuperAdmin: false,
       subscriptionStatus: 'trialing',
@@ -696,18 +740,27 @@ export const changePassword = async (req: AuthRequest, res: Response): Promise<v
 export const createCompany = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const uid = req.user!.userId;
-    const { name, industry, size, country, timeZone, accountType = 'company', organizationType = 'business' } = req.body;
-    if (!isOrganizationType(organizationType)) {
+    const { name, industry, size, country, timeZone } = req.body;
+    const requestedAccountType = req.body?.accountType;
+    const requestedOrganizationType = req.body?.organizationType;
+    if (requestedAccountType !== undefined && !['company', 'individual'].includes(requestedAccountType)) {
+      res.status(400).json({ success: false, message: 'Account type must be company or individual.' });
+      return;
+    }
+    if (requestedOrganizationType !== undefined && !isOrganizationType(requestedOrganizationType)) {
       res.status(400).json({ success: false, message: 'Organization type must be business, school, college, or university.' });
       return;
     }
     const user = await User.findById(uid);
     if (!user) { res.status(404).json({ success: false, message: 'User not found' }); return; }
+    const accountType = requestedAccountType ?? user.accountType ?? 'company';
+    const organizationType = requestedOrganizationType ?? user.signupOrganizationType ?? 'business';
 
     // Defensive Idempotency: If user already has a company, return it gracefully rather than crashing with 400
     if (user.companyId) {
       const existingCompany = await Company.findById(user.companyId);
       if (existingCompany) {
+        await restoreWorkspaceCreatorRole(user, existingCompany, req.ip);
         const tokens = issue(uid, existingCompany._id.toString(), user.role || 'owner');
         user.refreshTokens = [...normalizeRefreshTokenStore(user.refreshTokens), hashRefreshToken(tokens.refreshToken)];
         await user.save();
@@ -734,6 +787,10 @@ export const createCompany = async (req: AuthRequest, res: Response): Promise<vo
     }
 
     const isIndividual = accountType === 'individual';
+    if (isIndividual && organizationType !== 'business') {
+      res.status(400).json({ success: false, message: 'Individual workspaces must use the business organization type.' });
+      return;
+    }
     const workspaceName = name?.trim() || (isIndividual ? `${user.fullName}'s Workspace` : '');
     if (!workspaceName) {
       res.status(400).json({ success: false, message: 'Company or organization name is required' });
@@ -858,8 +915,18 @@ export const createCompany = async (req: AuthRequest, res: Response): Promise<vo
     user.companyId = company._id;
     user.role = 'owner';
     user.accountType = isIndividual ? 'individual' : 'company';
+    user.signupOrganizationType = undefined;
     user.refreshTokens = [hashRefreshToken(tokens.refreshToken)];
     await user.save();
+    await AuditLog.create({
+      companyId: company._id,
+      userId: user._id,
+      action: 'create',
+      resource: 'Workspace',
+      resourceId: company._id.toString(),
+      details: { accountType: user.accountType, organizationType: company.organizationType },
+      ipAddress: req.ip,
+    });
 
     setRefreshCookie(res, tokens.refreshToken);
     res.status(201).json({

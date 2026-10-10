@@ -1,4 +1,5 @@
 import mongoose, { Document, Schema } from 'mongoose';
+import { OrganizationType, ORGANIZATION_TYPES } from '../config/organization';
 
 export type OAuthProvider = 'google' | 'apple';
 
@@ -8,7 +9,9 @@ export interface IOAuthTransaction extends Document {
   nonce: string;
   codeVerifier: string;
   returnTo: string;
-  intent: 'login' | 'link';
+  intent: 'login' | 'link' | 'signup';
+  accountType?: 'company' | 'individual';
+  organizationType?: OrganizationType;
   userId?: mongoose.Types.ObjectId;
   expiresAt: Date;
 }
@@ -19,7 +22,9 @@ const OAuthTransactionSchema = new Schema<IOAuthTransaction>({
   nonce: { type: String, required: true },
   codeVerifier: { type: String, required: true },
   returnTo: { type: String, required: true },
-  intent: { type: String, required: true, enum: ['login', 'link'] },
+  intent: { type: String, required: true, enum: ['login', 'link', 'signup'] },
+  accountType: { type: String, enum: ['company', 'individual'] },
+  organizationType: { type: String, enum: ORGANIZATION_TYPES },
   userId: { type: Schema.Types.ObjectId, ref: 'User' },
   expiresAt: { type: Date, required: true, expires: 0 },
 }, { timestamps: true });

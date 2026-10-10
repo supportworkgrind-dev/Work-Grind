@@ -1,6 +1,7 @@
 import mongoose, { Document, Schema } from 'mongoose';
 import bcrypt from 'bcryptjs';
 import { randomInt } from 'crypto';
+import { ORGANIZATION_TYPES, OrganizationType } from '../config/organization';
 
 export interface IUser extends Document {
   _id: mongoose.Types.ObjectId;
@@ -38,6 +39,7 @@ export interface IUser extends Document {
   role: string; isActive: boolean; lastSeen?: Date;
   lastLogin?: Date;
   accountType?: 'company' | 'individual';
+  signupOrganizationType?: OrganizationType;
   isSuperAdmin?: boolean;
   mfaEnabled?: boolean;
   mfaSecretEncrypted?: string;
@@ -118,6 +120,7 @@ const S = new Schema<IUser>({
   companyId: { type: Schema.Types.ObjectId, ref: 'Company' },
   role: { type: String, default: 'employee' },
   accountType: { type: String, enum: ['company', 'individual'], default: 'company' },
+  signupOrganizationType: { type: String, enum: ORGANIZATION_TYPES },
   isSuperAdmin: { type: Boolean, default: false },
   mfaEnabled: { type: Boolean, default: false },
   mfaSecretEncrypted: { type: String, select: false },

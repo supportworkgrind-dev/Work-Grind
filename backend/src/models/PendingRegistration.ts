@@ -1,9 +1,12 @@
 import mongoose, { Document, Schema } from 'mongoose';
+import { OrganizationType, ORGANIZATION_TYPES } from '../config/organization';
 
 export interface IPendingRegistration extends Document {
   email: string;
   phone?: string;
   fullName: string;
+  accountType?: 'company' | 'individual';
+  organizationType?: OrganizationType;
   passwordCiphertext: string;
   passwordIv: string;
   passwordAuthTag: string;
@@ -19,6 +22,8 @@ const PendingRegistrationSchema = new Schema<IPendingRegistration>({
   email: { type: String, required: true, unique: true, lowercase: true, trim: true },
   phone: { type: String, trim: true },
   fullName: { type: String, required: true, trim: true, maxlength: 100 },
+  accountType: { type: String, enum: ['company', 'individual'] },
+  organizationType: { type: String, enum: ORGANIZATION_TYPES },
   passwordCiphertext: { type: String, required: true },
   passwordIv: { type: String, required: true },
   passwordAuthTag: { type: String, required: true },

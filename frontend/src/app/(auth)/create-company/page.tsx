@@ -29,13 +29,20 @@ export default function CreateCompanyPage() {
 
   // Step 1: Account Type selection | Step 2: Workspace details
   const [step, setStep] = useState<1 | 2>(1);
-  const [accountType, setAccountType] = useState<'company' | 'individual' | null>(null);
-  const [organizationType, setOrganizationType] = useState<'business' | 'school' | 'college' | 'university'>('business');
+  const [accountTypeOverride, setAccountType] = useState<'company' | 'individual' | null>(null);
+  const [organizationTypeOverride, setOrganizationType] = useState<'business' | 'school' | 'college' | 'university' | null>(null);
+  const accountType = accountTypeOverride ??
+    (user?.signupOrganizationType ? user.accountType === 'individual' ? 'individual' : 'company' : null);
+  const organizationType = organizationTypeOverride ?? user?.signupOrganizationType ?? 'business';
 
   // Form Fields
   const [name, setName] = useState('');
-  const [industry, setIndustry] = useState('Technology');
-  const [size, setSize] = useState('11-50');
+  const [industryOverride, setIndustry] = useState<string | null>(null);
+  const [sizeOverride, setSize] = useState<string | null>(null);
+  const industry = industryOverride ?? (organizationType !== 'business'
+    ? 'Education'
+    : accountType === 'individual' ? 'Freelance / Solo Work' : 'Technology');
+  const size = sizeOverride ?? (accountType === 'individual' ? '1-10' : '11-50');
   const [country, setCountry] = useState('Pakistan');
   const [timeZone, setTimeZone] = useState('UTC');
   const [isLoading, setIsLoading] = useState(false);
@@ -333,7 +340,7 @@ export default function CreateCompanyPage() {
                   <input
                     type="text"
                     required
-                    value={name}
+                    value={name || (accountType === 'individual' ? `${user?.fullName || 'Personal'}'s Workspace` : '')}
                     onChange={(e) => setName(e.target.value)}
                     placeholder={accountType === 'individual' ? "Maya's Creative Workspace" : 'Apex Technologies'}
                     className="block w-full rounded-xl border border-slate-200 py-2.5 pl-10 pr-3 text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-600 text-xs sm:leading-6 transition-all"
