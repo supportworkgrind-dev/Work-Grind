@@ -7,6 +7,7 @@ import AcademicGuardianLink from '../models/AcademicGuardianLink';
 import AcademicPerson from '../models/AcademicPerson';
 import AcademicSchedule from '../models/AcademicSchedule';
 import AcademicAssignment from '../models/AcademicAssignment';
+import AcademicAssessment from '../models/AcademicAssessment';
 import AcademicAttendance from '../models/AcademicAttendance';
 import AcademicResult from '../models/AcademicResult';
 import AcademicFeeCharge from '../models/AcademicFeeCharge';
@@ -74,7 +75,7 @@ export const getAcademicPortal = async (req: AuthRequest, res: Response): Promis
         .filter((classItem): classItem is mongoose.Types.ObjectId => !!classItem)
         .map((classItem) => (classItem as unknown as { _id: mongoose.Types.ObjectId })._id);
     }
-    const [schedules, assignments, attendance, results, feeCharges] = await Promise.all([
+    const [schedules, assignments, assessments, attendance, results, feeCharges] = await Promise.all([
       classIds.length
         ? AcademicSchedule.find({ companyId, classId: { $in: classIds } })
             .populate({ path: 'classId', match: { companyId }, select: 'name academicYear' })
@@ -83,6 +84,12 @@ export const getAcademicPortal = async (req: AuthRequest, res: Response): Promis
         : [],
       classIds.length
         ? AcademicAssignment.find({ companyId, classId: { $in: classIds } })
+            .populate({ path: 'classId', match: { companyId }, select: 'name academicYear' })
+            .populate({ path: 'courseId', match: { companyId }, select: 'name code' })
+            .lean()
+        : [],
+      classIds.length
+        ? AcademicAssessment.find({ companyId, classId: { $in: classIds } })
             .populate({ path: 'classId', match: { companyId }, select: 'name academicYear' })
             .populate({ path: 'courseId', match: { companyId }, select: 'name code' })
             .lean()
@@ -122,6 +129,7 @@ export const getAcademicPortal = async (req: AuthRequest, res: Response): Promis
       enrollments: enrollments.filter((enrollment) => enrollment.classId),
       schedules: schedules.filter((schedule) => schedule.classId),
       assignments: assignments.filter((assignment) => assignment.classId),
+      assessments: assessments.filter((assessment) => assessment.classId),
       attendance: attendance.filter((entry) => entry.classId),
       results: results.filter((result) => result.assessmentId && result.studentId),
       feeCharges: feeCharges.map((charge) => ({

@@ -1,7 +1,7 @@
 ﻿'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/store/useAuthStore';
 import type { EntitlementId } from '@/types';
 import { useAppStore } from '@/store/useAppStore';
@@ -37,6 +37,7 @@ import { premiumIconClass } from '@/components/common/AppIcons';
 import { getInitials } from '@/lib/utils';
 import { useState, memo, useCallback, useMemo, useEffect } from 'react';
 import { ThemeAwareLogo } from '@/components/common/ThemeAwareLogo';
+import { ACADEMIC_SECTIONS } from '@/lib/academicSections';
 
 type SidebarNavItem = {
   name: string;
@@ -47,19 +48,27 @@ type SidebarNavItem = {
   ownerOrAdmin?: boolean;
 };
 
-type SidebarSection = { name: string; items: readonly SidebarNavItem[] };
+type SidebarSection = { name: string; items: readonly SidebarNavItem[]; educationOnly?: boolean };
 
 const navSections: readonly SidebarSection[] = [
   {
     name: 'WORKSPACE',
     items: [
       { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
-      { name: 'Academic', href: '/academic', icon: Users2 },
       { name: 'Daily Focus', href: '/daily-focus', icon: Target, entitlement: 'aiAssistant' },
       { name: 'Tasks', href: '/tasks', icon: CheckSquare, entitlement: 'tasksProjects' },
       { name: 'Projects', href: '/projects', icon: FolderKanban, entitlement: 'tasksProjects' },
       { name: 'Calendar', href: '/calendar', icon: Calendar, entitlement: 'meetingsCalendar' },
     ],
+  },
+  {
+    name: 'EDUCATION',
+    educationOnly: true,
+    items: ACADEMIC_SECTIONS.map((section) => ({
+      name: section.label,
+      href: `/academic?section=${section.id}`,
+      icon: section.id === 'overview' ? LayoutDashboard : Users2,
+    })),
   },
   {
     name: 'CUSTOMERS',
@@ -122,6 +131,7 @@ const statusLabels = {
 // ── Granular selectors — each sub-component only re-renders for its own data ─
 export const Sidebar = memo(function Sidebar() {
   const pathname       = usePathname();
+  const searchParams   = useSearchParams();
   // Granular selectors: Sidebar only re-renders when these specific values change
   const user           = useAuthStore((s) => s.user);
   const company        = useAuthStore((s) => s.company);
@@ -155,7 +165,7 @@ export const Sidebar = memo(function Sidebar() {
       .map((section) => ({
         ...section,
         items: section.items.filter((item) =>
-          (item.href !== '/academic' || (!!company?.organizationType && company.organizationType !== 'business')) &&
+          (!section.educationOnly || (!!company?.organizationType && company.organizationType !== 'business')) &&
           (!item.managerOrAbove || canManageClientPortal) &&
           (!item.ownerOrAdmin || ['owner', 'admin'].includes(user?.role ?? '')) &&
           (!item.entitlement || canUse(item.entitlement)),
@@ -234,14 +244,19 @@ export const Sidebar = memo(function Sidebar() {
               <div className="space-y-0.5">
           {section.items.map((item) => {
             const Icon = item.icon;
-            const isActive = pathname === item.href ||
-              (item.href !== '/dashboard' && pathname.startsWith(item.href));
+            const [itemPath, itemQuery] = item.href.split('?');
+            const itemSection = itemQuery ? new URLSearchParams(itemQuery).get('section') : null;
+            const isAcademicItem = itemPath === '/academic' && itemSection !== null;
+            const isActive = isAcademicItem
+              ? pathname === itemPath && searchParams.get('section') === itemSection
+              : pathname === itemPath || (itemPath !== '/dashboard' && pathname.startsWith(itemPath));
 
             return (
               <Link
                 key={item.name}
                 href={item.href}
                 prefetch={true}
+                onClick={() => { if (isMobile) setSidebarOpen(false); }}
                 title={!isSidebarOpen ? item.name : undefined}
                 aria-label={item.name}
                 aria-current={isActive ? 'page' : undefined}

@@ -1039,7 +1039,7 @@ export const getMe = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const user = await User.findById(req.user!.userId).populate(
       'companyId',
-      'name logo plan inviteCode accountType industry size country timeZone settings'
+      'name logo plan inviteCode accountType organizationType industry size country timeZone currency settings academicSettings'
     );
     if (!user) { res.status(404).json({ success: false, message: 'User not found' }); return; }
     if (!user.callingId) {

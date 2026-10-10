@@ -16,6 +16,7 @@ const Company = require('../dist/models/Company').default;
 const User = require('../dist/models/User').default;
 const academicController = require('../dist/controllers/academic.controller');
 const academicPortalController = require('../dist/controllers/academicPortal.controller');
+const authController = require('../dist/controllers/auth.controller');
 const companyController = require('../dist/controllers/company.controller');
 const { requireAcademicAdmin } = require('../dist/middleware/academicOrganization');
 
@@ -32,6 +33,9 @@ function makeResponse() {
     },
     json(body) {
       this.body = body;
+      return this;
+    },
+    set() {
       return this;
     },
   };
@@ -61,6 +65,35 @@ function makeFindQuery(rows = []) {
   };
 }
 
+test('current-user organization projection includes education navigation settings', async () => {
+  const originalFindById = User.findById;
+  let selectedFields;
+  const user = {
+    callingId: 'WG-TEST',
+    subscriptionStatus: 'none',
+    companyId: { _id: companyId, organizationType: 'university' },
+    toObject() {
+      return { _id: recordId, companyId: this.companyId };
+    },
+  };
+  User.findById = () => ({
+    populate: async (path, fields) => {
+      assert.equal(path, 'companyId');
+      selectedFields = fields;
+      return user;
+    },
+  });
+  try {
+    const res = makeResponse();
+    await authController.getMe({ user: { userId: recordId.toString(), companyId: companyId.toString() } }, res);
+    assert.match(selectedFields, /\borganizationType\b/);
+    assert.match(selectedFields, /\bacademicSettings\b/);
+    assert.equal(res.body.user.companyId.organizationType, 'university');
+  } finally {
+    User.findById = originalFindById;
+  }
+});
+
 test('academic records require a tenant and supported person types', () => {
   const personWithoutTenant = new AcademicPerson({ type: 'student', firstName: 'A', lastName: 'Learner' });
   assert.equal(personWithoutTenant.validateSync().errors.companyId.kind, 'required');
@@ -70,6 +103,80 @@ test('academic records require a tenant and supported person types', () => {
     type: 'administrator',
     firstName: 'A',
     lastName: 'Learner',
+  });
+
+  test('academic record updates are tenant-scoped, validated, and audited', async () => {
+    const originalUpdate = AcademicPerson.findOneAndUpdate;
+    const originalAuditCreate = AuditLog.create;
+    let updateFilter;
+    let updateValues;
+    AcademicPerson.findOneAndUpdate = (filter, update) => {
+      updateFilter = filter;
+      updateValues = update.$set;
+      return { select: async () => ({ _id: recordId }) };
+    };
+    AuditLog.create = async () => ({});
+    try {
+      const res = makeResponse();
+      await academicController.updateAcademicRecord({
+        params: { resource: 'people', id: recordId.toString() },
+        user: { companyId: companyId.toString(), userId: recordId.toString(), role: 'admin' },
+        body: { firstName: '  Avery  ' },
+      }, res);
+      assert.equal(res.statusCode, 200);
+      assert.equal(updateFilter.companyId.toString(), companyId.toString());
+      assert.equal(updateFilter._id.toString(), recordId.toString());
+      assert.equal(updateValues.firstName, 'Avery');
+      assert.equal(res.body.success, true);
+    } finally {
+      AcademicPerson.findOneAndUpdate = originalUpdate;
+      AuditLog.create = originalAuditCreate;
+    }
+  });
+
+  test('academic person deletion deactivates the record and stays in the current tenant', async () => {
+    const originalUpdate = AcademicPerson.findOneAndUpdate;
+    const originalAuditCreate = AuditLog.create;
+    let updateFilter;
+    let updateValues;
+    AcademicPerson.findOneAndUpdate = (filter, update) => {
+      updateFilter = filter;
+      updateValues = update.$set;
+      return { select: async () => ({ _id: recordId }) };
+    };
+    AuditLog.create = async () => ({});
+    try {
+      const res = makeResponse();
+      await academicController.deleteAcademicRecord({
+        params: { resource: 'people', id: recordId.toString() },
+        user: { companyId: companyId.toString(), userId: recordId.toString(), role: 'admin' },
+      }, res);
+      assert.equal(res.statusCode, 200);
+      assert.equal(updateFilter.companyId.toString(), companyId.toString());
+      assert.deepEqual(updateValues, { status: 'inactive' });
+      assert.equal(res.body.success, true);
+    } finally {
+      AcademicPerson.findOneAndUpdate = originalUpdate;
+      AuditLog.create = originalAuditCreate;
+    }
+  });
+
+  test('academic CRUD rejects unrecognized resources and protected fields', async () => {
+    const invalidResourceResponse = makeResponse();
+    await academicController.updateAcademicRecord({
+      params: { resource: 'constructor', id: recordId.toString() },
+      user: { companyId: companyId.toString(), userId: recordId.toString(), role: 'admin' },
+      body: { firstName: 'Avery' },
+    }, invalidResourceResponse);
+    assert.equal(invalidResourceResponse.statusCode, 400);
+
+    const protectedFieldResponse = makeResponse();
+    await academicController.updateAcademicRecord({
+      params: { resource: 'people', id: recordId.toString() },
+      user: { companyId: companyId.toString(), userId: recordId.toString(), role: 'admin' },
+      body: { companyId: new mongoose.Types.ObjectId().toString() },
+    }, protectedFieldResponse);
+    assert.equal(protectedFieldResponse.statusCode, 400);
   });
   assert.equal(invalidPersonType.validateSync().errors.type.kind, 'enum');
 
@@ -340,6 +447,7 @@ test('teacher assignment creation validates both records inside the current tena
 });
 
 test('teacher portal is limited to assigned classes and never returns learner fee data', async () => {
+  const AcademicAssessment = require('../dist/models/AcademicAssessment').default;
   const AcademicSchedule = require('../dist/models/AcademicSchedule').default;
   const AcademicAssignment = require('../dist/models/AcademicAssignment').default;
   const originalPersonFindOne = AcademicPerson.findOne;
@@ -348,6 +456,7 @@ test('teacher portal is limited to assigned classes and never returns learner fe
   const originalEnrollmentFind = AcademicEnrollment.find;
   const originalScheduleFind = AcademicSchedule.find;
   const originalAssignmentFind = AcademicAssignment.find;
+  const originalAssessmentFind = AcademicAssessment.find;
   const originalAttendanceFind = AcademicAttendance.find;
   const originalResultFind = AcademicResult.find;
   const originalFeeFind = AcademicFeeCharge.find;
@@ -377,7 +486,7 @@ test('teacher portal is limited to assigned classes and never returns learner fe
     assert.deepEqual(filter._id.$in.map((id) => id.toString()), [studentId.toString()]);
     return { select() { return this; }, lean: async () => [{ _id: studentId, firstName: 'S', lastName: 'Student' }] };
   };
-  for (const model of [AcademicSchedule, AcademicAssignment]) {
+  for (const model of [AcademicSchedule, AcademicAssignment, AcademicAssessment]) {
     model.find = (filter) => {
       assert.equal(filter.companyId.toString(), companyId.toString());
       assert.deepEqual(filter.classId.$in.map((id) => id.toString()), [assignedClassId.toString()]);
@@ -411,6 +520,7 @@ test('teacher portal is limited to assigned classes and never returns learner fe
     AcademicEnrollment.find = originalEnrollmentFind;
     AcademicSchedule.find = originalScheduleFind;
     AcademicAssignment.find = originalAssignmentFind;
+    AcademicAssessment.find = originalAssessmentFind;
     AcademicAttendance.find = originalAttendanceFind;
     AcademicResult.find = originalResultFind;
     AcademicFeeCharge.find = originalFeeFind;

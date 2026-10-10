@@ -64,13 +64,14 @@ async function recordAcademicAudit(
   req: AuthRequest,
   resource: string,
   resourceId: mongoose.Types.ObjectId,
-  details?: Record<string, string>
+  details?: Record<string, string>,
+  action = 'create'
 ): Promise<void> {
   try {
     await AuditLog.create({
       companyId: getCompanyId(req),
       userId: new mongoose.Types.ObjectId(req.user!.userId),
-      action: 'create',
+      action,
       resource: `academic.${resource}`,
       resourceId: resourceId.toString(),
       details,
@@ -82,6 +83,452 @@ async function recordAcademicAudit(
     });
   }
 }
+
+type AcademicUpdateFieldType = 'string' | 'number' | 'date' | 'id' | 'idArray' | 'status' | 'attendance' | 'assessment' | 'relationship';
+type AcademicCrudResource =
+  | 'people'
+  | 'departments'
+  | 'courses'
+  | 'classes'
+  | 'guardians'
+  | 'enrollments'
+  | 'teaching-assignments'
+  | 'schedules'
+  | 'assignments'
+  | 'attendance'
+  | 'assessments'
+  | 'results'
+  | 'fees';
+
+type AcademicCrudDefinition = {
+  auditName: string;
+  fields: Record<string, AcademicUpdateFieldType>;
+  update: (id: mongoose.Types.ObjectId, companyId: mongoose.Types.ObjectId, values: Record<string, unknown>) => Promise<boolean>;
+  remove: (id: mongoose.Types.ObjectId, companyId: mongoose.Types.ObjectId) => Promise<boolean>;
+  canRemove?: (id: mongoose.Types.ObjectId, companyId: mongoose.Types.ObjectId) => Promise<boolean>;
+};
+
+function defineAcademicCrud<T extends mongoose.Document>(
+  model: mongoose.Model<T>,
+  auditName: string,
+  fields: Record<string, AcademicUpdateFieldType>,
+  canRemove?: AcademicCrudDefinition['canRemove']
+): AcademicCrudDefinition {
+  return {
+    auditName,
+    fields,
+    update: async (id, companyId, values) => {
+      const setValues: Record<string, unknown> = {};
+      const unsetValues: Record<string, 1> = {};
+      for (const [key, value] of Object.entries(values)) {
+        if (value === undefined) unsetValues[key] = 1;
+        else setValues[key] = value;
+      }
+      const updated = await model.findOneAndUpdate(
+        { _id: id, companyId },
+        {
+          ...(Object.keys(setValues).length ? { $set: setValues } : {}),
+          ...(Object.keys(unsetValues).length ? { $unset: unsetValues } : {}),
+        },
+        { new: true, runValidators: true }
+      ).select('_id');
+      return !!updated;
+    },
+    remove: async (id, companyId) => {
+      const result = await model.deleteOne({ _id: id, companyId });
+      return result.deletedCount === 1;
+    },
+    canRemove,
+  };
+}
+
+const academicCrud: Record<AcademicCrudResource, AcademicCrudDefinition> = {
+  people: defineAcademicCrud(AcademicPerson, 'person', {
+    firstName: 'string', lastName: 'string', email: 'string', externalId: 'string', status: 'status',
+  }, async (id, companyId) => {
+    const person = await AcademicPerson.findOne({ _id: id, companyId }).select('type');
+    if (!person) return false;
+    const dependencyChecks: Promise<number>[] = [];
+    if (person.type === 'student') {
+      dependencyChecks.push(
+        AcademicGuardianLink.countDocuments({ companyId, studentId: id }),
+        AcademicEnrollment.countDocuments({ companyId, studentId: id }),
+        AcademicAttendance.countDocuments({ companyId, studentId: id }),
+        AcademicResult.countDocuments({ companyId, studentId: id }),
+        AcademicFeeCharge.countDocuments({ companyId, studentId: id }),
+      );
+    } else if (person.type === 'teacher') {
+      dependencyChecks.push(AcademicTeachingAssignment.countDocuments({ companyId, teacherId: id }));
+    } else {
+      dependencyChecks.push(AcademicGuardianLink.countDocuments({ companyId, guardianId: id }));
+    }
+    return (await Promise.all(dependencyChecks)).every((count) => count === 0);
+  }),
+  departments: defineAcademicCrud(AcademicDepartment, 'department', {
+    name: 'string', code: 'string', description: 'string',
+  }, async (id, companyId) => (
+    await Promise.all([
+      AcademicCourse.countDocuments({ companyId, departmentId: id }),
+      AcademicClass.countDocuments({ companyId, departmentId: id }),
+    ])
+  ).every((count) => count === 0)),
+  courses: defineAcademicCrud(AcademicCourse, 'course', {
+    name: 'string', code: 'string', description: 'string', credits: 'number', departmentId: 'id',
+  }, async (id, companyId) => (
+    await Promise.all([
+      AcademicClass.countDocuments({ companyId, courseIds: id }),
+      AcademicSchedule.countDocuments({ companyId, courseId: id }),
+      AcademicAssignment.countDocuments({ companyId, courseId: id }),
+      AcademicAssessment.countDocuments({ companyId, courseId: id }),
+    ])
+  ).every((count) => count === 0)),
+  classes: defineAcademicCrud(AcademicClass, 'class', {
+    name: 'string', academicYear: 'string', departmentId: 'id', courseIds: 'idArray',
+  }, async (id, companyId) => (
+    await Promise.all([
+      AcademicEnrollment.countDocuments({ companyId, classId: id }),
+      AcademicTeachingAssignment.countDocuments({ companyId, classId: id }),
+      AcademicSchedule.countDocuments({ companyId, classId: id }),
+      AcademicAssignment.countDocuments({ companyId, classId: id }),
+      AcademicAttendance.countDocuments({ companyId, classId: id }),
+      AcademicAssessment.countDocuments({ companyId, classId: id }),
+    ])
+  ).every((count) => count === 0)),
+  guardians: defineAcademicCrud(AcademicGuardianLink, 'guardian_link', {
+    studentId: 'id', guardianId: 'id', relationship: 'relationship',
+  }),
+  enrollments: defineAcademicCrud(AcademicEnrollment, 'enrollment', {
+    studentId: 'id', classId: 'id', status: 'status', enrolledAt: 'date', completedAt: 'date',
+  }, async (id, companyId) => {
+    const enrollment = await AcademicEnrollment.findOne({ _id: id, companyId }).select('studentId classId');
+    if (!enrollment) return false;
+    const [attendanceCount, resultCount] = await Promise.all([
+      AcademicAttendance.countDocuments({ companyId, studentId: enrollment.studentId, classId: enrollment.classId }),
+      AcademicResult.countDocuments({
+        companyId,
+        studentId: enrollment.studentId,
+        assessmentId: { $in: await AcademicAssessment.find({ companyId, classId: enrollment.classId }).distinct('_id') },
+      }),
+    ]);
+    return attendanceCount === 0 && resultCount === 0;
+  }),
+  'teaching-assignments': defineAcademicCrud(AcademicTeachingAssignment, 'teaching_assignment', {
+    teacherId: 'id', classId: 'id',
+  }),
+  schedules: defineAcademicCrud(AcademicSchedule, 'schedule', {
+    classId: 'id', courseId: 'id', dayOfWeek: 'number', startTime: 'string', endTime: 'string',
+    location: 'string', validFrom: 'date', validUntil: 'date',
+  }),
+  assignments: defineAcademicCrud(AcademicAssignment, 'assignment', {
+    classId: 'id', courseId: 'id', title: 'string', instructions: 'string', dueAt: 'date', pointsPossible: 'number',
+  }),
+  attendance: defineAcademicCrud(AcademicAttendance, 'attendance', {
+    classId: 'id', studentId: 'id', date: 'date', status: 'attendance', note: 'string',
+  }),
+  assessments: defineAcademicCrud(AcademicAssessment, 'assessment', {
+    classId: 'id', courseId: 'id', title: 'string', type: 'assessment', scheduledAt: 'date', pointsPossible: 'number',
+  }, async (id, companyId) => (await AcademicResult.countDocuments({ companyId, assessmentId: id })) === 0),
+  results: defineAcademicCrud(AcademicResult, 'result', {
+    pointsEarned: 'number', feedback: 'string',
+  }),
+  fees: defineAcademicCrud(AcademicFeeCharge, 'fee_charge', {
+    invoiceNumber: 'string', description: 'string', amountMinor: 'number', currency: 'string', dueAt: 'date',
+  }),
+};
+
+function normalizeAcademicUpdate(
+  fields: Record<string, AcademicUpdateFieldType>,
+  input: unknown
+): Record<string, unknown> | null {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return null;
+  const body = input as Record<string, unknown>;
+  const entries = Object.entries(body);
+  if (!entries.length || entries.some(([key]) => !Object.prototype.hasOwnProperty.call(fields, key))) return null;
+
+  const values: Record<string, unknown> = {};
+  for (const [key, value] of entries) {
+    switch (fields[key]) {
+      case 'string':
+        if (value === null && ['email', 'externalId', 'description', 'instructions', 'location', 'note', 'feedback'].includes(key)) {
+          values[key] = undefined;
+          break;
+        }
+        if (typeof value !== 'string') return null;
+        values[key] = value.trim();
+        break;
+      case 'number':
+        if (typeof value !== 'number' || !Number.isFinite(value)) return null;
+        if (key === 'dayOfWeek' && !Number.isInteger(value)) return null;
+        values[key] = value;
+        break;
+      case 'date':
+        if (value === null && ['dueAt', 'validFrom', 'validUntil', 'completedAt', 'scheduledAt'].includes(key)) {
+          values[key] = undefined;
+          break;
+        }
+        if (typeof value !== 'string' || !Number.isFinite(Date.parse(value))) return null;
+        values[key] = new Date(value);
+        break;
+      case 'id':
+        if (!isObjectId(value)) return null;
+        values[key] = new mongoose.Types.ObjectId(value);
+        break;
+      case 'idArray':
+        if (!Array.isArray(value) || !value.every(isObjectId) || new Set(value).size !== value.length) return null;
+        values[key] = value.map((id) => new mongoose.Types.ObjectId(id));
+        break;
+      case 'status':
+        if (key === 'status' && !['active', 'inactive', 'completed', 'withdrawn'].includes(String(value))) return null;
+        values[key] = value;
+        break;
+      case 'attendance':
+        if (!ATTENDANCE_STATUSES.includes(value as AttendanceStatus)) return null;
+        values[key] = value;
+        break;
+      case 'assessment':
+        if (!ASSESSMENT_TYPES.includes(value as AssessmentType)) return null;
+        values[key] = value;
+        break;
+      case 'relationship':
+        if (!GUARDIAN_RELATIONSHIPS.includes(value as GuardianRelationshipType)) return null;
+        values[key] = value;
+        break;
+    }
+  }
+  return values;
+}
+
+async function academicRelationsBelongToTenant(
+  resource: AcademicCrudResource,
+  values: Record<string, unknown>,
+  companyId: mongoose.Types.ObjectId
+): Promise<boolean> {
+  const has = (key: string) => Object.prototype.hasOwnProperty.call(values, key);
+  if (resource === 'courses' && has('departmentId')) {
+    const department = await AcademicDepartment.findOne({ _id: values.departmentId, companyId }).select('_id');
+    if (!department) return false;
+    return !await AcademicClass.findOne({
+      companyId,
+      courseIds: values._id,
+      departmentId: { $ne: values.departmentId },
+    }).select('_id');
+  }
+  if (resource === 'classes' && (has('departmentId') || has('courseIds'))) {
+    const existingClass = await AcademicClass.findOne({ _id: values._id, companyId }).select('departmentId courseIds');
+    const existingDepartmentId = has('departmentId') ? values.departmentId : existingClass?.departmentId;
+    if (!existingDepartmentId || !await AcademicDepartment.findOne({ _id: existingDepartmentId, companyId }).select('_id')) return false;
+    if (has('courseIds') || has('departmentId')) {
+      const ids = has('courseIds') ? values.courseIds as mongoose.Types.ObjectId[] : existingClass?.courseIds ?? [];
+      const courses = ids.length
+        ? await AcademicCourse.find({ _id: { $in: ids }, companyId, departmentId: existingDepartmentId }).select('_id')
+        : [];
+      return courses.length === ids.length;
+    }
+    return true;
+  }
+  if (resource === 'schedules' || resource === 'assignments' || resource === 'assessments') {
+    if (!has('classId') && !has('courseId')) return true;
+    const currentRecord = await (
+      resource === 'schedules' ? AcademicSchedule.findOne({ _id: values._id, companyId }).select('classId courseId')
+        : resource === 'assignments' ? AcademicAssignment.findOne({ _id: values._id, companyId }).select('classId courseId')
+          : AcademicAssessment.findOne({ _id: values._id, companyId }).select('classId courseId')
+    );
+    const classId = has('classId') ? values.classId : currentRecord?.classId;
+    const courseId = has('courseId') ? values.courseId : currentRecord?.courseId;
+    const academicClass = await AcademicClass.findOne({ _id: classId, companyId }).select('courseIds');
+    if (!academicClass) return false;
+    return !courseId || academicClass.courseIds.some((id) => id.toString() === String(courseId));
+  }
+  if (resource === 'guardians') {
+    if (!has('studentId') && !has('guardianId')) return true;
+    const currentLink = await AcademicGuardianLink.findOne({ _id: values._id, companyId }).select('studentId guardianId');
+    const [student, guardian] = await Promise.all([
+      AcademicPerson.findOne({ _id: has('studentId') ? values.studentId : currentLink?.studentId, companyId, type: 'student', status: 'active' }).select('_id'),
+      AcademicPerson.findOne({ _id: has('guardianId') ? values.guardianId : currentLink?.guardianId, companyId, type: 'parent', status: 'active' }).select('_id'),
+    ]);
+    return !!student && !!guardian;
+  }
+  if (resource === 'enrollments') {
+    if (!has('studentId') && !has('classId')) return true;
+    const enrollment = await AcademicEnrollment.findOne({ _id: values._id, companyId }).select('studentId classId');
+    const [student, academicClass] = await Promise.all([
+      AcademicPerson.findOne({ _id: has('studentId') ? values.studentId : enrollment?.studentId, companyId, type: 'student', status: 'active' }).select('_id'),
+      AcademicClass.findOne({ _id: has('classId') ? values.classId : enrollment?.classId, companyId }).select('_id'),
+    ]);
+    return !!student && !!academicClass;
+  }
+  if (resource === 'teaching-assignments') {
+    const assignment = await AcademicTeachingAssignment.findOne({ _id: values._id, companyId }).select('teacherId classId');
+    const [teacher, academicClass] = await Promise.all([
+      AcademicPerson.findOne({ _id: has('teacherId') ? values.teacherId : assignment?.teacherId, companyId, type: 'teacher', status: 'active' }).select('_id'),
+      AcademicClass.findOne({ _id: has('classId') ? values.classId : assignment?.classId, companyId }).select('_id'),
+    ]);
+    return !!teacher && !!academicClass;
+  }
+  if (resource === 'attendance') {
+    if (!has('studentId') && !has('classId')) return true;
+    const attendance = await AcademicAttendance.findOne({ _id: values._id, companyId }).select('studentId classId');
+    const studentId = has('studentId') ? values.studentId : attendance?.studentId;
+    const classId = has('classId') ? values.classId : attendance?.classId;
+    const [student, academicClass] = await Promise.all([
+      AcademicPerson.findOne({ _id: studentId, companyId, type: 'student', status: 'active' }).select('_id'),
+      AcademicClass.findOne({ _id: classId, companyId }).select('_id'),
+    ]);
+    if (!student || !academicClass) return false;
+    return !!await AcademicEnrollment.findOne({ companyId, studentId, classId, status: 'active' }).select('_id');
+  }
+  return true;
+}
+
+export const updateAcademicRecord = async (req: AuthRequest, res: Response): Promise<void> => {
+  const resource = req.params.resource as AcademicCrudResource;
+  const definition = Object.prototype.hasOwnProperty.call(academicCrud, resource) ? academicCrud[resource] : undefined;
+  const { id } = req.params;
+  if (!definition || !isObjectId(id)) {
+    res.status(400).json({ success: false, message: 'Invalid academic resource or record identifier.' });
+    return;
+  }
+  const values = normalizeAcademicUpdate(definition.fields, req.body);
+  if (!values) {
+    res.status(400).json({ success: false, message: 'Provide valid editable fields for this academic record.' });
+    return;
+  }
+  const companyId = getCompanyId(req);
+  try {
+    values._id = new mongoose.Types.ObjectId(id);
+    if (!await academicRelationsBelongToTenant(resource, values, companyId)) {
+      res.status(400).json({ success: false, message: 'Related academic records must belong to this organization.' });
+      return;
+    }
+    if (resource === 'schedules') {
+      const schedule = await AcademicSchedule.findOne({ _id: id, companyId }).select('startTime endTime validFrom validUntil');
+      if (!schedule) {
+        res.status(404).json({ success: false, message: 'Academic record not found.' });
+        return;
+      }
+      const startTime = String(values.startTime ?? schedule.startTime);
+      const endTime = String(values.endTime ?? schedule.endTime);
+      const validFrom = Object.prototype.hasOwnProperty.call(values, 'validFrom') ? values.validFrom : schedule.validFrom;
+      const validUntil = Object.prototype.hasOwnProperty.call(values, 'validUntil') ? values.validUntil : schedule.validUntil;
+      if (
+        !/^([01]\d|2[0-3]):[0-5]\d$/.test(startTime) ||
+        !/^([01]\d|2[0-3]):[0-5]\d$/.test(endTime) ||
+        startTime >= endTime ||
+        (validFrom instanceof Date && validUntil instanceof Date && validFrom > validUntil)
+      ) {
+        res.status(400).json({ success: false, message: 'Timetable sessions require a valid time range and date range.' });
+        return;
+      }
+    }
+    if (resource === 'fees' && typeof values.amountMinor === 'number') {
+      const charge = await AcademicFeeCharge.findOne({ _id: id, companyId }).select('paidAmountMinor');
+      if (!charge) {
+        res.status(404).json({ success: false, message: 'Academic record not found.' });
+        return;
+      }
+      if (!Number.isSafeInteger(values.amountMinor) || values.amountMinor < charge.paidAmountMinor) {
+        res.status(400).json({ success: false, message: 'Fee amount must be an integer and cannot be less than its recorded payments.' });
+        return;
+      }
+    }
+    if (resource === 'results' && typeof values.pointsEarned === 'number') {
+      const result = await AcademicResult.findOne({ _id: id, companyId }).select('assessmentId');
+      const assessment = result
+        ? await AcademicAssessment.findOne({ _id: result.assessmentId, companyId }).select('pointsPossible')
+        : null;
+      if (!assessment) {
+        res.status(404).json({ success: false, message: 'Academic record not found.' });
+        return;
+      }
+      if (values.pointsEarned > assessment.pointsPossible) {
+        res.status(400).json({ success: false, message: 'Points earned cannot exceed the assessment maximum.' });
+        return;
+      }
+    }
+    if (resource === 'assessments' && typeof values.pointsPossible === 'number') {
+      const hasOverMaximumResult = await AcademicResult.exists({
+        companyId,
+        assessmentId: id,
+        pointsEarned: { $gt: values.pointsPossible },
+      });
+      if (hasOverMaximumResult) {
+        res.status(409).json({ success: false, message: 'The maximum cannot be lower than a score already recorded for this assessment.' });
+        return;
+      }
+    }
+    if (resource === 'assessments' && values.classId) {
+      const hasExistingResults = await AcademicResult.exists({ companyId, assessmentId: id });
+      if (hasExistingResults) {
+        const currentAssessment = await AcademicAssessment.findOne({ _id: id, companyId }).select('classId');
+        if (currentAssessment && currentAssessment.classId.toString() !== String(values.classId)) {
+          res.status(409).json({ success: false, message: 'An assessment with recorded results cannot be moved to another class.' });
+          return;
+        }
+      }
+    }
+    delete values._id;
+    if (!await definition.update(new mongoose.Types.ObjectId(id), companyId, values)) {
+      res.status(404).json({ success: false, message: 'Academic record not found.' });
+      return;
+    }
+    await recordAcademicAudit(req, definition.auditName, new mongoose.Types.ObjectId(id), undefined, 'update');
+    res.json({ success: true, message: 'Academic record updated.' });
+  } catch (error) {
+    handleOperationError(res, error, definition.auditName);
+  }
+};
+
+export const deleteAcademicRecord = async (req: AuthRequest, res: Response): Promise<void> => {
+  const resource = req.params.resource as AcademicCrudResource;
+  const definition = Object.prototype.hasOwnProperty.call(academicCrud, resource) ? academicCrud[resource] : undefined;
+  const { id } = req.params;
+  if (!definition || !isObjectId(id)) {
+    res.status(400).json({ success: false, message: 'Invalid academic resource or record identifier.' });
+    return;
+  }
+  const companyId = getCompanyId(req);
+  const recordId = new mongoose.Types.ObjectId(id);
+  try {
+    if (resource === 'people') {
+      const person = await AcademicPerson.findOneAndUpdate(
+        { _id: recordId, companyId },
+        { $set: { status: 'inactive' } },
+        { new: true, runValidators: true }
+      ).select('_id');
+      if (!person) {
+        res.status(404).json({ success: false, message: 'Academic record not found.' });
+        return;
+      }
+    } else if (resource === 'fees') {
+      const charge = await AcademicFeeCharge.findOneAndUpdate(
+        { _id: recordId, companyId, paidAmountMinor: 0, isVoided: false },
+        { $set: { isVoided: true } },
+        { new: true, runValidators: true }
+      ).select('_id');
+      if (!charge) {
+        const existingCharge = await AcademicFeeCharge.findOne({ _id: recordId, companyId }).select('isVoided');
+        res.status(existingCharge ? 409 : 404).json({
+          success: false,
+          message: existingCharge ? 'Only unpaid fee charges can be voided or deleted.' : 'Academic record not found.',
+        });
+        return;
+      }
+    } else {
+      if (definition.canRemove && !await definition.canRemove(recordId, companyId)) {
+        res.status(409).json({ success: false, message: 'This record is still referenced by other academic records.' });
+        return;
+      }
+      if (!await definition.remove(recordId, companyId)) {
+        res.status(404).json({ success: false, message: 'Academic record not found.' });
+        return;
+      }
+    }
+    await recordAcademicAudit(req, definition.auditName, recordId, undefined, 'delete');
+    res.json({ success: true, message: 'Academic record deleted.' });
+  } catch (error) {
+    handleOperationError(res, error, definition.auditName);
+  }
+};
 
 export const listPeople = async (req: AuthRequest, res: Response): Promise<void> => {
   const { skip, limit } = listOptions(req);
@@ -189,7 +636,9 @@ export const listCourses = async (req: AuthRequest, res: Response): Promise<void
   const companyId = getCompanyId(req);
   try {
     const [courses, total] = await Promise.all([
-      AcademicCourse.find({ companyId }).sort({ name: 1 }).skip(skip).limit(limit).lean(),
+      AcademicCourse.find({ companyId }).sort({ name: 1 }).skip(skip).limit(limit)
+        .populate({ path: 'departmentId', match: { companyId }, select: 'name code' })
+        .lean(),
       AcademicCourse.countDocuments({ companyId }),
     ]);
     res.json({ success: true, courses, total, page: Math.floor(skip / limit) + 1, pageSize: limit });
@@ -237,7 +686,10 @@ export const listClasses = async (req: AuthRequest, res: Response): Promise<void
   const companyId = getCompanyId(req);
   try {
     const [classes, total] = await Promise.all([
-      AcademicClass.find({ companyId }).sort({ academicYear: -1, name: 1 }).skip(skip).limit(limit).lean(),
+      AcademicClass.find({ companyId }).sort({ academicYear: -1, name: 1 }).skip(skip).limit(limit)
+        .populate({ path: 'departmentId', match: { companyId }, select: 'name code' })
+        .populate({ path: 'courseIds', match: { companyId }, select: 'name code' })
+        .lean(),
       AcademicClass.countDocuments({ companyId }),
     ]);
     res.json({ success: true, classes, total, page: Math.floor(skip / limit) + 1, pageSize: limit });

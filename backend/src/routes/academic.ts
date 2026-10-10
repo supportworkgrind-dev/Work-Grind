@@ -27,6 +27,8 @@ import {
   listResults,
   listFeeCharges,
   listAttendance,
+  updateAcademicRecord,
+  deleteAcademicRecord,
 } from '../controllers/academic.controller';
 import { authenticate } from '../middleware/auth';
 import { requireAcademicAdmin } from '../middleware/academicOrganization';
@@ -62,5 +64,7 @@ router.put('/results', recordResult);
 router.get('/fees', listFeeCharges);
 router.post('/fees', createFeeCharge);
 router.post('/fees/:chargeId/payments', recordFeePayment);
+router.patch('/:resource/:id', updateAcademicRecord);
+router.delete('/:resource/:id', deleteAcademicRecord);
 
 export default router;
