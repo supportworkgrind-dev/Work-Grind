@@ -4,6 +4,8 @@ const Company = require('../dist/models/Company').default;
 const User = require('../dist/models/User').default;
 const PendingRegistration = require('../dist/models/PendingRegistration').default;
 const OAuthTransaction = require('../dist/models/OAuthTransaction').default;
+const AuditLog = require('../dist/models/AuditLog').default;
+const { restoreWorkspaceCreatorRole } = require('../dist/controllers/auth.controller');
 const { isOrganizationType, ORGANIZATION_TYPES } = require('../dist/config/organization');
 const mongoose = require('mongoose');
 
@@ -86,6 +88,46 @@ test('mongoose organization type enum rejects values outside the supported types
       assert.equal(transaction.validateSync(), undefined);
       assert.equal(transaction.accountType, choice.accountType);
       assert.equal(transaction.organizationType, choice.organizationType);
+    }
+  });
+
+  test('owner-role repair requires matching persisted workspace ownership and is audited', async () => {
+    const originalAuditCreate = AuditLog.create;
+    const auditEntries = [];
+    AuditLog.create = async (entry) => { auditEntries.push(entry); return entry; };
+    try {
+      const unrelatedEmployee = {
+        _id: 'employee-1',
+        role: 'employee',
+        accountType: 'company',
+        save: async () => {},
+      };
+      await restoreWorkspaceCreatorRole(unrelatedEmployee, {
+        _id: 'workspace-1',
+        ownerId: 'different-user',
+        accountType: 'company',
+      }, '127.0.0.1');
+      assert.equal(unrelatedEmployee.role, 'employee');
+      assert.equal(auditEntries.length, 0);
+
+      const actualCreator = {
+        _id: 'creator-1',
+        role: 'employee',
+        accountType: 'company',
+        save: async () => {},
+      };
+      await restoreWorkspaceCreatorRole(actualCreator, {
+        _id: 'workspace-2',
+        ownerId: 'creator-1',
+        accountType: 'individual',
+      }, '127.0.0.1');
+      assert.equal(actualCreator.role, 'owner');
+      assert.equal(actualCreator.accountType, 'individual');
+      assert.equal(auditEntries.length, 1);
+      assert.equal(auditEntries[0].action, 'restore_owner_role');
+      assert.equal(auditEntries[0].details.reason, 'company_owner_id_match');
+    } finally {
+      AuditLog.create = originalAuditCreate;
     }
   });
 

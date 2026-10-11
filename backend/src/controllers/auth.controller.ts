@@ -40,7 +40,7 @@ const validPassword = (password: string) =>
 export async function restoreWorkspaceCreatorRole(
   user: IUser,
   company: Pick<ICompany, '_id' | 'ownerId' | 'accountType'>,
-  ipAddress: string,
+  ipAddress?: string,
 ): Promise<void> {
   if (company.ownerId.toString() !== user._id.toString() || user.role === 'owner') return;
   const previousRole = user.role;
@@ -762,6 +762,7 @@ export const createCompany = async (req: AuthRequest, res: Response): Promise<vo
       if (existingCompany) {
         await restoreWorkspaceCreatorRole(user, existingCompany, req.ip);
         const tokens = issue(uid, existingCompany._id.toString(), user.role || 'owner');
+        user.signupOrganizationType = undefined;
         user.refreshTokens = [...normalizeRefreshTokenStore(user.refreshTokens), hashRefreshToken(tokens.refreshToken)];
         await user.save();
         setRefreshCookie(res, tokens.refreshToken);
