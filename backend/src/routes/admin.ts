@@ -8,10 +8,12 @@ import {
   getAdminCrmStats,
 } from '../controllers/admin.controller';
 import { authenticate, requireRole } from '../middleware/auth';
+import { requireOrganizationFeature } from '../middleware/organizationAccess';
 
 const router = Router();
 
 router.use(authenticate);
+router.use(requireOrganizationFeature('businessAdmin'));
 router.use(requireRole('owner', 'admin'));
 
 router.get('/members', getAdminMembers);

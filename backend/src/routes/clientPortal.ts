@@ -12,6 +12,7 @@ import {
 import { validateObjectId } from '../middleware/validateObjectId';
 import { rateLimiter } from '../middleware/rateLimiter';
 import { getClientApprovals, respondToClientApproval } from '../controllers/approval.controller';
+import { requireOrganizationFeature } from '../middleware/organizationAccess';
 
 const router = Router();
 
@@ -29,7 +30,7 @@ router.get('/portal/approvals', authenticateClient as any, getClientApprovals);
 router.patch('/portal/approvals/:id', authenticateClient as any, validateObjectId('id'), respondToClientApproval);
 
 // ── Internal team management (WorkGrind JWT) ───────────────────────────────────
-router.use(authenticate, requireCompany);
+router.use(authenticate, requireCompany, requireOrganizationFeature('clientPortal'));
 router.get('/clients',                                  listClients);
 router.post('/invite',                                  inviteClient);
 router.patch('/clients/:id/share', validateObjectId('id'), shareWithClient);

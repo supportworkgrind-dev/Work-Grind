@@ -33,12 +33,12 @@ router.post(
 router.use(authenticate);
 
 router.get('/status',      getSubscriptionStatus);
-router.post('/checkout',   createCheckout);
-router.post('/cancel',     cancelSubscription);
-router.post('/change-plan', changeSubscriptionPlan);
-router.post('/reactivate', reactivateSubscription);
+router.post('/checkout',    requireRole('owner', 'admin'), createCheckout);
+router.post('/cancel',      requireRole('owner', 'admin'), cancelSubscription);
+router.post('/change-plan', requireRole('owner', 'admin'), changeSubscriptionPlan);
+router.post('/reactivate',  requireRole('owner', 'admin'), reactivateSubscription);
 
 // Coupon redemption — owner/admin only (enforced inside controller)
-router.post('/coupon',     redeemCoupon);
+router.post('/coupon',     requireRole('owner', 'admin'), redeemCoupon);
 
 export default router;

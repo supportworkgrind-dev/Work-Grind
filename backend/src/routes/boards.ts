@@ -21,10 +21,11 @@ import {
 } from '../controllers/whiteboard.controller';
 import { validateObjectId } from '../middleware/validateObjectId';
 import { upload } from '../middleware/upload';
+import { requireOrganizationFeature } from '../middleware/organizationAccess';
 
 const router = Router();
 
-router.use(authenticate, requireEntitlement('tasksProjects'));
+router.use(authenticate, requireOrganizationFeature('workspaceContent'), requireEntitlement('tasksProjects'));
 
 router.get('/', getBoards);
 router.post('/', createBoard);

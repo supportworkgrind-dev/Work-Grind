@@ -13,6 +13,7 @@ import { authenticate, requireCompany, requireRole } from '../middleware/auth';
 import { avatarUpload } from '../middleware/upload';
 import { asyncHandler } from '../middleware/asyncHandler';
 import { rateLimiter } from '../middleware/rateLimiter';
+import { requireOrganizationFeature } from '../middleware/organizationAccess';
 import {
   backfillWorkspaceCallingIds,
   checkCallingIdAvailability,
@@ -25,7 +26,7 @@ const router = Router();
 
 router.use(authenticate);
 
-router.get('/', getUsers);
+router.get('/', requireOrganizationFeature('memberDirectory'), getUsers);
 router.get('/me', (req, res, next) => {
   // handled in auth or updateMe
   next();
@@ -42,6 +43,6 @@ router.patch('/me/avatar', avatarUpload.single('avatar'), uploadAvatar);
 router.patch('/me/status', updateStatus);
 // Role guard: only owners, admins, and managers can invite members
 router.post('/invite', requireRole('owner', 'admin', 'manager'), inviteMember);
-router.get('/:id', getUserById);
+router.get('/:id', requireOrganizationFeature('memberDirectory'), getUserById);
 
 export default router;

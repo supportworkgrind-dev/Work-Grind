@@ -18,7 +18,8 @@ export type OrganizationFeature =
   | 'businessIntegrations'
   | 'businessAutomation'
   | 'billingAdmin'
-  | 'memberDirectory';
+  | 'memberDirectory'
+  | 'workspaceContent';
 
 export function isOrganizationAdminRole(role: string, organizationType: string): boolean {
   return roleMatches(role, ['owner', 'admin', 'manager'], organizationType);
@@ -96,6 +97,9 @@ export function requireOrganizationFeature(feature: OrganizationFeature) {
           allowed = isAcademic
             ? eligible && roleMatches(role, ['owner', 'principal', 'admin', 'dean', 'hod'], company.organizationType)
             : roleMatches(role, ['owner', 'admin', 'manager'], company.organizationType);
+          break;
+        case 'workspaceContent':
+          allowed = eligible && (!isAcademic || !roleMatches(role, ['student', 'parent'], company.organizationType));
           break;
       }
 

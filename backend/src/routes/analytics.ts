@@ -1,9 +1,10 @@
 import { Router } from 'express';
 import { authenticate, requireCompany, requireEntitlement, requireSubscription } from '../middleware/auth';
+import { requireOrganizationFeature } from '../middleware/organizationAccess';
 import { getOverview, getCrmAnalytics, getTaskAnalytics, getTeamAnalytics, getMeetingAnalytics } from '../controllers/analytics.controller';
 
 const router = Router();
-router.use(authenticate, requireCompany, requireSubscription, requireEntitlement('advancedAnalytics'));
+router.use(authenticate, requireCompany, requireOrganizationFeature('businessAnalytics'), requireSubscription, requireEntitlement('advancedAnalytics'));
 
 router.get('/overview',  getOverview);
 router.get('/crm',       getCrmAnalytics);

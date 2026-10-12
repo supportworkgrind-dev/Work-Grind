@@ -16,10 +16,11 @@ import {
 import { authenticate, requireCompany, requireEntitlement } from '../middleware/auth';
 import { asyncHandler } from '../middleware/asyncHandler';
 import { validateObjectId } from '../middleware/validateObjectId';
+import { requireOrganizationFeature } from '../middleware/organizationAccess';
 
 const router = Router();
 
-router.use(authenticate, requireCompany, requireEntitlement('fileStorage'));
+router.use(authenticate, requireCompany, requireOrganizationFeature('workspaceContent'), requireEntitlement('fileStorage'));
 
 router.get('/workbooks', asyncHandler(getWorkbooks));
 router.post('/workbooks', asyncHandler(createWorkbook));

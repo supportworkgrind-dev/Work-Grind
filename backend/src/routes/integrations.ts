@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { authenticate, requireCompany } from '../middleware/auth';
+import { requireOrganizationFeature } from '../middleware/organizationAccess';
 import {
   getIntegrations, connectIntegration, disconnectIntegration,
   receiveWebhook, updateIntegrationConfig,
@@ -11,7 +12,7 @@ const router = Router();
 router.post('/webhook/:token', receiveWebhook);
 
 // All other routes require authentication
-router.use(authenticate, requireCompany);
+router.use(authenticate, requireCompany, requireOrganizationFeature('businessIntegrations'));
 
 router.get('/',                              getIntegrations);
 router.post('/:provider/connect',            connectIntegration);

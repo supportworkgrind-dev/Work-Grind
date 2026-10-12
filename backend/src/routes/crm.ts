@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { authenticate, requireEntitlement } from '../middleware/auth';
+import { requireOrganizationFeature } from '../middleware/organizationAccess';
 import {
   // contacts
   getContacts, getContact, createContact, updateContact, deleteContact,
@@ -14,7 +15,7 @@ import {
 const router = Router();
 
 // All CRM routes require authentication
-router.use(authenticate, requireEntitlement('crm'));
+router.use(authenticate, requireOrganizationFeature('businessCrm'), requireEntitlement('crm'));
 
 // ── Pipeline stats ─────────────────────────────────────────────────────────────
 router.get('/stats', getPipelineStats);

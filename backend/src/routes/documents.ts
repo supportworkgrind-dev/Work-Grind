@@ -5,10 +5,11 @@ import {
 } from '../controllers/document.controller';
 import { authenticate, requireEntitlement } from '../middleware/auth';
 import { validateObjectId } from '../middleware/validateObjectId';
+import { requireOrganizationFeature } from '../middleware/organizationAccess';
 
 const router = Router();
 
-router.use(authenticate, requireEntitlement('fileStorage'));
+router.use(authenticate, requireOrganizationFeature('workspaceContent'), requireEntitlement('fileStorage'));
 
 router.get('/',  getDocuments);
 router.post('/', createDocument);

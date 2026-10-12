@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { authenticate, requireCompany, requireSubscription } from '../middleware/auth';
+import { requireOrganizationFeature } from '../middleware/organizationAccess';
 import { validateObjectId } from '../middleware/validateObjectId';
 import {
   getWorkflows, getWorkflow, createWorkflow,
@@ -8,7 +9,7 @@ import {
 } from '../controllers/workflow.controller';
 
 const router = Router();
-router.use(authenticate, requireCompany, requireSubscription);
+router.use(authenticate, requireCompany, requireOrganizationFeature('businessAutomation'), requireSubscription);
 
 router.get('/',                                       getWorkflows);
 router.post('/',                                      createWorkflow);
