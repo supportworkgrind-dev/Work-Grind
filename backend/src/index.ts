@@ -114,6 +114,7 @@ import { rateLimiter } from './middleware/rateLimiter';
 import { logPolarConfig } from './config/subscription';
 import { logR2Config }   from './services/r2Storage';
 import { logGeminiConfig } from './services/geminiService';
+import { checkRedisHealth } from './config/redis';
 import { runTaskDueReminderSweep } from './services/taskDueReminders';
 import { cleanupExpiredVerificationCodes, migrateRefreshTokensAtRest } from './services/refreshTokenMigration';
 import mongoose from 'mongoose';
@@ -196,7 +197,11 @@ async function ensureServerlessInitialization(): Promise<boolean> {
 
 if (isVercelRuntime) {
   app.use(async (req, res, next) => {
-    if (req.path === '/api/whatsapp/webhook') {
+    if (
+      req.path === '/api/whatsapp/webhook' ||
+      req.path === '/health/redis' ||
+      req.path === '/api/health/redis'
+    ) {
       next();
       return;
     }
@@ -223,6 +228,19 @@ const sendHealthStatus = (_req: express.Request, res: express.Response) => {
 };
 
 app.get('/health', sendHealthStatus);
+const sendRedisHealthStatus: express.RequestHandler = async (_req, res) => {
+  const redis = await checkRedisHealth();
+  const healthy = redis.status === 'connected' && redis.ping === 'PONG';
+  res.status(healthy ? 200 : 503).json({
+    status: healthy ? 'connected' : 'disconnected',
+    configured: redis.configured,
+    ping: redis.ping,
+    latencyMs: redis.latencyMs,
+    timestamp: new Date().toISOString(),
+  });
+};
+app.get('/health/redis', rateLimiter(1, 10), sendRedisHealthStatus);
+app.get('/api/health/redis', rateLimiter(1, 10), sendRedisHealthStatus);
 
 // Global Middlewares
 
@@ -307,7 +325,9 @@ app.use(
 app.use((req, res, next) => {
   if (
     req.path === '/health' ||
+    req.path === '/health/redis' ||
     req.path === '/api/health' ||
+    req.path === '/api/health/redis' ||
     req.path === '/api/whatsapp/webhook'
   ) {
     return next(); // always allow health checks through

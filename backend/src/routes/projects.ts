@@ -11,6 +11,7 @@ import {
 } from '../controllers/project.controller';
 import { authenticate, requireEntitlement, requireRole } from '../middleware/auth';
 import { requireAnyOrganizationFeature } from '../middleware/organizationAccess';
+import { invalidateAnalyticsOverviewCache } from '../middleware/invalidateAnalyticsCache';
 
 const router = Router();
 
@@ -19,6 +20,7 @@ router.use(
   requireAnyOrganizationFeature('workspaceContent', 'soloWorkspace'),
   requireEntitlement('tasksProjects'),
 );
+router.use(invalidateAnalyticsOverviewCache);
 
 router.get('/', getProjects);
 router.post('/', requireRole('owner', 'admin', 'manager'), createProject);

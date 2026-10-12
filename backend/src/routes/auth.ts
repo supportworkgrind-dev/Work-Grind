@@ -22,6 +22,7 @@ import {
 } from '../controllers/oauth.controller';
 import { authenticate } from '../middleware/auth';
 import { rateLimiter } from '../middleware/rateLimiter';
+import { invalidateAnalyticsOverviewCache } from '../middleware/invalidateAnalyticsCache';
 
 const router = Router();
 const startOAuthRoute: RequestHandler = (req, res, next) => {
@@ -57,7 +58,7 @@ router.post('/oauth/:provider/callback', rateLimiter(15, 20), completeOAuthCallb
 router.post('/oauth/exchange', rateLimiter(15, 10), exchangeOAuthSessionRoute);
 router.get('/invite/:tokenOrCode', validateInvite);
 router.post('/create-company', authenticate, createCompany);
-router.post('/join-company', authenticate, joinCompany);
+router.post('/join-company', authenticate, invalidateAnalyticsOverviewCache, joinCompany);
 router.get('/me', authenticate, getMe);
 
 export default router;
