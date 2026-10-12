@@ -26,7 +26,7 @@ router.post('/invite', requireRole('owner', 'admin', 'manager'), inviteMember);
 router.delete('/invites/:token', requireRole('owner', 'admin'), revokeInvite);
 router.post('/invites/:token/resend', requireRole('owner', 'admin', 'manager'), resendInvite);
 router.post('/regenerate-invite-code', requireRole('owner', 'admin'), regenerateInviteCode);
-router.delete('/members/:userId', requireRole('owner', 'admin'), removeMember);
+router.delete('/members/:userId', requireRole('owner', 'admin'), requireOrganizationFeature('memberDirectory'), removeMember);
 router.get('/stats', requireOrganizationFeature('memberDirectory'), getCompanyStats);
 
 export default router;

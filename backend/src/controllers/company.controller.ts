@@ -9,6 +9,7 @@ import { v4 as uuidv4 } from 'uuid';
 import {
   isOrganizationRoleEligible,
   isOrganizationType,
+  roleMatches,
 } from '../config/organization';
 
 export const getCompany = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -165,10 +166,32 @@ export const removeMember = async (req: AuthRequest, res: Response): Promise<voi
       res.status(400).json({ success: false, message: 'Cannot remove yourself' });
       return;
     }
-    await User.findOneAndUpdate(
+    const company = await Company.findById(req.user!.companyId).select('ownerId organizationType');
+    const member = await User.findOne({ _id: userId, companyId: req.user!.companyId }).select('_id role');
+    if (!company || !member) {
+      res.status(404).json({ success: false, message: 'Organization member not found.' });
+      return;
+    }
+    const actorOwnsOrganization = company.ownerId.toString() === req.user!.userId;
+    if (
+      member._id.toString() === company.ownerId.toString() ||
+      (!actorOwnsOrganization && roleMatches(
+        member.role,
+        ['owner', 'admin', 'manager', 'principal', 'dean', 'hod'],
+        company.organizationType,
+      ))
+    ) {
+      res.status(403).json({ success: false, message: 'You cannot remove this member.' });
+      return;
+    }
+    const removed = await User.findOneAndUpdate(
       { _id: userId, companyId: req.user!.companyId },
       { isActive: false, status: 'offline', companyId: null }
     );
+    if (!removed) {
+      res.status(404).json({ success: false, message: 'Organization member not found.' });
+      return;
+    }
     res.json({ success: true, message: 'Member removed' });
   } catch (err: any) {
     res.status(500).json({ success: false, message: err.message });

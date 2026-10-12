@@ -686,7 +686,14 @@ test('fee payment rejects when atomic balance guard reports overpayment', async 
 });
 
 test('organization settings reject invalid currency, timezone, and academic preferences', async () => {
+  const originalFindById = Company.findById;
   const originalFindByIdAndUpdate = Company.findByIdAndUpdate;
+  Company.findById = async () => ({
+    _id: companyId,
+    organizationType: 'business',
+    accountType: 'company',
+    ownerId: { toString: () => recordId.toString() },
+  });
   Company.findByIdAndUpdate = () => { throw new Error('Invalid settings must be rejected before persistence'); };
   const invalidSettings = [
     { currency: 'US' },
@@ -705,15 +712,23 @@ test('organization settings reject invalid currency, timezone, and academic pref
       assert.equal(res.statusCode, 400);
     }
   } finally {
+    Company.findById = originalFindById;
     Company.findByIdAndUpdate = originalFindByIdAndUpdate;
   }
 });
 
 test('organization settings persist validated localization and academic preferences', async () => {
+  const originalFindById = Company.findById;
   const originalFindByIdAndUpdate = Company.findByIdAndUpdate;
   let filter;
   let updates;
   let options;
+  Company.findById = async () => ({
+    _id: companyId,
+    organizationType: 'business',
+    accountType: 'company',
+    ownerId: { toString: () => recordId.toString() },
+  });
   Company.findByIdAndUpdate = async (...args) => {
     [filter, updates, options] = args;
     return { _id: companyId, currency: 'GBP', timeZone: 'Europe/London' };
@@ -736,6 +751,7 @@ test('organization settings persist validated localization and academic preferen
     assert.equal(updates['academicSettings.gradingScale'], 'letter');
     assert.equal(options.runValidators, true);
   } finally {
+    Company.findById = originalFindById;
     Company.findByIdAndUpdate = originalFindByIdAndUpdate;
   }
 });

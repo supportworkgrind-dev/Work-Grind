@@ -42,6 +42,7 @@ import {
 import { formatBytes, formatDate, getInitials } from '@/lib/utils';
 import { CountrySelect } from '@/components/common/CountrySelect';
 import { SocialAuthButtons } from '@/components/auth/SocialAuthButtons';
+import { canAccessOrganizationFeature } from '@/lib/organizationAccess';
 
 const NOTIFICATION_DEFAULTS = {
   taskAssigned: true,
@@ -118,7 +119,7 @@ export default function SettingsPage() {
   // Invite Modal State
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteRole, setInviteRole] = useState<'employee' | 'manager' | 'admin' | 'guest'>('employee');
+  const [inviteRole, setInviteRole] = useState('employee');
   const [inviteSending, setInviteSending] = useState(false);
   const [inviteSuccess, setInviteSuccess] = useState('');
   const [inviteError, setInviteError] = useState('');
@@ -589,7 +590,31 @@ export default function SettingsPage() {
     return matchesSearch && matchesRole;
   });
 
-  const isOwnerOrAdmin = user?.role === 'owner' || user?.role === 'admin';
+  const organization = company ?? (
+    user?.companyId && typeof user.companyId === 'object' ? user.companyId : null
+  );
+  const canManageMembers = canAccessOrganizationFeature(organization, user?.role, 'memberDirectory');
+  const canManageWorkspace = canAccessOrganizationFeature(organization, user?.role, 'academicAdmin') ||
+    (!!organization && organization.organizationType === 'business' &&
+      ['owner', 'admin'].includes(user?.role ?? ''));
+  const canViewAudit = canManageMembers;
+  const isAcademicOrganization = ['school', 'college', 'university'].includes(
+    organization?.organizationType ?? '',
+  );
+  const isOrganizationOwner = user?.role === 'owner';
+  const assignableRoles = isAcademicOrganization
+    ? [
+        ...(isOrganizationOwner ? ['principal', 'admin'] : []),
+        'teacher',
+        'student',
+        'parent',
+        ...(organization?.organizationType === 'university' && isOrganizationOwner ? ['dean', 'hod'] : []),
+      ]
+    : [
+        ...(isOrganizationOwner ? ['admin', 'manager'] : []),
+        'employee',
+        'guest',
+      ];
 
   const allNavTabs = [
     { id: 'profile', label: 'My Profile', icon: UserIcon, adminOnly: false },
@@ -601,7 +626,12 @@ export default function SettingsPage() {
     { id: 'audit', label: 'Audit Logs', icon: FileText, adminOnly: true },
   ];
 
-  const navTabs = allNavTabs.filter((t) => !t.adminOnly || isOwnerOrAdmin);
+  const navTabs = allNavTabs.filter((tab) => {
+    if (tab.id === 'workspace') return canManageWorkspace;
+    if (tab.id === 'members') return canManageMembers;
+    if (tab.id === 'audit') return canViewAudit;
+    return true;
+  });
 
   const getRoleBadgeStyle = (role: string) => {
     switch (role) {
@@ -652,7 +682,9 @@ export default function SettingsPage() {
         {/* Content Panel */}
         <div className="flex-1 min-w-0 theme-card rounded-2xl border p-4 sm:p-6 shadow-[var(--shadow-card)] transition-colors">
           {/* PERMISSION DENIED FOR EMPLOYEES ON ADMIN TABS */}
-          {!isOwnerOrAdmin && ['workspace', 'members', 'audit'].includes(activeTab) && (
+          {((activeTab === 'workspace' && !canManageWorkspace) ||
+            (activeTab === 'members' && !canManageMembers) ||
+            (activeTab === 'audit' && !canViewAudit)) && (
             <div className="flex flex-col items-center justify-center py-16 text-center space-y-3">
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50 text-amber-600 border border-amber-200">
                 <Shield className="h-7 w-7" />
@@ -1014,7 +1046,7 @@ export default function SettingsPage() {
                   <span>Workspace settings saved.</span>
                 </div>
               )}
-              {company?.accountType === 'individual' && (
+              {company?.accountType === 'individual' && isOrganizationOwner && (
                 <div className="rounded-2xl border border-emerald-200 bg-gradient-to-r from-emerald-50 to-teal-50/40 p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="flex items-start gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-600 text-white shrink-0 shadow-xs">
@@ -1147,7 +1179,11 @@ export default function SettingsPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700">Organization type</label>
-                    <select value={organizationType} onChange={(e) => setOrganizationType(e.target.value as NonNullable<Company['organizationType']>)} className="mt-1.5 block w-full rounded-xl border border-slate-200 py-2.5 px-3 text-xs text-slate-900 focus:ring-2 focus:ring-indigo-600">
+                    <select value={organizationType} onChange={(e) => {
+                      const nextType = e.target.value as NonNullable<Company['organizationType']>;
+                      setOrganizationType(nextType);
+                      setDefaultRole(nextType === 'business' ? 'employee' : 'student');
+                    }} className="mt-1.5 block w-full rounded-xl border border-slate-200 py-2.5 px-3 text-xs text-slate-900 focus:ring-2 focus:ring-indigo-600">
                       <option value="business">Business</option>
                       <option value="school">School</option>
                       <option value="college">College</option>
@@ -1190,9 +1226,18 @@ export default function SettingsPage() {
                       onChange={(e) => setDefaultRole(e.target.value)}
                       className="mt-1.5 block w-full rounded-xl border border-slate-200 py-2.5 px-3 text-xs text-slate-900 focus:ring-2 focus:ring-indigo-600"
                     >
-                      <option value="employee">Employee (Standard Member)</option>
-                      <option value="manager">Manager (Project Lead)</option>
-                      <option value="guest">Guest (Restricted Access)</option>
+                      {organizationType === 'business' ? (
+                        <>
+                          <option value="employee">Employee (Standard Member)</option>
+                          <option value="guest">Guest (Restricted Access)</option>
+                        </>
+                      ) : (
+                        <>
+                          <option value="student">Student</option>
+                          <option value="employee">Employee / Staff</option>
+                          <option value="guest">Guest (Restricted Access)</option>
+                        </>
+                      )}
                     </select>
                   </div>
                 </div>
@@ -1284,7 +1329,7 @@ export default function SettingsPage() {
                   </p>
                 </div>
 
-                {isOwnerOrAdmin && (memberLimitReached ? (
+                {canManageMembers && (memberLimitReached ? (
                   <a href="/billing" className="shrink-0 text-xs font-semibold text-indigo-600 underline">Member limit reached · Upgrade</a>
                 ) : (
                   <button
@@ -1317,10 +1362,14 @@ export default function SettingsPage() {
                 >
                   <option value="all">All Roles</option>
                   <option value="owner">Owner</option>
-                  <option value="admin">Admin</option>
-                  <option value="manager">Manager</option>
-                  <option value="employee">Employee</option>
-                  <option value="guest">Guest</option>
+                  {!assignableRoles.includes(m.role) && (
+                    <option value={m.role} disabled>{m.role}</option>
+                  )}
+                  {assignableRoles.map((role) => (
+                    <option key={role} value={role}>
+                      {role.charAt(0).toUpperCase() + role.slice(1)}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -1353,8 +1402,12 @@ export default function SettingsPage() {
                       ) : (
                         filteredMembers.map((m) => {
                           const isSelf = m._id === user?._id;
-                          const isTargetOwner = m.role === 'owner';
-                          const canEditThisMember = isOwnerOrAdmin && !isTargetOwner && !isSelf;
+                          const isTargetOwner = ['owner', 'founder'].includes(m.role);
+                          const isTargetElevated = [
+                            'admin', 'manager', 'principal', 'director', 'dean', 'hod',
+                          ].includes(m.role);
+                          const canEditThisMember = canManageMembers && !isTargetOwner && !isSelf &&
+                            (isOrganizationOwner || !isTargetElevated);
 
                           return (
                             <tr key={m._id} className="hover:bg-slate-50 transition-colors">
@@ -1834,13 +1887,14 @@ export default function SettingsPage() {
                 </label>
                 <select
                   value={inviteRole}
-                  onChange={(e) => setInviteRole(e.target.value as any)}
+                  onChange={(e) => setInviteRole(e.target.value)}
                   className="mt-1.5 block w-full rounded-xl border border-slate-200 py-2.5 px-3 text-xs text-slate-900 font-semibold focus:ring-2 focus:ring-indigo-600"
                 >
-                  <option value="employee">Employee — Standard tasks, channels, and projects</option>
-                  <option value="manager">Manager — Lead teams, create projects, assign tasks</option>
-                  <option value="admin">Admin — Manage workspace settings, members, and roles</option>
-                  <option value="guest">Guest — Restricted to explicitly shared channels/projects</option>
+                  {assignableRoles.map((role) => (
+                    <option key={role} value={role}>
+                      {role.charAt(0).toUpperCase() + role.slice(1)}
+                    </option>
+                  ))}
                 </select>
               </div>
 
