@@ -79,6 +79,24 @@ test('LinkedIn authorization requests ask only for OIDC profile/email and use st
   assert.equal(url.searchParams.has('client_secret'), false);
 });
 
+test('LinkedIn publishing consent keeps OIDC scopes and adds only member-post permission', () => {
+  configureLinkedIn();
+  const configuration = getOAuthConfiguration('linkedin');
+  const url = new URL(buildAuthorizationUrl(
+    'linkedin',
+    configuration,
+    'publishing-state',
+    'publishing-nonce',
+    'publishing-verifier',
+    true,
+  ));
+
+  assert.equal(url.searchParams.get('scope'), 'openid profile email w_member_social');
+  assert.equal(url.searchParams.get('state'), 'publishing-state');
+  assert.equal(url.searchParams.get('nonce'), 'publishing-nonce');
+  assert.ok(url.searchParams.get('code_challenge'));
+});
+
 test('LinkedIn code exchange validates the signed ID token and nonce and sends PKCE', async (context) => {
   configureLinkedIn();
   const configuration = getOAuthConfiguration('linkedin');
@@ -95,7 +113,12 @@ test('LinkedIn code exchange validates the signed ID token and nonce and sends P
   global.fetch = async (input, init = {}) => {
     if (String(input) === 'https://www.linkedin.com/oauth/v2/accessToken') {
       submittedForm = new URLSearchParams(init.body);
-      return new Response(JSON.stringify({ id_token: createIdToken(privateKey) }), { status: 200 });
+      return new Response(JSON.stringify({
+        id_token: createIdToken(privateKey),
+        access_token: 'server-only-access-token',
+        expires_in: 5184000,
+        scope: 'openid profile email w_member_social',
+      }), { status: 200 });
     }
     if (String(input) === 'https://www.linkedin.com/oauth/openid/jwks') {
       return new Response(JSON.stringify({ keys: [jwk] }), { status: 200 });
@@ -115,6 +138,9 @@ test('LinkedIn code exchange validates the signed ID token and nonce and sends P
   assert.equal(result.claims.email_verified, true);
   assert.equal(result.claims.given_name, 'Example');
   assert.equal(result.claims.family_name, 'Person');
+  assert.equal(result.accessToken, 'server-only-access-token');
+  assert.equal(result.expiresIn, 5184000);
+  assert.deepEqual(result.scopes, ['openid', 'profile', 'email', 'w_member_social']);
   assert.equal(submittedForm.get('client_id'), 'test-linkedin-client');
   assert.equal(submittedForm.get('client_secret'), 'test-linkedin-secret');
   assert.equal(submittedForm.get('code_verifier'), 'test-verifier');

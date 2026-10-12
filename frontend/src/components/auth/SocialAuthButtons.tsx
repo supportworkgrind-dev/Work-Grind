@@ -5,9 +5,10 @@ import { AlertCircle, LoaderCircle } from 'lucide-react';
 import { api } from '@/lib/api';
 
 type SocialAuthButtonsProps = {
-  intent?: 'login' | 'link' | 'signup';
+  intent?: 'login' | 'link' | 'signup' | 'publishing';
   audience?: 'user' | 'client';
   signupSelection?: { accountType: 'company' | 'individual'; organizationType: 'business' | 'school' | 'college' | 'university' } | null;
+  returnTo?: string;
   className?: string;
 };
 
@@ -20,6 +21,7 @@ export function SocialAuthButtons({
   intent = 'login',
   audience = 'user',
   signupSelection,
+  returnTo: returnToProp,
   className = '',
 }: SocialAuthButtonsProps) {
   const [busyProvider, setBusyProvider] = useState<string | null>(null);
@@ -28,15 +30,18 @@ export function SocialAuthButtons({
   const [notice, setNotice] = useState('');
 
   useEffect(() => {
-    if (intent !== 'link') return;
+    if (intent !== 'link' && intent !== 'publishing') return;
     const url = new URL(window.location.href);
     const result = url.searchParams.get('oauth');
     const issue = url.searchParams.get('oauth_error');
     if (result || issue) {
       const timer = window.setTimeout(() => {
         if (result === 'linked') setNotice('Sign-in provider linked successfully.');
+        if (result === 'connected') setNotice('LinkedIn publishing connected successfully.');
         if (issue) setError(issue === 'cancelled'
-          ? 'Provider linking was cancelled.'
+          ? 'Provider connection was cancelled.'
+          : issue === 'publishing_permission_denied'
+            ? 'LinkedIn did not grant member-post permission. Review the consent screen and try again.'
           : 'We could not link that provider. Confirm it belongs to this account and try again.');
       }, 0);
       url.searchParams.delete('oauth');
@@ -53,15 +58,17 @@ export function SocialAuthButtons({
     setError('');
     try {
       const requestedReturnTo = new URLSearchParams(window.location.search).get('redirect');
-      const returnTo = intent === 'link'
+      const returnTo = returnToProp || (intent === 'link'
         ? audience === 'client' ? '/client-portal/portal' : '/settings?tab=security'
+        : intent === 'publishing'
+          ? '/settings?tab=security'
         : audience === 'client'
           ? '/client-portal/oauth/callback'
         : intent === 'signup'
           ? '/create-company'
         : requestedReturnTo && requestedReturnTo.startsWith('/') && !requestedReturnTo.startsWith('//')
           ? requestedReturnTo
-          : '/dashboard';
+          : '/dashboard');
       const response = await api.get(`/auth/oauth/${provider}/start`, {
         withCredentials: true,
         headers: { Accept: 'application/json' },
@@ -96,14 +103,14 @@ export function SocialAuthButtons({
   return (
     <div className={className}>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {providers.map((provider) => (
+        {providers.filter((provider) => intent !== 'publishing' || provider.id === 'linkedin').map((provider) => (
           <button
             key={provider.id}
             type="button"
             disabled={busyProvider !== null || (intent === 'signup' && !signupSelection)}
             onClick={() => void connect(provider.id)}
             className={`flex min-h-11 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${provider.className}`}
-            aria-label={`${intent === 'link' ? 'Link' : 'Continue with'} ${provider.label}`}
+            aria-label={`${intent === 'link' ? 'Link' : intent === 'publishing' ? 'Connect publishing for' : 'Continue with'} ${provider.label}`}
             aria-busy={busyProvider === provider.id}
           >
             {busyProvider === provider.id
@@ -120,7 +127,9 @@ export function SocialAuthButtons({
                 </svg>}
             {busyProvider === provider.id
               ? `Connecting to ${provider.label}…`
-              : `${intent === 'link' ? 'Link' : 'Continue with'} ${provider.label}`}
+              : intent === 'publishing'
+                ? 'Connect LinkedIn publishing'
+                : `${intent === 'link' ? 'Link' : 'Continue with'} ${provider.label}`}
           </button>
         ))}
       </div>
