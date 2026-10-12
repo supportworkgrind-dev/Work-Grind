@@ -287,7 +287,7 @@ export default function PricingPage() {
             {educationPlans.filter((plan) => plan.id === workspaceType).map((plan) => (
               <article key={plan.id} className="rounded-3xl border border-indigo-500/40 bg-[#0d1117] p-7 shadow-xl shadow-indigo-500/10">
                 <h2 className="text-sm font-bold uppercase tracking-widest text-slate-300">{plan.name}</h2>
-                <p className="mt-4 text-4xl font-black text-white">{plan.currency} {plan.priceDisplay.replace('/month', '')}<span className="ml-1.5 text-sm font-medium text-slate-400">/{plan.billingInterval}</span></p>
+                <p className="mt-4 text-4xl font-black text-white">{plan.priceDisplay.replace('/month', '')} {plan.currency}<span className="ml-1.5 text-sm font-medium text-slate-400">/{plan.billingInterval}</span></p>
                 <p className="mt-3 text-sm text-slate-400">{plan.description}</p>
                 <ul className="mt-5 space-y-2 text-sm text-slate-200">
                   <li>Up to {plan.limits.students.toLocaleString()} active students</li>

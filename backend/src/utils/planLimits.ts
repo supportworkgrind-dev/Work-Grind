@@ -387,7 +387,8 @@ export async function checkMemberLimit(
   }
   const educationPlanId = educationPlanForOrganization(sub.organizationType);
   const inviteRole = (options.role ?? 'employee').toLowerCase();
-  const isStudent = inviteRole === 'student';
+  const isStudent = Boolean(educationPlanId && inviteRole === 'student');
+  const isParent = Boolean(educationPlanId && (inviteRole === 'parent' || inviteRole === 'guardian'));
   const limit = isStudent
     ? sub.planConfig.limits.students ?? 0
     : sub.planConfig.limits.members;
@@ -438,6 +439,8 @@ export async function checkMemberLimit(
   const linkedStudentIds = new Set(linkedStudentUserIds.map((id) => id.toString()));
   const activeCount = isStudent
     ? activeStudentRecords + activeMembers.filter((member) => !linkedStudentIds.has(member._id.toString())).length
+    : isParent
+      ? 0
     : activeMembers.length + activeStaffRecords;
   const current = activeCount + (educationPlanId ? 0 : pendingInvites);
 

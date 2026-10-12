@@ -515,8 +515,8 @@ export default function BillingPage() {
                     <div>
                       <p className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{plan.name}</p>
                       <p className="mt-1 text-2xl font-black" style={{ color: 'var(--text-primary)' }}>
-                        {plan.currency} {plan.priceDisplay}
-                        <span className="ml-1 text-sm font-medium" style={{ color: 'var(--text-muted)' }}>per {plan.billingInterval}</span>
+                        {plan.priceDisplay.replace('/month', '')} {plan.currency}
+                        <span className="ml-1 text-sm font-medium" style={{ color: 'var(--text-muted)' }}>/ {plan.billingInterval}</span>
                       </p>
                       <p className="mt-2 text-xs" style={{ color: 'var(--text-secondary)' }}>{plan.description}</p>
                     </div>

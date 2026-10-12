@@ -251,7 +251,9 @@ export async function getCompanySubscription(
         entitlements: Object.fromEntries(
           Object.keys(resolvedPlanConfig.entitlements).map((key) => [key, false]),
         ) as typeof resolvedPlanConfig.entitlements,
-        limits: { members: 0, storage: 0, aiRequests: 0 },
+        limits: educationPlanId
+          ? resolvedPlanConfig.limits
+          : { members: 0, storage: 0, aiRequests: 0 },
       };
   if (activeAccess && (company.storage.limit !== resolvedPlanConfig.limits.storage || company.plan !== effectivePlanId)) {
     company.storage.limit = resolvedPlanConfig.limits.storage;
