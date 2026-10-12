@@ -16,7 +16,7 @@
 import mongoose from 'mongoose';
 import Company, { CompanySubscriptionStatus, CompanyPlan, ICompany } from '../models/Company';
 import User from '../models/User';
-import { educationPlanForOrganization, getPlan, getPolarProductId, hasActiveAccess, PlanId, resolveEffectivePlanId, TRIAL_DAYS } from '../config/subscription';
+import { educationPlanForOrganization, getEducationPolarProductId, getPlan, getPolarProductId, hasActiveAccess, PlanId, resolveEffectivePlanId, TRIAL_DAYS } from '../config/subscription';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -59,7 +59,9 @@ export function hasVerifiedEducationSubscription(company: EducationSubscriptionR
     planId &&
     company.subscriptionPlan === planId &&
     company.polarSubscriptionId?.trim() &&
-    company.polarProductId?.trim(),
+    company.polarProductId?.trim() &&
+    (!getEducationPolarProductId(planId) ||
+      company.polarProductId === getEducationPolarProductId(planId)),
   );
 }
 

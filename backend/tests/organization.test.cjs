@@ -145,21 +145,32 @@ test('new education workspaces keep the free subscription default and organizati
 });
 
 test('verified Polar subscription activates its matching education plan only', () => {
-  const company = {
-    organizationType: 'university',
-    subscriptionPlan: 'university',
-    polarSubscriptionId: 'polar-subscription-1',
-    polarProductId: 'university-product',
-  };
-  assert.equal(hasVerifiedEducationSubscription(company), true);
-  assert.deepEqual(enforceEducationSubscriptionTruth('active', company), {
-    status: 'active',
-    subscriptionMismatch: false,
-  });
-  assert.equal(hasVerifiedEducationSubscription({
-    ...company,
-    organizationType: 'school',
-  }), false);
+  const previousProductId = process.env.POLAR_UNIVERSITY_PRODUCT_ID;
+  try {
+    process.env.POLAR_UNIVERSITY_PRODUCT_ID = 'university-product';
+    const company = {
+      organizationType: 'university',
+      subscriptionPlan: 'university',
+      polarSubscriptionId: 'polar-subscription-1',
+      polarProductId: 'university-product',
+    };
+    assert.equal(hasVerifiedEducationSubscription(company), true);
+    assert.deepEqual(enforceEducationSubscriptionTruth('active', company), {
+      status: 'active',
+      subscriptionMismatch: false,
+    });
+    assert.equal(hasVerifiedEducationSubscription({ ...company, polarProductId: 'other-product' }), false);
+    assert.equal(hasVerifiedEducationSubscription({ ...company, organizationType: 'school' }), false);
+    delete process.env.POLAR_UNIVERSITY_PRODUCT_ID;
+    assert.equal(hasVerifiedEducationSubscription(company), true);
+    assert.deepEqual(enforceEducationSubscriptionTruth('active', {
+      organizationType: 'business',
+      subscriptionPlan: 'free',
+    }), { status: 'active', subscriptionMismatch: false });
+  } finally {
+    if (previousProductId === undefined) delete process.env.POLAR_UNIVERSITY_PRODUCT_ID;
+    else process.env.POLAR_UNIVERSITY_PRODUCT_ID = previousProductId;
+  }
 });
 
 test('valid trials stay trials and expired or cancelled education subscriptions do not keep access', () => {
