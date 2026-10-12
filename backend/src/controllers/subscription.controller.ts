@@ -839,6 +839,10 @@ export const handleWebhook = async (
         if (!company) break;
 
         const productPlan = resolveWebhookPlan(company, sub.productId, meta?.planId);
+        if (!productPlan) {
+          console.warn(`[Webhook] subscription.updated: product does not match workspace type for ${companyId}`);
+          break;
+        }
         const pendingPlanTakesEffect = company.pendingSubscriptionPlan &&
           productPlan === company.pendingSubscriptionPlan &&
           (!company.subscriptionEndDate || Date.now() >= company.subscriptionEndDate.getTime());
@@ -882,6 +886,10 @@ export const handleWebhook = async (
         if (!companyId) break;
         const company = await Company.findById(companyId);
         if (!company) break;
+        if (!resolveWebhookPlan(company, sub.productId, meta?.planId)) {
+          console.warn(`[Webhook] subscription.canceled: product does not match workspace type for ${companyId}`);
+          break;
+        }
 
         company.subscriptionStatus = 'cancelled';
         company.cancelAtPeriodEnd  = sub.cancelAtPeriodEnd ?? true;
@@ -906,6 +914,10 @@ export const handleWebhook = async (
         if (!companyId) break;
         const company = await Company.findById(companyId);
         if (!company) break;
+        if (!resolveWebhookPlan(company, sub.productId, meta?.planId)) {
+          console.warn(`[Webhook] subscription.uncanceled: product does not match workspace type for ${companyId}`);
+          break;
+        }
         const polarStatus = normalizePolarSubscriptionStatus(sub.status);
         if (!polarStatus) {
           console.warn(`[Webhook] subscription.uncanceled: unsupported Polar status "${sub.status}"`);
@@ -926,6 +938,10 @@ export const handleWebhook = async (
         if (!companyId) break;
         const company = await Company.findById(companyId);
         if (!company) break;
+        if (!resolveWebhookPlan(company, sub.productId, meta?.planId)) {
+          console.warn(`[Webhook] subscription.revoked: product does not match workspace type for ${companyId}`);
+          break;
+        }
         company.subscriptionStatus = 'expired';
         if (sub.currentPeriodEnd) company.subscriptionEndDate = new Date(sub.currentPeriodEnd);
         if (sub.productId) company.polarProductId = sub.productId;

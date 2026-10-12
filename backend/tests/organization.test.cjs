@@ -12,7 +12,13 @@ const {
   canAssignOrganizationRole,
   ORGANIZATION_TYPES,
 } = require('../dist/config/organization');
-const { getEducationPlanPricing, getEducationPolarProductId } = require('../dist/config/subscription');
+const {
+  getEducationPlanPricing,
+  getEducationPolarProductId,
+  getEducationPlanConfig,
+  educationPlanForOrganization,
+} = require('../dist/config/subscription');
+const { withCompanyCapacityLock } = require('../dist/utils/planLimits');
 const mongoose = require('mongoose');
 
 test('new and legacy-shaped companies default to a business organization without changing account type', () => {
@@ -78,10 +84,79 @@ test('education monthly prices are backend-defined without placeholder Polar IDs
     assert.equal(getEducationPolarProductId('school'), undefined);
     assert.equal(getEducationPolarProductId('college'), undefined);
     assert.equal(getEducationPolarProductId('university'), undefined);
+    assert.ok(getEducationPlanPricing().every((plan) => plan.checkoutAvailable === false));
   } finally {
     envKeys.forEach((key, index) => {
       if (previousValues[index] === undefined) delete process.env[key];
       else process.env[key] = previousValues[index];
+    });
+
+    test('education subscription configs map workspace types to the specified monthly prices and limits', () => {
+      const expected = {
+        school: { priceMonthly: 1900, members: 25, students: 200, pendingInvites: 50 },
+        college: { priceMonthly: 4900, members: 75, students: 750, pendingInvites: 150 },
+        university: { priceMonthly: 9900, members: 200, students: 2000, pendingInvites: 500 },
+      };
+      for (const [organizationType, values] of Object.entries(expected)) {
+        assert.equal(educationPlanForOrganization(organizationType), organizationType);
+        const plan = getEducationPlanConfig(organizationType);
+        assert.equal(plan.priceMonthly, values.priceMonthly);
+        assert.equal(plan.limits.members, values.members);
+        assert.equal(plan.limits.students, values.students);
+        assert.equal(plan.limits.pendingInvites, values.pendingInvites);
+      }
+      assert.equal(educationPlanForOrganization('business'), undefined);
+      assert.equal(educationPlanForOrganization('individual'), undefined);
+    });
+
+    test('workspace capacity lock serializes concurrent capacity changes', async () => {
+      const originalFindOneAndUpdate = Company.findOneAndUpdate;
+      const originalUpdateOne = Company.updateOne;
+      const originalExists = Company.exists;
+      let lockToken;
+      let lockUntil = 0;
+      let activeOperations = 0;
+      let maximumActiveOperations = 0;
+
+      Company.findOneAndUpdate = (filter, update) => {
+        const now = Date.now();
+        const eligible = !lockToken || lockUntil <= now;
+        if (eligible) {
+          lockToken = update.$set.capacityLockToken;
+          lockUntil = update.$set.capacityLockUntil.getTime();
+        }
+        return { select: async () => eligible ? { _id: 'company' } : null };
+      };
+      Company.updateOne = async (filter) => {
+        if (filter.capacityLockToken === lockToken) {
+          lockToken = undefined;
+          lockUntil = 0;
+        }
+        return { matchedCount: 1 };
+      };
+      Company.exists = async () => ({ _id: 'company' });
+
+      try {
+        await Promise.all([
+          withCompanyCapacityLock('company', async () => {
+            activeOperations += 1;
+            maximumActiveOperations = Math.max(maximumActiveOperations, activeOperations);
+            await new Promise((resolve) => setTimeout(resolve, 60));
+            activeOperations -= 1;
+          }),
+          withCompanyCapacityLock('company', async () => {
+            activeOperations += 1;
+            maximumActiveOperations = Math.max(maximumActiveOperations, activeOperations);
+            await new Promise((resolve) => setTimeout(resolve, 10));
+            activeOperations -= 1;
+          }),
+        ]);
+        assert.equal(maximumActiveOperations, 1);
+      } finally {
+        Company.findOneAndUpdate = originalFindOneAndUpdate;
+        Company.updateOne = originalUpdateOne;
+        Company.exists = originalExists;
+      }
     });
   }
 });
