@@ -14,7 +14,7 @@ export default function ContactPage() {
   const [submittedMessage, setSubmittedMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError]             = useState<string | null>(null);
-  const [form, setForm] = useState({ name: '', email: '', company: '', subject: 'Sales Inquiry', message: '' });
+  const [form, setForm] = useState({ name: '', email: '', company: '', subject: 'General Question', message: '' });
 
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get('subject') === 'Technical Support') {

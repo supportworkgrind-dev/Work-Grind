@@ -11,9 +11,11 @@ export const metadata: Metadata = {
 
 const topics = [
   { title: 'Getting started', description: 'Create an account, verify your email, and set up a workspace.', href: '/signup', label: 'Sign up' },
+  { title: 'Workspace types', description: 'Choose Solo, Company, School / Academy, College, or University during signup. Available tools depend on workspace type, role, and plan.', href: '/features', label: 'Explore workspace features' },
   { title: 'Account', description: 'Manage your profile, preferences, security, and sign-in recovery.', href: '/settings', label: 'Account settings' },
   { title: 'Workspace', description: 'Manage workspace members, roles, and invitations.', href: '/team', label: 'Team' },
   { title: 'Tasks', description: 'Create and organize tasks, statuses, priorities, and assignees.', href: '/tasks', label: 'Tasks' },
+  { title: 'Academic administration', description: 'Use the academic areas available to your School, College, or University role.', href: '/academic', label: 'Academic workspace' },
   { title: 'Projects', description: 'Group and track work across projects.', href: '/projects', label: 'Projects' },
   { title: 'Calendar', description: 'Review and manage scheduled events and meetings.', href: '/calendar', label: 'Calendar' },
   { title: 'CRM', description: 'Manage contacts, companies, and deal records.', href: '/crm', label: 'CRM' },
@@ -38,7 +40,7 @@ export default function HelpCenterPage() {
             <BookOpen className="h-3.5 w-3.5" /> WorkGrind Help Center
           </span>
           <h1 className="mt-4 text-3xl font-extrabold tracking-tight sm:text-4xl">Find your way around WorkGrind</h1>
-          <p className="mt-3 text-sm leading-6 text-slate-600">Quick links and practical starting points for the features currently available in WorkGrind.</p>
+          <p className="mt-3 text-sm leading-6 text-slate-600">Quick links for Solo, Company, School / Academy, College, and University workspaces. Some destinations require sign-in and authorized access.</p>
         </div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {topics.map((topic) => (

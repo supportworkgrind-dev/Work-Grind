@@ -302,7 +302,7 @@ export default function BillingPage() {
           Workspace Subscription
         </h1>
         <p className="mt-1 text-sm" style={{ color: 'var(--text-secondary)' }}>
-          Your workspace pays once — all members share the subscription automatically.
+          Subscription and plan limits apply to this workspace.
           {!isOwnerAdmin && <span className="ml-1 font-semibold">Only workspace owners and admins can manage billing.</span>}
         </p>
       </div>
@@ -367,11 +367,11 @@ export default function BillingPage() {
             <Zap className="h-6 w-6 text-indigo-600" />
           </div>
           <div className="flex-1">
-            <p className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Workspace 7-day free trial active</p>
+            <p className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Workspace trial active</p>
             <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>
               {sub?.trialDaysRemaining != null && sub.trialDaysRemaining > 0
                 ? `${sub.trialDaysRemaining} day${sub.trialDaysRemaining !== 1 ? 's' : ''} remaining — choose a plan for your workspace.`
-                : 'Trial ends today. Choose a plan to keep your team\'s access.'}
+                : 'Trial ends today. Choose a plan to keep workspace access.'}
             </p>
           </div>
           {isOwnerAdmin && (

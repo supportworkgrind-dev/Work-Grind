@@ -5,10 +5,10 @@ import { motion } from 'framer-motion';
 import { Shield, Lock, Users, Eye } from 'lucide-react';
 
 const PILLARS = [
-  { Icon: Users,  title: 'Role-Based Access',    desc: 'Owner, Admin, Manager and Employee roles with clear permission boundaries.'  },
-  { Icon: Shield, title: 'Workspace Isolation',  desc: 'Each workspace is fully isolated — no cross-tenant data exposure.'           },
-  { Icon: Lock,   title: 'Secure Authentication',desc: 'JWT with refresh rotation and bcrypt password hashing.'                      },
-  { Icon: Eye,    title: 'Audit Logs',           desc: 'Every privileged action logged with actor, resource and timestamp.'          },
+  { Icon: Users,  title: 'Role-Based Access', desc: 'Workspace membership and role permissions govern access to supported features.' },
+  { Icon: Shield, title: 'Workspace Scoping', desc: 'Workspace context is used to scope access to tenant data.' },
+  { Icon: Lock,   title: 'Authentication', desc: 'WorkGrind uses account authentication and session controls.' },
+  { Icon: Eye,    title: 'Activity Records', desc: 'Some privileged actions are recorded where audit logging is available.' },
 ];
 
 export function SecuritySection() {
@@ -39,24 +39,24 @@ export function SecuritySection() {
             <h2 id="security-heading" className="text-3xl sm:text-4xl font-black text-white tracking-tight leading-tight">
               Built for{' '}
               <span className="bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
-                serious work.
+                work and learning.
               </span>
             </h2>
 
             <p className="text-[15px] text-slate-400 leading-relaxed max-w-md">
-              Workspace isolation, role-based access and audit logging — baked in from day one.
+              WorkGrind applies authentication and workspace permissions to supported areas. Available controls vary by feature and account.
             </p>
 
-            <div role="img" aria-label="Security flow with role-based access, an isolated workspace, and an audit trail" className="max-w-xl rounded-2xl border border-emerald-400/15 bg-gradient-to-br from-emerald-400/[0.06] to-cyan-400/[0.025] p-4 sm:p-5">
+            <div role="img" aria-label="Illustration of account authentication, workspace permissions, and recorded activity where available" className="max-w-xl rounded-2xl border border-emerald-400/15 bg-gradient-to-br from-emerald-400/[0.06] to-cyan-400/[0.025] p-4 sm:p-5">
               <div className="mb-4 flex items-center gap-2 text-xs font-semibold text-emerald-100">
                 <Shield className="h-4 w-4 text-emerald-300" aria-hidden="true" />
                 Protected workspace data flow
               </div>
               <div className="grid grid-cols-3 gap-2">
                 {[
-                  { title: 'Role access', detail: 'Permission checks', Icon: Users },
-                  { title: 'Workspace', detail: 'Isolated data', Icon: Lock },
-                  { title: 'Audit trail', detail: 'Actions recorded', Icon: Eye },
+                  { title: 'Role access', detail: 'Feature permissions', Icon: Users },
+                  { title: 'Workspace', detail: 'Tenant scoping', Icon: Lock },
+                  { title: 'Activity', detail: 'Where available', Icon: Eye },
                 ].map(({ title, detail, Icon }, index) => (
                   <div key={title} className="relative min-w-0 rounded-xl border border-white/[0.08] bg-slate-950/55 p-3 text-center">
                     <span className="mx-auto mb-2 flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-400/10">

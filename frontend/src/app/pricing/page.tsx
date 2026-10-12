@@ -117,7 +117,7 @@ function PricingCard({
 const FAQS = [
   {
     q: 'Does the free trial require a credit card?',
-    a: 'No. Your 7-day free trial starts automatically when you create an account — no credit card required. You only need to add payment details when you choose a paid plan.',
+    a: 'Trial availability and terms are shown with the applicable plan. Payment details are requested through checkout when you select a paid plan.',
   },
   {
     q: 'What happens when my trial expires?',
@@ -433,7 +433,7 @@ export default function PricingPage() {
               { icon: Calendar,     label: 'Calendar & Meetings',   desc: 'Scheduling, video, notes' },
               { icon: Sparkles,     label: 'Tavro AI',               desc: 'Smart summaries & actions' },
               { icon: Shield,       label: 'Security & RBAC',       desc: 'Roles, audit logs, MFA' },
-              { icon: Zap,          label: 'Real-time Updates',     desc: 'Live sync across your team' },
+              { icon: Zap,          label: 'Plan-based features',   desc: 'Feature access depends on your workspace type, role, and plan.' },
             ].map(({ icon: Icon, label, desc }) => (
               <div key={label} className="flex flex-col items-center text-center gap-2">
                 <div className="h-10 w-10 rounded-2xl bg-indigo-500/10 border border-indigo-500/15 flex items-center justify-center">
