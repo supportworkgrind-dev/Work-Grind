@@ -40,6 +40,10 @@ function normalizeGeminiModel(model?: string): string {
 export const GEMINI_MODEL = normalizeGeminiModel(process.env.GEMINI_MODEL);
 export const OPENAI_MODEL = process.env.OPENAI_MODEL?.trim() || 'gpt-4o-mini';
 export const CLOUDFLARE_AI_MODEL = process.env.CLOUDFLARE_AI_MODEL?.trim() || '@cf/openai/gpt-oss-20b';
+const configuredProviderRetries = Number.parseInt(process.env.AI_PROVIDER_RETRY_ATTEMPTS ?? '1', 10);
+export const AI_PROVIDER_RETRY_ATTEMPTS = Number.isFinite(configuredProviderRetries)
+  ? Math.min(2, Math.max(0, configuredProviderRetries))
+  : 1;
 export const AI_REQUEST_TIMEOUT_MS = Math.min(
   50_000,
   Math.max(5_000, Number(process.env.AI_REQUEST_TIMEOUT_MS) || 45_000),
@@ -145,7 +149,7 @@ export function classifyAIError(error: any, safeMessage?: string): AIErrorCatego
   if (status === 404 && /model/.test(message) || status === 400 && /model.*(not found|does not exist)/.test(message)) return 'INVALID_MODEL';
   if (status === 400 || code === 'INVALID_ARGUMENT') return 'BAD_REQUEST';
   if (error?.name === 'AbortError' || error?.name === 'TimeoutError' || code === 'ETIMEDOUT' || /timed out|abort/.test(message)) return 'TIMEOUT';
-  if (/econn|enotfound|socket|network|fetch failed/.test(message)) return 'NETWORK';
+  if (/^(ECONN|ENOTFOUND|EHOST|EAI_AGAIN|UND_ERR)/.test(code) || /econn|enotfound|socket|network|fetch failed/.test(message)) return 'NETWORK';
   return 'PROVIDER_ERROR';
 }
 

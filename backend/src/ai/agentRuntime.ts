@@ -2,6 +2,7 @@ import AuditLog from '../models/AuditLog';
 import mongoose from 'mongoose';
 import {
   AI_REQUEST_TIMEOUT_MS,
+  AI_PROVIDER_RETRY_ATTEMPTS,
   getConfiguredAgentAIProviders,
   getGenAI,
   getOpenAI,
@@ -15,6 +16,7 @@ import {
   type AIProvider,
 } from '../services/geminiService';
 import { AgentTool, getAvailableTools, getGeminiFunctionDeclarations, getOpenAIFunctions, getTool, isToolAvailable, ToolContext, ToolResult } from './tools';
+import { roleMatches } from '../config/organization';
 
 const MAX_TOOL_CALLS = 8;
 const MAX_HISTORY_MESSAGES = 12;
@@ -49,6 +51,59 @@ export interface AgentTurnOptions {
     args: Record<string, unknown>;
   };
   validateVoiceAction?: () => Promise<ToolContext | null>;
+}
+
+function isRetryableProviderError(error: unknown): boolean {
+  const category = classifyAIError(error);
+  if (category === 'NETWORK' || category === 'RATE_LIMIT') return true;
+  const status = (error as { status?: number; statusCode?: number } | null)?.status ??
+    (error as { statusCode?: number } | null)?.statusCode;
+  return category === 'PROVIDER_ERROR' && typeof status === 'number' && status >= 500;
+}
+
+function delayWithAbort(delayMs: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(signal.reason ?? new Error('Provider request cancelled.'));
+      return;
+    }
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', abort);
+      resolve();
+    }, delayMs);
+    const abort = () => {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', abort);
+      reject(signal?.reason ?? new Error('Provider request cancelled.'));
+    };
+    signal?.addEventListener('abort', abort, { once: true });
+  });
+}
+
+export async function withProviderRetries<T>(
+  request: () => Promise<T>,
+  options: {
+    signal?: AbortSignal;
+    onRetry?: () => void;
+    maxRetries?: number;
+    retryDelayMs?: number;
+  } = {},
+): Promise<T> {
+  const maxRetries = Math.min(2, Math.max(0, options.maxRetries ?? AI_PROVIDER_RETRY_ATTEMPTS));
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await request();
+    } catch (error) {
+      if (
+        attempt >= maxRetries ||
+        options.signal?.aborted ||
+        !isRetryableProviderError(error)
+      ) throw error;
+      options.onRetry?.();
+      const baseDelay = Math.max(0, options.retryDelayMs ?? 200) * (2 ** attempt);
+      await delayWithAbort(baseDelay + Math.random() * 100, options.signal);
+    }
+  }
 }
 
 export class AIProviderUnavailableError extends Error {
@@ -146,14 +201,14 @@ function toolResultForModel(result: ToolResult): string {
     : JSON.stringify({ success: result.success, data: serialized.slice(0, MAX_TOOL_RESULT_CHARS), truncated: true });
 }
 
-export async function executeToolCallBatch<T>(
-  calls: readonly T[],
-  isReadOnly: (call: T) => boolean,
-  execute: (call: T) => Promise<T>,
-): Promise<T[]> {
+export async function executeToolCallBatch<TCall, TResult>(
+  calls: readonly TCall[],
+  isReadOnly: (call: TCall) => boolean,
+  execute: (call: TCall) => Promise<TResult>,
+): Promise<TResult[]> {
   if (calls.every(isReadOnly)) return Promise.all(calls.map(execute));
 
-  const results: T[] = [];
+  const results: TResult[] = [];
   for (const call of calls) results.push(await execute(call));
   return results;
 }
@@ -183,7 +238,7 @@ async function logToolAction(
 }
 
 function canManageWorkspace(ctx: ToolContext): boolean {
-  return ['owner', 'admin', 'manager'].includes(ctx.userRole);
+  return roleMatches(ctx.userRole, ['admin', 'manager'], ctx.organizationType);
 }
 
 async function executeToolCall(
@@ -214,7 +269,7 @@ async function executeToolCall(
     return { success: false, error: 'Your current plan does not include this WorkGrind feature.' };
   }
 
-  const managerTools = new Set(['createProject', 'createDeal', 'updateDeal', 'assignTask']);
+  const managerTools = new Set(['createProject', 'createDeal', 'updateDeal', 'assignTask', 'createContact']);
   if (managerTools.has(toolName) && !canManageWorkspace(actionContext)) {
     return { success: false, error: 'Your workspace role does not allow that action. Ask an owner, admin, or manager.' };
   }
@@ -309,6 +364,7 @@ function logProviderDiagnostic(
   fallbackAttempted: boolean,
   fallbackResult: 'NOT_ATTEMPTED' | 'SUCCEEDED' | 'FAILED',
   providerDurationMs: number,
+  timeToFirstTokenMs: number | null,
 ): void {
   const safeError = safeAIErrorLog(error);
   console.error('[Tavro AI] provider diagnostic', {
@@ -319,6 +375,7 @@ function logProviderDiagnostic(
     fallbackAttempted,
     fallbackResult,
     providerDurationMs,
+    timeToFirstTokenMs,
   });
 }
 
@@ -329,6 +386,7 @@ async function runGeminiTurn(
   toolSteps: AgentToolStep[],
   signal?: AbortSignal,
   onText?: (text: string) => void,
+  onRetry?: () => void,
   voiceMode = false,
   voiceConfirmation?: AgentTurnOptions['voiceConfirmation'],
   validateVoiceAction?: AgentTurnOptions['validateVoiceAction'],
@@ -351,27 +409,28 @@ async function runGeminiTurn(
     const message = pendingParts ?? userMessage;
     const config = { systemInstruction, tools, abortSignal: signal ?? AbortSignal.timeout(AI_REQUEST_TIMEOUT_MS) };
     let response: any;
-    if (onText) {
-      const stream = await chat.sendMessageStream({ message, config });
-      const parts: any[] = [];
-      let finishReason: string | undefined;
-      for await (const chunk of stream) {
-        const candidate = chunk.candidates?.[0];
-        finishReason = candidate?.finishReason ?? finishReason;
-        const chunkParts = candidate?.content?.parts ?? [];
-        parts.push(...chunkParts);
-        for (const part of chunkParts) {
-          if (typeof part.text === 'string' && part.text) onText(part.text);
+    response = await withProviderRetries(async () => {
+      if (onText) {
+        const stream = await chat.sendMessageStream({ message, config });
+        const parts: any[] = [];
+        let finishReason: string | undefined;
+        for await (const chunk of stream) {
+          const candidate = chunk.candidates?.[0];
+          finishReason = candidate?.finishReason ?? finishReason;
+          const chunkParts = candidate?.content?.parts ?? [];
+          parts.push(...chunkParts);
+          for (const part of chunkParts) {
+            if (typeof part.text === 'string' && part.text) onText(part.text);
+          }
         }
+        return { candidates: [{ content: { parts }, finishReason }] };
       }
-      response = { candidates: [{ content: { parts }, finishReason }] };
-    } else {
-      response = await chat.sendMessage({ message, config });
-    }
+      return chat.sendMessage({ message, config });
+    }, { signal, onRetry });
     pendingParts = null;
     const candidate = response.candidates?.[0];
     const parts = candidate?.content?.parts ?? [];
-      const calls = parts.filter((part: any) => part.functionCall);
+    const calls = parts.filter((part: any) => part.functionCall);
     if (calls.length === 0) {
       const text = parts.filter((part: any) => typeof part.text === 'string').map((part: any) => part.text).join('').trim();
       if (!text) throw new Error(`Gemini returned no text (finishReason=${candidate?.finishReason ?? 'unknown'}).`);
@@ -413,6 +472,7 @@ async function runOpenAITurn(
   signal?: AbortSignal,
   provider: 'openai' | 'cloudflare' = 'openai',
   onText?: (text: string) => void,
+  onRetry?: () => void,
   voiceMode = false,
   voiceConfirmation?: AgentTurnOptions['voiceConfirmation'],
   validateVoiceAction?: AgentTurnOptions['validateVoiceAction'],
@@ -435,40 +495,41 @@ async function runOpenAITurn(
       max_tokens: 1600,
     };
     let assistantMessage: any;
-    if (onText) {
-      const stream = await client.chat.completions.create(
-        { ...request, stream: true },
-        { signal },
-      );
-      let content = '';
-      const calls = new Map<number, { id: string; type: 'function'; function: { name: string; arguments: string } }>();
-      for await (const chunk of stream) {
-        const delta = chunk.choices[0]?.delta;
-        if (typeof delta?.content === 'string') {
-          content += delta.content;
-          if (delta.content) onText(delta.content);
+    assistantMessage = await withProviderRetries(async () => {
+      if (onText) {
+        const stream = await client.chat.completions.create(
+          { ...request, stream: true },
+          { signal },
+        );
+        let content = '';
+        const calls = new Map<number, { id: string; type: 'function'; function: { name: string; arguments: string } }>();
+        for await (const chunk of stream) {
+          const delta = chunk.choices[0]?.delta;
+          if (typeof delta?.content === 'string') {
+            content += delta.content;
+            if (delta.content) onText(delta.content);
+          }
+          for (const call of delta?.tool_calls ?? []) {
+            const existing = calls.get(call.index) ?? {
+              id: '',
+              type: 'function' as const,
+              function: { name: '', arguments: '' },
+            };
+            existing.id += call.id ?? '';
+            existing.function.name += call.function?.name ?? '';
+            existing.function.arguments += call.function?.arguments ?? '';
+            calls.set(call.index, existing);
+          }
         }
-        for (const call of delta?.tool_calls ?? []) {
-          const existing = calls.get(call.index) ?? {
-            id: '',
-            type: 'function' as const,
-            function: { name: '', arguments: '' },
-          };
-          existing.id += call.id ?? '';
-          existing.function.name += call.function?.name ?? '';
-          existing.function.arguments += call.function?.arguments ?? '';
-          calls.set(call.index, existing);
-        }
+        return {
+          role: 'assistant',
+          content: content || null,
+          tool_calls: [...calls.values()],
+        };
       }
-      assistantMessage = {
-        role: 'assistant',
-        content: content || null,
-        tool_calls: [...calls.values()],
-      };
-    } else {
       const response = await client.chat.completions.create(request, { signal });
-      assistantMessage = response.choices[0]?.message;
-    }
+      return response.choices[0]?.message;
+    }, { signal, onRetry });
     if (!assistantMessage) throw new Error('OpenAI returned no assistant message.');
     const calls = assistantMessage.tool_calls ?? [];
     if (calls.length === 0) {
@@ -517,13 +578,19 @@ export async function runAgentTurn(
   options: AgentTurnOptions = {},
 ): Promise<AgentTurnResult> {
   const turnStartedAt = Date.now();
-  let firstTokenAt: number | undefined;
+  let totalToolDurationMs = 0;
   const providers = getConfiguredAgentAIProviders();
   if (providers.length === 0) throw providerFailureReply([]);
 
-  const errors: Array<{ provider: AIProvider; error: any; durationMs: number }> = [];
+  const errors: Array<{
+    provider: AIProvider;
+    error: any;
+    durationMs: number;
+    timeToFirstTokenMs: number | null;
+  }> = [];
   for (const provider of providers) {
     const providerStartedAt = Date.now();
+    let providerFirstTokenAt: number | undefined;
     const toolSteps: AgentToolStep[] = [];
     let reply: string | null = null;
     let providerError: any;
@@ -536,19 +603,28 @@ export async function runAgentTurn(
       const onText = options.onText
         ? (text: string) => {
             emittedText = true;
-            firstTokenAt ??= Date.now();
+            providerFirstTokenAt ??= Date.now();
             options.onText?.(text);
           }
         : undefined;
       reply = provider === 'gemini'
-        ? await runGeminiTurn(userMessage, history, ctx, toolSteps, providerSignal, onText, options.voiceMode, options.voiceConfirmation, options.validateVoiceAction)
-        : await runOpenAITurn(userMessage, history, ctx, toolSteps, providerSignal, provider, onText, options.voiceMode, options.voiceConfirmation, options.validateVoiceAction);
+        ? await runGeminiTurn(userMessage, history, ctx, toolSteps, providerSignal, onText, options.onReset, options.voiceMode, options.voiceConfirmation, options.validateVoiceAction)
+        : await runOpenAITurn(userMessage, history, ctx, toolSteps, providerSignal, provider, onText, options.onReset, options.voiceMode, options.voiceConfirmation, options.validateVoiceAction);
     } catch (error: any) {
       providerError = error;
     }
+    const toolDurationMs = toolSteps.reduce((total, step) => total + step.durationMs, 0);
+    totalToolDurationMs += toolDurationMs;
     if (reply !== null) {
       for (const failed of errors) {
-        logProviderDiagnostic(failed.provider, failed.error, true, 'SUCCEEDED', failed.durationMs);
+        logProviderDiagnostic(
+          failed.provider,
+          failed.error,
+          true,
+          'SUCCEEDED',
+          failed.durationMs,
+          failed.timeToFirstTokenMs,
+        );
       }
       console.info('[Tavro AI] provider diagnostic', {
         provider,
@@ -558,12 +634,18 @@ export async function runAgentTurn(
         fallbackAttempted: errors.length > 0,
         fallbackResult: errors.length > 0 ? 'SUCCEEDED' : 'NOT_ATTEMPTED',
         providerDurationMs: Date.now() - providerStartedAt,
-        timeToFirstTokenMs: firstTokenAt === undefined ? null : firstTokenAt - turnStartedAt,
-        toolDurationMs: toolSteps.reduce((total, step) => total + step.durationMs, 0),
+        totalDurationMs: Date.now() - turnStartedAt,
+        timeToFirstTokenMs: providerFirstTokenAt === undefined ? null : providerFirstTokenAt - turnStartedAt,
+        toolDurationMs,
       });
       return { reply, toolSteps, provider };
     }
-    errors.push({ provider, error: providerError, durationMs: Date.now() - providerStartedAt });
+    errors.push({
+      provider,
+      error: providerError,
+      durationMs: Date.now() - providerStartedAt,
+      timeToFirstTokenMs: providerFirstTokenAt === undefined ? null : providerFirstTokenAt - turnStartedAt,
+    });
     if (emittedText) options.onReset?.();
     if (toolSteps.length > 0 || options.signal?.aborted || !shouldAttemptFallback(providerError)) break;
   }
@@ -577,7 +659,14 @@ export async function runAgentTurn(
       fallbackWasAttempted,
       fallbackWasAttempted ? 'FAILED' : 'NOT_ATTEMPTED',
       errors[index].durationMs,
+      errors[index].timeToFirstTokenMs,
     );
   }
+  console.info('[Tavro AI] turn diagnostic', {
+    totalDurationMs: Date.now() - turnStartedAt,
+    timeToFirstTokenMs: errors[errors.length - 1].timeToFirstTokenMs,
+    providerDurationsMs: errors.map(({ provider, durationMs }) => ({ provider, durationMs })),
+    toolDurationMs: totalToolDurationMs,
+  });
   throw providerFailureReply(errors, fallbackAttempted, fallbackResult);
 }

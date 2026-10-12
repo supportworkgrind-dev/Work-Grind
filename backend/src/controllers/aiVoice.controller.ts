@@ -473,7 +473,9 @@ export const runVoiceTurn = async (req: AuthRequest, res: Response): Promise<voi
     ) return null;
 
     const [currentCompany, currentPlan] = await Promise.all([
-      Company.findById(credential.companyId).select('isActive').lean(),
+      Company.findById(credential.companyId)
+        .select('isActive accountType organizationType')
+        .lean(),
       getEffectiveSubscription(credential.sub),
     ]);
     if (
@@ -485,6 +487,8 @@ export const runVoiceTurn = async (req: AuthRequest, res: Response): Promise<voi
     return {
       ...ctx,
       userRole: currentRole,
+      accountType: currentCompany.accountType,
+      organizationType: currentCompany.organizationType,
       planName: currentPlan.planConfig.name,
       planId: currentPlan.plan,
       enabledFeatures: Object.entries(currentPlan.planConfig.entitlements)

@@ -25,6 +25,7 @@ import { CrmDeal }    from '../models/CrmDeal';
 import { CrmCompany } from '../models/CrmCompany';
 import Document  from '../models/Document';
 import File      from '../models/File';
+import { roleMatches } from '../config/organization';
 
 // ── Tool context injected server-side ─────────────────────────────────────────
 
@@ -69,7 +70,7 @@ function sanitize(value: any): any {
 }
 
 function canManageWorkspace(ctx: ToolContext): boolean {
-  return ['owner', 'admin', 'manager'].includes(ctx.userRole);
+  return roleMatches(ctx.userRole, ['admin', 'manager'], ctx.organizationType);
 }
 
 function sanitizeArr(arr: any[]): any[] {
@@ -661,6 +662,7 @@ export const TOOLS: AgentTool[] = [
       const cid = ctx.companyId;
       const uid = ctx.userId;
 
+      const canAccessCrm = isToolAvailable('searchDeals', ctx);
       const [
         myTasksTotal, myOverdue, myUrgent,
         activeProjects, projectsBehind,
@@ -674,8 +676,12 @@ export const TOOLS: AgentTool[] = [
         Project.countDocuments({ companyId: cid, status: 'active', isArchived: false }),
         Project.countDocuments({ companyId: cid, status: { $ne: 'completed' }, deadline: { $lt: new Date() }, isArchived: false }),
         Meeting.countDocuments({ companyId: cid, scheduledAt: { $gte: new Date() }, status: 'scheduled' }),
-        CrmDeal.countDocuments({ companyId: cid, stage: { $nin: ['won','lost'] } }),
-        CrmDeal.countDocuments({ companyId: cid, stage: { $nin: ['won','lost'] }, closeDate: { $lt: new Date() } }),
+        canAccessCrm
+          ? CrmDeal.countDocuments({ companyId: cid, stage: { $nin: ['won','lost'] } })
+          : Promise.resolve(null),
+        canAccessCrm
+          ? CrmDeal.countDocuments({ companyId: cid, stage: { $nin: ['won','lost'] }, closeDate: { $lt: new Date() } })
+          : Promise.resolve(null),
         User.countDocuments({ companyId: cid, isActive: true }),
       ]);
 
@@ -685,7 +691,7 @@ export const TOOLS: AgentTool[] = [
           myTasks:         { total: myTasksTotal, overdue: myOverdue, urgent: myUrgent },
           projects:        { active: activeProjects, behindSchedule: projectsBehind },
           meetings:        { upcoming: upcomingMeetings },
-          crm:             { openDeals, overdueDeals },
+          ...(openDeals !== null && overdueDeals !== null ? { crm: { openDeals, overdueDeals } } : {}),
           team:            { activeMembers: teamMembers },
         },
       };
@@ -984,12 +990,17 @@ const TOOL_ENTITLEMENTS: Partial<Record<string, string>> = {
   searchProjects: 'tasksProjects', createProject: 'tasksProjects',
   searchMeetings: 'meetingsCalendar', createMeeting: 'meetingsCalendar', searchCalendarEvents: 'meetingsCalendar',
   searchContacts: 'crm', searchDeals: 'crm', searchCrmCompanies: 'crm', createDeal: 'crm', updateDeal: 'crm', getCrmAccountSummary: 'crm',
+  createContact: 'crm',
   searchDocuments: 'fileStorage', searchFiles: 'fileStorage',
   searchMessages: 'teamChat', searchTeamMembers: 'teamChat', getTeamMembers: 'teamChat',
 };
 
 export function isToolAvailable(name: string, ctx: ToolContext): boolean {
   const entitlement = TOOL_ENTITLEMENTS[name];
+  if (
+    entitlement === 'crm' &&
+    (ctx.accountType === 'individual' || (ctx.organizationType && ctx.organizationType !== 'business'))
+  ) return false;
   return !entitlement || !ctx.enabledFeatures || ctx.enabledFeatures.includes(entitlement);
 }
 
