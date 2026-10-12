@@ -149,6 +149,17 @@ test('unassigned HOD is denied and an assigned Dean cannot mutate a class in ano
     assert.equal(nextCalled, false);
     assert.deepEqual(req.academicDepartmentScope.studentIds, [studentId.toString(), crossDepartmentStudentId.toString()]);
     assert.deepEqual(req.academicDepartmentScope.departmentExclusiveStudentIds, [studentId.toString()]);
+
+    const deleteRes = response();
+    await requireAssignedAcademicDepartment({
+      user: { companyId: companyId.toString(), userId: userId.toString(), role: 'dean' },
+      params: { resource: 'departments', id: departmentId.toString() },
+      path: `/departments/${departmentId}`,
+      method: 'DELETE',
+      body: {},
+    }, deleteRes, () => { nextCalled = true; });
+    assert.equal(deleteRes.statusCode, 403);
+    assert.equal(nextCalled, false);
   } finally {
     restore.reverse().forEach((undo) => undo());
   }

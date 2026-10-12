@@ -35,7 +35,7 @@ test('socket events use the organization feature policies and persisted role', (
     organizationType: 'school', accountType: 'company', role: 'teacher',
   }, 'globalCalling', allEntitlements), false);
   assert.equal(canSocketAccessFeature({
-    organizationType: 'business', accountType: 'company', role: 'guest',
+    organizationType: 'business', accountType: 'company', role: 'student',
   }, 'globalCalling', allEntitlements), false);
   assert.equal(canSocketAccessFeature({
     organizationType: 'business', accountType: 'company', role: 'employee',

@@ -312,6 +312,10 @@ export const requireAssignedAcademicDepartment = async (
     const isGenericMutation = req.path === `/${req.params.resource}/${req.params.id}` &&
       ['PATCH', 'DELETE'].includes(req.method);
     if (isGenericMutation) {
+      if (req.method === 'DELETE' && resource === 'departments') {
+        res.status(403).json({ success: false, message: 'Only trusted organization administrators may remove departments.' });
+        return;
+      }
       if (req.method === 'PATCH' && (
         Object.prototype.hasOwnProperty.call(req.body ?? {}, 'authorizedDeanUserIds') ||
         Object.prototype.hasOwnProperty.call(req.body ?? {}, 'authorizedHodUserIds')
