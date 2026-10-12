@@ -334,7 +334,9 @@ export default function PricingPage() {
                   <li>Up to {plan.limits.members.toLocaleString()} active staff and members</li>
                   <li>Up to {plan.limits.pendingInvites.toLocaleString()} pending invitations</li>
                 </ul>
-                {workspaceSubscription?.plan === plan.id && workspaceSubscription.hasActiveAccess ? (
+                {workspaceSubscription?.plan === plan.id &&
+                workspaceSubscription.hasActiveAccess &&
+                workspaceSubscription.status !== 'trialing' ? (
                   <div className="mt-6 flex items-center justify-center gap-2 rounded-xl border border-indigo-500/30 bg-indigo-500/10 py-3 text-sm font-semibold text-indigo-200">
                     <CheckCircle2 className="h-4 w-4" />Current workspace plan
                   </div>

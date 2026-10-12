@@ -18,6 +18,7 @@ import { Polar } from '@polar-sh/sdk';
 import User from '../models/User';
 import Company, { type CompanySubscriptionStatus, type ICompany } from '../models/Company';
 import AuditLog from '../models/AuditLog';
+import ProcessedPolarWebhook from '../models/ProcessedPolarWebhook';
 import { AuthRequest } from '../middleware/auth';
 import {
   PLANS,
@@ -38,6 +39,7 @@ import {
 import {
   getCompanySubscription,
   getCouponDefinition,
+  hasVerifiedEducationSubscription,
 } from '../services/companySubscription';
 import { getPlanUsage, getEffectiveSubscription } from '../utils/planLimits';
 import { disconnectCompanySockets } from '../utils/socket';
@@ -148,6 +150,33 @@ export function resolveWebhookPlan(
     : undefined;
 }
 
+export async function claimPolarWebhookDelivery(webhookId: string): Promise<boolean> {
+  try {
+    await ProcessedPolarWebhook.create({
+      _id: webhookId,
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+    });
+    return true;
+  } catch (error) {
+    if (error && typeof error === 'object' && 'code' in error && error.code === 11000) {
+      return false;
+    }
+    throw error;
+  }
+}
+
+export async function releasePolarWebhookDelivery(webhookId: string): Promise<void> {
+  await ProcessedPolarWebhook.deleteOne({ _id: webhookId });
+}
+
+export function isCurrentPolarSubscription(
+  company: Pick<ICompany, 'polarSubscriptionId' | 'polarProductId'>,
+  subscription: { id: string; productId?: string },
+): boolean {
+  return company.polarSubscriptionId === subscription.id &&
+    (!company.polarProductId || company.polarProductId === subscription.productId);
+}
+
 function normalizePolarSubscriptionStatus(status: string): CompanySubscriptionStatus | undefined {
   switch (status) {
     case 'trialing':
@@ -208,12 +237,20 @@ export const getSubscriptionStatus = async (
           subscriptionMismatch: sub.subscriptionMismatch,
           billingInterval:      sub.plan === 'school' || sub.plan === 'college' || sub.plan === 'university' ? 'month' : undefined,
           currency:             sub.plan === 'school' || sub.plan === 'college' || sub.plan === 'university' ? 'USD' : undefined,
-          planName:             sub.status === 'expired'
+          planName:             sub.status === 'trialing' && educationPlanForOrganization(sub.organizationType)
+            ? `${plan.name} trial`
+            : sub.status === 'expired'
             ? sub.plan === 'free' ? 'Free Trial' : plan.name
             : sub.status === 'never_subscribed'
               ? 'No subscription'
               : plan.name,
-          priceDisplay:         plan.priceDisplay,
+          priceDisplay:         educationPlanForOrganization(sub.organizationType)
+            ? sub.status === 'trialing'
+              ? 'Free trial'
+              : sub.hasActiveAccess
+                ? plan.priceDisplay
+                : 'No paid subscription'
+            : plan.priceDisplay,
           trialStartDate:       sub.trialStartDate,
           trialEndDate:         sub.trialEndDate,
           trialDaysRemaining,
@@ -791,9 +828,13 @@ export const handleWebhook = async (
       .update(signedContent)
       .digest('base64');
 
+    const expectedSignature = Buffer.from(expectedSig, 'base64');
     const verified = signatures.some((s) => {
       const sigValue = s.split(',')[1];
-      return sigValue === expectedSig;
+      if (!sigValue) return false;
+      const receivedSignature = Buffer.from(sigValue, 'base64');
+      return receivedSignature.length === expectedSignature.length &&
+        crypto.timingSafeEqual(receivedSignature, expectedSignature);
     });
 
     if (!verified) {
@@ -802,7 +843,11 @@ export const handleWebhook = async (
       return;
     }
 
-    const tsMs = parseInt(timestamp) * 1000;
+    if (!/^\d+$/.test(timestamp)) {
+      res.status(400).json({ success: false, message: 'Invalid webhook timestamp' });
+      return;
+    }
+    const tsMs = Number(timestamp) * 1000;
     if (Math.abs(Date.now() - tsMs) > 5 * 60 * 1000) {
       res.status(400).json({ success: false, message: 'Webhook timestamp too old' });
       return;
@@ -814,6 +859,22 @@ export const handleWebhook = async (
   }
 
   const event = req.body as { type: string; data: any };
+  if (!event || typeof event.type !== 'string' || !event.data || typeof event.data !== 'object') {
+    res.status(400).json({ success: false, message: 'Invalid webhook event payload' });
+    return;
+  }
+  try {
+    if (!await claimPolarWebhookDelivery(webhookId)) {
+      res.json({ success: true, received: true, duplicate: true });
+      return;
+    }
+  } catch (error) {
+    console.error('[Webhook] Could not record delivery idempotency state.', {
+      errorName: error instanceof Error ? error.name : 'UnknownError',
+    });
+    res.status(503).json({ success: false, message: 'Webhook processing is temporarily unavailable' });
+    return;
+  }
   console.log(`[Webhook] Received: ${event.type}`);
 
   try {
@@ -834,6 +895,10 @@ export const handleWebhook = async (
         const planId = resolveWebhookPlan(company, order.productId, meta?.planId);
         if (!planId) {
           console.warn(`[Webhook] order.created: product does not match workspace type for ${companyId}`);
+          break;
+        }
+        if (educationPlanForOrganization(company.organizationType)) {
+          console.info(`[Webhook] order.created: awaiting verified subscription lifecycle event for ${companyId}`);
           break;
         }
 
@@ -869,6 +934,12 @@ export const handleWebhook = async (
         }
 
         if (company.polarSubscriptionId === sub.id) { break; } // idempotent
+        if (company.polarSubscriptionId && company.polarSubscriptionId !== sub.id &&
+            hasVerifiedEducationSubscription(company) &&
+            hasActiveAccess(company.subscriptionStatus, company.subscriptionEndDate, company.trialEndDate)) {
+          console.warn(`[Webhook] subscription.created: existing subscription still grants access for ${companyId}`);
+          break;
+        }
 
         const polarStatus = normalizePolarSubscriptionStatus(sub.status);
         if (!polarStatus) {
@@ -902,6 +973,10 @@ export const handleWebhook = async (
         if (!companyId) break;
         const company = await Company.findById(companyId);
         if (!company) break;
+        if (!isCurrentPolarSubscription(company, sub)) {
+          console.warn(`[Webhook] subscription.updated: event does not match the recorded subscription for ${companyId}`);
+          break;
+        }
 
         const productPlan = resolveWebhookPlan(company, sub.productId, meta?.planId);
         if (!productPlan) {
@@ -951,6 +1026,10 @@ export const handleWebhook = async (
         if (!companyId) break;
         const company = await Company.findById(companyId);
         if (!company) break;
+        if (!isCurrentPolarSubscription(company, sub)) {
+          console.warn(`[Webhook] subscription.canceled: event does not match the recorded subscription for ${companyId}`);
+          break;
+        }
         if (!resolveWebhookPlan(company, sub.productId, meta?.planId) &&
             !(company.polarSubscriptionId === sub.id && company.polarProductId === sub.productId)) {
           console.warn(`[Webhook] subscription.canceled: product does not match workspace type for ${companyId}`);
@@ -980,6 +1059,10 @@ export const handleWebhook = async (
         if (!companyId) break;
         const company = await Company.findById(companyId);
         if (!company) break;
+        if (!isCurrentPolarSubscription(company, sub)) {
+          console.warn(`[Webhook] subscription.uncanceled: event does not match the recorded subscription for ${companyId}`);
+          break;
+        }
         if (!resolveWebhookPlan(company, sub.productId, meta?.planId) &&
             !(company.polarSubscriptionId === sub.id && company.polarProductId === sub.productId)) {
           console.warn(`[Webhook] subscription.uncanceled: product does not match workspace type for ${companyId}`);
@@ -1005,6 +1088,10 @@ export const handleWebhook = async (
         if (!companyId) break;
         const company = await Company.findById(companyId);
         if (!company) break;
+        if (!isCurrentPolarSubscription(company, sub)) {
+          console.warn(`[Webhook] subscription.revoked: event does not match the recorded subscription for ${companyId}`);
+          break;
+        }
         if (!resolveWebhookPlan(company, sub.productId, meta?.planId) &&
             !(company.polarSubscriptionId === sub.id && company.polarProductId === sub.productId)) {
           console.warn(`[Webhook] subscription.revoked: product does not match workspace type for ${companyId}`);
@@ -1025,8 +1112,13 @@ export const handleWebhook = async (
 
     res.json({ success: true, received: true });
   } catch (err: any) {
+    await releasePolarWebhookDelivery(webhookId).catch((releaseError: unknown) => {
+      console.error('[Webhook] Failed to release delivery claim after processing error.', {
+        errorName: releaseError instanceof Error ? releaseError.name : 'UnknownError',
+      });
+    });
     console.error('[Webhook] Processing error:', err);
-    res.json({ success: false, error: err.message });
+    res.status(500).json({ success: false, message: 'Webhook processing failed' });
   }
 };
 

@@ -14,9 +14,9 @@
  */
 
 import mongoose from 'mongoose';
-import Company, { CompanySubscriptionStatus, CompanyPlan } from '../models/Company';
+import Company, { CompanySubscriptionStatus, CompanyPlan, ICompany } from '../models/Company';
 import User from '../models/User';
-import { educationPlanForOrganization, getEducationPolarProductId, getPlan, getPolarProductId, hasActiveAccess, PlanId, resolveEffectivePlanId, TRIAL_DAYS } from '../config/subscription';
+import { educationPlanForOrganization, getPlan, getPolarProductId, hasActiveAccess, PlanId, resolveEffectivePlanId, TRIAL_DAYS } from '../config/subscription';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -45,6 +45,38 @@ export interface CompanySubscriptionInfo {
     type:       'three_months_free' | 'lifetime';
     redeemedAt: Date;
     freeUntil?: Date;
+  };
+}
+
+type EducationSubscriptionRecord = Pick<
+  ICompany,
+  'organizationType' | 'subscriptionPlan' | 'polarSubscriptionId' | 'polarProductId'
+>;
+
+export function hasVerifiedEducationSubscription(company: EducationSubscriptionRecord): boolean {
+  const planId = educationPlanForOrganization(company.organizationType);
+  return Boolean(
+    planId &&
+    company.subscriptionPlan === planId &&
+    company.polarSubscriptionId?.trim() &&
+    company.polarProductId?.trim(),
+  );
+}
+
+export function enforceEducationSubscriptionTruth(
+  status: CompanySubscriptionInfo['status'],
+  company: EducationSubscriptionRecord,
+): { status: CompanySubscriptionInfo['status']; subscriptionMismatch: boolean } {
+  const educationPlanId = educationPlanForOrganization(company.organizationType);
+  const isPaidAccessStatus = status === 'active' || status === 'past_due' || status === 'cancelled';
+  const subscriptionMismatch = Boolean(
+    educationPlanId &&
+    isPaidAccessStatus &&
+    !hasVerifiedEducationSubscription(company),
+  );
+  return {
+    status: subscriptionMismatch ? 'expired' : status,
+    subscriptionMismatch,
   };
 }
 
@@ -235,6 +267,8 @@ export async function getCompanySubscription(
     company.subscriptionEndDate,
   );
   const educationPlanId = educationPlanForOrganization(company.organizationType);
+  const enforcedEducationStatus = enforceEducationSubscriptionTruth(status, company);
+  status = enforcedEducationStatus.status;
   const hasPaidPlanHistory = Boolean(
     company.polarSubscriptionId ||
     company.polarOrderId ||
@@ -245,13 +279,15 @@ export async function getCompanySubscription(
     company.plan === 'pro',
   );
   const subscriptionMismatch = Boolean(
-    educationPlanId &&
-    hasPaidPlanHistory &&
-    status !== 'trialing' &&
-    status !== 'lifetime' &&
-    status !== 'never_subscribed' &&
-    (company.subscriptionPlan !== educationPlanId ||
-      company.polarProductId !== getEducationPolarProductId(educationPlanId))
+    enforcedEducationStatus.subscriptionMismatch ||
+    (
+      educationPlanId &&
+      hasPaidPlanHistory &&
+      status !== 'trialing' &&
+      status !== 'lifetime' &&
+      status !== 'never_subscribed' &&
+      !hasVerifiedEducationSubscription(company)
+    )
   );
   if (subscriptionMismatch) status = 'expired';
   const effectivePlanId = educationPlanId ?? effectiveBusinessPlanId;
@@ -275,9 +311,17 @@ export async function getCompanySubscription(
           ? resolvedPlanConfig.limits
           : { members: 0, storage: 0, aiRequests: 0 },
       };
-  if (activeAccess && (company.storage.limit !== resolvedPlanConfig.limits.storage || company.plan !== effectivePlanId)) {
+  const storedPlanId = educationPlanId
+    ? hasVerifiedEducationSubscription(company) && status !== 'expired'
+      ? educationPlanId
+      : 'free'
+    : effectivePlanId;
+  if (activeAccess && (
+    company.storage.limit !== resolvedPlanConfig.limits.storage ||
+    company.plan !== storedPlanId
+  )) {
     company.storage.limit = resolvedPlanConfig.limits.storage;
-    company.plan = effectivePlanId;
+    company.plan = storedPlanId;
     await company.save();
   }
 

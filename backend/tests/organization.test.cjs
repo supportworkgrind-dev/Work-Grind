@@ -5,6 +5,7 @@ const User = require('../dist/models/User').default;
 const PendingRegistration = require('../dist/models/PendingRegistration').default;
 const OAuthTransaction = require('../dist/models/OAuthTransaction').default;
 const AuditLog = require('../dist/models/AuditLog').default;
+const ProcessedPolarWebhook = require('../dist/models/ProcessedPolarWebhook').default;
 const { restoreWorkspaceCreatorRole } = require('../dist/controllers/auth.controller');
 const {
   isOrganizationType,
@@ -17,12 +18,20 @@ const {
   getEducationPolarProductId,
   getEducationPlanConfig,
   educationPlanForOrganization,
+  hasActiveAccess,
 } = require('../dist/config/subscription');
+const {
+  enforceEducationSubscriptionTruth,
+  hasVerifiedEducationSubscription,
+} = require('../dist/services/companySubscription');
 const { withCompanyCapacityLock } = require('../dist/utils/planLimits');
 const {
   matchesPolarProductPrice,
   resolveWebhookPlan,
   isCheckoutPlanAllowedForOrganization,
+  claimPolarWebhookDelivery,
+  releasePolarWebhookDelivery,
+  isCurrentPolarSubscription,
 } = require('../dist/controllers/subscription.controller');
 const mongoose = require('mongoose');
 
@@ -116,6 +125,59 @@ test('education subscription configs map workspace types to the specified monthl
   assert.equal(educationPlanForOrganization('individual'), undefined);
 });
 
+test('new education workspaces keep the free subscription default and organization selection is not payment', () => {
+  for (const organizationType of ['school', 'college', 'university']) {
+    const company = new Company({
+      name: `${organizationType} workspace`,
+      ownerId: new mongoose.Types.ObjectId(),
+      inviteCode: `${organizationType}-test`,
+      organizationType,
+    });
+    assert.equal(company.subscriptionStatus, 'none');
+    assert.equal(company.subscriptionPlan, 'free');
+    assert.equal(hasVerifiedEducationSubscription(company), false);
+    assert.equal(hasActiveAccess(company.subscriptionStatus), false);
+
+    const unverifiedActiveClaim = enforceEducationSubscriptionTruth('active', company);
+    assert.deepEqual(unverifiedActiveClaim, { status: 'expired', subscriptionMismatch: true });
+    assert.equal(hasActiveAccess(unverifiedActiveClaim.status), false);
+  }
+});
+
+test('verified Polar subscription activates its matching education plan only', () => {
+  const company = {
+    organizationType: 'university',
+    subscriptionPlan: 'university',
+    polarSubscriptionId: 'polar-subscription-1',
+    polarProductId: 'university-product',
+  };
+  assert.equal(hasVerifiedEducationSubscription(company), true);
+  assert.deepEqual(enforceEducationSubscriptionTruth('active', company), {
+    status: 'active',
+    subscriptionMismatch: false,
+  });
+  assert.equal(hasVerifiedEducationSubscription({
+    ...company,
+    organizationType: 'school',
+  }), false);
+});
+
+test('valid trials stay trials and expired or cancelled education subscriptions do not keep access', () => {
+  const company = {
+    organizationType: 'school',
+    subscriptionPlan: 'free',
+  };
+  assert.deepEqual(enforceEducationSubscriptionTruth('trialing', company), {
+    status: 'trialing',
+    subscriptionMismatch: false,
+  });
+  assert.equal(hasActiveAccess('trialing', undefined, new Date(Date.now() + 60_000)), true);
+  assert.equal(hasActiveAccess('trialing', undefined, new Date(Date.now() - 60_000)), false);
+  assert.equal(hasActiveAccess('cancelled', new Date(Date.now() - 60_000)), false);
+  assert.equal(hasActiveAccess('expired'), false);
+  assert.equal(hasActiveAccess('incomplete'), false);
+});
+
 test('Polar education product validation requires an active monthly USD fixed price at the configured amount', () => {
   const product = {
     isArchived: false,
@@ -159,6 +221,46 @@ test('Polar webhook plan mapping requires product/workspace match and ignores ed
       if (previousValues[index] === undefined) delete process.env[key];
       else process.env[key] = previousValues[index];
     });
+  }
+});
+
+test('Polar webhook delivery claims reject duplicate IDs and stale subscription IDs', async () => {
+  const originalCreate = ProcessedPolarWebhook.create;
+  const originalDeleteOne = ProcessedPolarWebhook.deleteOne;
+  const claimedIds = new Set();
+  ProcessedPolarWebhook.create = async ({ _id }) => {
+    if (claimedIds.has(_id)) {
+      throw Object.assign(new Error('duplicate event'), { code: 11000 });
+    }
+    claimedIds.add(_id);
+    return { _id };
+  };
+  ProcessedPolarWebhook.deleteOne = async ({ _id }) => {
+    claimedIds.delete(_id);
+    return { deletedCount: 1 };
+  };
+  try {
+    assert.equal(await claimPolarWebhookDelivery('polar-event-1'), true);
+    assert.equal(await claimPolarWebhookDelivery('polar-event-1'), false);
+    assert.equal(isCurrentPolarSubscription({
+      polarSubscriptionId: 'current-subscription',
+      polarProductId: 'university-product',
+    }, {
+      id: 'stale-subscription',
+      productId: 'university-product',
+    }), false);
+    assert.equal(isCurrentPolarSubscription({
+      polarSubscriptionId: 'current-subscription',
+      polarProductId: 'university-product',
+    }, {
+      id: 'current-subscription',
+      productId: 'wrong-product',
+    }), false);
+    await releasePolarWebhookDelivery('polar-event-1');
+    assert.equal(await claimPolarWebhookDelivery('polar-event-1'), true);
+  } finally {
+    ProcessedPolarWebhook.create = originalCreate;
+    ProcessedPolarWebhook.deleteOne = originalDeleteOne;
   }
 });
 

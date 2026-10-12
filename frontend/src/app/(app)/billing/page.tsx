@@ -546,16 +546,21 @@ export default function BillingPage() {
                       {plan.checkoutError || 'Checkout is not configured for this education plan.'}
                     </p>
                   )}
-                  {sub.hasActiveAccess ? (
+                  {sub.hasActiveAccess && sub.status !== 'trialing' ? (
                     <div className="mt-4 flex items-center justify-center gap-1.5 rounded-xl border py-2 text-xs font-semibold" style={{ borderColor: 'var(--accent)', color: 'var(--accent)' }}>
                       <CheckCircle2 className="h-3.5 w-3.5" />Current workspace plan
                     </div>
-                  ) : isOwnerAdmin && plan.checkoutAvailable ? (
+                  ) : sub.status === 'trialing' && sub.hasActiveAccess ? (
+                    <div className="mt-4 rounded-xl border border-indigo-300 bg-indigo-50 px-3 py-2 text-center text-xs text-indigo-800">
+                      Included during your free trial. A paid subscription starts only after checkout and Polar confirmation.
+                    </div>
+                  ) : null}
+                  {!(sub.hasActiveAccess && sub.status !== 'trialing') && isOwnerAdmin && plan.checkoutAvailable ? (
                     <button disabled={Boolean(checkoutPlan)} onClick={() => handleUpgrade(plan.id)} className="btn-primary mt-4 h-9 w-full justify-center">
                       {checkoutPlan === plan.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
                       Subscribe to {plan.name}
                     </button>
-                  ) : !isOwnerAdmin ? (
+                  ) : !(sub.hasActiveAccess && sub.status !== 'trialing') && !isOwnerAdmin ? (
                     <p className="mt-4 text-center text-xs" style={{ color: 'var(--text-muted)' }}>
                       <Lock className="mr-1 inline h-3 w-3" />Contact your workspace owner to manage billing
                     </p>
