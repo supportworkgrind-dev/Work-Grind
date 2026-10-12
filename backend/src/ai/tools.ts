@@ -656,7 +656,7 @@ export const TOOLS: AgentTool[] = [
   {
     name: 'getWorkspaceSummary',
     readOnly: true,
-    description: 'Get a high-level summary of the workspace: task counts, active projects, upcoming meetings, and CRM overview.',
+    description: 'Get a high-level summary of the workspace: task counts, active projects, upcoming meetings, and CRM overview when available.',
     parameters: { type: 'object', properties: {} },
     async execute(_args, ctx) {
       const cid = ctx.companyId;
