@@ -18,7 +18,7 @@ import { IncomingCallManager } from '@/components/calling/IncomingCallManager';
 import { ThemeAwareLogo } from '@/components/common/ThemeAwareLogo';
 import { ExpiredSubscriptionExperience } from '@/components/subscription/ExpiredSubscriptionExperience';
 import { DeveloperShell } from '@/components/layout/DeveloperShell';
-import { canAccessOrganizationFeature, getRouteOrganizationFeature, isEducationOrganization } from '@/lib/organizationAccess';
+import { canAccessRoute, getWorkspaceHome } from '@/lib/organizationAccess';
 import Link from 'next/link';
 
 // How long a cached user is considered "fresh" before we re-validate with the server.
@@ -79,10 +79,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const setTheme = useThemeStore((s) => s.setTheme);
   const { setLang } = useI18n();
   const isSidebarOpen    = useAppStore((s) => s.isSidebarOpen);
-  const routeFeature = getRouteOrganizationFeature(pathname);
   const organization = company ?? (user?.companyId && typeof user.companyId === 'object' ? user.companyId : null);
-  const hasOrganizationContext = !!organization;
-  const routeAllowed = !routeFeature || canAccessOrganizationFeature(organization, user?.role, routeFeature);
+  const routeAllowed = canAccessRoute(organization, user?.role, pathname);
   useEffect(() => {
     if (!user) return;
     setTheme(normalizeTheme(user.theme));
@@ -113,10 +111,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }, [authError, isLoading, user, router]);
 
   useEffect(() => {
-    if (user && hasOrganizationContext && routeFeature && !routeAllowed) {
-      router.replace(isEducationOrganization(organization) ? '/academic' : '/dashboard');
+    if (user && !routeAllowed) {
+      router.replace(getWorkspaceHome(organization));
     }
-  }, [hasOrganizationContext, organization, routeAllowed, routeFeature, router, user]);
+  }, [organization, routeAllowed, router, user]);
 
   useEffect(() => {
     if (user && !subscription && !subscriptionLoading && !subscriptionError) {
@@ -211,7 +209,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   if (!user) return null;
-  if (hasOrganizationContext && routeFeature && !routeAllowed) return null;
+  if (!routeAllowed) return null;
 
   if (pathname === '/billing' && (subscriptionError || (subscription && !subscription.hasActiveAccess))) {
     if (subscription?.status === 'expired' && subscription.hasActiveAccess === false) {

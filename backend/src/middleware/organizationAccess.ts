@@ -2,11 +2,14 @@ import { NextFunction, Response } from 'express';
 import Company from '../models/Company';
 import User from '../models/User';
 import {
-  isAcademicOrganizationType,
+  AccountType,
+  OrganizationType,
   isOrganizationRoleEligible,
   roleMatches,
 } from '../config/organization';
 import { AuthRequest } from './auth';
+import { getCompanySubscription } from '../services/companySubscription';
+import type { EntitlementId } from '../config/subscription';
 
 export type OrganizationFeature =
   | 'academic'
@@ -19,7 +22,81 @@ export type OrganizationFeature =
   | 'businessAutomation'
   | 'billingAdmin'
   | 'memberDirectory'
-  | 'workspaceContent';
+  | 'workspaceContent'
+  | 'soloWorkspace'
+  | 'companyWorkspace'
+  | 'educationCommunication'
+  | 'educationMeetings'
+  | 'educationFiles'
+  | 'educationAi'
+  | 'workspaceSettings'
+  | 'globalCalling'
+  | 'calendar';
+
+type FeaturePolicy = {
+  organizationTypes: readonly OrganizationType[];
+  accountTypes: readonly AccountType[];
+  roles: readonly string[] | 'eligible';
+  entitlement?: EntitlementId;
+};
+
+const ALL_EDUCATION_ROLES = [
+  'owner', 'principal', 'admin', 'teacher', 'student', 'parent', 'dean', 'hod', 'manager', 'employee',
+] as const;
+const ACADEMIC_ADMIN_ROLES = ['owner', 'principal', 'admin', 'dean', 'hod'] as const;
+const BUSINESS_ADMIN_ROLES = ['owner', 'admin', 'manager'] as const;
+const BUSINESS_TYPES = ['business'] as const;
+const EDUCATION_TYPES = ['school', 'college', 'university'] as const;
+const COMPANY_ACCOUNTS = ['company'] as const;
+const INDIVIDUAL_ACCOUNTS = ['individual'] as const;
+
+export const ORGANIZATION_FEATURE_POLICIES: Record<OrganizationFeature, FeaturePolicy> = {
+  soloWorkspace: { organizationTypes: BUSINESS_TYPES, accountTypes: INDIVIDUAL_ACCOUNTS, roles: ['owner'] },
+  companyWorkspace: { organizationTypes: BUSINESS_TYPES, accountTypes: COMPANY_ACCOUNTS, roles: 'eligible' },
+  academic: { organizationTypes: EDUCATION_TYPES, accountTypes: COMPANY_ACCOUNTS, roles: 'eligible' },
+  academicAdmin: { organizationTypes: EDUCATION_TYPES, accountTypes: COMPANY_ACCOUNTS, roles: ACADEMIC_ADMIN_ROLES },
+  businessCrm: { organizationTypes: BUSINESS_TYPES, accountTypes: COMPANY_ACCOUNTS, roles: BUSINESS_ADMIN_ROLES },
+  clientPortal: { organizationTypes: BUSINESS_TYPES, accountTypes: COMPANY_ACCOUNTS, roles: BUSINESS_ADMIN_ROLES },
+  businessAdmin: { organizationTypes: BUSINESS_TYPES, accountTypes: COMPANY_ACCOUNTS, roles: BUSINESS_ADMIN_ROLES },
+  businessAnalytics: { organizationTypes: BUSINESS_TYPES, accountTypes: COMPANY_ACCOUNTS, roles: BUSINESS_ADMIN_ROLES, entitlement: 'advancedAnalytics' },
+  businessIntegrations: { organizationTypes: BUSINESS_TYPES, accountTypes: COMPANY_ACCOUNTS, roles: BUSINESS_ADMIN_ROLES },
+  businessAutomation: { organizationTypes: BUSINESS_TYPES, accountTypes: COMPANY_ACCOUNTS, roles: BUSINESS_ADMIN_ROLES },
+  billingAdmin: {
+    organizationTypes: [...BUSINESS_TYPES, ...EDUCATION_TYPES],
+    accountTypes: [...COMPANY_ACCOUNTS, ...INDIVIDUAL_ACCOUNTS],
+    roles: ['owner', 'admin'],
+  },
+  memberDirectory: {
+    organizationTypes: [...BUSINESS_TYPES, ...EDUCATION_TYPES],
+    accountTypes: COMPANY_ACCOUNTS,
+    roles: ['owner', 'admin', 'manager', 'principal', 'dean', 'hod'],
+  },
+  workspaceContent: { organizationTypes: BUSINESS_TYPES, accountTypes: COMPANY_ACCOUNTS, roles: 'eligible' },
+  educationCommunication: { organizationTypes: [...BUSINESS_TYPES, ...EDUCATION_TYPES], accountTypes: COMPANY_ACCOUNTS, roles: 'eligible', entitlement: 'teamChat' },
+  educationMeetings: { organizationTypes: [...BUSINESS_TYPES, ...EDUCATION_TYPES], accountTypes: COMPANY_ACCOUNTS, roles: 'eligible', entitlement: 'meetingsCalendar' },
+  educationFiles: { organizationTypes: [...BUSINESS_TYPES, ...EDUCATION_TYPES], accountTypes: [...COMPANY_ACCOUNTS, ...INDIVIDUAL_ACCOUNTS], roles: 'eligible', entitlement: 'fileStorage' },
+  educationAi: { organizationTypes: [...BUSINESS_TYPES, ...EDUCATION_TYPES], accountTypes: [...COMPANY_ACCOUNTS, ...INDIVIDUAL_ACCOUNTS], roles: 'eligible', entitlement: 'aiAssistant' },
+  workspaceSettings: {
+    organizationTypes: [...BUSINESS_TYPES, ...EDUCATION_TYPES],
+    accountTypes: [...COMPANY_ACCOUNTS, ...INDIVIDUAL_ACCOUNTS],
+    roles: 'eligible',
+  },
+  globalCalling: { organizationTypes: BUSINESS_TYPES, accountTypes: COMPANY_ACCOUNTS, roles: 'eligible' },
+  calendar: { organizationTypes: [...BUSINESS_TYPES, ...EDUCATION_TYPES], accountTypes: [...COMPANY_ACCOUNTS, ...INDIVIDUAL_ACCOUNTS], roles: 'eligible', entitlement: 'meetingsCalendar' },
+};
+
+export function isOrganizationFeatureAllowed(
+  organization: { organizationType: OrganizationType; accountType: AccountType },
+  role: string,
+  feature: OrganizationFeature,
+): boolean {
+  const policy = ORGANIZATION_FEATURE_POLICIES[feature];
+  return policy.organizationTypes.includes(organization.organizationType) &&
+    policy.accountTypes.includes(organization.accountType) &&
+    (policy.roles === 'eligible'
+      ? isOrganizationRoleEligible(role, organization.organizationType)
+      : roleMatches(role, policy.roles, organization.organizationType));
+}
 
 export function isOrganizationAdminRole(role: string, organizationType: string): boolean {
   return roleMatches(role, ['owner', 'admin', 'manager'], organizationType);
@@ -54,57 +131,16 @@ export function requireOrganizationFeature(feature: OrganizationFeature) {
         return;
       }
 
-      const role = user.role || 'employee';
-      const isAcademic = isAcademicOrganizationType(company.organizationType);
-      const eligible = isOrganizationRoleEligible(role, company.organizationType);
-      let allowed = false;
-
-      switch (feature) {
-        case 'academic':
-          allowed = isAcademic && eligible;
-          break;
-        case 'academicAdmin':
-          allowed = isAcademic && eligible && roleMatches(
-            role,
-            ['owner', 'principal', 'admin', 'dean', 'hod'],
-            company.organizationType,
-          );
-          break;
-        case 'businessCrm':
-          allowed = company.organizationType === 'business' &&
-            company.accountType === 'company' &&
-            roleMatches(role, ['owner', 'admin', 'manager'], company.organizationType);
-          break;
-        case 'clientPortal':
-          allowed = company.organizationType === 'business' &&
-            company.accountType === 'company' &&
-            roleMatches(role, ['owner', 'admin', 'manager'], company.organizationType);
-          break;
-        case 'businessAdmin':
-          allowed = company.organizationType === 'business' &&
-            roleMatches(role, ['owner', 'admin', 'manager'], company.organizationType);
-          break;
-        case 'businessAnalytics':
-        case 'businessIntegrations':
-        case 'businessAutomation':
-          allowed = company.organizationType === 'business' &&
-            roleMatches(role, ['owner', 'admin', 'manager'], company.organizationType);
-          break;
-        case 'billingAdmin':
-          allowed = eligible && roleMatches(
-            role,
-            isAcademic ? ['owner'] : ['owner', 'admin'],
-            company.organizationType,
-          );
-          break;
-        case 'memberDirectory':
-          allowed = isAcademic
-            ? eligible && roleMatches(role, ['owner', 'principal', 'admin'], company.organizationType)
-            : roleMatches(role, ['owner', 'admin', 'manager'], company.organizationType);
-          break;
-        case 'workspaceContent':
-          allowed = eligible && (!isAcademic || !roleMatches(role, ['student', 'parent'], company.organizationType));
-          break;
+      const role = user.role || '';
+      const organization = {
+        organizationType: company.organizationType,
+        accountType: company.accountType,
+      };
+      let allowed = isOrganizationFeatureAllowed(organization, role, feature);
+      const policy = ORGANIZATION_FEATURE_POLICIES[feature];
+      if (allowed && policy.entitlement) {
+        const subscription = await getCompanySubscription(company._id.toString());
+        allowed = subscription.hasActiveAccess && subscription.planConfig.entitlements[policy.entitlement];
       }
 
       if (!allowed) {

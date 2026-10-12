@@ -8,11 +8,12 @@ import {
   pinMessage,
 } from '../controllers/channel.controller';
 import { authenticate, requireEntitlement } from '../middleware/auth';
+import { requireOrganizationFeature } from '../middleware/organizationAccess';
 import { rateLimiter } from '../middleware/rateLimiter';
 
 const router = Router();
 
-router.use(authenticate, requireEntitlement('teamChat'));
+router.use(authenticate, requireOrganizationFeature('educationCommunication'), requireEntitlement('teamChat'));
 
 router.get('/', getMessages);
 // 120 messages per minute per IP — generous for real usage, blocks automated spam

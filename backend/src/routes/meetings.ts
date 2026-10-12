@@ -12,11 +12,12 @@ import {
   createTaskFromAction,
 } from '../controllers/meeting.controller';
 import { authenticate, requireEntitlement } from '../middleware/auth';
+import { requireOrganizationFeature } from '../middleware/organizationAccess';
 import { rateLimiter } from '../middleware/rateLimiter';
 
 const router = Router();
 
-router.use(authenticate);
+router.use(authenticate, requireOrganizationFeature('educationMeetings'));
 
 router.get('/', requireEntitlement('meetingsCalendar'), getMeetings);
 router.get('/active', requireEntitlement('meetingsCalendar'), getActiveMeetings);

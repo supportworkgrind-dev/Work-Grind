@@ -7,10 +7,11 @@ import {
   deleteEvent,
 } from '../controllers/calendar.controller';
 import { authenticate, requireEntitlement } from '../middleware/auth';
+import { requireOrganizationFeature } from '../middleware/organizationAccess';
 
 const router = Router();
 
-router.use(authenticate, requireEntitlement('meetingsCalendar'));
+router.use(authenticate, requireOrganizationFeature('calendar'), requireEntitlement('meetingsCalendar'));
 
 router.get('/', getEvents);
 router.post('/', createEvent);

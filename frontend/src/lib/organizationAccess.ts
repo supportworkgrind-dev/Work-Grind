@@ -6,15 +6,23 @@ export type OrganizationInfo = {
 };
 
 export type OrganizationFeature =
+  | 'soloWorkspace'
+  | 'companyWorkspace'
   | 'academic'
   | 'academicAdmin'
+  | 'educationCommunication'
+  | 'educationMeetings'
+  | 'educationFiles'
+  | 'educationAi'
   | 'businessCrm'
   | 'clientPortal'
   | 'businessAnalytics'
   | 'businessAutomation'
   | 'billingAdmin'
   | 'memberDirectory'
-  | 'workspaceContent';
+  | 'workspaceSettings';
+
+type Experience = 'solo' | 'company' | 'school' | 'college' | 'university';
 
 const roleAliases: Record<string, string> = {
   founder: 'owner',
@@ -27,14 +35,66 @@ const roleAliases: Record<string, string> = {
   'head of department': 'hod',
 };
 
+const BUSINESS_ROLES = new Set(['owner', 'admin', 'manager', 'employee', 'guest']);
+const EDUCATION_ROLES = new Set([
+  'owner', 'principal', 'admin', 'teacher', 'student', 'parent', 'manager', 'employee', 'guest', 'dean', 'hod',
+]);
+const INSTITUTION_ADMINS = new Set(['owner', 'principal', 'admin', 'dean', 'hod']);
+const DEPARTMENT_ROLES = new Set(['dean', 'hod']);
+const EDUCATION_TYPES = new Set<OrganizationType>(['school', 'college', 'university']);
+
+const FEATURE_POLICIES: Record<OrganizationFeature, (experience: Experience, role: string) => boolean> = {
+  soloWorkspace: (experience, role) => experience === 'solo' && role === 'owner',
+  companyWorkspace: (experience, role) => experience === 'company' && BUSINESS_ROLES.has(role),
+  academic: (experience, role) => experience !== 'solo' && experience !== 'company' && EDUCATION_ROLES.has(role),
+  academicAdmin: (experience, role) =>
+    experience !== 'solo' && experience !== 'company' &&
+    (INSTITUTION_ADMINS.has(role) || (experience === 'university' && DEPARTMENT_ROLES.has(role))),
+  educationCommunication: (experience, role) =>
+    experience !== 'solo' && experience !== 'company' && EDUCATION_ROLES.has(role) && role !== 'guest',
+  educationMeetings: (experience, role) =>
+    experience !== 'solo' && experience !== 'company' && EDUCATION_ROLES.has(role) && role !== 'guest',
+  educationFiles: (experience, role) =>
+    experience !== 'solo' && experience !== 'company' && EDUCATION_ROLES.has(role) && role !== 'guest',
+  educationAi: (experience, role) =>
+    experience !== 'solo' && experience !== 'company' && EDUCATION_ROLES.has(role) && role !== 'guest',
+  businessCrm: (experience, role) => experience === 'company' && ['owner', 'admin', 'manager'].includes(role),
+  clientPortal: (experience, role) => experience === 'company' && ['owner', 'admin', 'manager'].includes(role),
+  businessAnalytics: (experience, role) => experience === 'company' && ['owner', 'admin', 'manager'].includes(role),
+  businessAutomation: (experience, role) => experience === 'company' && ['owner', 'admin', 'manager'].includes(role),
+  billingAdmin: (experience, role) =>
+    experience === 'solo' ? role === 'owner' :
+      experience === 'company' ? ['owner', 'admin'].includes(role) : role === 'owner',
+  memberDirectory: (experience, role) =>
+    experience === 'company' ? ['owner', 'admin', 'manager'].includes(role) :
+      experience !== 'solo' && experience !== 'company' && INSTITUTION_ADMINS.has(role),
+  workspaceSettings: (experience, role) =>
+    experience === 'solo' ? role === 'owner' :
+      experience === 'company' ? ['owner', 'admin'].includes(role) :
+        experience !== 'solo' && experience !== 'company' && INSTITUTION_ADMINS.has(role),
+};
+
 function canonicalRole(role: UserRole | string | undefined): string {
   const key = (role ?? '').trim().toLowerCase().replace(/[\s-]+/g, '_');
   return roleAliases[key] ?? key;
 }
 
+export function getWorkspaceExperience(
+  organization: OrganizationInfo | null | undefined,
+): Experience | null {
+  if (!organization) return null;
+  if (organization.accountType === 'individual' && organization.organizationType === 'business') return 'solo';
+  if (organization.accountType !== 'company') return null;
+  if (organization.organizationType === 'business') return 'company';
+  if (organization.organizationType && EDUCATION_TYPES.has(organization.organizationType)) {
+    return organization.organizationType;
+  }
+  return null;
+}
+
 export function isEducationOrganization(organization: OrganizationInfo | null | undefined): boolean {
-  return !!organization?.organizationType &&
-    ['school', 'college', 'university'].includes(organization.organizationType);
+  const experience = getWorkspaceExperience(organization);
+  return experience === 'school' || experience === 'college' || experience === 'university';
 }
 
 export function canAccessOrganizationFeature(
@@ -42,37 +102,9 @@ export function canAccessOrganizationFeature(
   role: UserRole | string | undefined,
   feature: OrganizationFeature,
 ): boolean {
-  const roleKey = canonicalRole(role);
-  const organizationType = organization?.organizationType ?? 'business';
-  const academic = isEducationOrganization(organization);
-  const universityRole = organizationType === 'university' && ['dean', 'hod'].includes(roleKey);
-  const eligible = academic
-    ? ['owner', 'principal', 'admin', 'teacher', 'student', 'parent', 'manager', 'employee', 'guest'].includes(roleKey) || universityRole
-    : ['owner', 'admin', 'manager', 'employee', 'guest'].includes(roleKey);
-  if (!eligible) return false;
-
-  switch (feature) {
-    case 'academic':
-      return academic;
-    case 'academicAdmin':
-      return academic && ['owner', 'principal', 'admin'].includes(roleKey) || universityRole;
-    case 'businessCrm':
-    case 'clientPortal':
-      return !academic &&
-        organization?.accountType !== 'individual' &&
-        ['owner', 'admin', 'manager'].includes(roleKey);
-    case 'businessAnalytics':
-    case 'businessAutomation':
-      return !academic && ['owner', 'admin', 'manager'].includes(roleKey);
-    case 'billingAdmin':
-      return academic ? roleKey === 'owner' : ['owner', 'admin'].includes(roleKey);
-    case 'memberDirectory':
-      return academic
-        ? ['owner', 'principal', 'admin'].includes(roleKey) || universityRole
-        : ['owner', 'admin', 'manager'].includes(roleKey);
-    case 'workspaceContent':
-      return !academic || !['student', 'parent'].includes(roleKey);
-  }
+  const experience = getWorkspaceExperience(organization);
+  if (!experience) return false;
+  return FEATURE_POLICIES[feature](experience, canonicalRole(role));
 }
 
 export function getRouteOrganizationFeature(pathname: string): OrganizationFeature | null {
@@ -80,20 +112,89 @@ export function getRouteOrganizationFeature(pathname: string): OrganizationFeatu
     ['/academic', 'academic'],
     ['/crm', 'businessCrm'],
     ['/client-portal-mgmt', 'clientPortal'],
+    ['/client-portal', 'clientPortal'],
     ['/billing', 'billingAdmin'],
     ['/team', 'memberDirectory'],
     ['/analytics', 'businessAnalytics'],
     ['/workflows', 'businessAutomation'],
-    ['/ai', 'workspaceContent'],
-    ['/daily-focus', 'workspaceContent'],
-    ['/tasks', 'workspaceContent'],
-    ['/projects', 'workspaceContent'],
-    ['/whiteboard', 'workspaceContent'],
-    ['/files', 'workspaceContent'],
-    ['/docs', 'workspaceContent'],
-    ['/sheets', 'workspaceContent'],
+    ['/calendar', 'educationMeetings'],
+    ['/chat', 'educationCommunication'],
+    ['/calling', 'companyWorkspace'],
+    ['/meetings', 'educationMeetings'],
+    ['/moderation', 'companyWorkspace'],
+    ['/notifications', 'workspaceSettings'],
+    ['/settings', 'workspaceSettings'],
+    ['/daily-focus', 'soloWorkspace'],
+    ['/tasks', 'companyWorkspace'],
+    ['/projects', 'companyWorkspace'],
+    ['/whiteboard', 'companyWorkspace'],
+    ['/files', 'educationFiles'],
+    ['/docs', 'soloWorkspace'],
+    ['/sheets', 'companyWorkspace'],
+    ['/ai', 'educationAi'],
+    ['/developer', 'companyWorkspace'],
   ];
-  return routeRules.find(([prefix]) => pathname === prefix || pathname.startsWith(`${prefix}/`))?.[1] ?? null;
+  const match = routeRules.find(([prefix]) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+  if (!match) return null;
+
+  const [, feature] = match;
+  if (feature === 'educationMeetings') return feature;
+  return feature;
+}
+
+export function canAccessRoute(
+  organization: OrganizationInfo | null | undefined,
+  role: UserRole | string | undefined,
+  pathname: string,
+): boolean {
+  if (pathname === '/dashboard') return getWorkspaceExperience(organization) !== null;
+  const feature = getRouteOrganizationFeature(pathname);
+  if (!feature) return true;
+  const experience = getWorkspaceExperience(organization);
+
+  if (pathname === '/calendar') {
+    return canAccessOrganizationFeature(organization, role, 'soloWorkspace') ||
+      canAccessOrganizationFeature(organization, role, 'companyWorkspace') ||
+      canAccessOrganizationFeature(organization, role, 'educationMeetings');
+  }
+  if (pathname === '/ai') {
+    return canAccessOrganizationFeature(organization, role, 'soloWorkspace') ||
+      canAccessOrganizationFeature(organization, role, 'companyWorkspace') ||
+      canAccessOrganizationFeature(organization, role, 'educationAi');
+  }
+  if (pathname === '/files') {
+    return canAccessOrganizationFeature(organization, role, 'soloWorkspace') ||
+      canAccessOrganizationFeature(organization, role, 'companyWorkspace') ||
+      canAccessOrganizationFeature(organization, role, 'educationFiles');
+  }
+  if (pathname === '/docs') {
+    return canAccessOrganizationFeature(organization, role, 'soloWorkspace') ||
+      canAccessOrganizationFeature(organization, role, 'companyWorkspace');
+  }
+  if (pathname === '/chat') {
+    return canAccessOrganizationFeature(organization, role, 'companyWorkspace') ||
+      canAccessOrganizationFeature(organization, role, 'educationCommunication');
+  }
+  if (pathname === '/meetings') {
+    return canAccessOrganizationFeature(organization, role, 'companyWorkspace') ||
+      canAccessOrganizationFeature(organization, role, 'educationMeetings');
+  }
+  if (feature === 'soloWorkspace') return canAccessOrganizationFeature(organization, role, feature);
+  if (feature === 'companyWorkspace') return canAccessOrganizationFeature(organization, role, feature);
+  if (experience === 'school' || experience === 'college' || experience === 'university') {
+    if (feature === 'educationFiles' || feature === 'educationAi') {
+      return canAccessOrganizationFeature(organization, role, feature);
+    }
+  }
+  return canAccessOrganizationFeature(organization, role, feature);
+}
+
+export function getWorkspaceHome(organization: OrganizationInfo | null | undefined): string {
+  const experience = getWorkspaceExperience(organization);
+  if (!experience) return '/create-company';
+  return experience === 'school' || experience === 'college' || experience === 'university'
+    ? '/academic'
+    : '/dashboard';
 }
 
 export function canAccessAcademicSection(
@@ -102,9 +203,9 @@ export function canAccessAcademicSection(
   organizationType?: OrganizationType,
 ): boolean {
   const roleKey = canonicalRole(role);
-  if (!['school', 'college', 'university'].includes(organizationType ?? '')) return false;
-  if (['owner', 'principal', 'admin'].includes(roleKey) ||
-      (organizationType === 'university' && ['dean', 'hod'].includes(roleKey))) return true;
+  if (!organizationType || !EDUCATION_TYPES.has(organizationType)) return false;
+  if (INSTITUTION_ADMINS.has(roleKey) ||
+      (organizationType === 'university' && DEPARTMENT_ROLES.has(roleKey))) return true;
   if (roleKey === 'teacher') {
     return ['overview', 'students', 'timetable', 'assignments', 'attendance', 'exams', 'results'].includes(section);
   }

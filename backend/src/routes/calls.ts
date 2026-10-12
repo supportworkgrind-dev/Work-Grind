@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { authenticate, requireCompany } from '../middleware/auth';
+import { requireOrganizationFeature } from '../middleware/organizationAccess';
 import { asyncHandler } from '../middleware/asyncHandler';
 import { rateLimiter } from '../middleware/rateLimiter';
 import {
@@ -14,7 +15,7 @@ import {
 } from '../controllers/globalCalling.controller';
 
 const router = Router();
-router.use(authenticate);
+router.use(authenticate, requireOrganizationFeature('globalCalling'));
 router.post('/', rateLimiter(15, 10), asyncHandler(createGlobalCall));
 router.get('/history', asyncHandler(listCallHistory));
 router.post('/history/crm-notes', requireCompany, asyncHandler(createCrmCallNote));

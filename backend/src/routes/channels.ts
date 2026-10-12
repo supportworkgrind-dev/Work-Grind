@@ -8,10 +8,11 @@ import {
   leaveChannel,
 } from '../controllers/channel.controller';
 import { authenticate, requireEntitlement, requireRole } from '../middleware/auth';
+import { requireOrganizationFeature } from '../middleware/organizationAccess';
 
 const router = Router();
 
-router.use(authenticate, requireEntitlement('teamChat'));
+router.use(authenticate, requireOrganizationFeature('educationCommunication'), requireEntitlement('teamChat'));
 
 router.get('/', getChannels);
 router.post('/', requireRole('owner', 'admin', 'manager'), createChannel);
