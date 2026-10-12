@@ -113,7 +113,7 @@ export function ProductShowcase() {
                   ))}
                 </ul>
 
-                {p.id === 'work' && (
+                {p.id === 'company' && (
                   <div className="mt-5 rounded-xl border border-white/[0.07] bg-slate-950/40 p-3" aria-label="Sheets spreadsheet preview">
                     <div className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold text-emerald-200">
                       <Grid3X3 className="h-3.5 w-3.5" aria-hidden="true" />

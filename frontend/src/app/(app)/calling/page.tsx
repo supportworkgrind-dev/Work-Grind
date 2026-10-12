@@ -63,12 +63,22 @@ export default function CallingPage() {
     }
   }, []);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
     let active = true;
-    api.get('/users/me/calling-id')
-      .then((response) => { if (active) setMyCallingId(response.data.callingId || ''); })
-      .catch((error: unknown) => { if (active) setMyIdError(getApiErrorMessage(error, 'Your Calling ID could not be loaded.')); })
-      .finally(() => { if (active) setMyIdLoading(false); });
+
+    const loadMyCallingId = async () => {
+      try {
+        const response = await api.get('/users/me/calling-id');
+        if (active) setMyCallingId(response.data.callingId || '');
+      } catch (error: unknown) {
+        if (active) setMyIdError(getApiErrorMessage(error, 'Your Calling ID could not be loaded.'));
+      } finally {
+        if (active) setMyIdLoading(false);
+      }
+    };
+
+    void loadMyCallingId();
     return () => { active = false; };
   }, []);
 
