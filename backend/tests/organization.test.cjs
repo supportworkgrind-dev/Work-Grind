@@ -6,7 +6,12 @@ const PendingRegistration = require('../dist/models/PendingRegistration').defaul
 const OAuthTransaction = require('../dist/models/OAuthTransaction').default;
 const AuditLog = require('../dist/models/AuditLog').default;
 const { restoreWorkspaceCreatorRole } = require('../dist/controllers/auth.controller');
-const { isOrganizationType, ORGANIZATION_TYPES } = require('../dist/config/organization');
+const {
+  isOrganizationType,
+  isOrganizationRoleEligible,
+  canAssignOrganizationRole,
+  ORGANIZATION_TYPES,
+} = require('../dist/config/organization');
 const mongoose = require('mongoose');
 
 test('new and legacy-shaped companies default to a business organization without changing account type', () => {
@@ -32,6 +37,24 @@ test('organization classification only accepts supported organization types', ()
   for (const type of ['individual', 'University', '', null, undefined, 1]) {
     assert.equal(isOrganizationType(type), false);
   }
+});
+
+test('education roles are limited to compatible institution types and assignment authority', () => {
+  for (const role of ['principal', 'teacher', 'student', 'parent']) {
+    assert.equal(isOrganizationRoleEligible(role, 'school'), true);
+    assert.equal(isOrganizationRoleEligible(role, 'college'), true);
+    assert.equal(isOrganizationRoleEligible(role, 'university'), true);
+  }
+  assert.equal(isOrganizationRoleEligible('dean', 'university'), true);
+  assert.equal(isOrganizationRoleEligible('hod', 'university'), true);
+  assert.equal(isOrganizationRoleEligible('dean', 'school'), false);
+  assert.equal(isOrganizationRoleEligible('hod', 'college'), false);
+  assert.equal(isOrganizationRoleEligible('student', 'business'), false);
+
+  assert.equal(canAssignOrganizationRole('owner', 'dean', 'university', true), true);
+  assert.equal(canAssignOrganizationRole('principal', 'teacher', 'school', false), true);
+  assert.equal(canAssignOrganizationRole('principal', 'admin', 'school', false), false);
+  assert.equal(canAssignOrganizationRole('admin', 'owner', 'business', false), false);
 });
 
 test('mongoose organization type enum rejects values outside the supported types', () => {

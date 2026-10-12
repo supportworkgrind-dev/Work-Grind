@@ -14,7 +14,27 @@ import {
 
 export const getCompany = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const company = await Company.findById(req.user!.companyId);
+    const company = await Company.findById(req.user!.companyId)
+      .select([
+        '-inviteCode',
+        '-pendingInvites',
+        '-plan',
+        '-subscriptionStatus',
+        '-subscriptionPlan',
+        '-subscriptionStartDate',
+        '-subscriptionEndDate',
+        '-pendingSubscriptionPlan',
+        '-pendingSubscriptionPlanEffectiveDate',
+        '-trialStartDate',
+        '-trialEndDate',
+        '-cancelAtPeriodEnd',
+        '-polarCustomerId',
+        '-polarSubscriptionId',
+        '-polarProductId',
+        '-polarOrderId',
+        '-coupon',
+        '-isLifetime',
+      ].join(' '));
     if (!company) {
       res.status(404).json({ success: false, message: 'Company not found' });
       return;

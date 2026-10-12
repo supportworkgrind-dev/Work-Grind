@@ -65,8 +65,7 @@ export function canAccessOrganizationFeature(
     case 'businessAutomation':
       return !academic && ['owner', 'admin', 'manager'].includes(roleKey);
     case 'billingAdmin':
-      return ['owner', 'admin'].includes(roleKey) ||
-        (academic && ['principal', 'dean', 'hod'].includes(roleKey));
+      return academic ? roleKey === 'owner' : ['owner', 'admin'].includes(roleKey);
     case 'memberDirectory':
       return academic
         ? ['owner', 'principal', 'admin'].includes(roleKey) || universityRole

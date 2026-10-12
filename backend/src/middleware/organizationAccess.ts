@@ -91,7 +91,11 @@ export function requireOrganizationFeature(feature: OrganizationFeature) {
             roleMatches(role, ['owner', 'admin', 'manager'], company.organizationType);
           break;
         case 'billingAdmin':
-          allowed = eligible && roleMatches(role, ['owner', 'admin'], company.organizationType);
+          allowed = eligible && roleMatches(
+            role,
+            isAcademic ? ['owner'] : ['owner', 'admin'],
+            company.organizationType,
+          );
           break;
         case 'memberDirectory':
           allowed = isAcademic
