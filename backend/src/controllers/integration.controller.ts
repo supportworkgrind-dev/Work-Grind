@@ -17,35 +17,11 @@ import mongoose from 'mongoose';
 import Integration, { IntegrationProvider } from '../models/Integration';
 import AuditLog from '../models/AuditLog';
 import { AuthRequest } from '../middleware/auth';
-
-// ── Encryption helpers (same pattern as MFA secrets) ─────────────────────────
-
-function getEncryptionKey(): Buffer {
-  const raw = process.env.MFA_ENCRYPTION_KEY || process.env.JWT_SECRET || 'fallback-key-please-set-env';
-  return crypto.createHash('sha256').update(raw).digest();
-}
-
-function encrypt(text: string): string {
-  const iv  = crypto.randomBytes(12);
-  const key = getEncryptionKey();
-  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
-  const enc  = Buffer.concat([cipher.update(text, 'utf8'), cipher.final()]);
-  const tag  = cipher.getAuthTag();
-  return `${iv.toString('hex')}:${tag.toString('hex')}:${enc.toString('hex')}`;
-}
-
-function decrypt(stored: string): string {
-  const [ivHex, tagHex, encHex] = stored.split(':');
-  const key     = getEncryptionKey();
-  const decipher = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(ivHex, 'hex'));
-  decipher.setAuthTag(Buffer.from(tagHex, 'hex'));
-  const dec = Buffer.concat([decipher.update(Buffer.from(encHex, 'hex')), decipher.final()]);
-  return dec.toString('utf8');
-}
+import { decryptProviderToken, encryptProviderToken } from '../utils/providerTokenEncryption';
 
 // ── Static provider registry (UI metadata) ───────────────────────────────────
 
-export const INTEGRATION_REGISTRY: Record<IntegrationProvider, {
+export const INTEGRATION_REGISTRY: Record<'webhook', {
   provider:     IntegrationProvider;
   name:         string;
   description:  string;
@@ -101,7 +77,7 @@ export const connectIntegration = async (req: AuthRequest, res: Response): Promi
     }
 
     const provider = req.params.provider as IntegrationProvider;
-    if (!INTEGRATION_REGISTRY[provider]) {
+    if (provider !== 'webhook' || !INTEGRATION_REGISTRY[provider]) {
       res.status(400).json({ success: false, message: 'Unknown integration provider' });
       return;
     }
@@ -123,7 +99,7 @@ export const connectIntegration = async (req: AuthRequest, res: Response): Promi
             createdBy:     new mongoose.Types.ObjectId(req.user!.userId),
             status:        'connected',
             webhookToken,
-            webhookSecret: encrypt(webhookSecret),
+            webhookSecret: encryptProviderToken(webhookSecret),
             config: { webhookUrl, webhookEvents: webhookEvents ?? ['all'] },
             errorMessage:  null,
           },
@@ -165,7 +141,7 @@ export const disconnectIntegration = async (req: AuthRequest, res: Response): Pr
     }
 
     const provider = req.params.provider as IntegrationProvider;
-    if (!INTEGRATION_REGISTRY[provider]) {
+    if (provider !== 'webhook' || !INTEGRATION_REGISTRY[provider]) {
       res.status(400).json({ success: false, message: 'Unknown integration provider' });
       return;
     }
@@ -212,7 +188,7 @@ export const receiveWebhook = async (req: Request, res: Response): Promise<void>
     const signature = req.headers['x-webhook-signature'] as string;
     if (signature && integration.webhookSecret) {
       try {
-        const secret = decrypt(integration.webhookSecret);
+        const secret = decryptProviderToken(integration.webhookSecret);
         const expected = crypto
           .createHmac('sha256', secret)
           .update(JSON.stringify(req.body))
@@ -254,7 +230,7 @@ export const updateIntegrationConfig = async (req: AuthRequest, res: Response): 
     }
 
     const provider = req.params.provider as IntegrationProvider;
-    if (!INTEGRATION_REGISTRY[provider]) {
+    if (provider !== 'webhook' || !INTEGRATION_REGISTRY[provider]) {
       res.status(400).json({ success: false, message: 'Unknown integration provider' });
       return;
     }

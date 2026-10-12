@@ -1,6 +1,6 @@
 import mongoose, { Document, Schema } from 'mongoose';
 
-export type IntegrationProvider = 'webhook';
+export type IntegrationProvider = 'webhook' | 'linkedin';
 
 export type IntegrationStatus = 'connected' | 'disconnected' | 'error' | 'pending';
 
@@ -34,7 +34,7 @@ const IntegrationSchema = new Schema<IIntegration>({
   createdBy:      { type: Schema.Types.ObjectId, ref: 'User',    required: true },
   provider:       {
     type: String,
-    enum: ['webhook'],
+    enum: ['webhook', 'linkedin'],
     required: true,
   },
   status:         { type: String, enum: ['connected','disconnected','error','pending'], default: 'disconnected' },

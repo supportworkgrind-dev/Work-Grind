@@ -10,7 +10,7 @@ export interface IOAuthTransaction extends Document {
   nonce: string;
   codeVerifier: string;
   returnTo: string;
-  intent: 'login' | 'link' | 'signup';
+  intent: 'login' | 'link' | 'signup' | 'publishing';
   accountType?: 'company' | 'individual';
   organizationType?: OrganizationType;
   userId?: mongoose.Types.ObjectId;
@@ -25,7 +25,7 @@ const OAuthTransactionSchema = new Schema<IOAuthTransaction>({
   nonce: { type: String, required: true },
   codeVerifier: { type: String, required: true },
   returnTo: { type: String, required: true },
-  intent: { type: String, required: true, enum: ['login', 'link', 'signup'] },
+  intent: { type: String, required: true, enum: ['login', 'link', 'signup', 'publishing'] },
   accountType: { type: String, enum: ['company', 'individual'] },
   organizationType: { type: String, enum: ORGANIZATION_TYPES },
   userId: { type: Schema.Types.ObjectId, ref: 'User' },

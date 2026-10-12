@@ -174,6 +174,7 @@ export function buildAuthorizationUrl(
   state: string,
   nonce: string,
   verifier: string,
+  publishingConsent = false,
 ): string {
   const definition = providers[provider];
   const url = new URL(definition.authorizationEndpoint);
@@ -182,7 +183,11 @@ export function buildAuthorizationUrl(
   url.searchParams.set('response_type', 'code');
   url.searchParams.set(
     'scope',
-    provider === 'apple' ? 'name email' : 'openid profile email',
+    provider === 'apple'
+      ? 'name email'
+      : provider === 'linkedin' && publishingConsent
+        ? 'openid profile email w_member_social'
+        : 'openid profile email',
   );
   url.searchParams.set('state', state);
   url.searchParams.set('nonce', nonce);
@@ -214,7 +219,13 @@ export async function exchangeAuthorizationCode(
   code: string,
   verifier: string,
   expectedNonce: string,
-): Promise<{ claims: OidcClaims; appleName?: string }> {
+): Promise<{
+  claims: OidcClaims;
+  accessToken?: string;
+  refreshToken?: string;
+  scopes: string[];
+  expiresIn?: number;
+}> {
   const definition = providers[provider];
   const formValues: Record<string, string> = {
     grant_type: 'authorization_code',
@@ -240,7 +251,13 @@ export async function exchangeAuthorizationCode(
     body: form.toString(),
   });
   if (!response.ok) throw new OAuthServiceError('token_endpoint_rejected', response.status);
-  let tokenResponse: { id_token?: string };
+  let tokenResponse: {
+    id_token?: string;
+    access_token?: string;
+    refresh_token?: string;
+    scope?: string;
+    expires_in?: number;
+  };
   try {
     tokenResponse = await response.json() as { id_token?: string };
   } catch {
@@ -256,7 +273,18 @@ export async function exchangeAuthorizationCode(
       !timingSafeEqual(receivedNonce, wantedNonce)) {
     throw new Error('Identity token nonce was invalid.');
   }
-  return { claims };
+  const scopes = typeof tokenResponse.scope === 'string'
+    ? tokenResponse.scope.split(/\s+/).filter(Boolean)
+    : [];
+  return {
+    claims,
+    ...(typeof tokenResponse.access_token === 'string' ? { accessToken: tokenResponse.access_token } : {}),
+    ...(typeof tokenResponse.refresh_token === 'string' ? { refreshToken: tokenResponse.refresh_token } : {}),
+    scopes,
+    ...(typeof tokenResponse.expires_in === 'number' && Number.isFinite(tokenResponse.expires_in)
+      ? { expiresIn: tokenResponse.expires_in }
+      : {}),
+  };
 }
 
 const jwksCache = new Map<OAuthProvider, { expiresAt: number; keys: Array<Record<string, unknown>> }>();

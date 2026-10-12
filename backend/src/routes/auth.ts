@@ -33,7 +33,7 @@ const startOAuthRoute: RequestHandler = (req, res, next) => {
       void startOAuth(req, res).catch(next);
     });
   }
-  if (req.query.intent === 'link') {
+  if (req.query.intent === 'link' || req.query.intent === 'publishing') {
     return authenticate(req, res, (error?: unknown) => {
       if (error) return next(error);
       void startOAuth(req, res).catch(next);

@@ -13,6 +13,11 @@ import { sendWelcomeEmail } from '../utils/email';
 import { restoreWorkspaceCreatorRole, sessionForUser } from './auth.controller';
 import { setRefreshCookie } from '../utils/authCookie';
 import { issueClientToken } from '../utils/clientPortalAuth';
+import AuditLog from '../models/AuditLog';
+import Integration from '../models/Integration';
+import { isOrganizationAdminRole } from '../middleware/organizationAccess';
+import { encryptProviderToken } from '../utils/providerTokenEncryption';
+import { LINKEDIN_PUBLISHING_SCOPE } from '../services/linkedinPublishing';
 import {
   buildAuthorizationUrl,
   createOAuthToken,
@@ -53,7 +58,8 @@ function providerPicture(provider: OAuthProvider, picture?: string): string | un
 }
 const safeError = (value: string) =>
   ['cancelled', 'mfa_required', 'provider_unavailable', 'invalid_request', 'account_exists', 'signup_required',
-    'identity_in_use', 'verified_email_required', 'client_invitation_required', 'try_again'].includes(value)
+    'identity_in_use', 'verified_email_required', 'client_invitation_required', 'publishing_permission_denied',
+    'provider_already_linked', 'try_again'].includes(value)
     ? value
     : 'try_again';
 
@@ -72,6 +78,8 @@ const knownOAuthFailures = new Set([
   'provider_error',
   'provider_already_linked',
   'verified_email_required',
+  'publishing_permission_denied',
+  'provider_already_linked',
   'Identity token nonce was invalid.',
   'Identity token claims were invalid.',
   'Identity token signing key was not recognized.',
@@ -168,7 +176,13 @@ export const startOAuth = async (req: Request, res: Response): Promise<void> => 
     return;
   }
   const requestedIntent = req.query.intent;
-  const intent = requestedIntent === 'link' ? 'link' : requestedIntent === 'signup' ? 'signup' : 'login';
+  const intent = requestedIntent === 'link'
+    ? 'link'
+    : requestedIntent === 'signup'
+      ? 'signup'
+      : requestedIntent === 'publishing'
+        ? 'publishing'
+        : 'login';
   if (req.query.audience !== undefined &&
       req.query.audience !== 'user' && req.query.audience !== 'client') {
     res.status(400).json({ success: false, code: 'OAUTH_INVALID_REQUEST', message: 'The sign-in request could not be started.' });
@@ -176,13 +190,22 @@ export const startOAuth = async (req: Request, res: Response): Promise<void> => 
   }
   const audience = req.query.audience === 'client' ? 'client' : 'user';
   const authRequest = req as AuthRequest;
-  const userId = intent === 'link' ? authRequest.user?.userId : undefined;
+  const userId = intent === 'link' || intent === 'publishing' ? authRequest.user?.userId : undefined;
   const clientUserId = intent === 'link'
     ? (req as Request & { client?: { clientUserId: string } }).client?.clientUserId
     : undefined;
   const requestedAccountType = typeof req.query.accountType === 'string' ? req.query.accountType : '';
   const requestedOrganizationType = typeof req.query.organizationType === 'string' ? req.query.organizationType : '';
-  if ((audience === 'client' && intent === 'signup') ||
+  if ((audience === 'client' && (intent === 'signup' || intent === 'publishing')) ||
+      (intent === 'publishing' && (
+        provider !== 'linkedin' ||
+        !userId ||
+        audience !== 'user' ||
+        !authRequest.user?.companyId ||
+        authRequest.user.accountType !== 'company' ||
+        authRequest.user.organizationType !== 'business' ||
+        !isOrganizationAdminRole(authRequest.user.role, authRequest.user.organizationType)
+      )) ||
       (audience === 'user' && intent === 'link' && !userId) ||
       (audience === 'client' && intent === 'link' && !clientUserId) ||
       (intent === 'signup' &&
@@ -247,7 +270,14 @@ export const startOAuth = async (req: Request, res: Response): Promise<void> => 
       'Set-Cookie',
       `wg_oauth_${provider}_state=${encodeURIComponent(state)}; Path=/api/auth/oauth; Max-Age=600; HttpOnly; SameSite=${sameSite}${secure}`,
     );
-    const authUrl = buildAuthorizationUrl(provider, configuration, state, nonce, codeVerifier);
+    const authUrl = buildAuthorizationUrl(
+      provider,
+      configuration,
+      state,
+      nonce,
+      codeVerifier,
+      intent === 'publishing',
+    );
     if (intent !== 'link' && req.accepts('html')) {
       res.redirect(303, authUrl);
       return;
@@ -394,6 +424,80 @@ async function finishClientLink(provider: OAuthProvider, clientUserId: string, c
   await client.save();
 }
 
+async function finishLinkedInPublishingConnection(
+  transactionUserId: string,
+  claims: OidcClaims,
+  accessToken: string | undefined,
+  scopes: string[],
+  expiresIn: number | undefined,
+): Promise<Integration> {
+  if (!accessToken || accessToken.length > 16_384 ||
+      !Number.isInteger(expiresIn) || expiresIn! < 60 || expiresIn! > 365 * 24 * 60 * 60 ||
+      !scopes.includes(LINKEDIN_PUBLISHING_SCOPE)) {
+    throw new Error('publishing_permission_denied');
+  }
+  if (!claims.email || !identityTokenHasVerifiedEmail(claims)) {
+    throw new Error('verified_email_required');
+  }
+
+  const user = await User.findById(transactionUserId);
+  if (!user || !user.isActive || user.isDeleted || !user.isVerified ||
+      user.email.toLowerCase() !== claims.email.trim().toLowerCase() ||
+      !user.companyId || !isOrganizationAdminRole(user.role, 'business')) {
+    throw new Error('account_unavailable');
+  }
+  const company = await Company.findOne({
+    _id: user.companyId,
+    isActive: true,
+    accountType: 'company',
+    organizationType: 'business',
+  }).select('_id');
+  if (!company) throw new Error('account_unavailable');
+
+  if (user.linkedinId && user.linkedinId !== claims.sub) {
+    throw new Error('provider_already_linked');
+  }
+  const identityOwner = await User.findOne({ linkedinId: claims.sub }).select('_id');
+  if (identityOwner && identityOwner._id.toString() !== user._id.toString()) {
+    throw new Error('identity_in_use');
+  }
+
+  const existingConnection = await Integration.findOne({
+    companyId: company._id,
+    provider: 'linkedin',
+  }).select('status config');
+  if (existingConnection?.status === 'connected' &&
+      existingConnection.config?.linkedinSubject !== claims.sub) {
+    throw new Error('provider_already_linked');
+  }
+
+  user.linkedinId = claims.sub;
+  await user.save();
+  const connection = await Integration.findOneAndUpdate(
+    { companyId: company._id, provider: 'linkedin' },
+    {
+      $set: {
+        createdBy: user._id,
+        status: 'connected',
+        accessToken: encryptProviderToken(accessToken),
+        tokenExpiresAt: new Date(Date.now() + expiresIn! * 1000),
+        config: {
+          linkedinSubject: claims.sub,
+          identityName: (claims.name || [claims.given_name, claims.family_name].filter(Boolean).join(' ') ||
+            claims.email || 'LinkedIn member').trim().slice(0, 200),
+          identityEmail: claims.email.trim().toLowerCase().slice(0, 254),
+          grantedScopes: scopes,
+        },
+        errorMessage: null,
+      },
+      $unset: { refreshToken: 1 },
+    },
+    { upsert: true, new: true, setDefaultsOnInsert: true, select: '-accessToken -refreshToken' },
+  );
+  if (!connection) throw new Error('provider_connection_failed');
+  return connection;
+}
+
 export const completeOAuthCallback = async (req: Request, res: Response): Promise<void> => {
   res.setHeader('Cache-Control', 'no-store');
   res.setHeader('Referrer-Policy', 'no-referrer');
@@ -432,7 +536,13 @@ export const completeOAuthCallback = async (req: Request, res: Response): Promis
     typeof req.body?.error === 'string' ? req.body.error : '';
   if (providerError) {
     logOAuthFailure(provider, 'provider_callback', new Error(providerError === 'access_denied' ? 'cancelled' : 'provider_error'));
-    errorRedirect(res, providerError === 'access_denied' ? 'cancelled' : 'try_again', transaction.returnTo, transaction.intent === 'link', transaction.audience);
+    errorRedirect(
+      res,
+      providerError === 'access_denied' ? 'cancelled' : 'try_again',
+      transaction.returnTo,
+      transaction.intent === 'link' || transaction.intent === 'publishing',
+      transaction.audience,
+    );
     return;
   }
   const code = typeof req.query.code === 'string' ? req.query.code :
@@ -440,18 +550,47 @@ export const completeOAuthCallback = async (req: Request, res: Response): Promis
   const configuration = getOAuthConfiguration(provider);
   if (!configuration || !code || code.length > 4096) {
     logOAuthFailure(provider, 'callback_configuration_or_code', new Error('invalid_request'));
-    errorRedirect(res, 'provider_unavailable', transaction.returnTo, transaction.intent === 'link', transaction.audience);
+    errorRedirect(
+      res,
+      'provider_unavailable',
+      transaction.returnTo,
+      transaction.intent === 'link' || transaction.intent === 'publishing',
+      transaction.audience,
+    );
     return;
   }
   let stage = 'authorization_code_exchange_and_id_token_validation';
   try {
-    const { claims } = await exchangeAuthorizationCode(
+    const { claims, accessToken, scopes, expiresIn } = await exchangeAuthorizationCode(
       provider,
       configuration,
       code,
       transaction.codeVerifier,
       transaction.nonce,
     );
+    if (transaction.intent === 'publishing' && transaction.audience === 'user') {
+      const connection = await finishLinkedInPublishingConnection(
+        transaction.userId?.toString() || '',
+        claims,
+        accessToken,
+        scopes,
+        expiresIn,
+      );
+      await AuditLog.create({
+        companyId: connection.companyId,
+        userId: connection.createdBy,
+        action: 'LINKEDIN_PUBLISHING_CONNECTED',
+        resource: 'Integration',
+        resourceId: connection._id.toString(),
+        details: { grantedScopes: scopes },
+        ipAddress: req.ip,
+      });
+      const destination = getClientRedirect(transaction.returnTo);
+      if (!destination) throw new Error('invalid_return_to');
+      destination.searchParams.set('oauth', 'connected');
+      res.redirect(303, destination.toString());
+      return;
+    }
     if (transaction.intent === 'link' && transaction.audience === 'client') {
       await finishClientLink(provider, transaction.clientUserId?.toString() || '', claims);
       const destination = getClientRedirect(transaction.returnTo);
@@ -513,7 +652,7 @@ export const completeOAuthCallback = async (req: Request, res: Response): Promis
     res.redirect(303, destination.toString());
   } catch (error: any) {
     logOAuthFailure(provider, stage, error);
-    const destination = transaction.intent === 'link'
+    const destination = transaction.intent === 'link' || transaction.intent === 'publishing'
       ? transaction.returnTo
       : transaction.audience === 'client' ? '/client-portal/oauth/callback' : undefined;
     const errorCode = error?.message === 'account_exists'
@@ -523,8 +662,16 @@ export const completeOAuthCallback = async (req: Request, res: Response): Promis
       : error?.message === 'mfa_required' ? 'mfa_required'
       : error?.message === 'identity_in_use' ? 'identity_in_use'
       : error?.message === 'verified_email_required' ? 'verified_email_required'
+      : error?.message === 'publishing_permission_denied' ? 'publishing_permission_denied'
+      : error?.message === 'provider_already_linked' ? 'provider_already_linked'
       : error?.message === 'cancelled' ? 'cancelled' : 'try_again';
-    errorRedirect(res, errorCode, destination, transaction.intent === 'link', transaction.audience);
+    errorRedirect(
+      res,
+      errorCode,
+      destination,
+      transaction.intent === 'link' || transaction.intent === 'publishing',
+      transaction.audience,
+    );
   }
 };
 
