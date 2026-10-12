@@ -1,11 +1,16 @@
 import 'dotenv/config';
-import { checkRedisHealth } from '../config/redis';
+import { checkRedisHealth, getRedisClient } from '../config/redis';
 
 async function run(): Promise<void> {
-  const health = await checkRedisHealth();
-  console.log(JSON.stringify(health));
-  if (health.status !== 'connected' || health.ping !== 'PONG') {
-    process.exitCode = 1;
+  const client = getRedisClient();
+  try {
+    const health = await checkRedisHealth(client);
+    console.log(JSON.stringify(health));
+    if (health.status !== 'connected' || health.ping !== 'PONG') {
+      process.exitCode = 1;
+    }
+  } finally {
+    client?.disconnect();
   }
 }
 
