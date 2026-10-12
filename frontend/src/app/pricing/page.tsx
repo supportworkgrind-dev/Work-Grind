@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/useAuthStore';
 import { api } from '@/lib/api';
-import { PlanConfig } from '@/types';
+import { EducationPlanPricing, PlanConfig } from '@/types';
 import {
   CheckCircle2, XCircle, ArrowRight, Zap, Shield, Users,
   MessageSquare, Briefcase, Sparkles, Building2, Calendar,
@@ -159,6 +159,7 @@ export default function PricingPage() {
   const [mounted, setMounted] = useState(false);
 
   const [plans,        setPlans]        = useState<PlanConfig[]>([]);
+  const [educationPlans, setEducationPlans] = useState<EducationPlanPricing[]>([]);
   const [loadingPlans, setLoadingPlans] = useState(true);
   const [checkoutPlan, setCheckoutPlan] = useState<string | null>(null);
   const [error,        setError]        = useState('');
@@ -169,7 +170,10 @@ export default function PricingPage() {
     (async () => {
       try {
         const res = await api.get('/subscription/plans');
-        if (res.data.success) setPlans(res.data.plans);
+        if (res.data.success) {
+          setPlans(res.data.plans);
+          setEducationPlans(res.data.educationPlans ?? []);
+        }
       } catch { /* use empty */ }
       finally { setLoadingPlans(false); }
     })();
@@ -268,6 +272,39 @@ export default function PricingPage() {
               />
             ))}
           </div>
+        )}
+
+        {/* ── Education pricing ── */}
+        {!loadingPlans && educationPlans.length > 0 && (
+          <section className="mb-20" aria-labelledby="education-pricing-heading">
+            <div className="mb-8 text-center">
+              <h2 id="education-pricing-heading" className="text-2xl font-black text-white">
+                Education pricing
+              </h2>
+              <p className="mt-2 text-sm text-slate-400">
+                Monthly plans for schools, colleges, and universities.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+              {educationPlans.map((plan) => (
+                <article key={plan.id} className="rounded-3xl border border-white/[0.08] bg-[#0d1117] p-7">
+                  <h3 className="text-[11px] font-bold uppercase tracking-widest text-slate-400">
+                    {plan.name}
+                  </h3>
+                  <p className="mt-4 text-4xl font-black text-white">
+                    {plan.priceDisplay.replace('/month', '')}
+                    <span className="ml-1.5 text-sm font-medium text-slate-400">/month</span>
+                  </p>
+                  <p className="mt-3 min-h-10 text-[13px] leading-relaxed text-slate-400">
+                    {plan.description}
+                  </p>
+                </article>
+              ))}
+            </div>
+            <p className="mt-5 text-center text-xs text-slate-500">
+              Education checkout will be enabled after the Polar products and education plan limits are configured.
+            </p>
+          </section>
         )}
 
         {/* ── Features strip ── */}

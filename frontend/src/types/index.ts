@@ -550,3 +550,12 @@ export interface PlanConfig {
   limits:       PlanLimits;
   features:     PlanFeature[];
 }
+
+export interface EducationPlanPricing {
+  id: 'school' | 'college' | 'university';
+  name: string;
+  priceMonthly: number;
+  priceDisplay: string;
+  billingInterval: 'month';
+  description: string;
+}

@@ -12,6 +12,7 @@ const {
   canAssignOrganizationRole,
   ORGANIZATION_TYPES,
 } = require('../dist/config/organization');
+const { getEducationPlanPricing, getEducationPolarProductId } = require('../dist/config/subscription');
 const mongoose = require('mongoose');
 
 test('new and legacy-shaped companies default to a business organization without changing account type', () => {
@@ -55,6 +56,34 @@ test('education roles are limited to compatible institution types and assignment
   assert.equal(canAssignOrganizationRole('principal', 'teacher', 'school', false), true);
   assert.equal(canAssignOrganizationRole('principal', 'admin', 'school', false), false);
   assert.equal(canAssignOrganizationRole('admin', 'owner', 'business', false), false);
+});
+
+test('education monthly prices are backend-defined without placeholder Polar IDs', () => {
+  const envKeys = [
+    'POLAR_SCHOOL_PRODUCT_ID',
+    'POLAR_COLLEGE_PRODUCT_ID',
+    'POLAR_UNIVERSITY_PRODUCT_ID',
+  ];
+  const previousValues = envKeys.map((key) => process.env[key]);
+  try {
+    for (const key of envKeys) delete process.env[key];
+    assert.deepEqual(
+      getEducationPlanPricing().map(({ id, priceMonthly, billingInterval }) => ({ id, priceMonthly, billingInterval })),
+      [
+        { id: 'school', priceMonthly: 1900, billingInterval: 'month' },
+        { id: 'college', priceMonthly: 4900, billingInterval: 'month' },
+        { id: 'university', priceMonthly: 9900, billingInterval: 'month' },
+      ],
+    );
+    assert.equal(getEducationPolarProductId('school'), undefined);
+    assert.equal(getEducationPolarProductId('college'), undefined);
+    assert.equal(getEducationPolarProductId('university'), undefined);
+  } finally {
+    envKeys.forEach((key, index) => {
+      if (previousValues[index] === undefined) delete process.env[key];
+      else process.env[key] = previousValues[index];
+    });
+  }
 });
 
 test('mongoose organization type enum rejects values outside the supported types', () => {

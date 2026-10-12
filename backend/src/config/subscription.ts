@@ -9,6 +9,7 @@
  */
 
 export type PlanId = 'free' | 'starter' | 'pro';
+export type EducationPlanId = 'school' | 'college' | 'university';
 export type SubscriptionStatus =
   | 'trialing'
   | 'active'
@@ -59,6 +60,57 @@ export interface PlanConfig {
 }
 
 export const TRIAL_DAYS = 7;
+
+export interface EducationPlanPricing {
+  id: EducationPlanId;
+  name: string;
+  priceMonthly: number;
+  priceDisplay: string;
+  billingInterval: 'month';
+  description: string;
+}
+
+const EDUCATION_PLAN_PRICING: EducationPlanPricing[] = [
+  {
+    id: 'school',
+    name: 'WorkGrind School',
+    priceMonthly: 1900,
+    priceDisplay: '$19/month',
+    billingInterval: 'month',
+    description: 'Monthly subscription for schools and academies.',
+  },
+  {
+    id: 'college',
+    name: 'WorkGrind College',
+    priceMonthly: 4900,
+    priceDisplay: '$49/month',
+    billingInterval: 'month',
+    description: 'Monthly subscription for colleges.',
+  },
+  {
+    id: 'university',
+    name: 'WorkGrind University',
+    priceMonthly: 9900,
+    priceDisplay: '$99/month',
+    billingInterval: 'month',
+    description: 'Monthly subscription for universities.',
+  },
+];
+
+const EDUCATION_PRODUCT_ID_ENV: Record<EducationPlanId, string> = {
+  school: 'POLAR_SCHOOL_PRODUCT_ID',
+  college: 'POLAR_COLLEGE_PRODUCT_ID',
+  university: 'POLAR_UNIVERSITY_PRODUCT_ID',
+};
+
+/** Public pricing data never includes Polar IDs; IDs are read only by server checkout code. */
+export function getEducationPlanPricing(): EducationPlanPricing[] {
+  return EDUCATION_PLAN_PRICING.map((plan) => ({ ...plan }));
+}
+
+export function getEducationPolarProductId(planId: EducationPlanId): string | undefined {
+  return process.env[EDUCATION_PRODUCT_ID_ENV[planId]]?.trim() || undefined;
+}
 
 // ── Static plan definitions (no env vars here) ────────────────────────────────
 // Polar Product IDs are injected by getPlan() / getPolarProductId() at call-time.

@@ -27,6 +27,7 @@ import {
   getPolarProductId,
   validatePolarProductId,
   hasActiveAccess,
+  getEducationPlanPricing,
 } from '../config/subscription';
 import {
   getCompanySubscription,
@@ -861,5 +862,5 @@ export const getPlans = async (_req: Request, res: Response): Promise<void> => {
     limits:       p.limits,
     features:     p.features,
   }));
-  res.json({ success: true, plans });
+  res.json({ success: true, plans, educationPlans: getEducationPlanPricing() });
 };
