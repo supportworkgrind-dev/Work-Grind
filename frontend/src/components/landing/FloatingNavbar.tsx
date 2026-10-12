@@ -58,7 +58,7 @@ export function FloatingNavbar({ isAuthenticated = false }: FloatingNavbarProps)
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-8">
           <Link href="/" aria-label="WorkGrind home" className="shrink-0">
-            <ThemeAwareLogo size="sm" showWordmark surface="light" />
+            <ThemeAwareLogo size="sm" showWordmark surface="auto" />
           </Link>
 
           {/* Desktop nav */}

@@ -71,7 +71,7 @@ export function EmptyState({
         {title}
       </h3>
       <p
-        className={`leading-relaxed max-w-sm ${compact ? 'text-xs' : 'text-xs sm:text-sm'}`}
+        className="text-sm leading-relaxed max-w-sm"
         style={{ color: 'var(--text-muted)' }}
       >
         {description}

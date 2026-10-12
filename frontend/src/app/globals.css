@@ -2425,6 +2425,104 @@ html[dir="rtl"] .stat-value {
   box-shadow: var(--shadow-card);
 }
 
+/* Shared visual refinements for the canonical light and dark themes. */
+body {
+  background-image: none;
+}
+
+.theme-scope {
+  --wg-radius-control: 7px;
+  --wg-radius-panel: 10px;
+  font-family: var(--wg-font-ui);
+}
+
+.theme-scope :is(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--wg-focus);
+  outline-offset: 2px;
+}
+
+.theme-scope :is(.btn-primary, .btn-secondary, .btn-ghost, .btn-danger) {
+  min-height: 2.5rem;
+  font-size: 0.875rem;
+}
+
+.theme-scope .badge {
+  min-height: 1.375rem;
+  font-size: 0.6875rem;
+  letter-spacing: 0.045em;
+}
+
+.theme-scope .data-table {
+  font-size: 0.8125rem;
+}
+
+.theme-scope .data-table thead th,
+.theme-scope .section-label {
+  font-size: 0.6875rem;
+  letter-spacing: 0.06em;
+}
+
+.theme-scope .page-hero {
+  background: var(--bg-card);
+}
+
+.theme-scope .page-hero::before {
+  background: linear-gradient(115deg, color-mix(in srgb, var(--accent) 7%, transparent), transparent 55%);
+}
+
+.theme-scope .page-hero::after {
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--accent) 45%, transparent), transparent);
+}
+
+.public-navbar {
+  background: color-mix(in srgb, var(--wg-bg) 94%, transparent);
+  border-color: var(--wg-border);
+  color: var(--wg-text);
+}
+
+.public-navbar :is(a, button):focus-visible {
+  outline: 2px solid var(--wg-focus);
+  outline-offset: 2px;
+}
+
+.public-nav-secondary,
+.public-nav-text {
+  color: var(--wg-text-secondary);
+}
+
+.public-nav-secondary:hover,
+.public-nav-text:hover,
+.public-nav-dropdown-item:hover {
+  background: var(--wg-surface-elevated);
+  color: var(--wg-text);
+}
+
+.public-nav-primary {
+  background: var(--wg-theme-accent);
+  color: var(--wg-on-accent);
+}
+
+.public-nav-primary:hover {
+  background: var(--wg-accent-hover);
+  color: var(--wg-on-accent);
+}
+
+.public-nav-mobile-menu,
+.public-nav-dropdown {
+  background: var(--wg-surface);
+  border-color: var(--wg-border);
+  color: var(--wg-text);
+}
+
+.public-nav-dropdown-item {
+  color: var(--wg-text-secondary);
+}
+
+.public-nav-dropdown-active {
+  background: var(--wg-accent-soft);
+  color: var(--wg-theme-accent);
+}
+
 @media (max-width: 640px) {
   .navbar-search {
     min-width: 0;
@@ -3255,7 +3353,7 @@ html:not([data-theme]) .theme-scope {
 
 /* Shared authenticated WorkGrind system */
 .theme-scope {
-  --wg-font-display: Georgia, "Times New Roman", serif;
+  --wg-font-display: var(--font-plus-jakarta-sans), "Segoe UI", sans-serif;
   --wg-font-ui: var(--font-plus-jakarta-sans), "Segoe UI", sans-serif;
   --wg-radius-control: 5px;
   --wg-radius-panel: 8px;
@@ -3280,8 +3378,8 @@ html:not([data-theme]) .theme-scope {
 .theme-scope .page-hero-sm h1 {
   color: var(--text-primary);
   font-family: var(--wg-font-display);
-  font-weight: 500;
-  letter-spacing: -0.045em;
+  font-weight: 650;
+  letter-spacing: -0.03em;
 }
 
 .theme-scope .page-title,
@@ -3895,38 +3993,38 @@ html:not([data-theme]) .theme-scope {
 
 /* Canonical WorkGrind theme tokens. Legacy variables below alias these values. */
 [data-theme="original"] {
-  --wg-bg: #f5f2e9;
-  --wg-surface: #fffdf7;
-  --wg-surface-elevated: #ffffff;
-  --wg-surface-sunken: #ece9df;
-  --wg-text: #202820;
-  --wg-text-secondary: #535c52;
-  --wg-text-muted: #687166;
-  --wg-border: #d8d5ca;
-  --wg-border-subtle: #e8e5db;
-  --wg-border-strong: #bdb9ac;
-  --wg-control-border: #85897e;
-  --wg-theme-accent: #294a38;
-  --wg-logo-accent: #294a38;
+  --wg-bg: #f5f3ed;
+  --wg-surface: #ffffff;
+  --wg-surface-elevated: #f0f0ea;
+  --wg-surface-sunken: #eae9e2;
+  --wg-text: #202b32;
+  --wg-text-secondary: #56636a;
+  --wg-text-muted: #56636a;
+  --wg-border: #dcddd6;
+  --wg-border-subtle: #e8e9e3;
+  --wg-border-strong: #b7c0bc;
+  --wg-control-border: #74817d;
+  --wg-theme-accent: #315f59;
+  --wg-logo-accent: #315f59;
   --wg-logo-dot: #bf6548;
-  --wg-logo-wordmark: #202820;
-  --wg-logo-wordmark-accent: #294a38;
+  --wg-logo-wordmark: #202b32;
+  --wg-logo-wordmark-accent: #315f59;
   --wg-logo-on-dark-accent: #91ac95;
   --wg-logo-on-dark-dot: #e0a083;
   --wg-logo-on-dark-wordmark: #fffdf7;
   --wg-logo-on-dark-wordmark-accent: #d9e5d4;
-  --wg-accent-hover: #203b2d;
-  --wg-accent-soft: #e5ebe4;
+  --wg-accent-hover: #254b46;
+  --wg-accent-soft: #e6efec;
   --wg-on-accent: #ffffff;
   --wg-success: #17663b; --wg-success-soft: #eaf6ee; --wg-success-border: #a9d5b4; --wg-on-success: #ffffff;
   --wg-warning: #805000; --wg-warning-soft: #fff5d9; --wg-warning-border: #e5c981; --wg-on-warning: #ffffff;
   --wg-danger: #a12b24; --wg-danger-soft: #fff0ed; --wg-danger-border: #e5aaa2; --wg-on-danger: #ffffff;
   --wg-info: #24549a; --wg-info-soft: #edf4ff; --wg-info-border: #b5c9eb; --wg-on-info: #ffffff;
-  --wg-focus: #52745d;
-  --wg-selection: #294a38;
+  --wg-focus: #315f59;
+  --wg-selection: #315f59;
   --wg-selection-text: #ffffff;
-  --wg-chart-1: #294a38; --wg-chart-2: #bf6548; --wg-chart-3: #738c68; --wg-chart-4: #b39052; --wg-chart-5: #55768a; --wg-chart-6: #8f6d60;
-  --wg-auth-panel: #294a38;
+  --wg-chart-1: #315f59; --wg-chart-2: #bf6548; --wg-chart-3: #738c68; --wg-chart-4: #b39052; --wg-chart-5: #55768a; --wg-chart-6: #8f6d60;
+  --wg-auth-panel: #315f59;
   --wg-auth-panel-text: #fffdf7;
   --wg-auth-muted: #d0d9cc;
   --wg-auth-accent: #e0a083;
@@ -3935,42 +4033,42 @@ html:not([data-theme]) .theme-scope {
 }
 
 [data-theme="midnight"] {
-  --wg-bg: #101216;
-  --wg-surface: #191c22;
-  --wg-surface-elevated: #22262e;
-  --wg-surface-sunken: #0b0d11;
-  --wg-text: #f0f2f6;
-  --wg-text-secondary: #c0c5ce;
-  --wg-text-muted: #a1a8b4;
-  --wg-border: #373c46;
-  --wg-border-subtle: #292e37;
-  --wg-border-strong: #525965;
-  --wg-control-border: #626b78;
-  --wg-theme-accent: #a9b4ff;
-  --wg-logo-accent: #4955a5;
-  --wg-logo-dot: #734d8f;
-  --wg-logo-wordmark: #20243a;
-  --wg-logo-wordmark-accent: #4955a5;
-  --wg-logo-on-dark-accent: #a9b4ff;
-  --wg-logo-on-dark-dot: #d5bded;
-  --wg-logo-on-dark-wordmark: #f0f2f6;
-  --wg-logo-on-dark-wordmark-accent: #c3cbff;
-  --wg-accent-hover: #c3cbff;
-  --wg-accent-soft: #282d47;
-  --wg-on-accent: #171a27;
+  --wg-bg: #111923;
+  --wg-surface: #19232e;
+  --wg-surface-elevated: #202d38;
+  --wg-surface-sunken: #0d141c;
+  --wg-text: #f3f0e8;
+  --wg-text-secondary: #b6c1ca;
+  --wg-text-muted: #b6c1ca;
+  --wg-border: #34414c;
+  --wg-border-subtle: #293640;
+  --wg-border-strong: #53636e;
+  --wg-control-border: #71818b;
+  --wg-theme-accent: #6fa99b;
+  --wg-logo-accent: #6fa99b;
+  --wg-logo-dot: #d18a6e;
+  --wg-logo-wordmark: #202b32;
+  --wg-logo-wordmark-accent: #315f59;
+  --wg-logo-on-dark-accent: #8fc1b4;
+  --wg-logo-on-dark-dot: #e0a083;
+  --wg-logo-on-dark-wordmark: #f3f0e8;
+  --wg-logo-on-dark-wordmark-accent: #b4d7cd;
+  --wg-accent-hover: #8fc1b4;
+  --wg-accent-soft: #293a43;
+  --wg-on-accent: #111923;
   --wg-success: #8bd7a6; --wg-success-soft: #1d3328; --wg-success-border: #3e7152; --wg-on-success: #10231a;
   --wg-warning: #f0c975; --wg-warning-soft: #392f1b; --wg-warning-border: #816b35; --wg-on-warning: #201a0b;
   --wg-danger: #ffaaa1; --wg-danger-soft: #3b2224; --wg-danger-border: #855052; --wg-on-danger: #2b1010;
   --wg-info: #9fc3ff; --wg-info-soft: #202d43; --wg-info-border: #49688f; --wg-on-info: #0b1830;
-  --wg-focus: #bdc5ff;
-  --wg-selection: #515eb0;
+  --wg-focus: #8fc1b4;
+  --wg-selection: #315f59;
   --wg-selection-text: #ffffff;
-  --wg-chart-1: #a9b4ff; --wg-chart-2: #e19b7c; --wg-chart-3: #8bd7a6; --wg-chart-4: #e5c875; --wg-chart-5: #79c9dc; --wg-chart-6: #c69be1;
-  --wg-auth-panel: #191c22;
-  --wg-auth-panel-text: #f0f2f6;
-  --wg-auth-muted: #c0c5ce;
-  --wg-auth-accent: #c3cbff;
-  --wg-landing-bg: #101216;
+  --wg-chart-1: #6fa99b; --wg-chart-2: #e19b7c; --wg-chart-3: #8bd7a6; --wg-chart-4: #e5c875; --wg-chart-5: #79c9dc; --wg-chart-6: #c69be1;
+  --wg-auth-panel: #19232e;
+  --wg-auth-panel-text: #f3f0e8;
+  --wg-auth-muted: #b6c1ca;
+  --wg-auth-accent: #8fc1b4;
+  --wg-landing-bg: #111923;
   color-scheme: dark;
 }
 
