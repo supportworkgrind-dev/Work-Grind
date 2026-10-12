@@ -25,6 +25,11 @@ import {
   PlanId,
   getPlan,
   getPolarProductId,
+  getEducationPolarProductId,
+  getEducationPlanConfig,
+  getEducationPolarProductIdEnv,
+  educationPlanForOrganization,
+  getConfiguredPlanIdForPolarProduct,
   validatePolarProductId,
   hasActiveAccess,
   getEducationPlanPricing,
@@ -48,7 +53,47 @@ function getPolar(): Polar {
 
 // ── Guard: must be owner or admin ─────────────────────────────────────────────
 function isBillingAdmin(role: string): boolean {
-  return role === 'owner' || role === 'admin';
+  return role === 'owner' || role === 'founder' || role === 'admin';
+}
+
+function isEducationPlan(planId: PlanId): planId is 'school' | 'college' | 'university' {
+  return planId === 'school' || planId === 'college' || planId === 'university';
+}
+
+function matchesPolarProductPrice(
+  product: Awaited<ReturnType<Polar['products']['get']>>,
+  planId: 'school' | 'college' | 'university',
+): boolean {
+  const expected = getEducationPlanConfig(planId);
+  return !product.isArchived &&
+    product.isRecurring &&
+    product.recurringInterval === 'month' &&
+    product.recurringIntervalCount === 1 &&
+    product.prices.some((price) =>
+      price.amountType === 'fixed' &&
+      !price.isArchived &&
+      price.priceCurrency.toUpperCase() === 'USD' &&
+      price.priceAmount === expected.priceMonthly
+    );
+}
+
+function resolveWebhookPlan(
+  company: ICompany,
+  productId: string | undefined,
+  metadataPlanId: string | undefined,
+): PlanId | undefined {
+  const mappedPlan = productId ? getConfiguredPlanIdForPolarProduct(productId) : undefined;
+  const educationPlanId = educationPlanForOrganization(company.organizationType);
+
+  if (educationPlanId) return mappedPlan === educationPlanId ? mappedPlan : undefined;
+  if (mappedPlan && isEducationPlan(mappedPlan)) return undefined;
+  if (mappedPlan) return mappedPlan;
+
+  // Keep already-issued business checkout sessions working while never
+  // allowing education subscriptions to be activated from metadata alone.
+  return metadataPlanId === 'starter' || metadataPlanId === 'pro'
+    ? metadataPlanId
+    : undefined;
 }
 
 function normalizePolarSubscriptionStatus(status: string): CompanySubscriptionStatus | undefined {
@@ -106,6 +151,10 @@ export const getSubscriptionStatus = async (
         subscription: {
           status:               sub.status,
           plan:                 sub.plan,
+          organizationType:     sub.organizationType,
+          accountType:          sub.accountType,
+          billingInterval:      sub.plan === 'school' || sub.plan === 'college' || sub.plan === 'university' ? 'month' : undefined,
+          currency:             sub.plan === 'school' || sub.plan === 'college' || sub.plan === 'university' ? 'USD' : undefined,
           planName:             sub.status === 'expired'
             ? sub.plan === 'free' ? 'Free Trial' : plan.name
             : sub.status === 'never_subscribed'
@@ -180,7 +229,7 @@ export const createCheckout = async (
   try {
     const { planId } = req.body as { planId: PlanId };
 
-    if (!planId || !PLANS[planId]) {
+    if (!planId || !['free', 'starter', 'pro', 'school', 'college', 'university'].includes(planId)) {
       res.status(400).json({ success: false, message: 'Invalid plan selected' });
       return;
     }
@@ -204,26 +253,64 @@ export const createCheckout = async (
       return;
     }
 
-    const configError = validatePolarProductId(planId);
+    const configError = isEducationPlan(planId) ? (
+      getEducationPolarProductId(planId)
+        ? null
+        : `Polar product ID is not configured. Set ${getEducationPolarProductIdEnv(planId)} after creating the matching monthly USD product in Polar.`
+    ) : validatePolarProductId(planId);
     if (configError) {
       console.error(`[Subscription] Configuration error: ${configError}`);
       res.status(500).json({ success: false, message: configError });
       return;
     }
 
-    const polarProductId = getPolarProductId(planId);
+    const polarProductId = isEducationPlan(planId)
+      ? getEducationPolarProductId(planId)
+      : getPolarProductId(planId);
     if (!polarProductId) {
       res.status(500).json({
         success: false,
-        message: `Polar product ID not configured for plan "${planId}". Set POLAR_${planId.toUpperCase()}_PRODUCT_ID in your .env.`,
+        message: isEducationPlan(planId)
+          ? `Polar product ID is not configured for the ${planId} plan.`
+          : `Polar product ID not configured for plan "${planId}". Set POLAR_${planId.toUpperCase()}_PRODUCT_ID in your .env.`,
       });
       return;
     }
 
+    const polar = getPolar();
+    if (isEducationPlan(planId)) {
+      let product: Awaited<ReturnType<Polar['products']['get']>>;
+      try {
+        product = await polar.products.get({ id: polarProductId });
+      } catch (error) {
+        console.error(`[Subscription] Could not verify Polar product for ${planId}:`, error);
+        res.status(502).json({ success: false, message: `Could not verify the configured Polar product for the ${planId} plan. Check the product ID and Polar API credentials.` });
+        return;
+      }
+      if (!matchesPolarProductPrice(product, planId)) {
+        res.status(500).json({
+          success: false,
+          message: `The configured Polar product for ${planId} must be active and priced at $${getEducationPlanConfig(planId).priceMonthly / 100} USD per month.`,
+        });
+        return;
+      }
+    }
+
     const company = await Company.findById(companyId).select(
-      'name subscriptionStatus subscriptionPlan isLifetime polarCustomerId polarSubscriptionId',
+      'name subscriptionStatus subscriptionPlan isLifetime polarCustomerId polarSubscriptionId organizationType',
     );
     if (!company) { res.status(404).json({ success: false, message: 'Company not found' }); return; }
+
+    const educationPlanId = educationPlanForOrganization(company.organizationType);
+    if (educationPlanId ? planId !== educationPlanId : isEducationPlan(planId)) {
+      res.status(403).json({
+        success: false,
+        message: educationPlanId
+          ? `This ${company.organizationType} workspace can only subscribe to the ${educationPlanId} plan.`
+          : 'Education plans are only available to school, college, and university workspaces.',
+      });
+      return;
+    }
 
     // Block if already active on the same plan
     if (company.subscriptionStatus === 'active' && company.subscriptionPlan === planId) {
@@ -241,8 +328,6 @@ export const createCheckout = async (
     if (!user) { res.status(404).json({ success: false, message: 'User not found' }); return; }
 
     const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
-    const polar     = getPolar();
-
     const checkout = await polar.checkouts.create({
       products:      [polarProductId],
       successUrl:    `${clientUrl}/payment/success?plan=${planId}`,
@@ -378,7 +463,7 @@ export const changeSubscriptionPlan = async (
       return;
     }
 
-    const rank: Record<PlanId, number> = { free: 0, starter: 1, pro: 2 };
+    const rank: Record<'free' | 'starter' | 'pro', number> = { free: 0, starter: 1, pro: 2 };
     if (rank[planId] >= rank[company.subscriptionPlan]) {
       res.status(400).json({ success: false, message: 'Select a lower plan to schedule a downgrade.' });
       return;
@@ -667,7 +752,6 @@ export const handleWebhook = async (
         const order    = event.data;
         const meta     = order.metadata as Record<string, string> | undefined;
         const companyId = meta?.companyId;
-        const planId   = (meta?.planId || 'starter') as PlanId;
 
         if (!companyId) {
           console.warn('[Webhook] order.created: no companyId in metadata');
@@ -676,6 +760,11 @@ export const handleWebhook = async (
 
         const company = await Company.findById(companyId);
         if (!company) { console.warn('[Webhook] order.created: company not found', companyId); break; }
+        const planId = resolveWebhookPlan(company, order.productId, meta?.planId);
+        if (!planId) {
+          console.warn(`[Webhook] order.created: product does not match workspace type for ${companyId}`);
+          break;
+        }
 
         if (company.polarOrderId === order.id) { console.log('[Webhook] Duplicate order, skipping'); break; }
 
@@ -697,12 +786,16 @@ export const handleWebhook = async (
         const sub     = event.data;
         const meta    = sub.metadata as Record<string, string> | undefined;
         const companyId = meta?.companyId;
-        const planId  = (meta?.planId || 'starter') as PlanId;
 
         if (!companyId) { console.warn('[Webhook] subscription.created: no companyId'); break; }
 
         const company = await Company.findById(companyId);
         if (!company) { console.warn('[Webhook] subscription.created: company not found'); break; }
+        const planId = resolveWebhookPlan(company, sub.productId, meta?.planId);
+        if (!planId) {
+          console.warn(`[Webhook] subscription.created: product does not match workspace type for ${companyId}`);
+          break;
+        }
 
         if (company.polarSubscriptionId === sub.id) { break; } // idempotent
 
@@ -739,9 +832,7 @@ export const handleWebhook = async (
         const company = await Company.findById(companyId);
         if (!company) break;
 
-        const productPlan = sub.productId
-          ? (['starter', 'pro'] as const).find((candidate) => getPolarProductId(candidate) === sub.productId)
-          : undefined;
+        const productPlan = resolveWebhookPlan(company, sub.productId, meta?.planId);
         const pendingPlanTakesEffect = company.pendingSubscriptionPlan &&
           productPlan === company.pendingSubscriptionPlan &&
           (!company.subscriptionEndDate || Date.now() >= company.subscriptionEndDate.getTime());
@@ -753,9 +844,13 @@ export const handleWebhook = async (
         } else if (!company.pendingSubscriptionPlan && productPlan) {
           company.subscriptionPlan = productPlan;
           company.plan = productPlan;
-        } else if (!company.pendingSubscriptionPlan && (meta?.planId === 'starter' || meta?.planId === 'pro')) {
-          company.subscriptionPlan = meta.planId;
-          company.plan = meta.planId;
+        } else if (
+          !company.pendingSubscriptionPlan &&
+          productPlan &&
+          company.subscriptionPlan !== productPlan
+        ) {
+          company.subscriptionPlan = productPlan;
+          company.plan = productPlan;
         }
         const polarStatus = normalizePolarSubscriptionStatus(sub.status);
         if (polarStatus) company.subscriptionStatus = polarStatus;

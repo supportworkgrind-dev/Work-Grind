@@ -16,12 +16,14 @@
 import mongoose from 'mongoose';
 import Company, { CompanySubscriptionStatus, CompanyPlan } from '../models/Company';
 import User from '../models/User';
-import { getPlan, getPolarProductId, hasActiveAccess, PlanId, resolveEffectivePlanId, TRIAL_DAYS } from '../config/subscription';
+import { educationPlanForOrganization, getPlan, getPolarProductId, hasActiveAccess, PlanId, resolveEffectivePlanId, TRIAL_DAYS } from '../config/subscription';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface CompanySubscriptionInfo {
   companyId:            string;
+  organizationType:     string;
+  accountType:          'company' | 'individual';
   status:               CompanySubscriptionStatus | 'never_subscribed';
   plan:                 PlanId;
   isLifetime:           boolean;
@@ -91,7 +93,7 @@ export async function getCompanySubscription(
     'subscriptionStatus subscriptionPlan isLifetime ' +
     'trialStartDate trialEndDate subscriptionStartDate subscriptionEndDate ' +
     'pendingSubscriptionPlan pendingSubscriptionPlanEffectiveDate cancelAtPeriodEnd ' +
-    'ownerId polarCustomerId polarSubscriptionId polarProductId polarOrderId coupon createdAt storage plan',
+    'ownerId polarCustomerId polarSubscriptionId polarProductId polarOrderId coupon createdAt storage plan organizationType accountType',
   );
 
   if (!company) throw new Error(`Company ${companyId} not found`);
@@ -225,12 +227,14 @@ export async function getCompanySubscription(
     ? company.subscriptionPlan
     : polarPlan ??
       (company.plan === 'starter' || company.plan === 'pro' ? company.plan : company.subscriptionPlan);
-  const effectivePlanId = resolveEffectivePlanId(
+  const effectiveBusinessPlanId = resolveEffectivePlanId(
     status,
     historicalPlan,
     company.isLifetime,
     company.subscriptionEndDate,
   );
+  const educationPlanId = educationPlanForOrganization(company.organizationType);
+  const effectivePlanId = educationPlanId ?? effectiveBusinessPlanId;
 
   const activeAccess = hasActiveAccess(
     status,
@@ -257,6 +261,8 @@ export async function getCompanySubscription(
 
   return {
     companyId:            company._id.toString(),
+    organizationType:     company.organizationType,
+    accountType:          company.accountType,
     status,
     plan:                 effectivePlanId,
     isLifetime:           company.isLifetime,

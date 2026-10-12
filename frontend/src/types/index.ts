@@ -489,11 +489,15 @@ export type SubscriptionStatus =
   | 'no_plan'
   | 'never_subscribed';
 
-export type SubscriptionPlan = 'free' | 'starter' | 'pro';
+export type SubscriptionPlan = 'free' | 'starter' | 'pro' | 'school' | 'college' | 'university';
 
 export interface SubscriptionInfo {
   status:               SubscriptionStatus | CompanySubscriptionStatus;
   plan:                 SubscriptionPlan;
+  organizationType?:    OrganizationType;
+  accountType?:         'company' | 'individual';
+  billingInterval?:     'month';
+  currency?:            'USD';
   planName:             string;
   priceDisplay:         string;
   trialStartDate?:      string;
@@ -511,6 +515,10 @@ export interface SubscriptionInfo {
     members: number;
     pendingInvites: number;
     memberSlotsUsed: number;
+    students?: number;
+    staffMembers?: number;
+    staffSlotsUsed?: number;
+    studentSlotsUsed?: number;
     storageBytes: number;
     aiRequests: number;
     aiRequestsByUser: number;
@@ -531,6 +539,8 @@ export interface PlanFeature {
 
 export interface PlanLimits {
   members:    number;
+  students?:  number;
+  pendingInvites?: number;
   storage:    number;
   aiRequests: number;
 }
@@ -557,5 +567,13 @@ export interface EducationPlanPricing {
   priceMonthly: number;
   priceDisplay: string;
   billingInterval: 'month';
+  currency: 'USD';
   description: string;
+  limits: {
+    members: number;
+    students: number;
+    pendingInvites: number;
+  };
+  checkoutAvailable: boolean;
+  checkoutError?: string;
 }

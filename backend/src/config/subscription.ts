@@ -8,8 +8,9 @@
  * environment variables are always current.
  */
 
-export type PlanId = 'free' | 'starter' | 'pro';
 export type EducationPlanId = 'school' | 'college' | 'university';
+export type PlanId = 'free' | 'starter' | 'pro' | EducationPlanId;
+export type BusinessPlanId = 'free' | 'starter' | 'pro';
 export type SubscriptionStatus =
   | 'trialing'
   | 'active'
@@ -53,6 +54,8 @@ export interface PlanConfig {
   polarProductId?: string;
   limits: {
     members:    number;          // -1 = unlimited
+    students?:  number;
+    pendingInvites?: number;
     storage:    number;          // bytes
     aiRequests: number;          // per month, -1 = unlimited
   };
@@ -67,7 +70,15 @@ export interface EducationPlanPricing {
   priceMonthly: number;
   priceDisplay: string;
   billingInterval: 'month';
+  currency: 'USD';
   description: string;
+  limits: {
+    members: number;
+    students: number;
+    pendingInvites: number;
+  };
+  checkoutAvailable?: boolean;
+  checkoutError?: string;
 }
 
 const EDUCATION_PLAN_PRICING: EducationPlanPricing[] = [
@@ -77,7 +88,9 @@ const EDUCATION_PLAN_PRICING: EducationPlanPricing[] = [
     priceMonthly: 1900,
     priceDisplay: '$19/month',
     billingInterval: 'month',
+    currency: 'USD',
     description: 'Monthly subscription for schools and academies.',
+    limits: { members: 25, students: 200, pendingInvites: 50 },
   },
   {
     id: 'college',
@@ -85,7 +98,9 @@ const EDUCATION_PLAN_PRICING: EducationPlanPricing[] = [
     priceMonthly: 4900,
     priceDisplay: '$49/month',
     billingInterval: 'month',
+    currency: 'USD',
     description: 'Monthly subscription for colleges.',
+    limits: { members: 75, students: 750, pendingInvites: 150 },
   },
   {
     id: 'university',
@@ -93,7 +108,9 @@ const EDUCATION_PLAN_PRICING: EducationPlanPricing[] = [
     priceMonthly: 9900,
     priceDisplay: '$99/month',
     billingInterval: 'month',
+    currency: 'USD',
     description: 'Monthly subscription for universities.',
+    limits: { members: 200, students: 2000, pendingInvites: 500 },
   },
 ];
 
@@ -105,11 +122,67 @@ const EDUCATION_PRODUCT_ID_ENV: Record<EducationPlanId, string> = {
 
 /** Public pricing data never includes Polar IDs; IDs are read only by server checkout code. */
 export function getEducationPlanPricing(): EducationPlanPricing[] {
-  return EDUCATION_PLAN_PRICING.map((plan) => ({ ...plan }));
+  return EDUCATION_PLAN_PRICING.map((plan) => {
+    const productId = getEducationPolarProductId(plan.id);
+    return {
+      ...plan,
+      checkoutAvailable: Boolean(productId),
+      ...(!productId ? {
+        checkoutError: `Polar product ID is not configured. Set ${EDUCATION_PRODUCT_ID_ENV[plan.id]} after creating the matching monthly USD product in Polar.`,
+      } : {}),
+    };
+  });
 }
 
 export function getEducationPolarProductId(planId: EducationPlanId): string | undefined {
   return process.env[EDUCATION_PRODUCT_ID_ENV[planId]]?.trim() || undefined;
+}
+
+export function getEducationPolarProductIdEnv(planId: EducationPlanId): string {
+  return EDUCATION_PRODUCT_ID_ENV[planId];
+}
+
+export function educationPlanForOrganization(
+  organizationType: string | null | undefined,
+): EducationPlanId | undefined {
+  return organizationType === 'school' || organizationType === 'college' || organizationType === 'university'
+    ? organizationType
+    : undefined;
+}
+
+export function getEducationPlanConfig(planId: EducationPlanId): PlanConfig {
+  const pricing = EDUCATION_PLAN_PRICING.find((plan) => plan.id === planId)!;
+  const base = STATIC_PLANS.find((plan) => plan.id === 'free')!;
+  return {
+    ...base,
+    id: planId,
+    name: pricing.name,
+    priceMonthly: pricing.priceMonthly,
+    priceDisplay: pricing.priceDisplay,
+    description: pricing.description,
+    highlighted: false,
+    entitlements: PLAN_ENTITLEMENTS,
+    limits: {
+      ...base.limits,
+      members: pricing.limits.members,
+      students: pricing.limits.students,
+      pendingInvites: pricing.limits.pendingInvites,
+    },
+    features: [
+      { label: `Up to ${pricing.limits.students.toLocaleString()} active students`, included: true },
+      { label: `Up to ${pricing.limits.members} active staff and members`, included: true },
+      { label: `Up to ${pricing.limits.pendingInvites} pending invitations`, included: true },
+      ...base.features.filter((feature) => !feature.label.toLowerCase().includes('member')),
+    ],
+  };
+}
+
+export function getConfiguredPlanIdForPolarProduct(productId: string): PlanId | undefined {
+  const businessPlan = (['starter', 'pro'] as const).find((planId) => getPolarProductId(planId) === productId);
+  if (businessPlan) return businessPlan;
+  return (['school', 'college', 'university'] as const).find(
+    (planId) => getEducationPolarProductId(planId) === productId,
+  );
 }
 
 // ── Static plan definitions (no env vars here) ────────────────────────────────
@@ -191,7 +264,7 @@ const STATIC_PLANS: Omit<PlanConfig, 'polarProductId' | 'entitlements'>[] = [
 ];
 
 /** Environment variable names for each paid plan's Polar Product ID. */
-const POLAR_PRODUCT_ID_ENV: Partial<Record<PlanId, string>> = {
+const POLAR_PRODUCT_ID_ENV: Partial<Record<BusinessPlanId, string>> = {
   starter: 'POLAR_STARTER_PRODUCT_ID',
   pro:     'POLAR_PRO_PRODUCT_ID',
 };
@@ -201,7 +274,7 @@ const POLAR_PRODUCT_ID_ENV: Partial<Record<PlanId, string>> = {
  * Returns undefined for the free plan (no Polar product needed).
  * Returns an empty string if the env var is not set — callers must validate.
  */
-export function getPolarProductId(planId: PlanId): string | undefined {
+export function getPolarProductId(planId: BusinessPlanId): string | undefined {
   const envKey = POLAR_PRODUCT_ID_ENV[planId];
   if (!envKey) return undefined;          // free plan — no product ID needed
   return process.env[envKey]?.trim() || '';
@@ -211,7 +284,7 @@ export function getPolarProductId(planId: PlanId): string | undefined {
  * Validate that a paid plan has its Polar Product ID configured.
  * Returns a descriptive error string, or null if configured correctly.
  */
-export function validatePolarProductId(planId: PlanId): string | null {
+export function validatePolarProductId(planId: BusinessPlanId): string | null {
   if (planId === 'free') return null;
   const envKey = POLAR_PRODUCT_ID_ENV[planId];
   if (!envKey) return null;
@@ -232,7 +305,7 @@ export function validatePolarProductId(planId: PlanId): string | null {
  * Call this once at server startup after dotenv has been loaded.
  */
 export function logPolarConfig(): void {
-  const paidPlans: PlanId[] = ['starter', 'pro'];
+  const paidPlans: BusinessPlanId[] = ['starter', 'pro'];
   for (const planId of paidPlans) {
     const envKey = POLAR_PRODUCT_ID_ENV[planId]!;
     const value  = process.env[envKey]?.trim();
@@ -251,18 +324,24 @@ export function logPolarConfig(): void {
  * from the environment at call-time.
  */
 export function getPlan(id: PlanId | string): PlanConfig {
+  if (id === 'school' || id === 'college' || id === 'university') {
+    return {
+      ...getEducationPlanConfig(id),
+      polarProductId: getEducationPolarProductId(id),
+    };
+  }
   const base = STATIC_PLANS.find((p) => p.id === id) ?? STATIC_PLANS.find((p) => p.id === 'free')!;
   return {
     ...base,
     entitlements: PLAN_ENTITLEMENTS,
-    polarProductId: getPolarProductId(base.id as PlanId),
+    polarProductId: getPolarProductId(base.id as BusinessPlanId),
   };
 }
 
 /** Stable PLANS record — Polar IDs injected at call-time via getPlan(). */
-export const PLANS: Record<PlanId, PlanConfig> = Object.fromEntries(
-  STATIC_PLANS.map((p) => [p.id, getPlan(p.id as PlanId)])
-) as Record<PlanId, PlanConfig>;
+export const PLANS: Record<BusinessPlanId, PlanConfig> = Object.fromEntries(
+  STATIC_PLANS.map((p) => [p.id, getPlan(p.id as BusinessPlanId)])
+) as Record<BusinessPlanId, PlanConfig>;
 
 /** Resolves access from the provider status and its effective period end. */
 export function hasActiveAccess(
@@ -289,6 +368,9 @@ export function resolveEffectivePlanId(
   isLifetime = false,
   subscriptionEndDate?: Date,
 ): PlanId {
+  if (purchasedPlan === 'school' || purchasedPlan === 'college' || purchasedPlan === 'university') {
+    return purchasedPlan;
+  }
   if (isLifetime || status === 'lifetime') return 'pro';
   if (status === 'trialing') return 'free';
   if (status === 'expired' && (purchasedPlan === 'starter' || purchasedPlan === 'pro')) {

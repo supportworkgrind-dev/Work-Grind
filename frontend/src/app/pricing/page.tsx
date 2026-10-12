@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/useAuthStore';
 import { api } from '@/lib/api';
-import { EducationPlanPricing, PlanConfig } from '@/types';
+import { EducationPlanPricing, OrganizationType, PlanConfig } from '@/types';
 import {
   CheckCircle2, XCircle, ArrowRight, Zap, Shield, Users,
   MessageSquare, Briefcase, Sparkles, Building2, Calendar,
@@ -160,6 +160,8 @@ export default function PricingPage() {
 
   const [plans,        setPlans]        = useState<PlanConfig[]>([]);
   const [educationPlans, setEducationPlans] = useState<EducationPlanPricing[]>([]);
+  const [workspaceType, setWorkspaceType] = useState<OrganizationType | null>(null);
+  const [workspaceTypeError, setWorkspaceTypeError] = useState('');
   const [loadingPlans, setLoadingPlans] = useState(true);
   const [checkoutPlan, setCheckoutPlan] = useState<string | null>(null);
   const [error,        setError]        = useState('');
@@ -174,10 +176,18 @@ export default function PricingPage() {
           setPlans(res.data.plans);
           setEducationPlans(res.data.educationPlans ?? []);
         }
-      } catch { /* use empty */ }
+        if (isAuthenticated) {
+          const status = await api.get('/subscription/status');
+          const type = status.data?.subscription?.organizationType as OrganizationType | undefined;
+          if (status.data?.success && type) setWorkspaceType(type);
+          else setWorkspaceTypeError('Could not verify the active workspace type. Pricing and checkout are unavailable until it can be verified.');
+        }
+      } catch {
+        if (isAuthenticated) setWorkspaceTypeError('Could not verify the active workspace type. Pricing and checkout are unavailable until it can be verified.');
+      }
       finally { setLoadingPlans(false); }
     })();
-  }, []);
+  }, [isAuthenticated]);
 
   const authReady = mounted && isAuthenticated;
 
@@ -249,9 +259,9 @@ export default function PricingPage() {
         </div>
 
         {/* ── Error ── */}
-        {error && (
+        {(error || workspaceTypeError) && (
           <div className="max-w-lg mx-auto mb-8 flex items-center gap-3 rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-300">
-            <XCircle className="h-4 w-4 shrink-0" />{error}
+            <XCircle className="h-4 w-4 shrink-0" />{error || workspaceTypeError}
           </div>
         )}
 
@@ -259,6 +269,44 @@ export default function PricingPage() {
         {loadingPlans ? (
           <div className="flex justify-center py-20">
             <Loader2 className="h-8 w-8 animate-spin text-indigo-400" />
+          </div>
+        ) : !authReady ? (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-20">
+            {plans.map((plan) => (
+              <PricingCard
+                key={plan.id}
+                plan={plan}
+                authed={authReady}
+                onSelect={handleSelect}
+                loading={checkoutPlan === plan.id}
+              />
+            ))}
+          </div>
+        ) : workspaceTypeError ? null : workspaceType === 'school' || workspaceType === 'college' || workspaceType === 'university' ? (
+          <div className="mx-auto mb-20 grid max-w-lg grid-cols-1 gap-6">
+            {educationPlans.filter((plan) => plan.id === workspaceType).map((plan) => (
+              <article key={plan.id} className="rounded-3xl border border-indigo-500/40 bg-[#0d1117] p-7 shadow-xl shadow-indigo-500/10">
+                <h2 className="text-sm font-bold uppercase tracking-widest text-slate-300">{plan.name}</h2>
+                <p className="mt-4 text-4xl font-black text-white">{plan.currency} {plan.priceDisplay.replace('/month', '')}<span className="ml-1.5 text-sm font-medium text-slate-400">/{plan.billingInterval}</span></p>
+                <p className="mt-3 text-sm text-slate-400">{plan.description}</p>
+                <ul className="mt-5 space-y-2 text-sm text-slate-200">
+                  <li>Up to {plan.limits.students.toLocaleString()} active students</li>
+                  <li>Up to {plan.limits.members.toLocaleString()} active staff and members</li>
+                  <li>Up to {plan.limits.pendingInvites.toLocaleString()} pending invitations</li>
+                </ul>
+                {plan.checkoutAvailable ? (
+                  <button onClick={() => void handleSelect(plan.id)} disabled={checkoutPlan === plan.id} className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 py-3 text-sm font-semibold text-white disabled:opacity-60">
+                    {checkoutPlan === plan.id ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                    Subscribe to {plan.name}
+                    {checkoutPlan !== plan.id && <ArrowRight className="h-4 w-4" />}
+                  </button>
+                ) : (
+                  <p className="mt-6 rounded-xl border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-200" role="status">
+                    {plan.checkoutError || 'Checkout is not configured for this education plan.'}
+                  </p>
+                )}
+              </article>
+            ))}
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-20">
@@ -275,7 +323,7 @@ export default function PricingPage() {
         )}
 
         {/* ── Education pricing ── */}
-        {!loadingPlans && educationPlans.length > 0 && (
+        {!loadingPlans && !authReady && educationPlans.length > 0 && (
           <section className="mb-20" aria-labelledby="education-pricing-heading">
             <div className="mb-8 text-center">
               <h2 id="education-pricing-heading" className="text-2xl font-black text-white">
@@ -298,11 +346,16 @@ export default function PricingPage() {
                   <p className="mt-3 min-h-10 text-[13px] leading-relaxed text-slate-400">
                     {plan.description}
                   </p>
+                  <ul className="mt-4 space-y-1 text-xs text-slate-300">
+                    <li>Up to {plan.limits.students.toLocaleString()} active students</li>
+                    <li>Up to {plan.limits.members.toLocaleString()} active staff and members</li>
+                    <li>Up to {plan.limits.pendingInvites.toLocaleString()} pending invitations</li>
+                  </ul>
                 </article>
               ))}
             </div>
             <p className="mt-5 text-center text-xs text-slate-500">
-              Education checkout will be enabled after the Polar products and education plan limits are configured.
+              Education checkout requires a matching monthly USD Polar product and is available after workspace setup.
             </p>
           </section>
         )}

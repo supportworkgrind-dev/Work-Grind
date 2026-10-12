@@ -13,7 +13,7 @@ export type CompanySubscriptionStatus =
   | 'lifetime'
   | 'none';
 
-export type CompanyPlan = 'free' | 'starter' | 'pro';
+export type CompanyPlan = 'free' | 'starter' | 'pro' | 'school' | 'college' | 'university';
 
 export interface ICouponRedemption {
   code:         string;
@@ -120,7 +120,7 @@ const CompanySchema = new Schema<ICompany>(
     ],
 
     // Legacy plan field (still used for display in some places)
-    plan: { type: String, enum: ['free', 'starter', 'pro'], default: 'free' },
+    plan: { type: String, enum: ['free', 'starter', 'pro', 'school', 'college', 'university'], default: 'free' },
 
     storage: {
       used:  { type: Number, default: 0 },
@@ -145,12 +145,12 @@ const CompanySchema = new Schema<ICompany>(
     },
     subscriptionPlan: {
       type:    String,
-      enum:    ['free', 'starter', 'pro'],
+      enum:    ['free', 'starter', 'pro', 'school', 'college', 'university'],
       default: 'free',
     },
     subscriptionStartDate: { type: Date },
     subscriptionEndDate:   { type: Date },
-    pendingSubscriptionPlan: { type: String, enum: ['free', 'starter', 'pro'] },
+    pendingSubscriptionPlan: { type: String, enum: ['free', 'starter', 'pro', 'school', 'college', 'university'] },
     pendingSubscriptionPlanEffectiveDate: { type: Date },
     trialStartDate:        { type: Date },
     trialEndDate:          { type: Date },

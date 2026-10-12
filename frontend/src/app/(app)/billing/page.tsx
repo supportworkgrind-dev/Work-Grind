@@ -6,6 +6,7 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { api } from '@/lib/api';
 import { formatDate } from '@/lib/utils';
 import { SubscriptionInfo, PlanConfig } from '@/types';
+import type { EducationPlanPricing } from '@/types';
 import {
   CreditCard, CheckCircle2, AlertCircle, Clock, Zap, ArrowUpRight,
   RefreshCw, XCircle, Loader2, Star, Infinity, Tag, Lock,
@@ -129,6 +130,7 @@ export default function BillingPage() {
 
   const [sub,          setSub]          = useState<SubscriptionInfo | null>(null);
   const [plans,        setPlans]        = useState<PlanConfig[]>([]);
+  const [educationPlans, setEducationPlans] = useState<EducationPlanPricing[]>([]);
   const [loadingSub,   setLoadingSub]   = useState(true);
   const [checkoutPlan, setCheckoutPlan] = useState<string | null>(null);
   const [cancelling,   setCancelling]   = useState(false);
@@ -138,7 +140,7 @@ export default function BillingPage() {
   const [couponCode,   setCouponCode]   = useState('');
   const [couponLoading,setCouponLoading]= useState(false);
 
-  const isOwnerAdmin = user?.role === 'owner' || user?.role === 'admin';
+  const isOwnerAdmin = user?.role === 'owner' || user?.role === 'founder' || user?.role === 'admin';
 
   const loadData = useCallback(async () => {
     setLoadingSub(true);
@@ -162,6 +164,7 @@ export default function BillingPage() {
       if (planResult.status === 'fulfilled' && planResult.value.data?.success &&
           Array.isArray(planResult.value.data.plans)) {
         setPlans(planResult.value.data.plans);
+        setEducationPlans(planResult.value.data.educationPlans ?? []);
       } else {
         errors.push(
           planResult.status === 'rejected'
@@ -276,7 +279,9 @@ export default function BillingPage() {
   const displayPlanName = sub?.status === 'no_plan' || sub?.status === 'none' || sub?.status === 'never_subscribed'
       ? 'No subscription'
       : sub?.status === 'trialing'
-        ? 'Free Trial'
+        ? (sub.organizationType === 'school' || sub.organizationType === 'college' || sub.organizationType === 'university'
+          ? sub.planName
+          : 'Free Trial')
         : sub?.planName;
   const displayEndDate = sub?.status === 'expired'
     ? sub.subscriptionEndDate ?? sub.trialEndDate
@@ -497,6 +502,54 @@ export default function BillingPage() {
           <h2 className="text-sm font-bold mb-4" style={{ color: 'var(--text-primary)' }}>
             {isActive || isPastDue ? 'Change Plan' : 'Choose a Plan'}
           </h2>
+          {sub?.organizationType === 'school' || sub?.organizationType === 'college' || sub?.organizationType === 'university' ? (
+            (() => {
+              const plan = educationPlans.find((candidate) => candidate.id === sub.organizationType);
+              if (!plan) {
+                return <p className="text-sm text-rose-600" role="alert">Education pricing could not be loaded for this workspace. Refresh the page or contact support.</p>;
+              }
+              const usage = sub.usage;
+              return (
+                <article className="surface rounded-2xl border p-5" key={plan.id}>
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{plan.name}</p>
+                      <p className="mt-1 text-2xl font-black" style={{ color: 'var(--text-primary)' }}>
+                        {plan.currency} {plan.priceDisplay}
+                        <span className="ml-1 text-sm font-medium" style={{ color: 'var(--text-muted)' }}>per {plan.billingInterval}</span>
+                      </p>
+                      <p className="mt-2 text-xs" style={{ color: 'var(--text-secondary)' }}>{plan.description}</p>
+                    </div>
+                    <StatusBadge status={sub.status} />
+                  </div>
+                  <dl className="mt-5 grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
+                    <div><dt style={{ color: 'var(--text-muted)' }}>Active students</dt><dd className="font-semibold" style={{ color: 'var(--text-primary)' }}>{usage.students ?? 0} / {plan.limits.students.toLocaleString()}</dd></div>
+                    <div><dt style={{ color: 'var(--text-muted)' }}>Active staff and members</dt><dd className="font-semibold" style={{ color: 'var(--text-primary)' }}>{usage.staffMembers ?? usage.members} / {plan.limits.members.toLocaleString()}</dd></div>
+                    <div><dt style={{ color: 'var(--text-muted)' }}>Pending invitations</dt><dd className="font-semibold" style={{ color: 'var(--text-primary)' }}>{usage.pendingInvites} / {plan.limits.pendingInvites.toLocaleString()}</dd></div>
+                  </dl>
+                  {!plan.checkoutAvailable && (
+                    <p className="mt-4 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800" role="status">
+                      {plan.checkoutError || 'Checkout is not configured for this education plan.'}
+                    </p>
+                  )}
+                  {sub.hasActiveAccess ? (
+                    <div className="mt-4 flex items-center justify-center gap-1.5 rounded-xl border py-2 text-xs font-semibold" style={{ borderColor: 'var(--accent)', color: 'var(--accent)' }}>
+                      <CheckCircle2 className="h-3.5 w-3.5" />Current workspace plan
+                    </div>
+                  ) : isOwnerAdmin && plan.checkoutAvailable ? (
+                    <button disabled={Boolean(checkoutPlan)} onClick={() => handleUpgrade(plan.id)} className="btn-primary mt-4 h-9 w-full justify-center">
+                      {checkoutPlan === plan.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                      Subscribe to {plan.name}
+                    </button>
+                  ) : !isOwnerAdmin ? (
+                    <p className="mt-4 text-center text-xs" style={{ color: 'var(--text-muted)' }}>
+                      <Lock className="mr-1 inline h-3 w-3" />Contact your workspace owner to manage billing
+                    </p>
+                  ) : null}
+                </article>
+              );
+            })()
+          ) : (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {plans.map((plan) => (
               <PlanCard
@@ -514,7 +567,8 @@ export default function BillingPage() {
               />
             ))}
           </div>
-          {!plans.length && !error && (
+          )}
+          {sub?.organizationType !== 'school' && sub?.organizationType !== 'college' && sub?.organizationType !== 'university' && !plans.length && !error && (
             <p className="mt-4 text-sm text-center" style={{ color: 'var(--text-muted)' }}>
               No subscription plans are currently available.
             </p>
