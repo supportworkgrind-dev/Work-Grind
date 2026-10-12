@@ -155,7 +155,7 @@ export const startOAuth = async (req: Request, res: Response): Promise<void> => 
     return;
   }
   const returnTo = intent === 'signup'
-    ? `/create-company?accountType=${requestedAccountType}&organizationType=${requestedOrganizationType}`
+    ? '/create-company'
     : typeof req.query.returnTo === 'string' ? req.query.returnTo : '/dashboard';
   const redirect = getClientRedirect(returnTo);
   const configuration = getOAuthConfiguration(provider);

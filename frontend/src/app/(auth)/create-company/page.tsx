@@ -27,6 +27,7 @@ export default function CreateCompanyPage() {
   const router = useRouter();
   const { user, setCompany, fetchCurrentUser } = useAuthStore();
 
+  const hasPersistedSignupContext = Boolean(user?.signupOrganizationType);
   // Step 1: Account Type selection | Step 2: Workspace details
   const [step, setStep] = useState<1 | 2>(1);
   const [accountTypeOverride, setAccountType] = useState<'company' | 'individual' | null>(null);
@@ -34,6 +35,12 @@ export default function CreateCompanyPage() {
   const accountType = accountTypeOverride ??
     (user?.signupOrganizationType ? user.accountType === 'individual' ? 'individual' : 'company' : null);
   const organizationType = organizationTypeOverride ?? user?.signupOrganizationType ?? 'business';
+
+  useEffect(() => {
+    if (hasPersistedSignupContext && step === 1) {
+      setStep(2);
+    }
+  }, [hasPersistedSignupContext, step]);
 
   // Form Fields
   const [name, setName] = useState('');
