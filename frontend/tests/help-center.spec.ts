@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { getSafeReturnPath } from '../src/lib/authRedirect';
+import { getSafeReturnPath, getWorkspaceSetupDestination } from '../src/lib/authRedirect';
 import { HELP_ARTICLES } from '../src/lib/helpArticles';
 
 test('Help Center and published articles are readable without authentication', async ({ page }) => {
@@ -39,6 +39,9 @@ test('return URLs reject external and protocol-relative destinations', () => {
   expect(getSafeReturnPath('https://example.com')).toBeUndefined();
   expect(getSafeReturnPath('//example.com')).toBeUndefined();
   expect(getSafeReturnPath('/\\\\example.com')).toBeUndefined();
+  expect(getSafeReturnPath('/login?redirect=%2Ftasks')).toBeUndefined();
+  expect(getWorkspaceSetupDestination('/tasks')).toBe('/create-company?redirect=%2Ftasks');
+  expect(getWorkspaceSetupDestination('/create-company')).toBe('/create-company');
 });
 
 test('protected destinations show a sign-in prompt with a safe return URL', async ({ page }) => {

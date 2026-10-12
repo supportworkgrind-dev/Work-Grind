@@ -10,7 +10,7 @@ import { AuthShell } from '@/components/auth/AuthShell';
 import { SocialAuthButtons } from '@/components/auth/SocialAuthButtons';
 import { useAuthStore } from '@/store/useAuthStore';
 import type { User } from '@/types';
-import { getSafeReturnPath } from '@/lib/authRedirect';
+import { getSafeReturnPath, getWorkspaceSetupDestination } from '@/lib/authRedirect';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -30,7 +30,7 @@ export default function LoginPage() {
     login(response.data.user, response.data.accessToken);
     const returnTo = getReturnTo();
     if (!response.data.user.companyId) {
-      router.push(returnTo ? `/create-company?redirect=${encodeURIComponent(returnTo)}` : '/create-company');
+      router.push(getWorkspaceSetupDestination(returnTo));
       return;
     }
     try {

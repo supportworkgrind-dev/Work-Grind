@@ -8,6 +8,7 @@ import type { AxiosError } from 'axios';
 import { AuthShell } from '@/components/auth/AuthShell';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/store/useAuthStore';
+import { getSafeReturnPath, getWorkspaceSetupDestination } from '@/lib/authRedirect';
 
 const errorMessages: Record<string, string> = {
   mfa_required: 'Administrator accounts must sign in through the Admin Portal and complete multi-factor authentication.',
@@ -45,16 +46,11 @@ function CallbackContent() {
           throw new Error('Sign-in response was incomplete.');
         }
         login(data.user, data.accessToken);
-        const returnTo = typeof data.returnTo === 'string' &&
-          data.returnTo.startsWith('/') &&
-          !data.returnTo.startsWith('//') &&
-          !data.returnTo.includes('\\')
-          ? data.returnTo
-          : (data.user.companyId ? '/dashboard' : '/create-company');
+        const returnTo = getSafeReturnPath(data.returnTo);
         const company = typeof data.user.companyId === 'object' ? data.user.companyId : undefined;
-        const destination = company?.organizationType && company.organizationType !== 'business'
-          ? '/academic'
-          : !data.user.companyId && returnTo === '/dashboard' ? '/create-company' : returnTo;
+        const destination = data.user.companyId
+          ? returnTo || (company?.organizationType && company.organizationType !== 'business' ? '/academic' : '/dashboard')
+          : getWorkspaceSetupDestination(returnTo);
         router.replace(destination);
       })
       .catch((requestError: unknown) => {
