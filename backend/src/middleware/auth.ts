@@ -1,11 +1,22 @@
 import { Request, Response, NextFunction } from 'express';
 import { getBearerToken, verifyAccessToken } from '../utils/jwt';
 import User from '../models/User';
+import Company from '../models/Company';
 import { EntitlementId, PlanId } from '../config/subscription';
 import { getEffectiveSubscription } from '../services/companySubscription';
+import { roleMatches } from '../config/organization';
 
 export interface AuthRequest extends Request {
-  user?: { userId: string; companyId: string; role: string; isSuperAdmin?: boolean; mfaPending?: boolean; mfaAuthenticated?: boolean };
+  user?: {
+    userId: string;
+    companyId: string;
+    role: string;
+    organizationType?: string;
+    accountType?: 'company' | 'individual';
+    isSuperAdmin?: boolean;
+    mfaPending?: boolean;
+    mfaAuthenticated?: boolean;
+  };
 }
 
 const BILLING_AND_BOOTSTRAP_PATHS = new Set([
@@ -62,12 +73,36 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
       return;
     }
     failureStage = 'user_lookup';
-    const user = await User.findById(payload.userId).select('isVerified isActive isDeleted');
+    const user = await User.findById(payload.userId)
+      .select('isVerified isActive isDeleted companyId role accountType');
     if (!user || !user.isVerified || !user.isActive || user.isDeleted) {
       res.status(403).json({ success: false, message: 'Account verification is required.' });
       return;
     }
-    req.user = payload;
+    const companyId = user.companyId?.toString() || '';
+    if (payload.companyId !== companyId) {
+      res.status(401).json({ success: false, message: 'Workspace membership changed. Sign in again to continue.' });
+      return;
+    }
+    let organizationType: string | undefined;
+    let accountType = user.accountType;
+    if (user.companyId) {
+      const company = await Company.findOne({ _id: user.companyId, isActive: true })
+        .select('organizationType accountType');
+      if (!company) {
+        res.status(403).json({ success: false, message: 'Your workspace is unavailable.' });
+        return;
+      }
+      organizationType = company.organizationType;
+      accountType = company.accountType;
+    }
+    req.user = {
+      ...payload,
+      companyId,
+      role: user.role || 'employee',
+      organizationType,
+      accountType,
+    };
   } catch (err) {
     console.warn('[Auth] Request rejected because the access token is invalid.', {
       method: req.method,
@@ -97,7 +132,7 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
 };
 
 export const requireRole = (...roles: string[]) => (req: AuthRequest, res: Response, next: NextFunction): void => {
-  if (!req.user || !roles.includes(req.user.role || '')) { res.status(403).json({ success: false, message: 'Insufficient permissions' }); return; }
+  if (!req.user || !roleMatches(req.user.role, roles, req.user.organizationType)) { res.status(403).json({ success: false, message: 'Insufficient permissions' }); return; }
   next();
 };
 

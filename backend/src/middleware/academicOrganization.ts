@@ -1,7 +1,7 @@
 import { NextFunction, Response } from 'express';
 import Company from '../models/Company';
 import User from '../models/User';
-import { normalizeOrganizationRole, isAcademicOrganizationType } from '../config/organization';
+import { isAcademicOrganizationType, roleMatches } from '../config/organization';
 import { AuthRequest } from './auth';
 
 async function getAcademicMember(
@@ -31,7 +31,7 @@ async function getAcademicMember(
       res.status(403).json({ success: false, message: 'Academic features require an education organization.' });
       return null;
     }
-    return { role: normalizeOrganizationRole(user.role, company.organizationType, 'employee'), organizationType: company.organizationType };
+    return { role: user.role || 'employee', organizationType: company.organizationType };
   } catch (error) {
     console.error('[Academic] Organization access check failed.', {
       errorName: error instanceof Error ? error.name : 'UnknownError',
@@ -49,10 +49,7 @@ export const requireAcademicRole = (...allowedRoles: string[]) => async (
   const member = await getAcademicMember(req, res);
   if (!member) return;
 
-  const normalizedAllowedRoles = new Set(allowedRoles.map((role) => normalizeOrganizationRole(role, member.organizationType, 'employee')));
-  const normalizedUserRole = normalizeOrganizationRole(member.role, member.organizationType, 'employee');
-
-  if (!normalizedAllowedRoles.has(normalizedUserRole)) {
+  if (!roleMatches(member.role, allowedRoles, member.organizationType)) {
     res.status(403).json({ success: false, message: 'Insufficient permissions' });
     return;
   }

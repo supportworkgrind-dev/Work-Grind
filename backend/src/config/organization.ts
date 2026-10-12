@@ -48,6 +48,9 @@ export const ROLE_ALIASES: Record<string, string> = {
   student: 'student',
 };
 
+const EDUCATION_COMMON_ROLES = ['owner', 'principal', 'admin', 'teacher', 'student', 'parent', 'manager', 'employee', 'guest'] as const;
+const UNIVERSITY_ROLES = [...EDUCATION_COMMON_ROLES, 'dean', 'hod'] as const;
+
 function keyForRole(value: string): string {
   return value.trim().toLowerCase().replace(/[\s-]+/g, '_');
 }
@@ -62,55 +65,62 @@ export function isAcademicOrganizationType(value: unknown): value is AcademicOrg
     ACADEMIC_ORGANIZATION_TYPES.includes(value as AcademicOrganizationType);
 }
 
-export function normalizeOrganizationRole(role: unknown, organizationType: OrganizationType | string | null | undefined, fallback = 'employee'): string {
-  if (typeof role !== 'string') return fallback;
+export function isOrganizationRoleEligible(role: unknown, organizationType: OrganizationType | string | null | undefined): boolean {
+  if (typeof role !== 'string') return false;
 
   const normalized = keyForRole(role);
   const canonical = ROLE_ALIASES[normalized] ?? normalized;
-
   if (isAcademicOrganizationType(organizationType)) {
-    const allowed = new Set<string>([...EDUCATION_ROLES]);
-    if (allowed.has(canonical)) return canonical;
+    const allowed = organizationType === 'university' ? UNIVERSITY_ROLES : EDUCATION_COMMON_ROLES;
+    return (allowed as readonly string[]).includes(canonical);
   }
-
   if (organizationType === 'business' || !organizationType) {
-    if (new Set<string>(BUSINESS_ROLES).has(canonical)) return canonical;
+    return (BUSINESS_ROLES as readonly string[]).includes(canonical);
   }
+  return false;
+}
 
-  return fallback;
+export function normalizeOrganizationRole(role: unknown, organizationType: OrganizationType | string | null | undefined, fallback = 'employee'): string {
+  if (!isOrganizationRoleEligible(role, organizationType)) return fallback;
+
+  const normalized = keyForRole(role);
+  return ROLE_ALIASES[normalized] ?? normalized;
 }
 
 export function isOrganizationRoleAllowed(role: unknown, organizationType: OrganizationType | string | null | undefined): boolean {
-  const normalized = normalizeOrganizationRole(role, organizationType, 'employee');
-
-  if (isAcademicOrganizationType(organizationType)) {
-    return normalized === 'owner' || normalized === 'principal' || normalized === 'admin' ||
-      normalized === 'teacher' || normalized === 'student' || normalized === 'parent' ||
-      normalized === 'dean' || normalized === 'hod' || normalized === 'manager' ||
-      normalized === 'employee' || normalized === 'guest';
-  }
-
-  return normalized === 'owner' || normalized === 'admin' || normalized === 'manager' ||
-    normalized === 'employee' || normalized === 'guest';
+  return isOrganizationRoleEligible(role, organizationType);
 }
 
 export function getAllowedRolesByOrganizationType(organizationType: OrganizationType | string | null | undefined): string[] {
-  if (isAcademicOrganizationType(organizationType)) {
-    return [...EDUCATION_ROLES];
-  }
-  return [...BUSINESS_ROLES];
+  if (organizationType === 'university') return [...UNIVERSITY_ROLES, 'founder', 'director', 'office_staff', 'faculty', 'guardian'];
+  if (isAcademicOrganizationType(organizationType)) return [...EDUCATION_COMMON_ROLES, 'founder', 'director', 'office_staff', 'faculty', 'guardian'];
+  return [...BUSINESS_ROLES, 'founder'];
 }
 
 export function isAcademicRole(role: unknown): boolean {
   const normalized = typeof role === 'string' ? (ROLE_ALIASES[keyForRole(role)] ?? keyForRole(role)) : '';
-  return [
-    ...EDUCATION_OWNER_ROLES,
-    ...EDUCATION_ADMIN_ROLES,
-    ...EDUCATION_TEACHER_ROLES,
-    ...EDUCATION_STUDENT_ROLES,
-    ...EDUCATION_PARENT_ROLES,
-    'manager',
-    'employee',
-    'guest',
-  ].includes(normalized as any);
+  return (EDUCATION_ROLES as readonly string[]).includes(normalized);
+}
+
+export function roleMatches(role: unknown, requestedRoles: readonly string[], organizationType?: OrganizationType | string): boolean {
+  if (typeof role !== 'string') return false;
+  if (organizationType && !isOrganizationRoleEligible(role, organizationType)) return false;
+  const key = keyForRole(role);
+  const normalized = ROLE_ALIASES[key] ?? key;
+  const requested = new Set(requestedRoles.flatMap((requestedRole) => {
+    const requestedKey = keyForRole(requestedRole);
+    return [requestedKey, ROLE_ALIASES[requestedKey] ?? requestedKey];
+  }));
+
+  if (requested.has(normalized)) return true;
+  if (requested.has('owner') && normalized === 'owner') return true;
+
+  if (requested.has('admin') || requested.has('manager')) {
+    if (isAcademicOrganizationType(organizationType)) {
+      return (EDUCATION_ADMIN_ROLES as readonly string[]).includes(normalized) ||
+        (normalized === 'manager' && requested.has('manager'));
+    }
+    return normalized === 'admin' || normalized === 'manager';
+  }
+  return false;
 }
