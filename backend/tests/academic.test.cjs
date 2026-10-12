@@ -717,6 +717,30 @@ test('organization settings reject invalid currency, timezone, and academic pref
   }
 });
 
+test('company profile response excludes invitation credentials and billing identifiers', async () => {
+  const originalFindById = Company.findById;
+  let projection = '';
+  Company.findById = () => ({
+    select: async (fields) => {
+      projection = fields;
+      return { _id: companyId, name: 'Example Workspace' };
+    },
+  });
+  try {
+    const res = makeResponse();
+    await companyController.getCompany({
+      user: { companyId: companyId.toString(), userId: recordId.toString(), role: 'student' },
+    }, res);
+    assert.equal(res.statusCode, 200);
+    assert.match(projection, /-inviteCode/);
+    assert.match(projection, /-pendingInvites/);
+    assert.match(projection, /-polarCustomerId/);
+    assert.match(projection, /-subscriptionPlan/);
+  } finally {
+    Company.findById = originalFindById;
+  }
+});
+
 test('organization settings persist validated localization and academic preferences', async () => {
   const originalFindById = Company.findById;
   const originalFindByIdAndUpdate = Company.findByIdAndUpdate;
