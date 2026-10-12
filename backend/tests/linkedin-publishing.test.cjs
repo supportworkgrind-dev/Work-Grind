@@ -14,7 +14,10 @@ test('LinkedIn text publisher sends only supported member-post fields and API he
     request = { url, options };
     return new Response(null, {
       status: 201,
-      headers: { 'x-restli-id': 'urn:li:share:123456' },
+      headers: {
+        'x-restli-id': 'urn:li:share:123456',
+        'content-type': 'application/json',
+      },
     });
   };
   context.after(() => { global.fetch = originalFetch; });

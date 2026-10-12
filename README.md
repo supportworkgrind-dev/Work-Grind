@@ -370,6 +370,29 @@ Automation can connect workspace events with actions such as:
 
 Automation is designed to work within existing workspace permissions.
 
+### LinkedIn Social Publishing
+
+Company workspaces can connect one LinkedIn member profile from Settings → Security
+or Workflow Automation → Social Publishing. The connection reuses WorkGrind's LinkedIn
+OAuth callback and requests `openid profile email w_member_social` only for the
+publishing-consent flow. Access tokens are encrypted server-side and never returned
+to the browser. Text posts are submitted through LinkedIn's versioned Posts API; an
+API-confirmed `201` is required before WorkGrind marks a post Published.
+
+The MVP supports member-profile text posts, Tavro-generated/editable drafts, draft
+review by an owner/admin, and publishing by an owner/admin or by a manager after
+approval. It does not yet support media, organization-page publishing, automatic
+scheduling, or LinkedIn Events. LinkedIn's app products, granted scopes, member
+eligibility, and rate limits still apply; requesting `w_member_social` alone does
+not guarantee API access. Reauthorize after access expires or is revoked. Disconnect
+removes WorkGrind's stored token; revoke WorkGrind separately in LinkedIn's app
+authorization settings if provider-side revocation is needed.
+
+`LINKEDIN_API_VERSION` selects the monthly Posts API version. It defaults to
+`202609` (the version documented for this release) and must be updated before
+LinkedIn retires it. No background scheduler is configured in the current backend
+deployment, so scheduled posts are deliberately not accepted.
+
 ---
 
 # 15. 🧠 Analytics

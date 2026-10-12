@@ -1663,7 +1663,7 @@ export default function SettingsPage() {
               {company?.accountType === 'company' &&
                 company.organizationType === 'business' &&
                 ['owner', 'admin', 'manager'].includes(user?.role ?? '') && (
-                  <LinkedInConnectionCard />
+                  <LinkedInConnectionCard canDisconnect={user?.role === 'owner' || user?.role === 'admin'} />
                 )}
 
               {passError && (

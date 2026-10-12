@@ -4,6 +4,7 @@ import AuditLog from '../models/AuditLog';
 import Integration from '../models/Integration';
 import SocialPost from '../models/SocialPost';
 import { AuthRequest } from '../middleware/auth';
+import { roleMatches } from '../config/organization';
 import { runAgentTurn } from '../ai/agentRuntime';
 import { reserveAiRequest } from '../utils/planLimits';
 import { recordUsage } from '../services/aiUsageTracker';
@@ -18,18 +19,20 @@ import {
   LINKEDIN_PUBLISHING_SCOPE,
   LINKEDIN_TEXT_POST_MAX_LENGTH,
   LinkedInApiError,
+  getLinkedInApiVersion,
   publishLinkedInTextPost,
 } from '../services/linkedinPublishing';
-
-const elevatedRoles = new Set(['owner', 'admin']);
-const businessAutomationRoles = new Set(['owner', 'admin', 'manager']);
 
 function companyIdOf(req: AuthRequest): mongoose.Types.ObjectId {
   return new mongoose.Types.ObjectId(req.user!.companyId);
 }
 
-function hasRole(req: AuthRequest, roles: Set<string>): boolean {
-  return roles.has(req.user!.role);
+function canReview(req: AuthRequest): boolean {
+  return roleMatches(req.user!.role, ['owner', 'admin'], 'business');
+}
+
+function canManagePublishing(req: AuthRequest): boolean {
+  return roleMatches(req.user!.role, ['owner', 'admin', 'manager'], 'business');
 }
 
 function validateText(value: unknown): string | null {
@@ -59,7 +62,7 @@ export const getLinkedInConnection = async (req: AuthRequest, res: Response): Pr
   const connection = await Integration.findOne({
     companyId: companyIdOf(req),
     provider: 'linkedin',
-  }).select('+accessToken').lean();
+  }).lean();
   const scopes = Array.isArray(connection?.config?.grantedScopes)
     ? connection.config.grantedScopes.filter((scope: unknown): scope is string => typeof scope === 'string')
     : [];
@@ -81,7 +84,7 @@ export const getLinkedInConnection = async (req: AuthRequest, res: Response): Pr
 };
 
 export const disconnectLinkedIn = async (req: AuthRequest, res: Response): Promise<void> => {
-  if (!hasRole(req, elevatedRoles)) {
+  if (!canReview(req)) {
     res.status(403).json({ success: false, message: 'Only a workspace owner or admin can disconnect LinkedIn.' });
     return;
   }
@@ -142,8 +145,11 @@ export const updateSocialDraft = async (req: AuthRequest, res: Response): Promis
   const post = await SocialPost.findOne({
     _id: req.params.id,
     companyId: companyIdOf(req),
-    status: { $in: ['draft', 'rejected'] },
-    ...(hasRole(req, elevatedRoles) ? {} : { authorId: new mongoose.Types.ObjectId(req.user!.userId) }),
+    $or: [
+      { status: { $in: ['draft', 'rejected'] } },
+      { status: 'failed', failureCode: { $in: ['rate_limited', 'post_rejected'] } },
+    ],
+    ...(canReview(req) ? {} : { authorId: new mongoose.Types.ObjectId(req.user!.userId) }),
   });
   if (!post) {
     res.status(404).json({ success: false, message: 'Editable draft not found.' });
@@ -153,12 +159,17 @@ export const updateSocialDraft = async (req: AuthRequest, res: Response): Promis
   post.status = 'draft';
   post.reviewerId = undefined;
   post.rejectionReason = undefined;
+  post.failureCode = undefined;
   await post.save();
   await audit(req, 'LINKEDIN_POST_DRAFT_UPDATED', post._id.toString());
   res.json({ success: true, post });
 };
 
 export const requestSocialPostApproval = async (req: AuthRequest, res: Response): Promise<void> => {
+  if (!roleMatches(req.user!.role, ['manager'], 'business')) {
+    res.status(403).json({ success: false, message: 'Only a workspace manager can submit a post for approval.' });
+    return;
+  }
   const post = await SocialPost.findOneAndUpdate(
     {
       _id: req.params.id,
@@ -178,7 +189,7 @@ export const requestSocialPostApproval = async (req: AuthRequest, res: Response)
 };
 
 export const reviewSocialPost = async (req: AuthRequest, res: Response): Promise<void> => {
-  if (!hasRole(req, elevatedRoles)) {
+  if (!canReview(req)) {
     res.status(403).json({ success: false, message: 'Only a workspace owner or admin can review posts.' });
     return;
   }
@@ -193,6 +204,7 @@ export const reviewSocialPost = async (req: AuthRequest, res: Response): Promise
       _id: req.params.id,
       companyId: companyIdOf(req),
       status: 'pending_approval',
+      authorId: { $ne: new mongoose.Types.ObjectId(req.user!.userId) },
     },
     {
       $set: {
@@ -213,11 +225,31 @@ export const reviewSocialPost = async (req: AuthRequest, res: Response): Promise
 
 export const publishSocialPost = async (req: AuthRequest, res: Response): Promise<void> => {
   const role = req.user!.role;
-  if (!businessAutomationRoles.has(role)) {
+  if (!canManagePublishing(req)) {
     res.status(403).json({ success: false, message: 'Your workspace role cannot publish LinkedIn posts.' });
     return;
   }
-  const allowedStatuses = elevatedRoles.has(role) ? ['draft', 'approved'] : ['approved'];
+  getLinkedInApiVersion();
+  const connection = await Integration.findOne({
+    companyId: companyIdOf(req),
+    provider: 'linkedin',
+    status: 'connected',
+  }).select('+accessToken');
+  if (!connection?.accessToken ||
+      !Array.isArray(connection.config?.grantedScopes) ||
+      !connection.config.grantedScopes.includes(LINKEDIN_PUBLISHING_SCOPE) ||
+      typeof connection.config.linkedinSubject !== 'string' ||
+      !connection.config.linkedinSubject ||
+      !connection.tokenExpiresAt ||
+      connection.tokenExpiresAt.getTime() <= Date.now()) {
+    res.status(409).json({
+      success: false,
+      code: 'LINKEDIN_RECONNECT_REQUIRED',
+      message: 'Reconnect LinkedIn and grant member-posting permission before publishing.',
+    });
+    return;
+  }
+  const allowedStatuses = canReview(req) ? ['draft', 'approved'] : ['approved'];
   const post = await SocialPost.findOneAndUpdate(
     {
       _id: req.params.id,
@@ -230,30 +262,9 @@ export const publishSocialPost = async (req: AuthRequest, res: Response): Promis
   if (!post) {
     res.status(409).json({
       success: false,
-      message: role === 'manager'
+      message: roleMatches(role, ['manager'], 'business')
         ? 'A workspace owner or admin must approve this draft before publication.'
         : 'This post is not available to publish or is already being processed.',
-    });
-    return;
-  }
-
-  const connection = await Integration.findOne({
-    companyId: companyIdOf(req),
-    provider: 'linkedin',
-    status: 'connected',
-  }).select('+accessToken');
-  if (!connection?.accessToken ||
-      !Array.isArray(connection.config?.grantedScopes) ||
-      !connection.config.grantedScopes.includes(LINKEDIN_PUBLISHING_SCOPE) ||
-      !connection.tokenExpiresAt ||
-      connection.tokenExpiresAt.getTime() <= Date.now()) {
-    await SocialPost.updateOne({ _id: post._id, companyId: post.companyId, status: 'publishing' }, {
-      $set: { status: 'failed', failureCode: 'connection_or_permission_required' },
-    });
-    res.status(409).json({
-      success: false,
-      code: 'LINKEDIN_RECONNECT_REQUIRED',
-      message: 'Reconnect LinkedIn and grant member-posting permission before publishing.',
     });
     return;
   }
@@ -274,6 +285,7 @@ export const publishSocialPost = async (req: AuthRequest, res: Response): Promis
           status: 'published',
           publishedAt: new Date(),
           ...(result.postUrn ? { linkedinPostUrn: result.postUrn } : {}),
+          ...(result.postUrl ? { linkedinPostUrl: result.postUrl } : {}),
         },
         $unset: { failureCode: 1 },
       },

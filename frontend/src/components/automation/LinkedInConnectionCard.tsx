@@ -19,9 +19,11 @@ export interface LinkedInConnection {
 export function LinkedInConnectionCard({
   onConnectionChange,
   returnTo = '/settings?tab=security',
+  canDisconnect = false,
 }: {
   onConnectionChange?: (connection: LinkedInConnection | null) => void;
   returnTo?: string;
+  canDisconnect?: boolean;
 }) {
   const [connection, setConnection] = useState<LinkedInConnection | null>(null);
   const [loading, setLoading] = useState(true);
@@ -119,7 +121,7 @@ export function LinkedInConnectionCard({
               <p className="mt-1 text-[11px] text-amber-700">Authorization or publishing access was rejected. Reconnect to restore access.</p>
             )}
           </div>
-          {connected && (
+          {canDisconnect && connection.status !== 'disconnected' && (
             <button
               type="button"
               onClick={() => void disconnect()}

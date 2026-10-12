@@ -20,7 +20,7 @@ export async function publishLinkedInTextPost(
   accessToken: string,
   subject: string,
   text: string,
-): Promise<{ postUrn?: string }> {
+): Promise<{ postUrn?: string; postUrl?: string }> {
   const response = await fetch('https://api.linkedin.com/rest/posts', {
     method: 'POST',
     headers: {
@@ -48,5 +48,25 @@ export async function publishLinkedInTextPost(
     throw new LinkedInApiError(response.status);
   }
   const postUrn = response.headers.get('x-restli-id')?.trim();
-  return postUrn ? { postUrn } : {};
+  let postUrl: string | undefined;
+  if (response.headers.get('content-type')?.includes('application/json')) {
+    try {
+      const body = await response.json() as { url?: unknown; postUrl?: unknown };
+      const candidate = typeof body.url === 'string' ? body.url : body.postUrl;
+      if (typeof candidate === 'string') {
+        const parsed = new URL(candidate);
+        if (parsed.protocol === 'https:' &&
+            (parsed.hostname === 'linkedin.com' || parsed.hostname.endsWith('.linkedin.com')) &&
+            !parsed.username && !parsed.password) {
+          postUrl = parsed.toString();
+        }
+      }
+    } catch {
+      postUrl = undefined;
+    }
+  }
+  return {
+    ...(postUrn ? { postUrn } : {}),
+    ...(postUrl ? { postUrl } : {}),
+  };
 }

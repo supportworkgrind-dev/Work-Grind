@@ -144,7 +144,11 @@ export function SocialPublishingPanel() {
 
   return (
     <div className="space-y-5">
-      <LinkedInConnectionCard onConnectionChange={setConnection} returnTo="/workflows?tab=social" />
+      <LinkedInConnectionCard
+        onConnectionChange={setConnection}
+        returnTo="/workflows?tab=social"
+        canDisconnect={canReview}
+      />
 
       <section className="surface rounded-2xl border p-4 sm:p-5">
         <div className="mb-4">
@@ -233,7 +237,8 @@ export function SocialPublishingPanel() {
                 {post.linkedinPostUrl && <a href={post.linkedinPostUrl} target="_blank" rel="noreferrer" className="mt-2 inline-block text-xs font-medium text-sky-700 underline">View LinkedIn post</a>}
                 {post.linkedinPostUrn && <p className="mt-2 break-all text-[11px] theme-text-muted">LinkedIn post ID: {post.linkedinPostUrn}</p>}
                 <div className="mt-3 flex flex-wrap gap-2">
-                  {(post.status === 'draft' || post.status === 'rejected') && (
+                  {(post.status === 'draft' || post.status === 'rejected' ||
+                    (post.status === 'failed' && ['rate_limited', 'post_rejected'].includes(post.failureCode ?? ''))) && (
                     <>
                       {(post.authorId?._id === user?._id || canReview) && (
                         <button type="button" onClick={() => beginEdit(post)} className="btn-ghost h-8 px-2 text-xs">Edit draft</button>

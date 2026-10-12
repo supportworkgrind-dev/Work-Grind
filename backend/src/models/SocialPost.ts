@@ -17,6 +17,7 @@ export interface ISocialPost extends Document {
   status: SocialPostStatus;
   rejectionReason?: string;
   linkedinPostUrn?: string;
+  linkedinPostUrl?: string;
   publishedAt?: Date;
   failureCode?: string;
 }
@@ -34,6 +35,7 @@ const SocialPostSchema = new Schema<ISocialPost>({
   },
   rejectionReason: { type: String, maxlength: 500 },
   linkedinPostUrn: String,
+  linkedinPostUrl: String,
   publishedAt: Date,
   failureCode: String,
 }, { timestamps: true });

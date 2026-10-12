@@ -14,7 +14,7 @@ import { restoreWorkspaceCreatorRole, sessionForUser } from './auth.controller';
 import { setRefreshCookie } from '../utils/authCookie';
 import { issueClientToken } from '../utils/clientPortalAuth';
 import AuditLog from '../models/AuditLog';
-import Integration from '../models/Integration';
+import Integration, { IIntegration } from '../models/Integration';
 import { isOrganizationAdminRole } from '../middleware/organizationAccess';
 import { encryptProviderToken } from '../utils/providerTokenEncryption';
 import { LINKEDIN_PUBLISHING_SCOPE } from '../services/linkedinPublishing';
@@ -430,7 +430,7 @@ async function finishLinkedInPublishingConnection(
   accessToken: string | undefined,
   scopes: string[],
   expiresIn: number | undefined,
-): Promise<Integration> {
+): Promise<IIntegration> {
   if (!accessToken || accessToken.length > 16_384 ||
       !Number.isInteger(expiresIn) || expiresIn! < 60 || expiresIn! > 365 * 24 * 60 * 60 ||
       !scopes.includes(LINKEDIN_PUBLISHING_SCOPE)) {
