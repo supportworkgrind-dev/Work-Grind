@@ -20,6 +20,7 @@ export type OrganizationFeature =
   | 'businessAnalytics'
   | 'businessIntegrations'
   | 'businessAutomation'
+  | 'socialPublishing'
   | 'billingAdmin'
   | 'memberDirectory'
   | 'workspaceContent'
@@ -45,6 +46,10 @@ const ALL_EDUCATION_ROLES = [
 ] as const;
 const ACADEMIC_ADMIN_ROLES = ['owner', 'principal', 'admin', 'dean', 'hod'] as const;
 const BUSINESS_ADMIN_ROLES = ['owner', 'admin', 'manager'] as const;
+const SOCIAL_PUBLISHING_BUSINESS_ROLES = ['owner', 'admin', 'manager', 'employee'] as const;
+const SOCIAL_PUBLISHING_EDUCATION_ROLES = [
+  'owner', 'principal', 'admin', 'office_staff', 'teacher', 'dean', 'hod',
+] as const;
 const BUSINESS_TYPES = ['business'] as const;
 const EDUCATION_TYPES = ['school', 'college', 'university'] as const;
 const COMPANY_ACCOUNTS = ['company'] as const;
@@ -61,6 +66,11 @@ export const ORGANIZATION_FEATURE_POLICIES: Record<OrganizationFeature, FeatureP
   businessAnalytics: { organizationTypes: BUSINESS_TYPES, accountTypes: COMPANY_ACCOUNTS, roles: BUSINESS_ADMIN_ROLES, entitlement: 'advancedAnalytics' },
   businessIntegrations: { organizationTypes: BUSINESS_TYPES, accountTypes: COMPANY_ACCOUNTS, roles: BUSINESS_ADMIN_ROLES },
   businessAutomation: { organizationTypes: BUSINESS_TYPES, accountTypes: COMPANY_ACCOUNTS, roles: BUSINESS_ADMIN_ROLES },
+  socialPublishing: {
+    organizationTypes: [...BUSINESS_TYPES, ...EDUCATION_TYPES],
+    accountTypes: [...COMPANY_ACCOUNTS, ...INDIVIDUAL_ACCOUNTS],
+    roles: SOCIAL_PUBLISHING_BUSINESS_ROLES,
+  },
   billingAdmin: {
     organizationTypes: [...BUSINESS_TYPES, ...EDUCATION_TYPES],
     accountTypes: [...COMPANY_ACCOUNTS, ...INDIVIDUAL_ACCOUNTS],
@@ -119,11 +129,18 @@ export function isOrganizationFeatureAllowed(
   feature: OrganizationFeature,
 ): boolean {
   const policy = ORGANIZATION_FEATURE_POLICIES[feature];
+  const roles = feature === 'socialPublishing'
+    ? organization.organizationType === 'business' && organization.accountType === 'individual'
+      ? ['owner']
+      : organization.organizationType === 'business'
+        ? SOCIAL_PUBLISHING_BUSINESS_ROLES
+        : SOCIAL_PUBLISHING_EDUCATION_ROLES
+    : policy.roles;
   return policy.organizationTypes.includes(organization.organizationType) &&
     policy.accountTypes.includes(organization.accountType) &&
-    (policy.roles === 'eligible'
+    (roles === 'eligible'
       ? isOrganizationRoleEligible(role, organization.organizationType)
-      : roleMatches(role, policy.roles, organization.organizationType));
+      : roleMatches(role, roles, organization.organizationType));
 }
 
 export function isOrganizationAdminRole(role: string, organizationType: string): boolean {

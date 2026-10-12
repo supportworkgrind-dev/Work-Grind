@@ -1,10 +1,16 @@
 import mongoose from 'mongoose';
+import { timingSafeEqual } from 'crypto';
 import { Response } from 'express';
 import AuditLog from '../models/AuditLog';
+import Company from '../models/Company';
 import Integration from '../models/Integration';
+import { IIntegration } from '../models/Integration';
 import SocialPost from '../models/SocialPost';
+import User from '../models/User';
 import { AuthRequest } from '../middleware/auth';
 import { roleMatches } from '../config/organization';
+import { getCompanySubscription } from '../services/companySubscription';
+import { createNotification } from './channel.controller';
 import { runAgentTurn } from '../ai/agentRuntime';
 import { reserveAiRequest } from '../utils/planLimits';
 import { recordUsage } from '../services/aiUsageTracker';
@@ -16,11 +22,14 @@ import {
 } from '../services/geminiService';
 import { decryptProviderToken } from '../utils/providerTokenEncryption';
 import {
+  getSocialProviderAdapter,
+  getSocialProviderCatalog,
+  LinkedInApiError,
+} from '../services/socialProviders';
+import {
   LINKEDIN_PUBLISHING_SCOPE,
   LINKEDIN_TEXT_POST_MAX_LENGTH,
-  LinkedInApiError,
   getLinkedInApiVersion,
-  publishLinkedInTextPost,
 } from '../services/linkedinPublishing';
 
 function companyIdOf(req: AuthRequest): mongoose.Types.ObjectId {
@@ -28,17 +37,86 @@ function companyIdOf(req: AuthRequest): mongoose.Types.ObjectId {
 }
 
 function canReview(req: AuthRequest): boolean {
-  return roleMatches(req.user!.role, ['owner', 'admin'], 'business');
+  return roleMatches(req.user!.role, ['owner', 'admin'], req.user!.organizationType);
 }
 
 function canManagePublishing(req: AuthRequest): boolean {
-  return roleMatches(req.user!.role, ['owner', 'admin', 'manager'], 'business');
+  return roleMatches(req.user!.role, ['owner', 'admin', 'manager'], req.user!.organizationType);
 }
 
-function validateText(value: unknown): string | null {
+function canRequestApproval(req: AuthRequest): boolean {
+  return roleMatches(
+    req.user!.role,
+    ['manager', 'employee', 'teacher', 'faculty'],
+    req.user!.organizationType,
+  );
+}
+
+function getProviderId(value: unknown): string {
+  return typeof value === 'string' ? value : 'linkedin';
+}
+
+function validateProviderText(providerId: string, value: unknown): string | null {
   if (typeof value !== 'string') return null;
-  const text = value.trim();
-  return text.length > 0 && text.length <= LINKEDIN_TEXT_POST_MAX_LENGTH ? text : null;
+  return getSocialProviderAdapter(providerId)?.validateText(value) ?? null;
+}
+
+function validTimeZone(value: unknown): value is string {
+  if (typeof value !== 'string' || value.length > 100) return false;
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: value });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function hasExplicitDateZone(value: string): boolean {
+  return /(?:Z|[+-]\d{2}:\d{2})$/i.test(value);
+}
+
+function isCronAuthorized(req: AuthRequest): boolean {
+  const secret = process.env.CRON_SECRET;
+  const header = req.get('authorization') ?? '';
+  const supplied = header.startsWith('Bearer ') ? header.slice(7) : '';
+  if (!secret || !supplied) return false;
+  const expectedBytes = Buffer.from(secret);
+  const suppliedBytes = Buffer.from(supplied);
+  return expectedBytes.length === suppliedBytes.length && timingSafeEqual(expectedBytes, suppliedBytes);
+}
+
+async function markPostFailed(post: {
+  _id: mongoose.Types.ObjectId;
+  companyId: mongoose.Types.ObjectId;
+  authorId: mongoose.Types.ObjectId;
+}, failureCode: string): Promise<void> {
+  await SocialPost.updateOne(
+    { _id: post._id, companyId: post.companyId, status: 'publishing' },
+    {
+      $set: {
+        status: 'failed',
+        failureCode,
+        'destinations.$[destination].status': 'failed',
+        'destinations.$[destination].errorCode': failureCode,
+      },
+    },
+    { arrayFilters: [{ 'destination.provider': 'linkedin', 'destination.status': 'publishing' }] },
+  );
+  try {
+    await createNotification({
+      companyId: post.companyId.toString(),
+      userId: post.authorId.toString(),
+      type: 'system',
+      title: 'Social post needs attention',
+      body: `LinkedIn could not confirm publication (${failureCode.replaceAll('_', ' ')}). Review the post before retrying.`,
+      actionUrl: '/workflows?tab=social',
+      metadata: { postId: post._id.toString(), failureCode },
+    });
+  } catch (notificationError) {
+    console.error('[SocialPublishing] Failure notification could not be created.', {
+      errorName: notificationError instanceof Error ? notificationError.name : 'UnknownError',
+    });
+  }
 }
 
 async function audit(
@@ -84,6 +162,10 @@ export const getLinkedInConnection = async (req: AuthRequest, res: Response): Pr
   });
 };
 
+export const getSocialProviders = async (_req: AuthRequest, res: Response): Promise<void> => {
+  res.json({ success: true, providers: getSocialProviderCatalog() });
+};
+
 export const disconnectLinkedIn = async (req: AuthRequest, res: Response): Promise<void> => {
   if (!canReview(req)) {
     res.status(403).json({ success: false, message: 'Only a workspace owner or admin can disconnect LinkedIn.' });
@@ -116,34 +198,54 @@ export const listSocialPosts = async (req: AuthRequest, res: Response): Promise<
 };
 
 export const createSocialDraft = async (req: AuthRequest, res: Response): Promise<void> => {
-  const text = validateText(req.body?.text);
-  if (!text) {
+  const platform = getProviderId(req.body?.platform);
+  const adapter = getSocialProviderAdapter(platform);
+  if (!adapter) {
+    res.status(422).json({ success: false, code: 'PROVIDER_UNAVAILABLE', message: 'This social provider is not configured for publishing.' });
+    return;
+  }
+  const text = typeof req.body?.text === 'string' ? req.body.text.trim() : '';
+  const validationError = adapter.validateText(text);
+  if (validationError) {
     res.status(400).json({
       success: false,
-      message: `Post text must contain 1–${LINKEDIN_TEXT_POST_MAX_LENGTH} characters.`,
+      message: validationError,
     });
     return;
+  }
+  let integrationId: mongoose.Types.ObjectId | undefined;
+  if (req.body?.integrationId !== undefined) {
+    if (!mongoose.isValidObjectId(req.body.integrationId)) {
+      res.status(400).json({ success: false, message: 'Select a valid connected social account.' });
+      return;
+    }
+    const integration = await Integration.findOne({
+      _id: req.body.integrationId,
+      companyId: companyIdOf(req),
+      provider: platform,
+      status: 'connected',
+    }).select('_id');
+    if (!integration) {
+      res.status(404).json({ success: false, message: 'The selected social account is not connected to this workspace.' });
+      return;
+    }
+    integrationId = integration._id;
   }
   const post = await SocialPost.create({
     companyId: companyIdOf(req),
     authorId: new mongoose.Types.ObjectId(req.user!.userId),
     text,
+    platform,
+    ...(integrationId ? { integrationId } : {}),
     status: 'draft',
   });
-  await audit(req, 'LINKEDIN_POST_DRAFT_CREATED', post._id.toString());
+  await audit(req, 'SOCIAL_POST_DRAFT_CREATED', post._id.toString(), { platform });
   res.status(201).json({ success: true, post });
 };
 
 export const updateSocialDraft = async (req: AuthRequest, res: Response): Promise<void> => {
-  const text = validateText(req.body?.text);
-  if (!text) {
-    res.status(400).json({
-      success: false,
-      message: `Post text must contain 1–${LINKEDIN_TEXT_POST_MAX_LENGTH} characters.`,
-    });
-    return;
-  }
-  const post = await SocialPost.findOne({
+  const text = typeof req.body?.text === 'string' ? req.body.text.trim() : '';
+  const postQuery = {
     _id: req.params.id,
     companyId: companyIdOf(req),
     $or: [
@@ -151,7 +253,21 @@ export const updateSocialDraft = async (req: AuthRequest, res: Response): Promis
       { status: 'failed', failureCode: { $in: ['rate_limited', 'post_rejected'] } },
     ],
     ...(canReview(req) ? {} : { authorId: new mongoose.Types.ObjectId(req.user!.userId) }),
-  });
+  };
+  const candidate = await SocialPost.findOne(postQuery).select('platform');
+  if (!candidate) {
+    res.status(404).json({ success: false, message: 'Editable draft not found.' });
+    return;
+  }
+  const validationError = validateProviderText(candidate.platform, text);
+  if (validationError) {
+    res.status(400).json({
+      success: false,
+      message: validationError || 'Editable draft not found.',
+    });
+    return;
+  }
+  const post = await SocialPost.findOne(postQuery);
   if (!post) {
     res.status(404).json({ success: false, message: 'Editable draft not found.' });
     return;
@@ -162,13 +278,28 @@ export const updateSocialDraft = async (req: AuthRequest, res: Response): Promis
   post.rejectionReason = undefined;
   post.failureCode = undefined;
   await post.save();
-  await audit(req, 'LINKEDIN_POST_DRAFT_UPDATED', post._id.toString());
+  await audit(req, 'SOCIAL_POST_DRAFT_UPDATED', post._id.toString(), { platform: post.platform });
   res.json({ success: true, post });
 };
 
+export const deleteSocialDraft = async (req: AuthRequest, res: Response): Promise<void> => {
+  const post = await SocialPost.findOneAndDelete({
+    _id: req.params.id,
+    companyId: companyIdOf(req),
+    status: { $in: ['draft', 'rejected', 'failed'] },
+    ...(canReview(req) ? {} : { authorId: new mongoose.Types.ObjectId(req.user!.userId) }),
+  });
+  if (!post) {
+    res.status(404).json({ success: false, message: 'Deletable draft not found.' });
+    return;
+  }
+  await audit(req, 'SOCIAL_POST_DRAFT_DELETED', post._id.toString(), { platform: post.platform });
+  res.json({ success: true });
+};
+
 export const requestSocialPostApproval = async (req: AuthRequest, res: Response): Promise<void> => {
-  if (!roleMatches(req.user!.role, ['manager'], 'business')) {
-    res.status(403).json({ success: false, message: 'Only a workspace manager can submit a post for approval.' });
+  if (!canRequestApproval(req)) {
+    res.status(403).json({ success: false, message: 'Your workspace role cannot request publishing approval.' });
     return;
   }
   const post = await SocialPost.findOneAndUpdate(
@@ -185,7 +316,24 @@ export const requestSocialPostApproval = async (req: AuthRequest, res: Response)
     res.status(404).json({ success: false, message: 'Draft not found or it cannot be submitted for approval.' });
     return;
   }
-  await audit(req, 'LINKEDIN_POST_SUBMITTED_FOR_APPROVAL', post._id.toString());
+  await audit(req, 'SOCIAL_POST_SUBMITTED_FOR_APPROVAL', post._id.toString(), { platform: post.platform });
+  const approvers = await User.find({
+    companyId: post.companyId,
+    isActive: true,
+    isVerified: true,
+    isDeleted: { $ne: true },
+  }).select('_id role').lean();
+  await Promise.all(approvers
+    .filter((approver) => roleMatches(approver.role, ['owner', 'admin'], req.user!.organizationType))
+    .map((approver) => createNotification({
+      companyId: post.companyId.toString(),
+      userId: approver._id.toString(),
+      type: 'system',
+      title: 'Social post awaiting review',
+      body: `${req.user!.role} submitted a ${post.platform} post for approval.`,
+      actionUrl: '/workflows?tab=social',
+      metadata: { postId: post._id.toString() },
+    })));
   res.json({ success: true, post });
 };
 
@@ -220,14 +368,28 @@ export const reviewSocialPost = async (req: AuthRequest, res: Response): Promise
     res.status(404).json({ success: false, message: 'Post awaiting review was not found.' });
     return;
   }
-  await audit(req, decision === 'approve' ? 'LINKEDIN_POST_APPROVED' : 'LINKEDIN_POST_REJECTED', post._id.toString());
+  await audit(req, decision === 'approve' ? 'SOCIAL_POST_APPROVED' : 'SOCIAL_POST_REJECTED', post._id.toString(), { platform: post.platform });
+  await createNotification({
+    companyId: post.companyId.toString(),
+    userId: post.authorId.toString(),
+    type: 'system',
+    title: decision === 'approve' ? 'Social post approved' : 'Social post needs changes',
+    body: decision === 'approve' ? 'Your social post was approved for publishing.' : reason || 'Your social post was rejected for changes.',
+    actionUrl: '/workflows?tab=social',
+    metadata: { postId: post._id.toString(), decision },
+  });
   res.json({ success: true, post });
 };
 
 export const publishSocialPost = async (req: AuthRequest, res: Response): Promise<void> => {
   const role = req.user!.role;
   if (!canManagePublishing(req)) {
-    res.status(403).json({ success: false, message: 'Your workspace role cannot publish LinkedIn posts.' });
+    res.status(403).json({ success: false, message: 'Your workspace role cannot publish social posts.' });
+    return;
+  }
+  const adapter = getSocialProviderAdapter('linkedin');
+  if (!adapter?.capabilities.publishText) {
+    res.status(422).json({ success: false, code: 'PROVIDER_UNAVAILABLE', message: 'This provider cannot publish text posts.' });
     return;
   }
   getLinkedInApiVersion();
@@ -235,6 +397,9 @@ export const publishSocialPost = async (req: AuthRequest, res: Response): Promis
     companyId: companyIdOf(req),
     provider: 'linkedin',
     status: 'connected',
+    ...(req.body?.integrationId && mongoose.isValidObjectId(req.body.integrationId)
+      ? { _id: req.body.integrationId }
+      : {}),
   }).select('+accessToken');
   if (!connection?.accessToken ||
       !Array.isArray(connection.config?.grantedScopes) ||
@@ -255,9 +420,17 @@ export const publishSocialPost = async (req: AuthRequest, res: Response): Promis
     {
       _id: req.params.id,
       companyId: companyIdOf(req),
+      platform: adapter.id,
+      ...(req.body?.integrationId ? { integrationId: req.body.integrationId } : {}),
       status: { $in: allowedStatuses },
     },
-    { $set: { status: 'publishing' }, $unset: { failureCode: 1 } },
+    {
+      $set: {
+        status: 'publishing',
+        destinations: [{ provider: adapter.id, integrationId: connection._id, status: 'publishing' }],
+      },
+      $unset: { failureCode: 1 },
+    },
     { new: true },
   );
   if (!post) {
@@ -273,7 +446,7 @@ export const publishSocialPost = async (req: AuthRequest, res: Response): Promis
   let linkedinConfirmed = false;
   try {
     const accessToken = decryptProviderToken(connection.accessToken);
-    const result = await publishLinkedInTextPost(
+    const result = await adapter.publishText(
       accessToken,
       String(connection.config.linkedinSubject),
       post.text,
@@ -285,14 +458,22 @@ export const publishSocialPost = async (req: AuthRequest, res: Response): Promis
         $set: {
           status: 'published',
           publishedAt: new Date(),
-          ...(result.postUrn ? { linkedinPostUrn: result.postUrn } : {}),
-          ...(result.postUrl ? { linkedinPostUrl: result.postUrl } : {}),
+          destinations: [{
+            provider: adapter.id,
+            integrationId: connection._id,
+            status: 'published',
+            ...(result.externalPostId ? { externalPostId: result.externalPostId } : {}),
+            ...(result.externalPostUrl ? { externalPostUrl: result.externalPostUrl } : {}),
+            publishedAt: new Date(),
+          }],
+          ...(result.externalPostId ? { linkedinPostUrn: result.externalPostId } : {}),
+          ...(result.externalPostUrl ? { linkedinPostUrl: result.externalPostUrl } : {}),
         },
         $unset: { failureCode: 1 },
       },
     );
     try {
-      await audit(req, 'LINKEDIN_POST_PUBLISHED', post._id.toString());
+      await audit(req, 'SOCIAL_POST_PUBLISHED', post._id.toString(), { platform: adapter.id });
     } catch (auditError) {
       console.error('[SocialPublishing] Published post audit write failed.', {
         errorName: auditError instanceof Error ? auditError.name : 'UnknownError',
@@ -304,7 +485,31 @@ export const publishSocialPost = async (req: AuthRequest, res: Response): Promis
       });
       return;
     }
-    res.json({ success: true, post: { ...post.toObject(), status: 'published', ...result, publishedAt: new Date() } });
+    try {
+      await createNotification({
+        companyId: post.companyId.toString(),
+        userId: post.authorId.toString(),
+        type: 'system',
+        title: 'Social post published',
+        body: 'LinkedIn confirmed publication.',
+        actionUrl: '/workflows?tab=social',
+        metadata: { postId: post._id.toString(), platform: adapter.id },
+      });
+    } catch (notificationError) {
+      console.error('[SocialPublishing] Publish notification could not be created.', {
+        errorName: notificationError instanceof Error ? notificationError.name : 'UnknownError',
+      });
+    }
+    res.json({
+      success: true,
+      post: {
+        ...post.toObject(),
+        status: 'published',
+        linkedinPostUrn: result.externalPostId,
+        linkedinPostUrl: result.externalPostUrl,
+        publishedAt: new Date(),
+      },
+    });
   } catch (error) {
     if (linkedinConfirmed) {
       console.error('[SocialPublishing] LinkedIn confirmed publication but WorkGrind could not persist the result.', {
@@ -329,16 +534,13 @@ export const publishSocialPost = async (req: AuthRequest, res: Response): Promis
             : status && status >= 400 && status < 500
               ? 'post_rejected'
               : 'provider_unavailable';
-    await SocialPost.updateOne(
-      { _id: post._id, companyId: post.companyId, status: 'publishing' },
-      { $set: { status: 'failed', failureCode } },
-    );
+    await markPostFailed(post, failureCode);
     if (status === 401 || status === 403) {
       connection.status = 'error';
       connection.errorMessage = failureCode;
       await connection.save();
     }
-    await audit(req, 'LINKEDIN_POST_PUBLISH_FAILED', post._id.toString(), { failureCode });
+    await audit(req, 'SOCIAL_POST_PUBLISH_FAILED', post._id.toString(), { platform: adapter.id, failureCode });
     res.status(status === 429 ? 429 : status === 401 || status === 403 ? 409 : 502).json({
       success: false,
       code: failureCode,
@@ -353,13 +555,348 @@ export const publishSocialPost = async (req: AuthRequest, res: Response): Promis
   }
 };
 
+export const scheduleSocialPost = async (req: AuthRequest, res: Response): Promise<void> => {
+  if (!canManagePublishing(req)) {
+    res.status(403).json({ success: false, message: 'Your workspace role cannot schedule social posts.' });
+    return;
+  }
+  const scheduledAtValue = req.body?.scheduledAt;
+  const timeZone = req.body?.timeZone;
+  if (typeof scheduledAtValue !== 'string' || !hasExplicitDateZone(scheduledAtValue) || !validTimeZone(timeZone)) {
+    res.status(400).json({ success: false, message: 'Provide a scheduled time with a timezone and a valid IANA time zone.' });
+    return;
+  }
+  const scheduledAt = new Date(scheduledAtValue);
+  const now = Date.now();
+  if (!Number.isFinite(scheduledAt.getTime()) ||
+      scheduledAt.getTime() < now + 5 * 60_000 ||
+      scheduledAt.getTime() > now + 365 * 24 * 60 * 60_000) {
+    res.status(400).json({ success: false, message: 'Choose a time at least 5 minutes and no more than one year in the future.' });
+    return;
+  }
+
+  const connection = await Integration.findOne({
+    companyId: companyIdOf(req),
+    provider: 'linkedin',
+    status: 'connected',
+  }).select('config tokenExpiresAt');
+  if (!connection ||
+      !connection.config?.grantedScopes?.includes(LINKEDIN_PUBLISHING_SCOPE) ||
+      !connection.tokenExpiresAt ||
+      connection.tokenExpiresAt.getTime() <= scheduledAt.getTime()) {
+    res.status(409).json({
+      success: false,
+      code: 'LINKEDIN_RECONNECT_REQUIRED',
+      message: 'Connect LinkedIn with member-post permission and ensure authorization remains valid through the scheduled time.',
+    });
+    return;
+  }
+
+  const allowedStatuses = canReview(req) ? ['draft', 'approved'] : ['approved'];
+  const post = await SocialPost.findOne({
+    _id: req.params.id,
+    companyId: companyIdOf(req),
+    platform: 'linkedin',
+    status: { $in: allowedStatuses },
+    ...(canReview(req) ? {} : { authorId: new mongoose.Types.ObjectId(req.user!.userId) }),
+  });
+  if (!post) {
+    res.status(409).json({
+      success: false,
+      message: canReview(req)
+        ? 'Only a draft or approved post can be scheduled.'
+        : 'A workspace owner or admin must approve this post before it can be scheduled.',
+    });
+    return;
+  }
+  const adapter = getSocialProviderAdapter(post.platform);
+  const validationError = adapter?.validateText(post.text);
+  if (!adapter?.capabilities.schedule || validationError) {
+    res.status(422).json({
+      success: false,
+      code: 'SCHEDULE_UNAVAILABLE',
+      message: validationError || 'This provider does not support scheduled publishing.',
+    });
+    return;
+  }
+
+  const originalStatus = post.status as 'draft' | 'approved';
+  post.status = 'scheduled';
+  post.scheduledAt = scheduledAt;
+  post.scheduleTimeZone = timeZone;
+  post.scheduledFromStatus = originalStatus;
+  post.scheduledBy = new mongoose.Types.ObjectId(req.user!.userId);
+  post.integrationId = connection._id;
+  post.scheduleAttempts = 0;
+  post.failureCode = undefined;
+  await post.save();
+  await audit(req, 'SOCIAL_POST_SCHEDULED', post._id.toString(), {
+    platform: post.platform,
+    scheduledAt: scheduledAt.toISOString(),
+    timeZone,
+  });
+  res.json({ success: true, post });
+};
+
+export const cancelSocialPostSchedule = async (req: AuthRequest, res: Response): Promise<void> => {
+  const post = await SocialPost.findOne({
+    _id: req.params.id,
+    companyId: companyIdOf(req),
+    status: 'scheduled',
+    ...(canReview(req) ? {} : { authorId: new mongoose.Types.ObjectId(req.user!.userId) }),
+  });
+  if (!post) {
+    res.status(404).json({ success: false, message: 'Scheduled post not found or cannot be cancelled.' });
+    return;
+  }
+  post.status = post.scheduledFromStatus ?? 'draft';
+  post.scheduledAt = undefined;
+  post.scheduleTimeZone = undefined;
+  post.scheduledFromStatus = undefined;
+  post.scheduledBy = undefined;
+  post.scheduleAttempts = 0;
+  await post.save();
+  await audit(req, 'SOCIAL_POST_SCHEDULE_CANCELLED', post._id.toString(), { platform: post.platform });
+  res.json({ success: true, post });
+};
+
+async function publishScheduledPost(postId: mongoose.Types.ObjectId): Promise<'published' | 'failed' | 'retrying' | 'skipped'> {
+  const post = await SocialPost.findOneAndUpdate(
+    { _id: postId, status: 'scheduled', scheduledAt: { $lte: new Date() } },
+    {
+      $set: {
+        status: 'publishing',
+        destinations: [{ provider: 'linkedin', status: 'publishing' }],
+      },
+    },
+    { new: true },
+  );
+  if (!post) return 'skipped';
+
+  const [company, publisher] = await Promise.all([
+    Company.findOne({ _id: post.companyId, isActive: true }).select('organizationType accountType'),
+    User.findOne({
+      _id: post.scheduledBy ?? post.authorId,
+      companyId: post.companyId,
+      isActive: true,
+      isVerified: true,
+      isDeleted: { $ne: true },
+    }).select('_id role'),
+  ]);
+  if (!company || !publisher ||
+      !roleMatches(publisher.role, ['owner', 'admin', 'manager'], company.organizationType)) {
+    await markPostFailed(post, 'workspace_or_publisher_unavailable');
+    return 'failed';
+  }
+
+  let subscription;
+  try {
+    subscription = await getCompanySubscription(post.companyId.toString());
+  } catch (error) {
+    console.error('[SocialPublishing] Scheduled subscription check failed.', {
+      errorName: error instanceof Error ? error.name : 'UnknownError',
+    });
+    await SocialPost.updateOne(
+      { _id: post._id, status: 'publishing' },
+      { $set: { status: 'scheduled', scheduledAt: new Date(Date.now() + 5 * 60_000) } },
+    );
+    return 'retrying';
+  }
+  if (!subscription.hasActiveAccess) {
+    await markPostFailed(post, 'subscription_inactive');
+    return 'failed';
+  }
+
+  const connection = await Integration.findOne({
+    _id: post.integrationId,
+    companyId: post.companyId,
+    provider: 'linkedin',
+    status: 'connected',
+  }).select('+accessToken');
+  if (!connection?.accessToken ||
+      !Array.isArray(connection.config?.grantedScopes) ||
+      !connection.config.grantedScopes.includes(LINKEDIN_PUBLISHING_SCOPE) ||
+      typeof connection.config.linkedinSubject !== 'string' ||
+      !connection.config.linkedinSubject ||
+      !connection.tokenExpiresAt ||
+      connection.tokenExpiresAt.getTime() <= Date.now()) {
+    await markPostFailed(post, 'authorization_revoked');
+    return 'failed';
+  }
+
+  const adapter = getSocialProviderAdapter(post.platform);
+  if (!adapter?.capabilities.schedule || !adapter.capabilities.publishText) {
+    await markPostFailed(post, 'provider_schedule_unavailable');
+    return 'failed';
+  }
+
+  let providerConfirmed = false;
+  try {
+    const result = await adapter.publishText(
+      decryptProviderToken(connection.accessToken),
+      String(connection.config.linkedinSubject),
+      post.text,
+    );
+    providerConfirmed = true;
+    await SocialPost.updateOne(
+      { _id: post._id, status: 'publishing' },
+      {
+        $set: {
+          status: 'published',
+          publishedAt: new Date(),
+          destinations: [{
+            provider: adapter.id,
+            integrationId: connection._id,
+            status: 'published',
+            ...(result.externalPostId ? { externalPostId: result.externalPostId } : {}),
+            ...(result.externalPostUrl ? { externalPostUrl: result.externalPostUrl } : {}),
+            publishedAt: new Date(),
+          }],
+          ...(result.externalPostId ? { linkedinPostUrn: result.externalPostId } : {}),
+          ...(result.externalPostUrl ? { linkedinPostUrl: result.externalPostUrl } : {}),
+        },
+        $unset: {
+          scheduledAt: 1,
+          scheduleTimeZone: 1,
+          scheduledFromStatus: 1,
+          scheduledBy: 1,
+          failureCode: 1,
+        },
+      },
+    );
+    await AuditLog.create({
+      companyId: post.companyId,
+      userId: publisher._id,
+      action: 'SOCIAL_POST_PUBLISHED',
+      resource: 'SocialPost',
+      resourceId: post._id.toString(),
+      details: { platform: adapter.id, scheduled: true },
+    });
+    try {
+      await createNotification({
+        companyId: post.companyId.toString(),
+        userId: post.authorId.toString(),
+        type: 'system',
+        title: 'Scheduled social post published',
+        body: 'LinkedIn confirmed publication.',
+        actionUrl: '/workflows?tab=social',
+        metadata: { postId: post._id.toString(), platform: adapter.id },
+      });
+    } catch (notificationError) {
+      console.error('[SocialPublishing] Scheduled success notification failed.', {
+        errorName: notificationError instanceof Error ? notificationError.name : 'UnknownError',
+      });
+    }
+    return 'published';
+  } catch (error) {
+    if (providerConfirmed) {
+      console.error('[SocialPublishing] LinkedIn confirmed scheduled publication but WorkGrind could not persist it.', {
+        errorName: error instanceof Error ? error.name : 'UnknownError',
+      });
+      return 'failed';
+    }
+    const status = error instanceof LinkedInApiError ? error.status : undefined;
+    if (status === 429 && post.scheduleAttempts < 2) {
+      await SocialPost.updateOne(
+        { _id: post._id, status: 'publishing' },
+        {
+          $set: {
+            status: 'scheduled',
+            scheduledAt: new Date(Date.now() + 5 * 60_000),
+            failureCode: 'rate_limited_retry',
+          },
+          $inc: { scheduleAttempts: 1 },
+        },
+      );
+      return 'retrying';
+    }
+    const failureCode = status === 401
+      ? 'authorization_revoked'
+      : status === 403
+        ? 'permission_or_member_access_denied'
+        : status === 429
+          ? 'rate_limited'
+          : error instanceof Error && error.name === 'TimeoutError'
+            ? 'provider_timeout'
+            : status && status >= 400 && status < 500
+              ? 'post_rejected'
+              : 'provider_unavailable';
+    await markPostFailed(post, failureCode);
+    await AuditLog.create({
+      companyId: post.companyId,
+      userId: publisher._id,
+      action: 'SOCIAL_POST_PUBLISH_FAILED',
+      resource: 'SocialPost',
+      resourceId: post._id.toString(),
+      details: { platform: adapter.id, failureCode, scheduled: true },
+    });
+    if (status === 401 || status === 403) {
+      connection.status = 'error';
+      connection.errorMessage = failureCode;
+      await connection.save();
+    }
+    return 'failed';
+  }
+}
+
+export const dispatchScheduledSocialPosts = async (req: AuthRequest, res: Response): Promise<void> => {
+  if (!isCronAuthorized(req)) {
+    res.status(process.env.CRON_SECRET ? 401 : 503).json({
+      success: false,
+      message: process.env.CRON_SECRET
+        ? 'Cron authorization failed.'
+        : 'Scheduled publishing is not configured.',
+    });
+    return;
+  }
+  const due = await SocialPost.find({ status: 'scheduled', scheduledAt: { $lte: new Date() } })
+    .sort({ scheduledAt: 1 })
+    .limit(10)
+    .select('_id')
+    .lean();
+  const results: Array<'published' | 'failed' | 'retrying' | 'skipped'> = [];
+  for (const { _id } of due) {
+    try {
+      results.push(await publishScheduledPost(_id));
+    } catch (error) {
+      console.error('[SocialPublishing] Scheduled post processing failed.', {
+        errorName: error instanceof Error ? error.name : 'UnknownError',
+      });
+      try {
+        await SocialPost.updateOne(
+          { _id, status: 'publishing' },
+          { $set: { status: 'failed', failureCode: 'scheduler_error' } },
+        );
+      } catch (persistError) {
+        console.error('[SocialPublishing] Scheduled failure state could not be persisted.', {
+          errorName: persistError instanceof Error ? persistError.name : 'UnknownError',
+        });
+      }
+      results.push('failed');
+    }
+  }
+  res.json({
+    success: true,
+    processed: results.filter((result) => result !== 'skipped').length,
+    published: results.filter((result) => result === 'published').length,
+    failed: results.filter((result) => result === 'failed').length,
+    retrying: results.filter((result) => result === 'retrying').length,
+  });
+};
+
 export const generateSocialDraft = async (req: AuthRequest, res: Response): Promise<void> => {
   const topic = typeof req.body?.topic === 'string' ? req.body.topic.trim() : '';
   const details = typeof req.body?.details === 'string' ? req.body.details.trim() : '';
   const style = typeof req.body?.style === 'string' ? req.body.style : 'professional update';
-  if (!topic || topic.length > 500 || details.length > 1500 ||
-      !['professional update', 'product announcement', 'marketing post'].includes(style)) {
-    res.status(400).json({ success: false, message: 'Provide a topic, supported writing style, and optional details within the length limits.' });
+  const operation = typeof req.body?.operation === 'string' ? req.body.operation : 'generate';
+  const sourceText = typeof req.body?.text === 'string' ? req.body.text.trim() : '';
+  const tone = typeof req.body?.tone === 'string' ? req.body.tone : 'professional';
+  if ((operation === 'generate' ? !topic : !sourceText) ||
+      !['generate', 'rewrite', 'shorten', 'improve', 'tone'].includes(operation) ||
+      topic.length > 500 || details.length > 1500 || sourceText.length > LINKEDIN_TEXT_POST_MAX_LENGTH ||
+      !['professional update', 'product announcement', 'marketing post', 'event promotion'].includes(style) ||
+      !['professional', 'friendly', 'confident', 'informative'].includes(tone)) {
+    res.status(400).json({ success: false, message: 'Provide a valid topic or draft, supported writing style, tone, and optional details within the length limits.' });
     return;
   }
 
@@ -377,11 +914,14 @@ export const generateSocialDraft = async (req: AuthRequest, res: Response): Prom
 
   const startedAt = Date.now();
   try {
+    const prompt = operation === 'generate'
+      ? `Write a LinkedIn ${style} draft about this topic: ${topic}${details ? `\n\nUser-provided facts and context (do not add unsupported claims):\n${details}` : ''}`
+      : `${operation === 'tone' ? 'Adjust the tone' : `${operation[0].toUpperCase()}${operation.slice(1)} this LinkedIn draft`} using a ${tone} tone. Preserve the user's factual claims and intent; do not add unsupported claims.\n\nDraft:\n${sourceText}${topic ? `\n\nAdditional direction: ${topic}` : ''}${details ? `\n\nUser-provided facts and context:\n${details}` : ''}`;
     const result = await runAgentTurn(
-      `Write a LinkedIn ${style} draft about this topic: ${topic}${details ? `\n\nUser-provided facts and context (do not add unsupported claims):\n${details}` : ''}\n\nReturn only the proposed post text, under 3000 characters. Do not publish, schedule, or claim any action was taken.`,
+      `${prompt}\n\nReturn only the proposed post text, under 3000 characters. Do not publish, schedule, or claim any action was taken.`,
       [],
       {
-        companyId: '',
+        companyId: req.user!.companyId,
         userId: req.user!.userId,
         userRole: req.user!.role,
         accountType: req.user!.accountType,

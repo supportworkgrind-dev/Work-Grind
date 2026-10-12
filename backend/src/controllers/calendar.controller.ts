@@ -2,6 +2,7 @@ import { Response } from 'express';
 import CalendarEvent from '../models/CalendarEvent';
 import Task from '../models/Task';
 import Meeting from '../models/Meeting';
+import SocialPost from '../models/SocialPost';
 import { AuthRequest } from '../middleware/auth';
 
 export const getEvents = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -13,7 +14,10 @@ export const getEvents = async (req: AuthRequest, res: Response): Promise<void> 
       filter.startDate = { $gte: new Date(start as string), $lte: new Date(end as string) };
     }
 
-    const [events, tasks, meetings] = await Promise.all([
+    const postDateFilter = start && end
+      ? { $gte: new Date(start as string), $lte: new Date(end as string) }
+      : { $gte: new Date() };
+    const [events, tasks, meetings, socialPosts] = await Promise.all([
       CalendarEvent.find(filter)
         .populate('creatorId', 'fullName avatar')
         .populate('attendees', 'fullName avatar email')
@@ -31,6 +35,13 @@ export const getEvents = async (req: AuthRequest, res: Response): Promise<void> 
         companyId: req.user!.companyId,
         scheduledAt: { $exists: true, $ne: null },
       }).populate('hostId', 'fullName avatar'),
+      SocialPost.find({
+        companyId: req.user!.companyId,
+        status: 'scheduled',
+        scheduledAt: postDateFilter,
+      }).select('platform text authorId scheduledAt scheduleTimeZone')
+        .populate('authorId', 'fullName avatar')
+        .sort({ scheduledAt: 1 }),
     ]);
 
     // Format tasks as calendar events
@@ -65,7 +76,22 @@ export const getEvents = async (req: AuthRequest, res: Response): Promise<void> 
       attendees: (m.participants || []).map((p: any) => p.userId).filter(Boolean),
     }));
 
-    const combined = [...events, ...taskEvents, ...meetingEvents].sort(
+    const socialPostEvents = socialPosts.map((post) => ({
+      _id: `social-post-${post._id}`,
+      companyId: req.user!.companyId,
+      creatorId: post.authorId,
+      title: `Scheduled ${post.platform} post`,
+      description: post.text,
+      type: 'social_post',
+      startDate: post.scheduledAt,
+      endDate: post.scheduledAt,
+      allDay: false,
+      color: '#315F59',
+      attendees: [],
+      scheduleTimeZone: post.scheduleTimeZone,
+    }));
+
+    const combined = [...events, ...taskEvents, ...meetingEvents, ...socialPostEvents].sort(
       (a: any, b: any) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
     );
 

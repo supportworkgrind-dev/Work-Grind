@@ -8,14 +8,13 @@ import { ClientUser } from '../models/ClientPortal';
 import { AuthRequest } from '../middleware/auth';
 import { createWorkGrindUser } from '../services/callingId';
 import { TRIAL_DAYS } from '../config/subscription';
-import { isOrganizationType } from '../config/organization';
+import { isOrganizationType, roleMatches } from '../config/organization';
 import { sendWelcomeEmail } from '../utils/email';
 import { restoreWorkspaceCreatorRole, sessionForUser } from './auth.controller';
 import { setRefreshCookie } from '../utils/authCookie';
 import { issueClientToken } from '../utils/clientPortalAuth';
 import AuditLog from '../models/AuditLog';
 import Integration, { IIntegration } from '../models/Integration';
-import { isOrganizationAdminRole } from '../middleware/organizationAccess';
 import { encryptProviderToken } from '../utils/providerTokenEncryption';
 import { LINKEDIN_PUBLISHING_SCOPE } from '../services/linkedinPublishing';
 import {
@@ -63,6 +62,18 @@ const safeError = (value: string) =>
     'provider_already_linked', 'try_again'].includes(value)
     ? value
     : 'try_again';
+
+function canManageSocialConnection(user: {
+  role: string;
+  accountType?: 'company' | 'individual';
+  organizationType?: string;
+}): boolean {
+  if (!user.organizationType) return false;
+  if (user.accountType === 'individual') {
+    return roleMatches(user.role, ['owner'], user.organizationType);
+  }
+  return roleMatches(user.role, ['owner', 'admin', 'manager'], user.organizationType);
+}
 
 const knownOAuthFailures = new Set([
   'account_exists',
@@ -203,9 +214,7 @@ export const startOAuth = async (req: Request, res: Response): Promise<void> => 
         !userId ||
         audience !== 'user' ||
         !authRequest.user?.companyId ||
-        authRequest.user.accountType !== 'company' ||
-        authRequest.user.organizationType !== 'business' ||
-        !isOrganizationAdminRole(authRequest.user.role, authRequest.user.organizationType)
+        !canManageSocialConnection(authRequest.user)
       )) ||
       (audience === 'user' && intent === 'link' && !userId) ||
       (audience === 'client' && intent === 'link' && !clientUserId) ||
@@ -437,31 +446,20 @@ async function finishLinkedInPublishingConnection(
       !scopes.includes(LINKEDIN_PUBLISHING_SCOPE)) {
     throw new Error('publishing_permission_denied');
   }
-  if (!claims.email || !identityTokenHasVerifiedEmail(claims)) {
-    throw new Error('verified_email_required');
-  }
-
   const user = await User.findById(transactionUserId);
   if (!user || !user.isActive || user.isDeleted || !user.isVerified ||
-      user.email.toLowerCase() !== claims.email.trim().toLowerCase() ||
-      !user.companyId || !isOrganizationAdminRole(user.role, 'business')) {
+      !user.companyId) {
     throw new Error('account_unavailable');
   }
   const company = await Company.findOne({
     _id: user.companyId,
     isActive: true,
-    accountType: 'company',
-    organizationType: 'business',
-  }).select('_id');
-  if (!company) throw new Error('account_unavailable');
-
-  if (user.linkedinId && user.linkedinId !== claims.sub) {
-    throw new Error('provider_already_linked');
-  }
-  const identityOwner = await User.findOne({ linkedinId: claims.sub }).select('_id');
-  if (identityOwner && identityOwner._id.toString() !== user._id.toString()) {
-    throw new Error('identity_in_use');
-  }
+  }).select('_id accountType organizationType');
+  if (!company || !canManageSocialConnection({
+    role: user.role,
+    accountType: company.accountType,
+    organizationType: company.organizationType,
+  })) throw new Error('account_unavailable');
 
   const existingConnection = await Integration.findOne({
     companyId: company._id,
@@ -472,8 +470,6 @@ async function finishLinkedInPublishingConnection(
     throw new Error('provider_already_linked');
   }
 
-  user.linkedinId = claims.sub;
-  await user.save();
   const connection = await Integration.findOneAndUpdate(
     { companyId: company._id, provider: 'linkedin' },
     {
@@ -486,7 +482,7 @@ async function finishLinkedInPublishingConnection(
           linkedinSubject: claims.sub,
           identityName: (claims.name || [claims.given_name, claims.family_name].filter(Boolean).join(' ') ||
             claims.email || 'LinkedIn member').trim().slice(0, 200),
-          identityEmail: claims.email.trim().toLowerCase().slice(0, 254),
+          ...(claims.email ? { identityEmail: claims.email.trim().toLowerCase().slice(0, 254) } : {}),
           grantedScopes: scopes,
         },
         errorMessage: null,
