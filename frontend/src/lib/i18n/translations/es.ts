@@ -3,24 +3,24 @@ import type { Translations } from './en';
 export const es: Translations = {
   dir: 'ltr',
   nav: { signIn: 'Iniciar sesión', getStarted: 'Empezar', openWorkspace: 'Abrir espacio', product: 'Producto', solutions: 'Soluciones', features: 'Características', ai: 'IA', security: 'Seguridad', backToHome: '← Volver al inicio' },
-  footer: { tagline: 'Un espacio de trabajo inteligente para equipos modernos.', company: 'Empresa', security: 'Seguridad', about: 'Acerca de', features: 'Características', demo: 'Demo', contact: 'Contacto', privacy: 'Política de privacidad', terms: 'Términos de servicio', rights: '© {{year}} WorkGrind. Todos los derechos reservados.', trial: 'Prueba gratuita de 7 días · Sin compromiso · Para equipos modernos' },
+  footer: { tagline: 'Un espacio conectado para el trabajo personal, los negocios y la educación.', company: 'Empresa', security: 'Seguridad', about: 'Acerca de', features: 'Características', demo: 'Demo', contact: 'Contacto', privacy: 'Política de privacidad', terms: 'Términos de servicio', rights: '© {{year}} WorkGrind. Todos los derechos reservados.', trial: 'Elige un espacio Solo, Company, Escuela, Colegio o Universidad.' },
   common: { submit: 'Enviar', send: 'Enviar', cancel: 'Cancelar', loading: 'Cargando…', optional: 'opcional', required: 'requerido', errorGeneric: 'Algo salió mal. Por favor inténtalo de nuevo.', backToHome: 'Volver al inicio', startFreeTrial: 'Iniciar prueba gratuita', learnMore: 'Más información', close: 'Cerrar' },
   about: {
-    badge: 'Nuestra misión', headline1: 'Reimaginando cómo las', headline2: 'organizaciones', headline3: 'modernas trabajan juntas',
-    subheadline: 'WorkGrind fue creado con un único mandato: eliminar la fragmentación de software y restaurar el enfoque profundo para equipos en todo el mundo.',
+    badge: 'Acerca de WorkGrind', headline1: 'Un espacio conectado para', headline2: 'trabajar y aprender', headline3: '',
+    subheadline: 'WorkGrind ofrece experiencias distintas para la productividad personal, la colaboración empresarial y la administración académica.',
     stats: { workspaces: 'Espacios creados', messages: 'Mensajes enviados', tasks: 'Tareas completadas', uptime: 'SLA de disponibilidad' },
-    story: { heading: 'La historia de WorkGrind', p1: 'En la oficina digital actual, los empleados pasan hasta el 30 % de su jornada alternando entre herramientas desconectadas.', p2: 'Este cambio constante de contexto conduce a comunicación fragmentada, plazos perdidos y agotamiento. WorkGrind resuelve esto.' },
+    story: { heading: 'Un espacio pensado para cada forma de trabajar', p1: 'Organizar el día personal, coordinar proyectos de una empresa y administrar una institución educativa requieren herramientas y permisos distintos.', p2: 'WorkGrind ofrece espacios Solo, Company, Escuela / Academia, Colegio y Universidad. Las funciones disponibles dependen del tipo de espacio, el rol y el plan.' },
     pillars: {
-      sync:     { title: 'Sincronización en tiempo real', desc: 'Impulsado por Socket.io y MongoDB para latencia cero en chat, tareas y presencia.' },
-      security: { title: 'Seguridad empresarial',         desc: 'Aislamiento multi-tenant a nivel de filas, sesiones cifradas y controles RBAC estrictos.' },
-      scale:    { title: 'Escala global',                  desc: 'Diseñado para equipos híbridos, remotos y de múltiples oficinas desde el primer día.' },
+      sync:     { title: 'Trabajo conectado', desc: 'Tareas, proyectos, calendarios, conversaciones y registros compartidos compatibles en un mismo espacio.' },
+      security: { title: 'Permisos del espacio', desc: 'El acceso depende de la membresía, el rol, las funciones disponibles y los datos solicitados.' },
+      scale:    { title: 'Distintas formas de trabajar', desc: 'Elige un espacio personal, empresarial, escolar, universitario o de educación superior al registrarte.' },
     },
-    workspace: { heading: 'Todo en un solo espacio', subheading: '12 módulos integrados que reemplazan 12 suscripciones SaaS separadas.' },
-    cta: { badge: 'Liderazgo ejecutivo', name: 'RANA MOEZ', role: 'Arquitecto de producto e ingeniero de sistemas principal', button: 'Empieza gratis' },
+    workspace: { heading: 'Elige el espacio adecuado', subheading: 'El CRM y las herramientas para clientes son distintas de la administración académica.' },
+    cta: { badge: 'Explora WorkGrind', name: 'Elige tu espacio', role: 'Compara los cinco tipos de espacio y elige el que se adapte a ti.', button: 'Empezar' },
   },
   features: {
-    badge: 'Conjunto completo de características', headline: 'Todas las herramientas que tu equipo necesita', subheadline: 'Descubre cómo WorkGrind reemplaza aplicaciones desconectadas con una plataforma unificada.',
-    cta: { heading: '¿Listo para probar estas características en vivo?', sub: 'Crea tu espacio de trabajo en menos de 30 segundos, sin tarjeta de crédito.' },
+    badge: 'Espacios y capacidades', headline: 'Las herramientas adecuadas para tu trabajo', subheadline: 'WorkGrind separa la productividad personal, las operaciones empresariales y la administración educativa, y conecta funciones útiles de colaboración.',
+    cta: { heading: 'Elige cómo usar WorkGrind', sub: 'Selecciona Solo, Company, Escuela / Academia, Colegio o Universidad al registrarte.' },
     items: {
       chat:          { title: 'Comunicación en tiempo real',   tag: 'Chat y DMs',      desc: 'Organiza discusiones en canales públicos o privados, envía mensajes directos y usa Markdown con emojis.' },
       tasks:         { title: 'Gestión de tareas y trabajo',   tag: 'Kanban y listas', desc: 'Realiza el seguimiento de entregables con tableros Kanban flexibles o listas estructuradas. Asigna responsables y prioridades.' },
@@ -33,13 +33,13 @@ export const es: Translations = {
     },
   },
   demo: {
-    badge: 'Presentación personalizada', headline: 'Reserva una demo de WorkGrind', subheadline: 'Cuéntanos sobre tu equipo y programaremos una presentación personalizada 1-a-1 adaptada a tu flujo de trabajo.',
-    form: { name: 'Nombre completo', email: 'Correo de trabajo', company: 'Nombre de empresa', message: '¿Qué te gustaría explorar?', namePH: 'ej. Ana García', emailPH: 'ana@empresa.com', companyPH: 'Acme Corp', messagePH: 'Dinos qué te gustaría ver…', submit: 'Solicitar demo en vivo', submitting: 'Enviando…' },
+    badge: 'Conoce WorkGrind', headline: 'Explora WorkGrind', subheadline: 'Cuéntanos qué espacio de WorkGrind te interesa y qué te gustaría conocer.',
+    form: { name: 'Nombre completo', email: 'Correo electrónico', company: 'Empresa o institución (opcional)', message: '¿Qué te gustaría explorar?', namePH: 'ej. Ana García', emailPH: 'ana@example.com', companyPH: 'Nombre de la organización', messagePH: 'Indica el tipo de espacio y tus preguntas…', submit: 'Solicitar recorrido', submitting: 'Enviando…' },
     success: { heading: '¡Gracias! Pronto nos pondremos en contacto.', sub: 'Recibimos tu solicitud de demo para {{email}}. Nuestro equipo te contactará pronto.', home: 'Volver al inicio', another: 'Enviar otra solicitud' },
   },
   contact: {
-    badge: 'Ponerse en contacto', headline: 'Contactar WorkGrind', sub: '¿Preguntas sobre implementación o planes enterprise? Nuestro equipo está aquí para ayudar.',
-    form: { heading: 'Envíanos un mensaje', name: 'Tu nombre', email: 'Correo de trabajo', company: 'Empresa', subject: 'Asunto', message: 'Mensaje', namePH: 'Sarah Jenkins', emailPH: 'sarah@empresa.com', companyPH: 'Apex Technologies', messagePH: 'Cuéntanos sobre el tamaño de tu equipo y sus necesidades…', submit: 'Enviar consulta', submitting: 'Enviando…', subjects: { sales: 'Ventas y demo enterprise', support: 'Soporte técnico', partner: 'Oportunidades de asociación', general: 'Pregunta general' } },
+    badge: 'Contacto', headline: 'Contacta con WorkGrind', sub: '¿Tienes preguntas sobre Solo, Company, Escuela / Academia, Colegio, Universidad, planes o soporte? Escríbenos.',
+    form: { heading: 'Envíanos un mensaje', name: 'Tu nombre', email: 'Correo electrónico', company: 'Empresa o institución (opcional)', subject: 'Asunto', message: 'Mensaje', namePH: 'Tu nombre', emailPH: 'tu@example.com', companyPH: 'Nombre de la organización', messagePH: 'Indica el tipo de espacio y cómo podemos ayudarte…', submit: 'Enviar consulta', submitting: 'Enviando…', subjects: { sales: 'Planes y preguntas sobre el producto', support: 'Soporte técnico', partner: 'Oportunidades de asociación', general: 'Pregunta general' } },
     success: { heading: '¡Mensaje recibido!', sub: 'Gracias por contactar WorkGrind. Nuestro equipo responderá en 2 horas hábiles.', another: 'Enviar otro mensaje' },
   },
 };
