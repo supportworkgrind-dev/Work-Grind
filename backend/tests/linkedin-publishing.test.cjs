@@ -6,6 +6,10 @@ const {
   LINKEDIN_TEXT_POST_MAX_LENGTH,
   publishLinkedInTextPost,
 } = require('../dist/services/linkedinPublishing');
+const {
+  getSocialProviderAdapter,
+  getSocialProviderCatalog,
+} = require('../dist/services/socialProviders');
 
 test('LinkedIn text publisher sends only supported member-post fields and API headers', async (context) => {
   const originalFetch = global.fetch;
@@ -56,4 +60,41 @@ test('LinkedIn API version configuration accepts YYYYMM and rejects malformed va
   assert.throws(() => getLinkedInApiVersion(), /YYYYMM/);
   if (previous === undefined) delete process.env.LINKEDIN_API_VERSION;
   else process.env.LINKEDIN_API_VERSION = previous;
+});
+
+test('provider catalog exposes only verified capabilities and leaves unconfigured platforms disabled', async (context) => {
+  const linkedin = getSocialProviderCatalog().find((provider) => provider.id === 'linkedin');
+  assert.equal(linkedin.availability, 'available');
+  assert.deepEqual(linkedin.capabilities, {
+    connect: true,
+    publishText: true,
+    publishMedia: false,
+    schedule: true,
+    analytics: false,
+    organizationPublishing: false,
+  });
+  const unavailable = getSocialProviderCatalog().filter((provider) => provider.id !== 'linkedin');
+  assert.deepEqual(unavailable.map((provider) => provider.availability), [
+    'setup_required',
+    'setup_required',
+    'setup_required',
+  ]);
+  assert.ok(unavailable.every((provider) =>
+    Object.values(provider.capabilities).every((supported) => supported === false)));
+
+  const adapter = getSocialProviderAdapter('linkedin');
+  assert.ok(adapter);
+  assert.equal(adapter.validateText('  A post.  '), null);
+  assert.match(adapter.validateText('  '), /1–3000/);
+  const originalFetch = global.fetch;
+  global.fetch = async () => new Response(null, {
+    status: 201,
+    headers: { 'x-restli-id': 'urn:li:share:adapter-test' },
+  });
+  context.after(() => { global.fetch = originalFetch; });
+  assert.deepEqual(
+    await adapter.publishText('access-token', 'person-123', 'Adapter test.'),
+    { externalPostId: 'urn:li:share:adapter-test' },
+  );
+  assert.equal(getSocialProviderAdapter('instagram'), null);
 });

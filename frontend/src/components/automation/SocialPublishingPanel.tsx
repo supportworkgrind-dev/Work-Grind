@@ -8,8 +8,9 @@ import { LinkedInConnection, LinkedInConnectionCard } from './LinkedInConnection
 
 type SocialPost = {
   _id: string;
-  text: string;
   platform: 'linkedin' | 'instagram' | 'facebook' | 'youtube';
+  integrationId?: string;
+  text: string;
   status: 'draft' | 'pending_approval' | 'approved' | 'rejected' | 'scheduled' | 'publishing' | 'published' | 'failed';
   authorId?: { _id: string; fullName: string };
   reviewerId?: { _id: string; fullName: string };
@@ -30,6 +31,16 @@ type SocialProvider = {
   capabilities: { connect: boolean; publishText: boolean; publishMedia: boolean; schedule: boolean; analytics: boolean; organizationPublishing: boolean };
 };
 
+type SocialAccount = {
+  id: string;
+  provider: SocialProvider['id'];
+  status: 'connected' | 'disconnected' | 'error' | 'pending';
+  displayName: string | null;
+  displayEmail: string | null;
+  expiresAt: string | null;
+  canPublish: boolean;
+};
+
 const statusLabel: Record<SocialPost['status'], string> = {
   draft: 'Draft',
   pending_approval: 'Pending approval',
@@ -47,6 +58,8 @@ export function SocialPublishingPanel() {
   const isManager = user?.role === 'manager';
   const [connection, setConnection] = useState<LinkedInConnection | null>(null);
   const [providers, setProviders] = useState<SocialProvider[]>([]);
+  const [accounts, setAccounts] = useState<SocialAccount[]>([]);
+  const [selectedAccountId, setSelectedAccountId] = useState('');
   const [posts, setPosts] = useState<SocialPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [text, setText] = useState('');
@@ -72,11 +85,15 @@ export function SocialPublishingPanel() {
     Promise.all([
       api.get('/social-publishing/posts'),
       api.get('/social-publishing/providers'),
+      api.get('/social-publishing/accounts'),
     ])
-      .then(([postsResponse, providersResponse]) => {
+      .then(([postsResponse, providersResponse, accountsResponse]) => {
         if (!active) return;
         setPosts(postsResponse.data.posts as SocialPost[]);
         setProviders(providersResponse.data.providers as SocialProvider[]);
+        const nextAccounts = accountsResponse.data.accounts as SocialAccount[];
+        setAccounts(nextAccounts);
+        setSelectedAccountId(nextAccounts.find((account) => account.canPublish)?.id ?? '');
       })
       .catch((requestError: unknown) => {
         if (active) {
@@ -98,7 +115,13 @@ export function SocialPublishingPanel() {
     setNotice('');
     try {
       if (editingId) await api.patch(`/social-publishing/posts/${editingId}`, { text: text.trim() });
-      else await api.post('/social-publishing/posts', { text: text.trim(), platform: selectedPlatform });
+      else await api.post('/social-publishing/posts', {
+        text: text.trim(),
+        platform: selectedPlatform,
+        ...(accounts.find((account) => account.id === selectedAccountId && account.canPublish)
+          ? { integrationId: selectedAccountId }
+          : {}),
+      });
       await refreshPosts();
       setText('');
       setEditingId(null);
@@ -208,7 +231,9 @@ export function SocialPublishingPanel() {
     setError('');
     setNotice('');
     try {
-      const response = await api.post(`/social-publishing/posts/${post._id}/${action}`);
+      const response = await api.post(`/social-publishing/posts/${post._id}/${action}`, {
+        ...(post.integrationId ? { integrationId: post.integrationId } : {}),
+      });
       await refreshPosts();
       setNotice(action === 'publish'
         ? 'LinkedIn confirmed the post was published.'
@@ -272,8 +297,32 @@ export function SocialPublishingPanel() {
 
       <section className="surface rounded-2xl border p-4 sm:p-5">
         <div className="mb-4">
-          <h2 className="text-base font-semibold theme-text-primary">Create a LinkedIn post</h2>
+          <h2 className="text-base font-semibold theme-text-primary">Create a social post</h2>
           <p className="mt-1 text-xs theme-text-muted">Drafts are private to this workspace. Tavro only writes draft text; it never publishes.</p>
+        </div>
+
+        <div className="mb-3 grid gap-3 sm:grid-cols-2">
+          <label className="text-xs font-medium theme-text-secondary">
+            Destination account
+            <select
+              value={selectedAccountId}
+              onChange={(event) => setSelectedAccountId(event.target.value)}
+              className="input-premium mt-1 w-full"
+              aria-label="Select a connected social account"
+            >
+              <option value="">Save as draft without a connected account</option>
+              {accounts.filter((account) => account.provider === selectedPlatform).map((account) => (
+                <option key={account.id} value={account.id}>
+                  {account.displayName || 'LinkedIn member'} {account.canPublish ? '· Connected' : '· Reconnect required'}
+                </option>
+              ))}
+            </select>
+          </label>
+          <p className="self-end text-xs theme-text-muted">
+            {accounts.some((account) => account.provider === selectedPlatform && account.canPublish)
+              ? 'Publishing uses this workspace-authorized account.'
+              : 'Connect an authorized account before publishing.'}
+          </p>
         </div>
 
         {error && <p role="alert" className="mb-3 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{error}</p>}

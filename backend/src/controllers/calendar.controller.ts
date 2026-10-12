@@ -4,6 +4,8 @@ import Task from '../models/Task';
 import Meeting from '../models/Meeting';
 import SocialPost from '../models/SocialPost';
 import { AuthRequest } from '../middleware/auth';
+import { AccountType, OrganizationType, isOrganizationType } from '../config/organization';
+import { isOrganizationFeatureAllowed } from '../middleware/organizationAccess';
 
 export const getEvents = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -17,6 +19,15 @@ export const getEvents = async (req: AuthRequest, res: Response): Promise<void> 
     const postDateFilter = start && end
       ? { $gte: new Date(start as string), $lte: new Date(end as string) }
       : { $gte: new Date() };
+    const organizationType = req.user!.organizationType;
+    const accountType = req.user!.accountType;
+    const canSeeSocialPosts = isOrganizationType(organizationType) &&
+      (accountType === 'company' || accountType === 'individual') &&
+      isOrganizationFeatureAllowed(
+        { organizationType: organizationType as OrganizationType, accountType: accountType as AccountType },
+        req.user!.role,
+        'socialPublishing',
+      );
     const [events, tasks, meetings, socialPosts] = await Promise.all([
       CalendarEvent.find(filter)
         .populate('creatorId', 'fullName avatar')
@@ -35,13 +46,15 @@ export const getEvents = async (req: AuthRequest, res: Response): Promise<void> 
         companyId: req.user!.companyId,
         scheduledAt: { $exists: true, $ne: null },
       }).populate('hostId', 'fullName avatar'),
-      SocialPost.find({
-        companyId: req.user!.companyId,
-        status: 'scheduled',
-        scheduledAt: postDateFilter,
-      }).select('platform text authorId scheduledAt scheduleTimeZone')
-        .populate('authorId', 'fullName avatar')
-        .sort({ scheduledAt: 1 }),
+      canSeeSocialPosts
+        ? SocialPost.find({
+          companyId: req.user!.companyId,
+          status: 'scheduled',
+          scheduledAt: postDateFilter,
+        }).select('platform text authorId scheduledAt scheduleTimeZone')
+          .populate('authorId', 'fullName avatar')
+          .sort({ scheduledAt: 1 })
+        : Promise.resolve([]),
     ]);
 
     // Format tasks as calendar events

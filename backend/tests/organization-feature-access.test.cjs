@@ -22,6 +22,18 @@ test('feature registry separates Solo, Company, and education capabilities by ro
   assert.equal(can('university', 'company', 'student', 'globalCalling'), false);
 });
 
+test('Social Publishing is available to authorized workspace contributors but excludes learners and parents', () => {
+  assert.equal(can('business', 'individual', 'owner', 'socialPublishing'), true);
+  assert.equal(can('business', 'individual', 'employee', 'socialPublishing'), false);
+  assert.equal(can('business', 'company', 'employee', 'socialPublishing'), true);
+  assert.equal(can('business', 'company', 'guest', 'socialPublishing'), false);
+  assert.equal(can('school', 'company', 'teacher', 'socialPublishing'), true);
+  assert.equal(can('college', 'company', 'faculty', 'socialPublishing'), true);
+  assert.equal(can('university', 'company', 'hod', 'socialPublishing'), true);
+  assert.equal(can('school', 'company', 'student', 'socialPublishing'), false);
+  assert.equal(can('university', 'company', 'parent', 'socialPublishing'), false);
+});
+
 test('any-of workspace middleware allows Solo content but fails closed without an eligible workspace', () => {
   const middleware = requireAnyOrganizationFeature('workspaceContent', 'soloWorkspace');
   let nextCalled = false;

@@ -109,7 +109,7 @@ async function markPostFailed(post: {
       userId: post.authorId.toString(),
       type: 'system',
       title: 'Social post needs attention',
-      body: `LinkedIn could not confirm publication (${failureCode.replaceAll('_', ' ')}). Review the post before retrying.`,
+      body: `LinkedIn could not confirm publication (${failureCode.replace(/_/g, ' ')}). Review the post before retrying.`,
       actionUrl: '/social-publishing',
       metadata: { postId: post._id.toString(), failureCode },
     });
