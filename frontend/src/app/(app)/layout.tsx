@@ -87,7 +87,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     if (!user) return;
     setTheme(normalizeTheme(user.theme));
     if (user.preferredLanguage) setLang(user.preferredLanguage);
-  }, [user?._id, user?.theme, user?.preferredLanguage, setTheme, setLang]);
+  }, [user, setTheme, setLang]);
 
   useEffect(() => {
     setHasHydrated(true);
@@ -107,11 +107,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   // Redirect unauthenticated users after auth state is resolved
   useEffect(() => {
-    if (!isLoading && !authError && !user) {
+    if (!isLoading && !user) {
       const returnTo = `${pathname}${window.location.search}`;
       router.replace(`/login?redirect=${encodeURIComponent(returnTo)}`);
     }
-  }, [authError, isLoading, pathname, user, router]);
+  }, [isLoading, pathname, user, router]);
 
   useEffect(() => {
     if (user && !routeAllowed) {
@@ -136,7 +136,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       window.clearInterval(interval);
       window.removeEventListener('focus', refreshVisibleSubscription);
     };
-  }, [user?._id, refreshSubscription]);
+  }, [user, refreshSubscription]);
 
   useEffect(() => {
     if (user && !subscriptionLoading && !subscriptionError && subscription && !subscription.hasActiveAccess && pathname !== '/billing') {

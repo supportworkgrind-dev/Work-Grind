@@ -1,10 +1,11 @@
 import { expect, test } from '@playwright/test';
+import { getSafeReturnPath } from '../src/lib/authRedirect';
 import { HELP_ARTICLES } from '../src/lib/helpArticles';
 
 test('Help Center and published articles are readable without authentication', async ({ page }) => {
   await page.goto('/help');
   await expect(page.getByRole('heading', { name: 'How can we help?' })).toBeVisible();
-  await expect(page.getByRole('textbox', { name: 'Search help articles' })).toBeVisible();
+  await expect(page.getByRole('searchbox', { name: 'Search help articles' })).toBeVisible();
 
   await page.goto('/help/getting-started');
   await expect(page.getByRole('heading', { name: 'Create an account and set up your workspace' })).toBeVisible();
@@ -16,9 +17,28 @@ test('Help Center and published articles are readable without authentication', a
 
 test('Help search matches feature and payment-provider keywords', async ({ page }) => {
   await page.goto('/help');
-  await page.getByRole('textbox', { name: 'Search help articles' }).fill('Polar');
+  await page.getByRole('searchbox', { name: 'Search help articles' }).fill('Polar');
   await expect(page.getByRole('link', { name: /Fix checkout, payment, and cancellation problems/ })).toBeVisible();
   await expect(page.getByText(/matching “Polar”/)).toBeVisible();
+});
+
+test('the help index remains usable at a narrow mobile viewport', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/help');
+  await expect(page.getByRole('heading', { name: 'How can we help?' })).toBeVisible();
+  await expect(page.getByRole('searchbox', { name: 'Search help articles' })).toBeVisible();
+  const widths = await page.evaluate(() => ({
+    viewport: document.documentElement.clientWidth,
+    content: document.documentElement.scrollWidth,
+  }));
+  expect(widths.content).toBeLessThanOrEqual(widths.viewport);
+});
+
+test('return URLs reject external and protocol-relative destinations', () => {
+  expect(getSafeReturnPath('/tasks?filter=mine')).toBe('/tasks?filter=mine');
+  expect(getSafeReturnPath('https://example.com')).toBeUndefined();
+  expect(getSafeReturnPath('//example.com')).toBeUndefined();
+  expect(getSafeReturnPath('/\\\\example.com')).toBeUndefined();
 });
 
 test('protected destinations show a sign-in prompt with a safe return URL', async ({ page }) => {
@@ -89,7 +109,7 @@ test('successful sign-in returns an existing member to the requested destination
 
   await page.goto('/login?redirect=%2Ftasks');
   await page.getByLabel('Work email').fill('help-test@example.invalid');
-  await page.getByLabel('Password').fill('not-a-real-secret');
+  await page.locator('#login-password').fill('not-a-real-secret');
   await page.getByRole('button', { name: /Sign in to WorkGrind/ }).click();
   await expect(page).toHaveURL(/\/tasks$/);
 });
@@ -98,5 +118,13 @@ test('every published article has a public route', async ({ request, baseURL }) 
   for (const article of HELP_ARTICLES) {
     const response = await request.get(`${baseURL}/help/${article.slug}`);
     expect(response.status(), `${article.slug} should be publicly readable`).toBe(200);
+  }
+});
+
+test('every application destination linked by an article is a real route', async ({ request, baseURL }) => {
+  const paths = [...new Set(HELP_ARTICLES.flatMap((article) => article.appPath ? [article.appPath] : []))];
+  for (const path of paths) {
+    const response = await request.get(`${baseURL}${path}`);
+    expect(response.status(), `${path} should resolve to an application route`).toBe(200);
   }
 });
