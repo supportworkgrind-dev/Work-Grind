@@ -364,7 +364,8 @@ export default function SuperAdminUsersPage() {
               type="button"
               onClick={() => {
                 setPlanChangeUser(user);
-                setSelectedPlan(company?.subscriptionPlan ?? user.subscriptionPlan ?? 'free');
+                const plan = company?.subscriptionPlan ?? user.subscriptionPlan;
+                setSelectedPlan(plan === 'starter' || plan === 'pro' ? plan : 'free');
               }}
               className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs text-slate-300 hover:bg-slate-800 hover:text-white"
             >

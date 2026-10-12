@@ -439,9 +439,13 @@ export const changeSubscriptionPlan = async (
 
     const company = await Company.findById(req.user!.companyId).select(
       'subscriptionStatus subscriptionPlan subscriptionEndDate pendingSubscriptionPlan ' +
-      'pendingSubscriptionPlanEffectiveDate polarSubscriptionId cancelAtPeriodEnd isLifetime',
+      'pendingSubscriptionPlanEffectiveDate polarSubscriptionId cancelAtPeriodEnd isLifetime organizationType',
     );
     if (!company) { res.status(404).json({ success: false, message: 'Company not found.' }); return; }
+    if (educationPlanForOrganization(company.organizationType)) {
+      res.status(400).json({ success: false, message: 'Education plans cannot be changed through the business downgrade flow.' });
+      return;
+    }
     if (company.isLifetime) {
       res.status(400).json({ success: false, message: 'Lifetime access cannot be changed to a paid plan.' });
       return;
@@ -463,8 +467,10 @@ export const changeSubscriptionPlan = async (
       return;
     }
 
+    const businessPlanId = planId as 'free' | 'starter' | 'pro';
+    const currentPlanId = company.subscriptionPlan as 'free' | 'starter' | 'pro';
     const rank: Record<'free' | 'starter' | 'pro', number> = { free: 0, starter: 1, pro: 2 };
-    if (rank[planId] >= rank[company.subscriptionPlan]) {
+    if (rank[businessPlanId] >= rank[currentPlanId]) {
       res.status(400).json({ success: false, message: 'Select a lower plan to schedule a downgrade.' });
       return;
     }
@@ -477,7 +483,7 @@ export const changeSubscriptionPlan = async (
       });
       company.cancelAtPeriodEnd = true;
     } else {
-      const productId = getPolarProductId(planId);
+      const productId = getPolarProductId(planId as 'starter' | 'pro');
       if (!productId) {
         res.status(500).json({ success: false, message: `Polar product ID is not configured for the ${planId} plan.` });
         return;

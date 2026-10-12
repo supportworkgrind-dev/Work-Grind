@@ -40,6 +40,8 @@ export interface ICompany extends Document {
   ownerId: mongoose.Types.ObjectId;
   inviteCode: string;
   pendingInvites: { email: string; token: string; expiresAt: Date; role: string; inviterId?: mongoose.Types.ObjectId }[];
+  capacityLockToken?: string;
+  capacityLockUntil?: Date;
 
   /** Legacy workspace-level plan field (kept for backward compat). */
   plan: CompanyPlan;
@@ -118,6 +120,8 @@ const CompanySchema = new Schema<ICompany>(
         inviterId: { type: Schema.Types.ObjectId, ref: 'User' },
       },
     ],
+    capacityLockToken: { type: String },
+    capacityLockUntil: { type: Date },
 
     // Legacy plan field (still used for display in some places)
     plan: { type: String, enum: ['free', 'starter', 'pro', 'school', 'college', 'university'], default: 'free' },

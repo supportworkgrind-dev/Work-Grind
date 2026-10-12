@@ -6,9 +6,12 @@
  */
 
 import mongoose from 'mongoose';
+import { randomUUID } from 'crypto';
 import User from '../models/User';
 import Company from '../models/Company';
 import AiUsage from '../models/AiUsage';
+import AcademicPerson from '../models/AcademicPerson';
+import { educationPlanForOrganization } from '../config/subscription';
 import { getCompanySubscription, getEffectiveSubscription } from '../services/companySubscription';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -27,9 +30,59 @@ export interface PlanUsage {
   members: number;
   pendingInvites: number;
   memberSlotsUsed: number;
+  students?: number;
+  staffMembers?: number;
+  studentSlotsUsed?: number;
+  staffSlotsUsed?: number;
   storageBytes: number;
   aiRequests: number;
   aiRequestsByUser: number;
+}
+
+export async function withCompanyCapacityLock<T>(
+  companyId: string,
+  operation: () => Promise<T>,
+): Promise<T> {
+  const lockToken = randomUUID();
+  const deadline = Date.now() + 10_000;
+  let acquired = false;
+  while (Date.now() < deadline) {
+    const now = new Date();
+    const lock = await Company.findOneAndUpdate(
+      {
+        _id: companyId,
+        $or: [
+          { capacityLockUntil: { $exists: false } },
+          { capacityLockUntil: { $lte: now } },
+        ],
+      },
+      {
+        $set: {
+          capacityLockToken: lockToken,
+          capacityLockUntil: new Date(now.getTime() + 60_000),
+        },
+      },
+      { new: true },
+    ).select('_id');
+    if (lock) {
+      acquired = true;
+      break;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  if (!acquired) {
+    const companyExists = await Company.exists({ _id: companyId });
+    if (!companyExists) throw new Error('Workspace not found while reserving capacity.');
+    throw new Error('Workspace capacity is busy. Retry the operation.');
+  }
+  try {
+    return await operation();
+  } finally {
+    await Company.updateOne(
+      { _id: companyId, capacityLockToken: lockToken },
+      { $unset: { capacityLockToken: 1, capacityLockUntil: 1 } },
+    );
+  }
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -119,13 +172,52 @@ export async function getPlanUsage(userId: string): Promise<PlanUsage> {
   }
 
   const companyId = user.companyId;
-  const [members, company] = await Promise.all([
-    User.countDocuments({ companyId, isActive: true }),
-    Company.findById(companyId).select('pendingInvites storage'),
+  const [company, activeMembers] = await Promise.all([
+    Company.findById(companyId).select('organizationType pendingInvites storage'),
+    User.find({ companyId, isActive: true }).select('role'),
   ]);
   const pendingInvites = (company?.pendingInvites ?? []).filter(
     (invite) => new Date(invite.expiresAt).getTime() > Date.now(),
   ).length;
+  const educationPlanId = educationPlanForOrganization(company?.organizationType);
+  if (educationPlanId) {
+    const [activeStudents, linkedStudentUserIds] = await Promise.all([
+      AcademicPerson.countDocuments({ companyId, type: 'student', status: 'active' }),
+      AcademicPerson.distinct('userId', {
+        companyId,
+        type: 'student',
+        status: 'active',
+        userId: { $exists: true },
+      }),
+    ]);
+    const linkedStudentIds = new Set(linkedStudentUserIds.map((id) => id.toString()));
+    const students = activeStudents + activeMembers.filter(
+      (member) => member.role.toLowerCase() === 'student' && !linkedStudentIds.has(member._id.toString()),
+    ).length;
+    const staffAccounts = activeMembers.filter(
+      (member) => !['student', 'parent', 'guardian'].includes(member.role.toLowerCase()),
+    ).length;
+    const unlinkedTeachers = await AcademicPerson.countDocuments({
+      companyId,
+      type: 'teacher',
+      status: 'active',
+      userId: { $exists: false },
+    });
+    const staffMembers = staffAccounts + unlinkedTeachers;
+    return {
+      members: staffMembers,
+      staffMembers,
+      students,
+      staffSlotsUsed: staffMembers,
+      studentSlotsUsed: students,
+      pendingInvites,
+      memberSlotsUsed: staffMembers,
+      storageBytes: company?.storage?.used ?? 0,
+      aiRequests,
+      aiRequestsByUser,
+    };
+  }
+  const members = activeMembers.length;
   return {
     members,
     pendingInvites,
@@ -281,7 +373,7 @@ async function incrementUserAiCounter(userId: string, monthStart: Date): Promise
 export async function checkMemberLimit(
   _ownerUserId: string,
   companyId:   string,
-  options: { excludePendingInviteToken?: string } = {},
+  options: { excludePendingInviteToken?: string; role?: string } = {},
 ): Promise<LimitCheckResult> {
   const sub = await getCompanySubscription(companyId);
 
@@ -293,32 +385,74 @@ export async function checkMemberLimit(
       limit: 0,
     };
   }
-  const limit = sub.planConfig.limits.members;
+  const educationPlanId = educationPlanForOrganization(sub.organizationType);
+  const inviteRole = (options.role ?? 'employee').toLowerCase();
+  const isStudent = inviteRole === 'student';
+  const limit = isStudent
+    ? sub.planConfig.limits.students ?? 0
+    : sub.planConfig.limits.members;
   if (limit === -1) return { allowed: true, limit: -1 }; // Pro: unlimited
 
-  const [activeMembers, company] = await Promise.all([User.countDocuments({
-    companyId: new mongoose.Types.ObjectId(companyId),
-    isActive:  true,
-  }), Company.findById(companyId).select('pendingInvites')]);
+  const [activeMembers, activeStudentRecords, linkedStudentUserIds, activeStaffRecords, company] = await Promise.all([
+    User.find({
+      companyId: new mongoose.Types.ObjectId(companyId),
+      isActive: true,
+      ...(educationPlanId
+        ? isStudent
+          ? { role: 'student' }
+          : { role: { $nin: ['student', 'parent', 'guardian'] } }
+        : {}),
+    }).select('_id role'),
+    educationPlanId && isStudent
+      ? AcademicPerson.countDocuments({ companyId, type: 'student', status: 'active' })
+      : Promise.resolve(0),
+    educationPlanId && isStudent
+      ? AcademicPerson.distinct('userId', {
+        companyId,
+        type: 'student',
+        status: 'active',
+        userId: { $exists: true },
+      })
+      : Promise.resolve([]),
+    educationPlanId && !isStudent
+      ? AcademicPerson.countDocuments({ companyId, type: 'teacher', status: 'active', userId: { $exists: false } })
+      : Promise.resolve(0),
+    Company.findById(companyId).select('pendingInvites'),
+  ]);
   const now = Date.now();
   const pendingInvites = (company?.pendingInvites ?? []).filter((invite) =>
     invite.token !== options.excludePendingInviteToken &&
     new Date(invite.expiresAt).getTime() > now
   ).length;
-  const current = activeMembers + pendingInvites;
+  const pendingInviteLimit = educationPlanId ? sub.planConfig.limits.pendingInvites ?? 0 : undefined;
+  if (educationPlanId && pendingInviteLimit !== undefined && pendingInvites >= pendingInviteLimit) {
+    return {
+      allowed: false,
+      reason: `Pending invitation limit reached (${pendingInviteLimit} on ${sub.planConfig.name} plan).`,
+      code: 'INVITATION_LIMIT_EXCEEDED',
+      limit: pendingInviteLimit,
+      current: pendingInvites,
+      upgrade: false,
+    };
+  }
+  const linkedStudentIds = new Set(linkedStudentUserIds.map((id) => id.toString()));
+  const activeCount = isStudent
+    ? activeStudentRecords + activeMembers.filter((member) => !linkedStudentIds.has(member._id.toString())).length
+    : activeMembers.length + activeStaffRecords;
+  const current = activeCount + (educationPlanId ? 0 : pendingInvites);
 
   if (current >= limit) {
     return {
       allowed: false,
-      reason:  `Member limit reached (${limit} members on ${sub.planConfig.name} plan). Upgrade to a higher plan for more members.`,
-      code:    'MEMBER_LIMIT_EXCEEDED',
+      reason:  `${isStudent ? 'Student' : 'Member'} limit reached (${limit} on ${sub.planConfig.name} plan).`,
+      code:    isStudent ? 'STUDENT_LIMIT_EXCEEDED' : 'MEMBER_LIMIT_EXCEEDED',
       limit,
       current,
       upgrade: true,
     };
   }
 
-  return { allowed: true, limit, current: activeMembers, upgrade: false };
+  return { allowed: true, limit, current: activeCount, upgrade: false };
 }
 
 // ── Re-export getEffectiveSubscription for convenience ────────────────────────

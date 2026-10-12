@@ -17,6 +17,7 @@ import AcademicTeachingAssignment from '../models/AcademicTeachingAssignment';
 import AcademicPerson, { AcademicPersonType } from '../models/AcademicPerson';
 import { GuardianRelationshipType } from '../models/AcademicGuardianLink';
 import User from '../models/User';
+import { checkMemberLimit, withCompanyCapacityLock } from '../utils/planLimits';
 
 const PAGE_SIZE = 100;
 const ACADEMIC_PERSON_TYPES: AcademicPersonType[] = ['student', 'teacher', 'parent'];
@@ -467,7 +468,31 @@ export const updateAcademicRecord = async (req: AuthRequest, res: Response): Pro
       }
     }
     delete values._id;
-    if (!await definition.update(new mongoose.Types.ObjectId(id), companyId, values)) {
+    const updateResult = resource === 'people' && values.status === 'active'
+      ? await withCompanyCapacityLock(companyId.toString(), async () => {
+        const person = await AcademicPerson.findOne({ _id: id, companyId }).select('type status');
+        if (!person) return { notFound: true as const, updated: false, capacityDenied: undefined };
+        if (person.status !== 'active' && (person.type === 'student' || person.type === 'teacher')) {
+          const capacity = await checkMemberLimit(req.user!.userId, companyId.toString(), { role: person.type });
+          if (!capacity.allowed) return { notFound: false as const, updated: false, capacityDenied: capacity };
+        }
+        return {
+          notFound: false as const,
+          updated: await definition.update(new mongoose.Types.ObjectId(id), companyId, values),
+          capacityDenied: undefined,
+        };
+      })
+      : { notFound: false as const, updated: await definition.update(new mongoose.Types.ObjectId(id), companyId, values), capacityDenied: undefined };
+    if (updateResult.capacityDenied) {
+      res.status(403).json({
+        success: false,
+        code: updateResult.capacityDenied.code,
+        message: updateResult.capacityDenied.reason,
+        limit: updateResult.capacityDenied.limit,
+      });
+      return;
+    }
+    if (!updateResult.updated) {
       res.status(404).json({ success: false, message: 'Academic record not found.' });
       return;
     }
@@ -581,15 +606,28 @@ export const createPerson = async (req: AuthRequest, res: Response): Promise<voi
       }
     }
 
-    const person = await AcademicPerson.create({
-      companyId,
-      type,
-      firstName: firstName.trim(),
-      lastName: lastName.trim(),
-      ...(email !== undefined ? { email: email.trim() } : {}),
-      ...(externalId !== undefined ? { externalId: externalId.trim() } : {}),
-      ...(userId ? { userId } : {}),
+    const createResult = await withCompanyCapacityLock(companyId.toString(), async () => {
+      if (!userId && (type === 'student' || type === 'teacher')) {
+        const capacity = await checkMemberLimit(req.user!.userId, companyId.toString(), { role: type });
+        if (!capacity.allowed) return { capacityDenied: capacity, person: undefined };
+      }
+      const person = await AcademicPerson.create({
+        companyId,
+        type,
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        ...(email !== undefined ? { email: email.trim() } : {}),
+        ...(externalId !== undefined ? { externalId: externalId.trim() } : {}),
+        ...(userId ? { userId } : {}),
+      });
+      return { person, capacityDenied: undefined };
     });
+    if (createResult.capacityDenied) {
+      res.status(403).json({ success: false, code: createResult.capacityDenied.code, message: createResult.capacityDenied.reason, limit: createResult.capacityDenied.limit });
+      return;
+    }
+    const person = createResult.person;
+    if (!person) throw new Error('Academic person creation did not return a record.');
     await recordAcademicAudit(req, 'person', person._id, { type: person.type });
     res.status(201).json({ success: true, person });
   } catch (error) {

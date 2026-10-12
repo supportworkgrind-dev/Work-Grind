@@ -17,7 +17,7 @@ import {
 import Company, { ICompany } from '../models/Company';
 import AuditLog from '../models/AuditLog';
 import { TRIAL_DAYS } from '../config/subscription';
-import { checkMemberLimit } from '../utils/planLimits';
+import { checkMemberLimit, withCompanyCapacityLock } from '../utils/planLimits';
 import Channel from '../models/Channel';
 import Project from '../models/Project';
 import Task from '../models/Task';
@@ -1100,25 +1100,43 @@ export const joinCompany = async (req: AuthRequest, res: Response): Promise<void
       return;
     }
 
-    const memberCheck = await checkMemberLimit(uid, company._id.toString(), {
-      excludePendingInviteToken: inviteToken || undefined,
+    const admission = await withCompanyCapacityLock(company._id.toString(), async () => {
+      const lockedCompany = await Company.findById(company._id);
+      if (!lockedCompany) throw new Error('Workspace not found while reserving capacity.');
+      if (inviteToken) {
+        const currentInvite = lockedCompany.pendingInvites.find(
+          (invite) => invite.token === inviteToken && new Date(invite.expiresAt).getTime() > Date.now(),
+        );
+        if (!currentInvite) return { staleInvite: true as const };
+        lockedCompany.pendingInvites = lockedCompany.pendingInvites.filter((invite) => invite.token !== inviteToken);
+      }
+      const memberCheck = await checkMemberLimit(uid, company._id.toString(), {
+        excludePendingInviteToken: inviteToken || undefined,
+        role: assignedRole,
+      });
+      if (!memberCheck.allowed) return { allowed: false as const, memberCheck };
+
+      joiningUser.companyId = company._id;
+      joiningUser.role = assignedRole as any;
+      await joiningUser.save();
+      await lockedCompany.save();
+      return { allowed: true as const, staleInvite: false as const };
     });
-    if (!memberCheck.allowed) {
+    if ('staleInvite' in admission && admission.staleInvite) {
+      res.status(400).json({ success: false, message: 'Invalid or expired invite' });
+      return;
+    }
+    if (!admission.allowed) {
       res.status(403).json({
         success: false,
-        code: memberCheck.code,
-        message: memberCheck.reason,
-        current: memberCheck.current,
-        limit: memberCheck.limit,
-        requiresUpgrade: memberCheck.upgrade ?? false,
+        code: admission.memberCheck.code,
+        message: admission.memberCheck.reason,
+        current: admission.memberCheck.current,
+        limit: admission.memberCheck.limit,
+        requiresUpgrade: admission.memberCheck.upgrade ?? false,
       });
       return;
     }
-
-    joiningUser.companyId = company._id;
-    joiningUser.role = assignedRole as any;
-    await joiningUser.save();
-    await company.save();
 
     await Channel.updateMany({ companyId: company._id, isDefault: true }, { $addToSet: { members: uid } });
 

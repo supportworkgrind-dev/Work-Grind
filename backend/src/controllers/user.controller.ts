@@ -5,7 +5,7 @@ import Company from '../models/Company';
 import { AuthRequest } from '../middleware/auth';
 import { sendInviteEmail } from '../utils/email';
 import { v4 as uuidv4 } from 'uuid';
-import { checkMemberLimit } from '../utils/planLimits';
+import { checkMemberLimit, withCompanyCapacityLock } from '../utils/planLimits';
 import {
   isR2Configured,
   uploadFile as r2Upload,
@@ -349,29 +349,35 @@ export const inviteMember = async (req: AuthRequest, res: Response): Promise<voi
       return;
     }
 
-    // ── Plan-based member limit check ─────────────────────────────────────
-    const memberCheck = await checkMemberLimit(req.user!.userId, company._id.toString());
-    if (!memberCheck.allowed) {
+    const admission = await withCompanyCapacityLock(company._id.toString(), async () => {
+      const lockedCompany = await Company.findById(company._id);
+      if (!lockedCompany) throw new Error('Company not found while reserving capacity.');
+      const memberCheck = await checkMemberLimit(req.user!.userId, company._id.toString(), { role: assignedRole });
+      if (!memberCheck.allowed) return { allowed: false as const, memberCheck };
+
+      const inviter = await User.findById(req.user!.userId);
+      const token = uuidv4();
+      lockedCompany.pendingInvites.push({
+        email: email.trim().toLowerCase(),
+        token,
+        expiresAt: new Date(Date.now() + 7 * 86400000),
+        role: assignedRole,
+        inviterId: new mongoose.Types.ObjectId(req.user!.userId),
+      });
+      await lockedCompany.save();
+      return { allowed: true as const, token, inviterName: inviter?.fullName || 'Someone' };
+    });
+    if (!admission.allowed) {
       res.status(403).json({
         success:         false,
-        message:         memberCheck.reason,
-        code:            memberCheck.code,
-        requiresUpgrade: memberCheck.upgrade ?? false,
+        message:         admission.memberCheck.reason,
+        code:            admission.memberCheck.code,
+        requiresUpgrade: admission.memberCheck.upgrade ?? false,
       });
       return;
     }
 
-    const inviter = await User.findById(req.user!.userId);
-    const token = uuidv4();
-    company.pendingInvites.push({
-      email: email.trim().toLowerCase(),
-      token,
-      expiresAt: new Date(Date.now() + 7 * 86400000),
-      role: assignedRole,
-      inviterId: new mongoose.Types.ObjectId(req.user!.userId),
-    });
-    await company.save();
-    await sendInviteEmail(email.trim().toLowerCase(), inviter?.fullName || 'Someone', company.name, token);
+    await sendInviteEmail(email.trim().toLowerCase(), admission.inviterName, company.name, admission.token);
     res.json({ success: true, message: 'Invitation sent' });
   } catch (e: any) { res.status(500).json({ success: false, message: e.message }); }
 };
