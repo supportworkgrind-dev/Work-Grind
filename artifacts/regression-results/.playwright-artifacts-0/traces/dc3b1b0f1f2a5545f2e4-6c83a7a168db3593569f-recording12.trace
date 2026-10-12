@@ -1,0 +1,577 @@
+{"version":10,"type":"context-options","origin":"library","browserName":"","playwrightVersion":"1.64.0","options":{},"platform":"win32","wallTime":1791814536531,"monotonicTime":48330.403,"sdkLanguage":"javascript","title":"help-center.spec.ts:117 › every published article has a public route"}
+{"type":"before","callId":"sodu@652","startTime":48336.833,"class":"APIRequestContext","method":"fetch","params":{"url":"http://127.0.0.1:3101/help/getting-started","method":"GET"}}
+{"type":"log","callId":"sodu@652","time":48355.75,"message":"→ GET http://127.0.0.1:3101/help/getting-started"}
+{"type":"log","callId":"sodu@652","time":48355.793,"message":"  user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.8078.4 Safari/537.36"}
+{"type":"log","callId":"sodu@652","time":48355.807,"message":"  accept: */*"}
+{"type":"log","callId":"sodu@652","time":48355.815,"message":"  accept-encoding: gzip,deflate,br"}
+{"type":"log","callId":"sodu@652","time":48607.692,"message":"← 200 OK"}
+{"type":"log","callId":"sodu@652","time":48607.728,"message":"  cache-control: no-cache, must-revalidate"}
+{"type":"log","callId":"sodu@652","time":48607.742,"message":"  x-content-type-options: nosniff"}
+{"type":"log","callId":"sodu@652","time":48607.757,"message":"  x-frame-options: DENY"}
+{"type":"log","callId":"sodu@652","time":48607.765,"message":"  referrer-policy: strict-origin-when-cross-origin"}
+{"type":"log","callId":"sodu@652","time":48607.773,"message":"  permissions-policy: camera=(self), microphone=(self), display-capture=(self), geolocation=()"}
+{"type":"log","callId":"sodu@652","time":48607.785,"message":"  strict-transport-security: max-age=31536000; includeSubDomains; preload"}
+{"type":"log","callId":"sodu@652","time":48607.793,"message":"  vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding"}
+{"type":"log","callId":"sodu@652","time":48607.805,"message":"  link: </_next/static/media/fba5a26ea33df6a3-s.p.18rizl4rsrl42.woff2>; rel=preload; as=\"font\"; crossorigin=\"\"; type=\"font/woff2\", </_next/static/chunks/%5Broot-of-the-server%5D__0fi_bsf._.css>; rel=preload; as=\"style\""}
+{"type":"log","callId":"sodu@652","time":48607.814,"message":"  x-nextjs-cache: HIT"}
+{"type":"log","callId":"sodu@652","time":48607.826,"message":"  x-nextjs-prerender: 1"}
+{"type":"log","callId":"sodu@652","time":48607.845,"message":"  x-powered-by: Next.js"}
+{"type":"log","callId":"sodu@652","time":48607.855,"message":"  content-type: text/html; charset=utf-8"}
+{"type":"log","callId":"sodu@652","time":48607.867,"message":"  content-encoding: gzip"}
+{"type":"log","callId":"sodu@652","time":48607.876,"message":"  date: Mon, 12 Oct 2026 14:15:36 GMT"}
+{"type":"log","callId":"sodu@652","time":48607.888,"message":"  connection: keep-alive"}
+{"type":"log","callId":"sodu@652","time":48607.897,"message":"  keep-alive: timeout=5"}
+{"type":"log","callId":"sodu@652","time":48607.908,"message":"  transfer-encoding: chunked"}
+{"type":"after","callId":"sodu@652","endTime":48624.989,"result":{"response":{"url":"http://127.0.0.1:3101/help/getting-started","status":200,"statusText":"OK","headers":[{"name":"Cache-Control","value":"no-cache, must-revalidate"},{"name":"X-Content-Type-Options","value":"nosniff"},{"name":"X-Frame-Options","value":"DENY"},{"name":"Referrer-Policy","value":"strict-origin-when-cross-origin"},{"name":"Permissions-Policy","value":"camera=(self), microphone=(self), display-capture=(self), geolocation=()"},{"name":"Strict-Transport-Security","value":"max-age=31536000; includeSubDomains; preload"},{"name":"Vary","value":"rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding"},{"name":"Link","value":"</_next/static/media/fba5a26ea33df6a3-s.p.18rizl4rsrl42.woff2>; rel=preload; as=\"font\"; crossorigin=\"\"; type=\"font/woff2\", </_next/static/chunks/%5Broot-of-the-server%5D__0fi_bsf._.css>; rel=preload; as=\"style\""},{"name":"x-nextjs-cache","value":"HIT"},{"name":"x-nextjs-prerender","value":"1"},{"name":"X-Powered-By","value":"Next.js"},{"name":"Content-Type","value":"text/html; charset=utf-8"},{"name":"Content-Encoding","value":"gzip"},{"name":"Date","value":"Mon, 12 Oct 2026 14:15:36 GMT"},{"name":"Connection","value":"keep-alive"},{"name":"Keep-Alive","value":"timeout=5"},{"name":"Transfer-Encoding","value":"chunked"}],"serverAddr":{"ipAddress":"127.0.0.1","port":3101},"timing":{"startTime":1791814536542,"domainLookupStart":-1,"domainLookupEnd":-1,"connectStart":0,"secureConnectionStart":-1,"connectEnd":18.45900000000256,"requestStart":18.45900000000256,"responseStart":256.1730000000025},"responseEndTiming":281.2079999999987,"fetchUid":"58fc4272dc97b40bf330fea04bdc9d64"}}}
+{"type":"before","callId":"sodu@655","startTime":48628.357,"class":"APIRequestContext","method":"fetch","params":{"url":"http://127.0.0.1:3101/help/login-and-password-recovery","method":"GET"}}
+{"type":"log","callId":"sodu@655","time":48629.669,"message":"→ GET http://127.0.0.1:3101/help/login-and-password-recovery"}
+{"type":"log","callId":"sodu@655","time":48629.708,"message":"  user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.8078.4 Safari/537.36"}
+{"type":"log","callId":"sodu@655","time":48629.714,"message":"  accept: */*"}
+{"type":"log","callId":"sodu@655","time":48629.718,"message":"  accept-encoding: gzip,deflate,br"}
+{"type":"log","callId":"sodu@655","time":48842.748,"message":"← 200 OK"}
+{"type":"log","callId":"sodu@655","time":48842.784,"message":"  cache-control: no-cache, must-revalidate"}
+{"type":"log","callId":"sodu@655","time":48842.795,"message":"  x-content-type-options: nosniff"}
+{"type":"log","callId":"sodu@655","time":48842.805,"message":"  x-frame-options: DENY"}
+{"type":"log","callId":"sodu@655","time":48842.809,"message":"  referrer-policy: strict-origin-when-cross-origin"}
+{"type":"log","callId":"sodu@655","time":48842.818,"message":"  permissions-policy: camera=(self), microphone=(self), display-capture=(self), geolocation=()"}
+{"type":"log","callId":"sodu@655","time":48842.835,"message":"  strict-transport-security: max-age=31536000; includeSubDomains; preload"}
+{"type":"log","callId":"sodu@655","time":48842.848,"message":"  vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding"}
+{"type":"log","callId":"sodu@655","time":48842.852,"message":"  link: </_next/static/media/fba5a26ea33df6a3-s.p.18rizl4rsrl42.woff2>; rel=preload; as=\"font\"; crossorigin=\"\"; type=\"font/woff2\", </_next/static/chunks/%5Broot-of-the-server%5D__0fi_bsf._.css>; rel=preload; as=\"style\""}
+{"type":"log","callId":"sodu@655","time":48842.866,"message":"  x-nextjs-cache: HIT"}
+{"type":"log","callId":"sodu@655","time":48842.875,"message":"  x-nextjs-prerender: 1"}
+{"type":"log","callId":"sodu@655","time":48842.886,"message":"  x-powered-by: Next.js"}
+{"type":"log","callId":"sodu@655","time":48842.898,"message":"  content-type: text/html; charset=utf-8"}
+{"type":"log","callId":"sodu@655","time":48842.917,"message":"  content-encoding: gzip"}
+{"type":"log","callId":"sodu@655","time":48842.922,"message":"  date: Mon, 12 Oct 2026 14:15:37 GMT"}
+{"type":"log","callId":"sodu@655","time":48842.929,"message":"  connection: keep-alive"}
+{"type":"log","callId":"sodu@655","time":48842.941,"message":"  keep-alive: timeout=5"}
+{"type":"log","callId":"sodu@655","time":48842.947,"message":"  transfer-encoding: chunked"}
+{"type":"after","callId":"sodu@655","endTime":48846.444,"result":{"response":{"url":"http://127.0.0.1:3101/help/login-and-password-recovery","status":200,"statusText":"OK","headers":[{"name":"Cache-Control","value":"no-cache, must-revalidate"},{"name":"X-Content-Type-Options","value":"nosniff"},{"name":"X-Frame-Options","value":"DENY"},{"name":"Referrer-Policy","value":"strict-origin-when-cross-origin"},{"name":"Permissions-Policy","value":"camera=(self), microphone=(self), display-capture=(self), geolocation=()"},{"name":"Strict-Transport-Security","value":"max-age=31536000; includeSubDomains; preload"},{"name":"Vary","value":"rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding"},{"name":"Link","value":"</_next/static/media/fba5a26ea33df6a3-s.p.18rizl4rsrl42.woff2>; rel=preload; as=\"font\"; crossorigin=\"\"; type=\"font/woff2\", </_next/static/chunks/%5Broot-of-the-server%5D__0fi_bsf._.css>; rel=preload; as=\"style\""},{"name":"x-nextjs-cache","value":"HIT"},{"name":"x-nextjs-prerender","value":"1"},{"name":"X-Powered-By","value":"Next.js"},{"name":"Content-Type","value":"text/html; charset=utf-8"},{"name":"Content-Encoding","value":"gzip"},{"name":"Date","value":"Mon, 12 Oct 2026 14:15:37 GMT"},{"name":"Connection","value":"keep-alive"},{"name":"Keep-Alive","value":"timeout=5"},{"name":"Transfer-Encoding","value":"chunked"}],"serverAddr":{"ipAddress":"127.0.0.1","port":3101},"timing":{"startTime":1791814536829,"domainLookupStart":-1,"domainLookupEnd":-1,"connectStart":-1,"secureConnectionStart":-1,"connectEnd":-1,"requestStart":0.9729999999981374,"responseStart":212.72200000000157},"responseEndTiming":216.82299999999668,"fetchUid":"ab2a8de34bb869413ad201555a3b2e8f"}}}
+{"type":"before","callId":"sodu@658","startTime":48849.222,"class":"APIRequestContext","method":"fetch","params":{"url":"http://127.0.0.1:3101/help/choose-the-right-workspace","method":"GET"}}
+{"type":"log","callId":"sodu@658","time":48849.902,"message":"→ GET http://127.0.0.1:3101/help/choose-the-right-workspace"}
+{"type":"log","callId":"sodu@658","time":48849.919,"message":"  user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.8078.4 Safari/537.36"}
+{"type":"log","callId":"sodu@658","time":48849.924,"message":"  accept: */*"}
+{"type":"log","callId":"sodu@658","time":48849.927,"message":"  accept-encoding: gzip,deflate,br"}
+{"type":"log","callId":"sodu@658","time":49019.15,"message":"← 200 OK"}
+{"type":"log","callId":"sodu@658","time":49019.197,"message":"  cache-control: no-cache, must-revalidate"}
+{"type":"log","callId":"sodu@658","time":49019.212,"message":"  x-content-type-options: nosniff"}
+{"type":"log","callId":"sodu@658","time":49019.221,"message":"  x-frame-options: DENY"}
+{"type":"log","callId":"sodu@658","time":49019.229,"message":"  referrer-policy: strict-origin-when-cross-origin"}
+{"type":"log","callId":"sodu@658","time":49019.236,"message":"  permissions-policy: camera=(self), microphone=(self), display-capture=(self), geolocation=()"}
+{"type":"log","callId":"sodu@658","time":49019.253,"message":"  strict-transport-security: max-age=31536000; includeSubDomains; preload"}
+{"type":"log","callId":"sodu@658","time":49019.266,"message":"  vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding"}
+{"type":"log","callId":"sodu@658","time":49019.273,"message":"  link: </_next/static/media/fba5a26ea33df6a3-s.p.18rizl4rsrl42.woff2>; rel=preload; as=\"font\"; crossorigin=\"\"; type=\"font/woff2\", </_next/static/chunks/%5Broot-of-the-server%5D__0fi_bsf._.css>; rel=preload; as=\"style\""}
+{"type":"log","callId":"sodu@658","time":49019.279,"message":"  x-nextjs-cache: HIT"}
+{"type":"log","callId":"sodu@658","time":49019.287,"message":"  x-nextjs-prerender: 1"}
+{"type":"log","callId":"sodu@658","time":49019.296,"message":"  x-powered-by: Next.js"}
+{"type":"log","callId":"sodu@658","time":49019.303,"message":"  content-type: text/html; charset=utf-8"}
+{"type":"log","callId":"sodu@658","time":49019.312,"message":"  content-encoding: gzip"}
+{"type":"log","callId":"sodu@658","time":49019.318,"message":"  date: Mon, 12 Oct 2026 14:15:37 GMT"}
+{"type":"log","callId":"sodu@658","time":49019.326,"message":"  connection: keep-alive"}
+{"type":"log","callId":"sodu@658","time":49019.332,"message":"  keep-alive: timeout=5"}
+{"type":"log","callId":"sodu@658","time":49019.338,"message":"  transfer-encoding: chunked"}
+{"type":"after","callId":"sodu@658","endTime":49024.765,"result":{"response":{"url":"http://127.0.0.1:3101/help/choose-the-right-workspace","status":200,"statusText":"OK","headers":[{"name":"Cache-Control","value":"no-cache, must-revalidate"},{"name":"X-Content-Type-Options","value":"nosniff"},{"name":"X-Frame-Options","value":"DENY"},{"name":"Referrer-Policy","value":"strict-origin-when-cross-origin"},{"name":"Permissions-Policy","value":"camera=(self), microphone=(self), display-capture=(self), geolocation=()"},{"name":"Strict-Transport-Security","value":"max-age=31536000; includeSubDomains; preload"},{"name":"Vary","value":"rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding"},{"name":"Link","value":"</_next/static/media/fba5a26ea33df6a3-s.p.18rizl4rsrl42.woff2>; rel=preload; as=\"font\"; crossorigin=\"\"; type=\"font/woff2\", </_next/static/chunks/%5Broot-of-the-server%5D__0fi_bsf._.css>; rel=preload; as=\"style\""},{"name":"x-nextjs-cache","value":"HIT"},{"name":"x-nextjs-prerender","value":"1"},{"name":"X-Powered-By","value":"Next.js"},{"name":"Content-Type","value":"text/html; charset=utf-8"},{"name":"Content-Encoding","value":"gzip"},{"name":"Date","value":"Mon, 12 Oct 2026 14:15:37 GMT"},{"name":"Connection","value":"keep-alive"},{"name":"Keep-Alive","value":"timeout=5"},{"name":"Transfer-Encoding","value":"chunked"}],"serverAddr":{"ipAddress":"127.0.0.1","port":3101},"timing":{"startTime":1791814537050,"domainLookupStart":-1,"domainLookupEnd":-1,"connectStart":-1,"secureConnectionStart":-1,"connectEnd":-1,"requestStart":0.45900000000256114,"responseStart":167.86500000000524},"responseEndTiming":174.26200000000244,"fetchUid":"3924ffd28a70d6d8c79ef8288e7e2266"}}}
+{"type":"before","callId":"sodu@661","startTime":49027.733,"class":"APIRequestContext","method":"fetch","params":{"url":"http://127.0.0.1:3101/help/solo-workspace-setup","method":"GET"}}
+{"type":"log","callId":"sodu@661","time":49028.34,"message":"→ GET http://127.0.0.1:3101/help/solo-workspace-setup"}
+{"type":"log","callId":"sodu@661","time":49028.356,"message":"  user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.8078.4 Safari/537.36"}
+{"type":"log","callId":"sodu@661","time":49028.363,"message":"  accept: */*"}
+{"type":"log","callId":"sodu@661","time":49028.367,"message":"  accept-encoding: gzip,deflate,br"}
+{"type":"log","callId":"sodu@661","time":49202.029,"message":"← 200 OK"}
+{"type":"log","callId":"sodu@661","time":49202.181,"message":"  cache-control: no-cache, must-revalidate"}
+{"type":"log","callId":"sodu@661","time":49202.228,"message":"  x-content-type-options: nosniff"}
+{"type":"log","callId":"sodu@661","time":49202.268,"message":"  x-frame-options: DENY"}
+{"type":"log","callId":"sodu@661","time":49202.335,"message":"  referrer-policy: strict-origin-when-cross-origin"}
+{"type":"log","callId":"sodu@661","time":49202.348,"message":"  permissions-policy: camera=(self), microphone=(self), display-capture=(self), geolocation=()"}
+{"type":"log","callId":"sodu@661","time":49202.359,"message":"  strict-transport-security: max-age=31536000; includeSubDomains; preload"}
+{"type":"log","callId":"sodu@661","time":49202.373,"message":"  vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding"}
+{"type":"log","callId":"sodu@661","time":49202.419,"message":"  link: </_next/static/media/fba5a26ea33df6a3-s.p.18rizl4rsrl42.woff2>; rel=preload; as=\"font\"; crossorigin=\"\"; type=\"font/woff2\", </_next/static/chunks/%5Broot-of-the-server%5D__0fi_bsf._.css>; rel=preload; as=\"style\""}
+{"type":"log","callId":"sodu@661","time":49202.437,"message":"  x-nextjs-cache: HIT"}
+{"type":"log","callId":"sodu@661","time":49202.455,"message":"  x-nextjs-prerender: 1"}
+{"type":"log","callId":"sodu@661","time":49202.474,"message":"  x-powered-by: Next.js"}
+{"type":"log","callId":"sodu@661","time":49202.494,"message":"  content-type: text/html; charset=utf-8"}
+{"type":"log","callId":"sodu@661","time":49202.513,"message":"  content-encoding: gzip"}
+{"type":"log","callId":"sodu@661","time":49202.532,"message":"  date: Mon, 12 Oct 2026 14:15:37 GMT"}
+{"type":"log","callId":"sodu@661","time":49202.55,"message":"  connection: keep-alive"}
+{"type":"log","callId":"sodu@661","time":49202.568,"message":"  keep-alive: timeout=5"}
+{"type":"log","callId":"sodu@661","time":49202.589,"message":"  transfer-encoding: chunked"}
+{"type":"after","callId":"sodu@661","endTime":49208.996,"result":{"response":{"url":"http://127.0.0.1:3101/help/solo-workspace-setup","status":200,"statusText":"OK","headers":[{"name":"Cache-Control","value":"no-cache, must-revalidate"},{"name":"X-Content-Type-Options","value":"nosniff"},{"name":"X-Frame-Options","value":"DENY"},{"name":"Referrer-Policy","value":"strict-origin-when-cross-origin"},{"name":"Permissions-Policy","value":"camera=(self), microphone=(self), display-capture=(self), geolocation=()"},{"name":"Strict-Transport-Security","value":"max-age=31536000; includeSubDomains; preload"},{"name":"Vary","value":"rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding"},{"name":"Link","value":"</_next/static/media/fba5a26ea33df6a3-s.p.18rizl4rsrl42.woff2>; rel=preload; as=\"font\"; crossorigin=\"\"; type=\"font/woff2\", </_next/static/chunks/%5Broot-of-the-server%5D__0fi_bsf._.css>; rel=preload; as=\"style\""},{"name":"x-nextjs-cache","value":"HIT"},{"name":"x-nextjs-prerender","value":"1"},{"name":"X-Powered-By","value":"Next.js"},{"name":"Content-Type","value":"text/html; charset=utf-8"},{"name":"Content-Encoding","value":"gzip"},{"name":"Date","value":"Mon, 12 Oct 2026 14:15:37 GMT"},{"name":"Connection","value":"keep-alive"},{"name":"Keep-Alive","value":"timeout=5"},{"name":"Transfer-Encoding","value":"chunked"}],"serverAddr":{"ipAddress":"127.0.0.1","port":3101},"timing":{"startTime":1791814537228,"domainLookupStart":-1,"domainLookupEnd":-1,"connectStart":-1,"secureConnectionStart":-1,"connectEnd":-1,"requestStart":0.42000000000552973,"responseStart":172.59100000000035},"responseEndTiming":179.88300000000163,"fetchUid":"ca9fd3461d2db65839b67900bd12c738"}}}
+{"type":"before","callId":"sodu@664","startTime":49213.157,"class":"APIRequestContext","method":"fetch","params":{"url":"http://127.0.0.1:3101/help/company-workspace-setup","method":"GET"}}
+{"type":"log","callId":"sodu@664","time":49213.979,"message":"→ GET http://127.0.0.1:3101/help/company-workspace-setup"}
+{"type":"log","callId":"sodu@664","time":49214.008,"message":"  user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.8078.4 Safari/537.36"}
+{"type":"log","callId":"sodu@664","time":49214.015,"message":"  accept: */*"}
+{"type":"log","callId":"sodu@664","time":49214.021,"message":"  accept-encoding: gzip,deflate,br"}
+{"type":"log","callId":"sodu@664","time":49408.479,"message":"← 200 OK"}
+{"type":"log","callId":"sodu@664","time":49408.525,"message":"  cache-control: no-cache, must-revalidate"}
+{"type":"log","callId":"sodu@664","time":49408.542,"message":"  x-content-type-options: nosniff"}
+{"type":"log","callId":"sodu@664","time":49408.552,"message":"  x-frame-options: DENY"}
+{"type":"log","callId":"sodu@664","time":49408.561,"message":"  referrer-policy: strict-origin-when-cross-origin"}
+{"type":"log","callId":"sodu@664","time":49408.569,"message":"  permissions-policy: camera=(self), microphone=(self), display-capture=(self), geolocation=()"}
+{"type":"log","callId":"sodu@664","time":49408.576,"message":"  strict-transport-security: max-age=31536000; includeSubDomains; preload"}
+{"type":"log","callId":"sodu@664","time":49408.583,"message":"  vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding"}
+{"type":"log","callId":"sodu@664","time":49408.59,"message":"  link: </_next/static/media/fba5a26ea33df6a3-s.p.18rizl4rsrl42.woff2>; rel=preload; as=\"font\"; crossorigin=\"\"; type=\"font/woff2\", </_next/static/chunks/%5Broot-of-the-server%5D__0fi_bsf._.css>; rel=preload; as=\"style\""}
+{"type":"log","callId":"sodu@664","time":49408.599,"message":"  x-nextjs-cache: HIT"}
+{"type":"log","callId":"sodu@664","time":49408.612,"message":"  x-nextjs-prerender: 1"}
+{"type":"log","callId":"sodu@664","time":49408.62,"message":"  x-powered-by: Next.js"}
+{"type":"log","callId":"sodu@664","time":49408.627,"message":"  content-type: text/html; charset=utf-8"}
+{"type":"log","callId":"sodu@664","time":49408.635,"message":"  content-encoding: gzip"}
+{"type":"log","callId":"sodu@664","time":49408.643,"message":"  date: Mon, 12 Oct 2026 14:15:37 GMT"}
+{"type":"log","callId":"sodu@664","time":49408.651,"message":"  connection: keep-alive"}
+{"type":"log","callId":"sodu@664","time":49408.706,"message":"  keep-alive: timeout=5"}
+{"type":"log","callId":"sodu@664","time":49408.718,"message":"  transfer-encoding: chunked"}
+{"type":"after","callId":"sodu@664","endTime":49413.314,"result":{"response":{"url":"http://127.0.0.1:3101/help/company-workspace-setup","status":200,"statusText":"OK","headers":[{"name":"Cache-Control","value":"no-cache, must-revalidate"},{"name":"X-Content-Type-Options","value":"nosniff"},{"name":"X-Frame-Options","value":"DENY"},{"name":"Referrer-Policy","value":"strict-origin-when-cross-origin"},{"name":"Permissions-Policy","value":"camera=(self), microphone=(self), display-capture=(self), geolocation=()"},{"name":"Strict-Transport-Security","value":"max-age=31536000; includeSubDomains; preload"},{"name":"Vary","value":"rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding"},{"name":"Link","value":"</_next/static/media/fba5a26ea33df6a3-s.p.18rizl4rsrl42.woff2>; rel=preload; as=\"font\"; crossorigin=\"\"; type=\"font/woff2\", </_next/static/chunks/%5Broot-of-the-server%5D__0fi_bsf._.css>; rel=preload; as=\"style\""},{"name":"x-nextjs-cache","value":"HIT"},{"name":"x-nextjs-prerender","value":"1"},{"name":"X-Powered-By","value":"Next.js"},{"name":"Content-Type","value":"text/html; charset=utf-8"},{"name":"Content-Encoding","value":"gzip"},{"name":"Date","value":"Mon, 12 Oct 2026 14:15:37 GMT"},{"name":"Connection","value":"keep-alive"},{"name":"Keep-Alive","value":"timeout=5"},{"name":"Transfer-Encoding","value":"chunked"}],"serverAddr":{"ipAddress":"127.0.0.1","port":3101},"timing":{"startTime":1791814537414,"domainLookupStart":-1,"domainLookupEnd":-1,"connectStart":-1,"secureConnectionStart":-1,"connectEnd":-1,"requestStart":0.5939999999973224,"responseStart":193.82099999999627},"responseEndTiming":198.83899999999994,"fetchUid":"1aaf6bee83e703ec423f7295dc28ab7f"}}}
+{"type":"before","callId":"sodu@667","startTime":49416.898,"class":"APIRequestContext","method":"fetch","params":{"url":"http://127.0.0.1:3101/help/education-workspace-setup","method":"GET"}}
+{"type":"log","callId":"sodu@667","time":49418.01,"message":"→ GET http://127.0.0.1:3101/help/education-workspace-setup"}
+{"type":"log","callId":"sodu@667","time":49418.052,"message":"  user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.8078.4 Safari/537.36"}
+{"type":"log","callId":"sodu@667","time":49418.063,"message":"  accept: */*"}
+{"type":"log","callId":"sodu@667","time":49418.072,"message":"  accept-encoding: gzip,deflate,br"}
+{"type":"log","callId":"sodu@667","time":49663.909,"message":"← 200 OK"}
+{"type":"log","callId":"sodu@667","time":49663.935,"message":"  cache-control: no-cache, must-revalidate"}
+{"type":"log","callId":"sodu@667","time":49663.942,"message":"  x-content-type-options: nosniff"}
+{"type":"log","callId":"sodu@667","time":49663.946,"message":"  x-frame-options: DENY"}
+{"type":"log","callId":"sodu@667","time":49663.956,"message":"  referrer-policy: strict-origin-when-cross-origin"}
+{"type":"log","callId":"sodu@667","time":49663.96,"message":"  permissions-policy: camera=(self), microphone=(self), display-capture=(self), geolocation=()"}
+{"type":"log","callId":"sodu@667","time":49663.964,"message":"  strict-transport-security: max-age=31536000; includeSubDomains; preload"}
+{"type":"log","callId":"sodu@667","time":49663.97,"message":"  vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding"}
+{"type":"log","callId":"sodu@667","time":49663.973,"message":"  link: </_next/static/media/fba5a26ea33df6a3-s.p.18rizl4rsrl42.woff2>; rel=preload; as=\"font\"; crossorigin=\"\"; type=\"font/woff2\", </_next/static/chunks/%5Broot-of-the-server%5D__0fi_bsf._.css>; rel=preload; as=\"style\""}
+{"type":"log","callId":"sodu@667","time":49663.983,"message":"  x-nextjs-cache: HIT"}
+{"type":"log","callId":"sodu@667","time":49663.987,"message":"  x-nextjs-prerender: 1"}
+{"type":"log","callId":"sodu@667","time":49663.99,"message":"  x-powered-by: Next.js"}
+{"type":"log","callId":"sodu@667","time":49664.04,"message":"  content-type: text/html; charset=utf-8"}
+{"type":"log","callId":"sodu@667","time":49664.044,"message":"  content-encoding: gzip"}
+{"type":"log","callId":"sodu@667","time":49664.048,"message":"  date: Mon, 12 Oct 2026 14:15:37 GMT"}
+{"type":"log","callId":"sodu@667","time":49664.052,"message":"  connection: keep-alive"}
+{"type":"log","callId":"sodu@667","time":49664.055,"message":"  keep-alive: timeout=5"}
+{"type":"log","callId":"sodu@667","time":49664.059,"message":"  transfer-encoding: chunked"}
+{"type":"after","callId":"sodu@667","endTime":49667.08,"result":{"response":{"url":"http://127.0.0.1:3101/help/education-workspace-setup","status":200,"statusText":"OK","headers":[{"name":"Cache-Control","value":"no-cache, must-revalidate"},{"name":"X-Content-Type-Options","value":"nosniff"},{"name":"X-Frame-Options","value":"DENY"},{"name":"Referrer-Policy","value":"strict-origin-when-cross-origin"},{"name":"Permissions-Policy","value":"camera=(self), microphone=(self), display-capture=(self), geolocation=()"},{"name":"Strict-Transport-Security","value":"max-age=31536000; includeSubDomains; preload"},{"name":"Vary","value":"rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding"},{"name":"Link","value":"</_next/static/media/fba5a26ea33df6a3-s.p.18rizl4rsrl42.woff2>; rel=preload; as=\"font\"; crossorigin=\"\"; type=\"font/woff2\", </_next/static/chunks/%5Broot-of-the-server%5D__0fi_bsf._.css>; rel=preload; as=\"style\""},{"name":"x-nextjs-cache","value":"HIT"},{"name":"x-nextjs-prerender","value":"1"},{"name":"X-Powered-By","value":"Next.js"},{"name":"Content-Type","value":"text/html; charset=utf-8"},{"name":"Content-Encoding","value":"gzip"},{"name":"Date","value":"Mon, 12 Oct 2026 14:15:37 GMT"},{"name":"Connection","value":"keep-alive"},{"name":"Keep-Alive","value":"timeout=5"},{"name":"Transfer-Encoding","value":"chunked"}],"serverAddr":{"ipAddress":"127.0.0.1","port":3101},"timing":{"startTime":1791814537618,"domainLookupStart":-1,"domainLookupEnd":-1,"connectStart":-1,"secureConnectionStart":-1,"connectEnd":-1,"requestStart":0.8250000000043656,"responseStart":246.05400000000373},"responseEndTiming":249.07800000000134,"fetchUid":"d311faa0b899126d3ea1e7d0116bd559"}}}
+{"type":"before","callId":"sodu@670","startTime":49672.921,"class":"APIRequestContext","method":"fetch","params":{"url":"http://127.0.0.1:3101/help/roles-invitations-and-members","method":"GET"}}
+{"type":"log","callId":"sodu@670","time":49674.849,"message":"→ GET http://127.0.0.1:3101/help/roles-invitations-and-members"}
+{"type":"log","callId":"sodu@670","time":49674.902,"message":"  user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.8078.4 Safari/537.36"}
+{"type":"log","callId":"sodu@670","time":49674.912,"message":"  accept: */*"}
+{"type":"log","callId":"sodu@670","time":49674.921,"message":"  accept-encoding: gzip,deflate,br"}
+{"type":"log","callId":"sodu@670","time":49848.58,"message":"← 200 OK"}
+{"type":"log","callId":"sodu@670","time":49848.6,"message":"  cache-control: no-cache, must-revalidate"}
+{"type":"log","callId":"sodu@670","time":49848.605,"message":"  x-content-type-options: nosniff"}
+{"type":"log","callId":"sodu@670","time":49848.609,"message":"  x-frame-options: DENY"}
+{"type":"log","callId":"sodu@670","time":49848.612,"message":"  referrer-policy: strict-origin-when-cross-origin"}
+{"type":"log","callId":"sodu@670","time":49848.616,"message":"  permissions-policy: camera=(self), microphone=(self), display-capture=(self), geolocation=()"}
+{"type":"log","callId":"sodu@670","time":49848.621,"message":"  strict-transport-security: max-age=31536000; includeSubDomains; preload"}
+{"type":"log","callId":"sodu@670","time":49848.624,"message":"  vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding"}
+{"type":"log","callId":"sodu@670","time":49848.635,"message":"  link: </_next/static/media/fba5a26ea33df6a3-s.p.18rizl4rsrl42.woff2>; rel=preload; as=\"font\"; crossorigin=\"\"; type=\"font/woff2\", </_next/static/chunks/%5Broot-of-the-server%5D__0fi_bsf._.css>; rel=preload; as=\"style\""}
+{"type":"log","callId":"sodu@670","time":49848.639,"message":"  x-nextjs-cache: HIT"}
+{"type":"log","callId":"sodu@670","time":49848.648,"message":"  x-nextjs-prerender: 1"}
+{"type":"log","callId":"sodu@670","time":49848.652,"message":"  x-powered-by: Next.js"}
+{"type":"log","callId":"sodu@670","time":49848.658,"message":"  content-type: text/html; charset=utf-8"}
+{"type":"log","callId":"sodu@670","time":49848.698,"message":"  content-encoding: gzip"}
+{"type":"log","callId":"sodu@670","time":49848.702,"message":"  date: Mon, 12 Oct 2026 14:15:38 GMT"}
+{"type":"log","callId":"sodu@670","time":49848.707,"message":"  connection: keep-alive"}
+{"type":"log","callId":"sodu@670","time":49848.711,"message":"  keep-alive: timeout=5"}
+{"type":"log","callId":"sodu@670","time":49848.716,"message":"  transfer-encoding: chunked"}
+{"type":"after","callId":"sodu@670","endTime":49851.327,"result":{"response":{"url":"http://127.0.0.1:3101/help/roles-invitations-and-members","status":200,"statusText":"OK","headers":[{"name":"Cache-Control","value":"no-cache, must-revalidate"},{"name":"X-Content-Type-Options","value":"nosniff"},{"name":"X-Frame-Options","value":"DENY"},{"name":"Referrer-Policy","value":"strict-origin-when-cross-origin"},{"name":"Permissions-Policy","value":"camera=(self), microphone=(self), display-capture=(self), geolocation=()"},{"name":"Strict-Transport-Security","value":"max-age=31536000; includeSubDomains; preload"},{"name":"Vary","value":"rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding"},{"name":"Link","value":"</_next/static/media/fba5a26ea33df6a3-s.p.18rizl4rsrl42.woff2>; rel=preload; as=\"font\"; crossorigin=\"\"; type=\"font/woff2\", </_next/static/chunks/%5Broot-of-the-server%5D__0fi_bsf._.css>; rel=preload; as=\"style\""},{"name":"x-nextjs-cache","value":"HIT"},{"name":"x-nextjs-prerender","value":"1"},{"name":"X-Powered-By","value":"Next.js"},{"name":"Content-Type","value":"text/html; charset=utf-8"},{"name":"Content-Encoding","value":"gzip"},{"name":"Date","value":"Mon, 12 Oct 2026 14:15:38 GMT"},{"name":"Connection","value":"keep-alive"},{"name":"Keep-Alive","value":"timeout=5"},{"name":"Transfer-Encoding","value":"chunked"}],"serverAddr":{"ipAddress":"127.0.0.1","port":3101},"timing":{"startTime":1791814537874,"domainLookupStart":-1,"domainLookupEnd":-1,"connectStart":-1,"secureConnectionStart":-1,"connectEnd":-1,"requestStart":0.885999999998603,"responseStart":174.04499999999825},"responseEndTiming":176.58899999999994,"fetchUid":"94b86730ab77f1965236abc157ec2f63"}}}
+{"type":"before","callId":"sodu@673","startTime":49856.991,"class":"APIRequestContext","method":"fetch","params":{"url":"http://127.0.0.1:3101/help/access-denied","method":"GET"}}
+{"type":"log","callId":"sodu@673","time":49857.753,"message":"→ GET http://127.0.0.1:3101/help/access-denied"}
+{"type":"log","callId":"sodu@673","time":49857.771,"message":"  user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.8078.4 Safari/537.36"}
+{"type":"log","callId":"sodu@673","time":49857.776,"message":"  accept: */*"}
+{"type":"log","callId":"sodu@673","time":49857.779,"message":"  accept-encoding: gzip,deflate,br"}
+{"type":"log","callId":"sodu@673","time":50071.067,"message":"← 200 OK"}
+{"type":"log","callId":"sodu@673","time":50071.115,"message":"  cache-control: no-cache, must-revalidate"}
+{"type":"log","callId":"sodu@673","time":50071.13,"message":"  x-content-type-options: nosniff"}
+{"type":"log","callId":"sodu@673","time":50071.138,"message":"  x-frame-options: DENY"}
+{"type":"log","callId":"sodu@673","time":50071.145,"message":"  referrer-policy: strict-origin-when-cross-origin"}
+{"type":"log","callId":"sodu@673","time":50071.152,"message":"  permissions-policy: camera=(self), microphone=(self), display-capture=(self), geolocation=()"}
+{"type":"log","callId":"sodu@673","time":50071.159,"message":"  strict-transport-security: max-age=31536000; includeSubDomains; preload"}
+{"type":"log","callId":"sodu@673","time":50071.165,"message":"  vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding"}
+{"type":"log","callId":"sodu@673","time":50071.176,"message":"  link: </_next/static/media/fba5a26ea33df6a3-s.p.18rizl4rsrl42.woff2>; rel=preload; as=\"font\"; crossorigin=\"\"; type=\"font/woff2\", </_next/static/chunks/%5Broot-of-the-server%5D__0fi_bsf._.css>; rel=preload; as=\"style\""}
+{"type":"log","callId":"sodu@673","time":50071.183,"message":"  x-nextjs-cache: HIT"}
+{"type":"log","callId":"sodu@673","time":50071.19,"message":"  x-nextjs-prerender: 1"}
+{"type":"log","callId":"sodu@673","time":50071.196,"message":"  x-powered-by: Next.js"}
+{"type":"log","callId":"sodu@673","time":50071.203,"message":"  content-type: text/html; charset=utf-8"}
+{"type":"log","callId":"sodu@673","time":50071.209,"message":"  content-encoding: gzip"}
+{"type":"log","callId":"sodu@673","time":50071.215,"message":"  date: Mon, 12 Oct 2026 14:15:38 GMT"}
+{"type":"log","callId":"sodu@673","time":50071.221,"message":"  connection: keep-alive"}
+{"type":"log","callId":"sodu@673","time":50071.229,"message":"  keep-alive: timeout=5"}
+{"type":"log","callId":"sodu@673","time":50071.236,"message":"  transfer-encoding: chunked"}
+{"type":"after","callId":"sodu@673","endTime":50076.118,"result":{"response":{"url":"http://127.0.0.1:3101/help/access-denied","status":200,"statusText":"OK","headers":[{"name":"Cache-Control","value":"no-cache, must-revalidate"},{"name":"X-Content-Type-Options","value":"nosniff"},{"name":"X-Frame-Options","value":"DENY"},{"name":"Referrer-Policy","value":"strict-origin-when-cross-origin"},{"name":"Permissions-Policy","value":"camera=(self), microphone=(self), display-capture=(self), geolocation=()"},{"name":"Strict-Transport-Security","value":"max-age=31536000; includeSubDomains; preload"},{"name":"Vary","value":"rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding"},{"name":"Link","value":"</_next/static/media/fba5a26ea33df6a3-s.p.18rizl4rsrl42.woff2>; rel=preload; as=\"font\"; crossorigin=\"\"; type=\"font/woff2\", </_next/static/chunks/%5Broot-of-the-server%5D__0fi_bsf._.css>; rel=preload; as=\"style\""},{"name":"x-nextjs-cache","value":"HIT"},{"name":"x-nextjs-prerender","value":"1"},{"name":"X-Powered-By","value":"Next.js"},{"name":"Content-Type","value":"text/html; charset=utf-8"},{"name":"Content-Encoding","value":"gzip"},{"name":"Date","value":"Mon, 12 Oct 2026 14:15:38 GMT"},{"name":"Connection","value":"keep-alive"},{"name":"Keep-Alive","value":"timeout=5"},{"name":"Transfer-Encoding","value":"chunked"}],"serverAddr":{"ipAddress":"127.0.0.1","port":3101},"timing":{"startTime":1791814538058,"domainLookupStart":-1,"domainLookupEnd":-1,"connectStart":-1,"secureConnectionStart":-1,"connectEnd":-1,"requestStart":0.477999999995518,"responseStart":212.57399999999325},"responseEndTiming":217.83299999999872,"fetchUid":"ad8f571003713ae57137a1d54305ff33"}}}
+{"type":"before","callId":"sodu@676","startTime":50080.018,"class":"APIRequestContext","method":"fetch","params":{"url":"http://127.0.0.1:3101/help/tasks-and-projects","method":"GET"}}
+{"type":"log","callId":"sodu@676","time":50081.167,"message":"→ GET http://127.0.0.1:3101/help/tasks-and-projects"}
+{"type":"log","callId":"sodu@676","time":50081.197,"message":"  user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.8078.4 Safari/537.36"}
+{"type":"log","callId":"sodu@676","time":50081.206,"message":"  accept: */*"}
+{"type":"log","callId":"sodu@676","time":50081.212,"message":"  accept-encoding: gzip,deflate,br"}
+{"type":"log","callId":"sodu@676","time":50266.166,"message":"← 200 OK"}
+{"type":"log","callId":"sodu@676","time":50266.197,"message":"  cache-control: no-cache, must-revalidate"}
+{"type":"log","callId":"sodu@676","time":50266.203,"message":"  x-content-type-options: nosniff"}
+{"type":"log","callId":"sodu@676","time":50266.207,"message":"  x-frame-options: DENY"}
+{"type":"log","callId":"sodu@676","time":50266.21,"message":"  referrer-policy: strict-origin-when-cross-origin"}
+{"type":"log","callId":"sodu@676","time":50266.213,"message":"  permissions-policy: camera=(self), microphone=(self), display-capture=(self), geolocation=()"}
+{"type":"log","callId":"sodu@676","time":50266.216,"message":"  strict-transport-security: max-age=31536000; includeSubDomains; preload"}
+{"type":"log","callId":"sodu@676","time":50266.219,"message":"  vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding"}
+{"type":"log","callId":"sodu@676","time":50266.222,"message":"  link: </_next/static/media/fba5a26ea33df6a3-s.p.18rizl4rsrl42.woff2>; rel=preload; as=\"font\"; crossorigin=\"\"; type=\"font/woff2\", </_next/static/chunks/%5Broot-of-the-server%5D__0fi_bsf._.css>; rel=preload; as=\"style\""}
+{"type":"log","callId":"sodu@676","time":50266.225,"message":"  x-nextjs-cache: HIT"}
+{"type":"log","callId":"sodu@676","time":50266.228,"message":"  x-nextjs-prerender: 1"}
+{"type":"log","callId":"sodu@676","time":50266.231,"message":"  x-powered-by: Next.js"}
+{"type":"log","callId":"sodu@676","time":50266.235,"message":"  content-type: text/html; charset=utf-8"}
+{"type":"log","callId":"sodu@676","time":50266.238,"message":"  content-encoding: gzip"}
+{"type":"log","callId":"sodu@676","time":50266.241,"message":"  date: Mon, 12 Oct 2026 14:15:38 GMT"}
+{"type":"log","callId":"sodu@676","time":50266.245,"message":"  connection: keep-alive"}
+{"type":"log","callId":"sodu@676","time":50266.248,"message":"  keep-alive: timeout=5"}
+{"type":"log","callId":"sodu@676","time":50266.251,"message":"  transfer-encoding: chunked"}
+{"type":"after","callId":"sodu@676","endTime":50270.522,"result":{"response":{"url":"http://127.0.0.1:3101/help/tasks-and-projects","status":200,"statusText":"OK","headers":[{"name":"Cache-Control","value":"no-cache, must-revalidate"},{"name":"X-Content-Type-Options","value":"nosniff"},{"name":"X-Frame-Options","value":"DENY"},{"name":"Referrer-Policy","value":"strict-origin-when-cross-origin"},{"name":"Permissions-Policy","value":"camera=(self), microphone=(self), display-capture=(self), geolocation=()"},{"name":"Strict-Transport-Security","value":"max-age=31536000; includeSubDomains; preload"},{"name":"Vary","value":"rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding"},{"name":"Link","value":"</_next/static/media/fba5a26ea33df6a3-s.p.18rizl4rsrl42.woff2>; rel=preload; as=\"font\"; crossorigin=\"\"; type=\"font/woff2\", </_next/static/chunks/%5Broot-of-the-server%5D__0fi_bsf._.css>; rel=preload; as=\"style\""},{"name":"x-nextjs-cache","value":"HIT"},{"name":"x-nextjs-prerender","value":"1"},{"name":"X-Powered-By","value":"Next.js"},{"name":"Content-Type","value":"text/html; charset=utf-8"},{"name":"Content-Encoding","value":"gzip"},{"name":"Date","value":"Mon, 12 Oct 2026 14:15:38 GMT"},{"name":"Connection","value":"keep-alive"},{"name":"Keep-Alive","value":"timeout=5"},{"name":"Transfer-Encoding","value":"chunked"}],"serverAddr":{"ipAddress":"127.0.0.1","port":3101},"timing":{"startTime":1791814538281,"domainLookupStart":-1,"domainLookupEnd":-1,"connectStart":-1,"secureConnectionStart":-1,"connectEnd":-1,"requestStart":0.838000000003376,"responseStart":185.0699999999997},"responseEndTiming":188.7430000000022,"fetchUid":"96d6a005c67736ebd27830b8aa057ea1"}}}
+{"type":"before","callId":"sodu@679","startTime":50275.13,"class":"APIRequestContext","method":"fetch","params":{"url":"http://127.0.0.1:3101/help/calendar-and-meetings","method":"GET"}}
+{"type":"log","callId":"sodu@679","time":50276.771,"message":"→ GET http://127.0.0.1:3101/help/calendar-and-meetings"}
+{"type":"log","callId":"sodu@679","time":50276.802,"message":"  user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.8078.4 Safari/537.36"}
+{"type":"log","callId":"sodu@679","time":50276.81,"message":"  accept: */*"}
+{"type":"log","callId":"sodu@679","time":50276.816,"message":"  accept-encoding: gzip,deflate,br"}
+{"type":"log","callId":"sodu@679","time":50448.428,"message":"← 200 OK"}
+{"type":"log","callId":"sodu@679","time":50448.465,"message":"  cache-control: no-cache, must-revalidate"}
+{"type":"log","callId":"sodu@679","time":50448.471,"message":"  x-content-type-options: nosniff"}
+{"type":"log","callId":"sodu@679","time":50448.475,"message":"  x-frame-options: DENY"}
+{"type":"log","callId":"sodu@679","time":50448.478,"message":"  referrer-policy: strict-origin-when-cross-origin"}
+{"type":"log","callId":"sodu@679","time":50448.481,"message":"  permissions-policy: camera=(self), microphone=(self), display-capture=(self), geolocation=()"}
+{"type":"log","callId":"sodu@679","time":50448.485,"message":"  strict-transport-security: max-age=31536000; includeSubDomains; preload"}
+{"type":"log","callId":"sodu@679","time":50448.488,"message":"  vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding"}
+{"type":"log","callId":"sodu@679","time":50448.491,"message":"  link: </_next/static/media/fba5a26ea33df6a3-s.p.18rizl4rsrl42.woff2>; rel=preload; as=\"font\"; crossorigin=\"\"; type=\"font/woff2\", </_next/static/chunks/%5Broot-of-the-server%5D__0fi_bsf._.css>; rel=preload; as=\"style\""}
+{"type":"log","callId":"sodu@679","time":50448.495,"message":"  x-nextjs-cache: HIT"}
+{"type":"log","callId":"sodu@679","time":50448.498,"message":"  x-nextjs-prerender: 1"}
+{"type":"log","callId":"sodu@679","time":50448.502,"message":"  x-powered-by: Next.js"}
+{"type":"log","callId":"sodu@679","time":50448.505,"message":"  content-type: text/html; charset=utf-8"}
+{"type":"log","callId":"sodu@679","time":50448.508,"message":"  content-encoding: gzip"}
+{"type":"log","callId":"sodu@679","time":50448.512,"message":"  date: Mon, 12 Oct 2026 14:15:38 GMT"}
+{"type":"log","callId":"sodu@679","time":50448.515,"message":"  connection: keep-alive"}
+{"type":"log","callId":"sodu@679","time":50448.518,"message":"  keep-alive: timeout=5"}
+{"type":"log","callId":"sodu@679","time":50448.521,"message":"  transfer-encoding: chunked"}
+{"type":"after","callId":"sodu@679","endTime":50452.347,"result":{"response":{"url":"http://127.0.0.1:3101/help/calendar-and-meetings","status":200,"statusText":"OK","headers":[{"name":"Cache-Control","value":"no-cache, must-revalidate"},{"name":"X-Content-Type-Options","value":"nosniff"},{"name":"X-Frame-Options","value":"DENY"},{"name":"Referrer-Policy","value":"strict-origin-when-cross-origin"},{"name":"Permissions-Policy","value":"camera=(self), microphone=(self), display-capture=(self), geolocation=()"},{"name":"Strict-Transport-Security","value":"max-age=31536000; includeSubDomains; preload"},{"name":"Vary","value":"rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding"},{"name":"Link","value":"</_next/static/media/fba5a26ea33df6a3-s.p.18rizl4rsrl42.woff2>; rel=preload; as=\"font\"; crossorigin=\"\"; type=\"font/woff2\", </_next/static/chunks/%5Broot-of-the-server%5D__0fi_bsf._.css>; rel=preload; as=\"style\""},{"name":"x-nextjs-cache","value":"HIT"},{"name":"x-nextjs-prerender","value":"1"},{"name":"X-Powered-By","value":"Next.js"},{"name":"Content-Type","value":"text/html; charset=utf-8"},{"name":"Content-Encoding","value":"gzip"},{"name":"Date","value":"Mon, 12 Oct 2026 14:15:38 GMT"},{"name":"Connection","value":"keep-alive"},{"name":"Keep-Alive","value":"timeout=5"},{"name":"Transfer-Encoding","value":"chunked"}],"serverAddr":{"ipAddress":"127.0.0.1","port":3101},"timing":{"startTime":1791814538476,"domainLookupStart":-1,"domainLookupEnd":-1,"connectStart":-1,"secureConnectionStart":-1,"connectEnd":-1,"requestStart":0.8600000000005821,"responseStart":171.88100000000122},"responseEndTiming":175.10900000000402,"fetchUid":"43ed996121fda4f818e402e8e31d4745"}}}
+{"type":"before","callId":"sodu@682","startTime":50457.173,"class":"APIRequestContext","method":"fetch","params":{"url":"http://127.0.0.1:3101/help/crm-and-client-portal","method":"GET"}}
+{"type":"log","callId":"sodu@682","time":50458.025,"message":"→ GET http://127.0.0.1:3101/help/crm-and-client-portal"}
+{"type":"log","callId":"sodu@682","time":50458.061,"message":"  user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.8078.4 Safari/537.36"}
+{"type":"log","callId":"sodu@682","time":50458.068,"message":"  accept: */*"}
+{"type":"log","callId":"sodu@682","time":50458.076,"message":"  accept-encoding: gzip,deflate,br"}
+{"type":"log","callId":"sodu@682","time":50651.881,"message":"← 200 OK"}
+{"type":"log","callId":"sodu@682","time":50651.982,"message":"  cache-control: no-cache, must-revalidate"}
+{"type":"log","callId":"sodu@682","time":50652.016,"message":"  x-content-type-options: nosniff"}
+{"type":"log","callId":"sodu@682","time":50652.029,"message":"  x-frame-options: DENY"}
+{"type":"log","callId":"sodu@682","time":50652.069,"message":"  referrer-policy: strict-origin-when-cross-origin"}
+{"type":"log","callId":"sodu@682","time":50652.09,"message":"  permissions-policy: camera=(self), microphone=(self), display-capture=(self), geolocation=()"}
+{"type":"log","callId":"sodu@682","time":50652.108,"message":"  strict-transport-security: max-age=31536000; includeSubDomains; preload"}
+{"type":"log","callId":"sodu@682","time":50652.12,"message":"  vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding"}
+{"type":"log","callId":"sodu@682","time":50652.132,"message":"  link: </_next/static/media/fba5a26ea33df6a3-s.p.18rizl4rsrl42.woff2>; rel=preload; as=\"font\"; crossorigin=\"\"; type=\"font/woff2\", </_next/static/chunks/%5Broot-of-the-server%5D__0fi_bsf._.css>; rel=preload; as=\"style\""}
+{"type":"log","callId":"sodu@682","time":50652.146,"message":"  x-nextjs-cache: HIT"}
+{"type":"log","callId":"sodu@682","time":50652.157,"message":"  x-nextjs-prerender: 1"}
+{"type":"log","callId":"sodu@682","time":50652.175,"message":"  x-powered-by: Next.js"}
+{"type":"log","callId":"sodu@682","time":50652.182,"message":"  content-type: text/html; charset=utf-8"}
+{"type":"log","callId":"sodu@682","time":50652.189,"message":"  content-encoding: gzip"}
+{"type":"log","callId":"sodu@682","time":50652.55,"message":"  date: Mon, 12 Oct 2026 14:15:38 GMT"}
+{"type":"log","callId":"sodu@682","time":50652.581,"message":"  connection: keep-alive"}
+{"type":"log","callId":"sodu@682","time":50652.597,"message":"  keep-alive: timeout=5"}
+{"type":"log","callId":"sodu@682","time":50652.606,"message":"  transfer-encoding: chunked"}
+{"type":"after","callId":"sodu@682","endTime":50658.183,"result":{"response":{"url":"http://127.0.0.1:3101/help/crm-and-client-portal","status":200,"statusText":"OK","headers":[{"name":"Cache-Control","value":"no-cache, must-revalidate"},{"name":"X-Content-Type-Options","value":"nosniff"},{"name":"X-Frame-Options","value":"DENY"},{"name":"Referrer-Policy","value":"strict-origin-when-cross-origin"},{"name":"Permissions-Policy","value":"camera=(self), microphone=(self), display-capture=(self), geolocation=()"},{"name":"Strict-Transport-Security","value":"max-age=31536000; includeSubDomains; preload"},{"name":"Vary","value":"rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding"},{"name":"Link","value":"</_next/static/media/fba5a26ea33df6a3-s.p.18rizl4rsrl42.woff2>; rel=preload; as=\"font\"; crossorigin=\"\"; type=\"font/woff2\", </_next/static/chunks/%5Broot-of-the-server%5D__0fi_bsf._.css>; rel=preload; as=\"style\""},{"name":"x-nextjs-cache","value":"HIT"},{"name":"x-nextjs-prerender","value":"1"},{"name":"X-Powered-By","value":"Next.js"},{"name":"Content-Type","value":"text/html; charset=utf-8"},{"name":"Content-Encoding","value":"gzip"},{"name":"Date","value":"Mon, 12 Oct 2026 14:15:38 GMT"},{"name":"Connection","value":"keep-alive"},{"name":"Keep-Alive","value":"timeout=5"},{"name":"Transfer-Encoding","value":"chunked"}],"serverAddr":{"ipAddress":"127.0.0.1","port":3101},"timing":{"startTime":1791814538658,"domainLookupStart":-1,"domainLookupEnd":-1,"connectStart":-1,"secureConnectionStart":-1,"connectEnd":-1,"requestStart":0.7330000000001746,"responseStart":193.56900000000314},"responseEndTiming":199.57800000000134,"fetchUid":"a752dd80ec02d7b6addcb5a4b43caf00"}}}
+{"type":"before","callId":"sodu@685","startTime":50661.929,"class":"APIRequestContext","method":"fetch","params":{"url":"http://127.0.0.1:3101/help/chat-and-global-calling","method":"GET"}}
+{"type":"log","callId":"sodu@685","time":50662.615,"message":"→ GET http://127.0.0.1:3101/help/chat-and-global-calling"}
+{"type":"log","callId":"sodu@685","time":50662.642,"message":"  user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.8078.4 Safari/537.36"}
+{"type":"log","callId":"sodu@685","time":50662.651,"message":"  accept: */*"}
+{"type":"log","callId":"sodu@685","time":50662.659,"message":"  accept-encoding: gzip,deflate,br"}
+{"type":"log","callId":"sodu@685","time":50935.098,"message":"← 200 OK"}
+{"type":"log","callId":"sodu@685","time":50935.124,"message":"  cache-control: no-cache, must-revalidate"}
+{"type":"log","callId":"sodu@685","time":50935.132,"message":"  x-content-type-options: nosniff"}
+{"type":"log","callId":"sodu@685","time":50935.136,"message":"  x-frame-options: DENY"}
+{"type":"log","callId":"sodu@685","time":50935.141,"message":"  referrer-policy: strict-origin-when-cross-origin"}
+{"type":"log","callId":"sodu@685","time":50935.144,"message":"  permissions-policy: camera=(self), microphone=(self), display-capture=(self), geolocation=()"}
+{"type":"log","callId":"sodu@685","time":50935.148,"message":"  strict-transport-security: max-age=31536000; includeSubDomains; preload"}
+{"type":"log","callId":"sodu@685","time":50935.152,"message":"  vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding"}
+{"type":"log","callId":"sodu@685","time":50935.156,"message":"  link: </_next/static/media/fba5a26ea33df6a3-s.p.18rizl4rsrl42.woff2>; rel=preload; as=\"font\"; crossorigin=\"\"; type=\"font/woff2\", </_next/static/chunks/%5Broot-of-the-server%5D__0fi_bsf._.css>; rel=preload; as=\"style\""}
+{"type":"log","callId":"sodu@685","time":50935.161,"message":"  x-nextjs-cache: HIT"}
+{"type":"log","callId":"sodu@685","time":50935.165,"message":"  x-nextjs-prerender: 1"}
+{"type":"log","callId":"sodu@685","time":50935.168,"message":"  x-powered-by: Next.js"}
+{"type":"log","callId":"sodu@685","time":50935.172,"message":"  content-type: text/html; charset=utf-8"}
+{"type":"log","callId":"sodu@685","time":50935.176,"message":"  content-encoding: gzip"}
+{"type":"log","callId":"sodu@685","time":50935.18,"message":"  date: Mon, 12 Oct 2026 14:15:39 GMT"}
+{"type":"log","callId":"sodu@685","time":50935.184,"message":"  connection: keep-alive"}
+{"type":"log","callId":"sodu@685","time":50935.188,"message":"  keep-alive: timeout=5"}
+{"type":"log","callId":"sodu@685","time":50935.195,"message":"  transfer-encoding: chunked"}
+{"type":"after","callId":"sodu@685","endTime":50942.118,"result":{"response":{"url":"http://127.0.0.1:3101/help/chat-and-global-calling","status":200,"statusText":"OK","headers":[{"name":"Cache-Control","value":"no-cache, must-revalidate"},{"name":"X-Content-Type-Options","value":"nosniff"},{"name":"X-Frame-Options","value":"DENY"},{"name":"Referrer-Policy","value":"strict-origin-when-cross-origin"},{"name":"Permissions-Policy","value":"camera=(self), microphone=(self), display-capture=(self), geolocation=()"},{"name":"Strict-Transport-Security","value":"max-age=31536000; includeSubDomains; preload"},{"name":"Vary","value":"rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding"},{"name":"Link","value":"</_next/static/media/fba5a26ea33df6a3-s.p.18rizl4rsrl42.woff2>; rel=preload; as=\"font\"; crossorigin=\"\"; type=\"font/woff2\", </_next/static/chunks/%5Broot-of-the-server%5D__0fi_bsf._.css>; rel=preload; as=\"style\""},{"name":"x-nextjs-cache","value":"HIT"},{"name":"x-nextjs-prerender","value":"1"},{"name":"X-Powered-By","value":"Next.js"},{"name":"Content-Type","value":"text/html; charset=utf-8"},{"name":"Content-Encoding","value":"gzip"},{"name":"Date","value":"Mon, 12 Oct 2026 14:15:39 GMT"},{"name":"Connection","value":"keep-alive"},{"name":"Keep-Alive","value":"timeout=5"},{"name":"Transfer-Encoding","value":"chunked"}],"serverAddr":{"ipAddress":"127.0.0.1","port":3101},"timing":{"startTime":1791814538862,"domainLookupStart":-1,"domainLookupEnd":-1,"connectStart":-1,"secureConnectionStart":-1,"connectEnd":-1,"requestStart":0.5709999999962747,"responseStart":272.3470000000016},"responseEndTiming":278.38300000000163,"fetchUid":"d65f5aa314cddc6827f2e7e2c92c5691"}}}
+{"type":"before","callId":"sodu@688","startTime":50946.664,"class":"APIRequestContext","method":"fetch","params":{"url":"http://127.0.0.1:3101/help/files-documents-and-sheets","method":"GET"}}
+{"type":"log","callId":"sodu@688","time":50947.469,"message":"→ GET http://127.0.0.1:3101/help/files-documents-and-sheets"}
+{"type":"log","callId":"sodu@688","time":50947.494,"message":"  user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.8078.4 Safari/537.36"}
+{"type":"log","callId":"sodu@688","time":50947.507,"message":"  accept: */*"}
+{"type":"log","callId":"sodu@688","time":50947.516,"message":"  accept-encoding: gzip,deflate,br"}
+{"type":"log","callId":"sodu@688","time":51253.414,"message":"← 200 OK"}
+{"type":"log","callId":"sodu@688","time":51253.468,"message":"  cache-control: no-cache, must-revalidate"}
+{"type":"log","callId":"sodu@688","time":51253.483,"message":"  x-content-type-options: nosniff"}
+{"type":"log","callId":"sodu@688","time":51253.492,"message":"  x-frame-options: DENY"}
+{"type":"log","callId":"sodu@688","time":51253.5,"message":"  referrer-policy: strict-origin-when-cross-origin"}
+{"type":"log","callId":"sodu@688","time":51253.508,"message":"  permissions-policy: camera=(self), microphone=(self), display-capture=(self), geolocation=()"}
+{"type":"log","callId":"sodu@688","time":51253.518,"message":"  strict-transport-security: max-age=31536000; includeSubDomains; preload"}
+{"type":"log","callId":"sodu@688","time":51253.526,"message":"  vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding"}
+{"type":"log","callId":"sodu@688","time":51253.534,"message":"  link: </_next/static/media/fba5a26ea33df6a3-s.p.18rizl4rsrl42.woff2>; rel=preload; as=\"font\"; crossorigin=\"\"; type=\"font/woff2\", </_next/static/chunks/%5Broot-of-the-server%5D__0fi_bsf._.css>; rel=preload; as=\"style\""}
+{"type":"log","callId":"sodu@688","time":51253.55,"message":"  x-nextjs-cache: HIT"}
+{"type":"log","callId":"sodu@688","time":51253.562,"message":"  x-nextjs-prerender: 1"}
+{"type":"log","callId":"sodu@688","time":51253.57,"message":"  x-powered-by: Next.js"}
+{"type":"log","callId":"sodu@688","time":51253.628,"message":"  content-type: text/html; charset=utf-8"}
+{"type":"log","callId":"sodu@688","time":51253.64,"message":"  content-encoding: gzip"}
+{"type":"log","callId":"sodu@688","time":51253.649,"message":"  date: Mon, 12 Oct 2026 14:15:39 GMT"}
+{"type":"log","callId":"sodu@688","time":51253.659,"message":"  connection: keep-alive"}
+{"type":"log","callId":"sodu@688","time":51253.669,"message":"  keep-alive: timeout=5"}
+{"type":"log","callId":"sodu@688","time":51253.677,"message":"  transfer-encoding: chunked"}
+{"type":"after","callId":"sodu@688","endTime":51260.52,"result":{"response":{"url":"http://127.0.0.1:3101/help/files-documents-and-sheets","status":200,"statusText":"OK","headers":[{"name":"Cache-Control","value":"no-cache, must-revalidate"},{"name":"X-Content-Type-Options","value":"nosniff"},{"name":"X-Frame-Options","value":"DENY"},{"name":"Referrer-Policy","value":"strict-origin-when-cross-origin"},{"name":"Permissions-Policy","value":"camera=(self), microphone=(self), display-capture=(self), geolocation=()"},{"name":"Strict-Transport-Security","value":"max-age=31536000; includeSubDomains; preload"},{"name":"Vary","value":"rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding"},{"name":"Link","value":"</_next/static/media/fba5a26ea33df6a3-s.p.18rizl4rsrl42.woff2>; rel=preload; as=\"font\"; crossorigin=\"\"; type=\"font/woff2\", </_next/static/chunks/%5Broot-of-the-server%5D__0fi_bsf._.css>; rel=preload; as=\"style\""},{"name":"x-nextjs-cache","value":"HIT"},{"name":"x-nextjs-prerender","value":"1"},{"name":"X-Powered-By","value":"Next.js"},{"name":"Content-Type","value":"text/html; charset=utf-8"},{"name":"Content-Encoding","value":"gzip"},{"name":"Date","value":"Mon, 12 Oct 2026 14:15:39 GMT"},{"name":"Connection","value":"keep-alive"},{"name":"Keep-Alive","value":"timeout=5"},{"name":"Transfer-Encoding","value":"chunked"}],"serverAddr":{"ipAddress":"127.0.0.1","port":3101},"timing":{"startTime":1791814539147,"domainLookupStart":-1,"domainLookupEnd":-1,"connectStart":-1,"secureConnectionStart":-1,"connectEnd":-1,"requestStart":0.5649999999950523,"responseStart":305.53899999999703},"responseEndTiming":312.75,"fetchUid":"fab87fd4b43cab1ded66d938805daa03"}}}
+{"type":"before","callId":"sodu@691","startTime":51264.706,"class":"APIRequestContext","method":"fetch","params":{"url":"http://127.0.0.1:3101/help/education-people-and-guardians","method":"GET"}}
+{"type":"log","callId":"sodu@691","time":51265.504,"message":"→ GET http://127.0.0.1:3101/help/education-people-and-guardians"}
+{"type":"log","callId":"sodu@691","time":51265.533,"message":"  user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.8078.4 Safari/537.36"}
+{"type":"log","callId":"sodu@691","time":51265.549,"message":"  accept: */*"}
+{"type":"log","callId":"sodu@691","time":51265.557,"message":"  accept-encoding: gzip,deflate,br"}
+{"type":"log","callId":"sodu@691","time":51564.489,"message":"← 200 OK"}
+{"type":"log","callId":"sodu@691","time":51564.511,"message":"  cache-control: no-cache, must-revalidate"}
+{"type":"log","callId":"sodu@691","time":51564.518,"message":"  x-content-type-options: nosniff"}
+{"type":"log","callId":"sodu@691","time":51564.522,"message":"  x-frame-options: DENY"}
+{"type":"log","callId":"sodu@691","time":51564.525,"message":"  referrer-policy: strict-origin-when-cross-origin"}
+{"type":"log","callId":"sodu@691","time":51564.529,"message":"  permissions-policy: camera=(self), microphone=(self), display-capture=(self), geolocation=()"}
+{"type":"log","callId":"sodu@691","time":51564.532,"message":"  strict-transport-security: max-age=31536000; includeSubDomains; preload"}
+{"type":"log","callId":"sodu@691","time":51564.536,"message":"  vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding"}
+{"type":"log","callId":"sodu@691","time":51564.555,"message":"  link: </_next/static/media/fba5a26ea33df6a3-s.p.18rizl4rsrl42.woff2>; rel=preload; as=\"font\"; crossorigin=\"\"; type=\"font/woff2\", </_next/static/chunks/%5Broot-of-the-server%5D__0fi_bsf._.css>; rel=preload; as=\"style\""}
+{"type":"log","callId":"sodu@691","time":51564.559,"message":"  x-nextjs-cache: HIT"}
+{"type":"log","callId":"sodu@691","time":51564.563,"message":"  x-nextjs-prerender: 1"}
+{"type":"log","callId":"sodu@691","time":51564.566,"message":"  x-powered-by: Next.js"}
+{"type":"log","callId":"sodu@691","time":51564.57,"message":"  content-type: text/html; charset=utf-8"}
+{"type":"log","callId":"sodu@691","time":51564.574,"message":"  content-encoding: gzip"}
+{"type":"log","callId":"sodu@691","time":51564.577,"message":"  date: Mon, 12 Oct 2026 14:15:39 GMT"}
+{"type":"log","callId":"sodu@691","time":51564.581,"message":"  connection: keep-alive"}
+{"type":"log","callId":"sodu@691","time":51564.584,"message":"  keep-alive: timeout=5"}
+{"type":"log","callId":"sodu@691","time":51564.588,"message":"  transfer-encoding: chunked"}
+{"type":"after","callId":"sodu@691","endTime":51566.994,"result":{"response":{"url":"http://127.0.0.1:3101/help/education-people-and-guardians","status":200,"statusText":"OK","headers":[{"name":"Cache-Control","value":"no-cache, must-revalidate"},{"name":"X-Content-Type-Options","value":"nosniff"},{"name":"X-Frame-Options","value":"DENY"},{"name":"Referrer-Policy","value":"strict-origin-when-cross-origin"},{"name":"Permissions-Policy","value":"camera=(self), microphone=(self), display-capture=(self), geolocation=()"},{"name":"Strict-Transport-Security","value":"max-age=31536000; includeSubDomains; preload"},{"name":"Vary","value":"rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding"},{"name":"Link","value":"</_next/static/media/fba5a26ea33df6a3-s.p.18rizl4rsrl42.woff2>; rel=preload; as=\"font\"; crossorigin=\"\"; type=\"font/woff2\", </_next/static/chunks/%5Broot-of-the-server%5D__0fi_bsf._.css>; rel=preload; as=\"style\""},{"name":"x-nextjs-cache","value":"HIT"},{"name":"x-nextjs-prerender","value":"1"},{"name":"X-Powered-By","value":"Next.js"},{"name":"Content-Type","value":"text/html; charset=utf-8"},{"name":"Content-Encoding","value":"gzip"},{"name":"Date","value":"Mon, 12 Oct 2026 14:15:39 GMT"},{"name":"Connection","value":"keep-alive"},{"name":"Keep-Alive","value":"timeout=5"},{"name":"Transfer-Encoding","value":"chunked"}],"serverAddr":{"ipAddress":"127.0.0.1","port":3101},"timing":{"startTime":1791814539465,"domainLookupStart":-1,"domainLookupEnd":-1,"connectStart":-1,"secureConnectionStart":-1,"connectEnd":-1,"requestStart":0.5449999999982538,"responseStart":299.012999999999},"responseEndTiming":301.4340000000011,"fetchUid":"39cab2d11e581a5e1f9dfc482abbaa3c"}}}
+{"type":"before","callId":"sodu@694","startTime":51570.628,"class":"APIRequestContext","method":"fetch","params":{"url":"http://127.0.0.1:3101/help/departments-courses-and-classes","method":"GET"}}
+{"type":"log","callId":"sodu@694","time":51571.485,"message":"→ GET http://127.0.0.1:3101/help/departments-courses-and-classes"}
+{"type":"log","callId":"sodu@694","time":51571.512,"message":"  user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.8078.4 Safari/537.36"}
+{"type":"log","callId":"sodu@694","time":51571.521,"message":"  accept: */*"}
+{"type":"log","callId":"sodu@694","time":51571.528,"message":"  accept-encoding: gzip,deflate,br"}
+{"type":"log","callId":"sodu@694","time":51839.391,"message":"← 200 OK"}
+{"type":"log","callId":"sodu@694","time":51839.433,"message":"  cache-control: no-cache, must-revalidate"}
+{"type":"log","callId":"sodu@694","time":51839.446,"message":"  x-content-type-options: nosniff"}
+{"type":"log","callId":"sodu@694","time":51839.454,"message":"  x-frame-options: DENY"}
+{"type":"log","callId":"sodu@694","time":51839.463,"message":"  referrer-policy: strict-origin-when-cross-origin"}
+{"type":"log","callId":"sodu@694","time":51839.496,"message":"  permissions-policy: camera=(self), microphone=(self), display-capture=(self), geolocation=()"}
+{"type":"log","callId":"sodu@694","time":51839.504,"message":"  strict-transport-security: max-age=31536000; includeSubDomains; preload"}
+{"type":"log","callId":"sodu@694","time":51839.512,"message":"  vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding"}
+{"type":"log","callId":"sodu@694","time":51839.518,"message":"  link: </_next/static/media/fba5a26ea33df6a3-s.p.18rizl4rsrl42.woff2>; rel=preload; as=\"font\"; crossorigin=\"\"; type=\"font/woff2\", </_next/static/chunks/%5Broot-of-the-server%5D__0fi_bsf._.css>; rel=preload; as=\"style\""}
+{"type":"log","callId":"sodu@694","time":51839.526,"message":"  x-nextjs-cache: HIT"}
+{"type":"log","callId":"sodu@694","time":51839.538,"message":"  x-nextjs-prerender: 1"}
+{"type":"log","callId":"sodu@694","time":51839.547,"message":"  x-powered-by: Next.js"}
+{"type":"log","callId":"sodu@694","time":51839.554,"message":"  content-type: text/html; charset=utf-8"}
+{"type":"log","callId":"sodu@694","time":51839.563,"message":"  content-encoding: gzip"}
+{"type":"log","callId":"sodu@694","time":51839.57,"message":"  date: Mon, 12 Oct 2026 14:15:40 GMT"}
+{"type":"log","callId":"sodu@694","time":51839.577,"message":"  connection: keep-alive"}
+{"type":"log","callId":"sodu@694","time":51839.584,"message":"  keep-alive: timeout=5"}
+{"type":"log","callId":"sodu@694","time":51839.591,"message":"  transfer-encoding: chunked"}
+{"type":"after","callId":"sodu@694","endTime":51846.053,"result":{"response":{"url":"http://127.0.0.1:3101/help/departments-courses-and-classes","status":200,"statusText":"OK","headers":[{"name":"Cache-Control","value":"no-cache, must-revalidate"},{"name":"X-Content-Type-Options","value":"nosniff"},{"name":"X-Frame-Options","value":"DENY"},{"name":"Referrer-Policy","value":"strict-origin-when-cross-origin"},{"name":"Permissions-Policy","value":"camera=(self), microphone=(self), display-capture=(self), geolocation=()"},{"name":"Strict-Transport-Security","value":"max-age=31536000; includeSubDomains; preload"},{"name":"Vary","value":"rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding"},{"name":"Link","value":"</_next/static/media/fba5a26ea33df6a3-s.p.18rizl4rsrl42.woff2>; rel=preload; as=\"font\"; crossorigin=\"\"; type=\"font/woff2\", </_next/static/chunks/%5Broot-of-the-server%5D__0fi_bsf._.css>; rel=preload; as=\"style\""},{"name":"x-nextjs-cache","value":"HIT"},{"name":"x-nextjs-prerender","value":"1"},{"name":"X-Powered-By","value":"Next.js"},{"name":"Content-Type","value":"text/html; charset=utf-8"},{"name":"Content-Encoding","value":"gzip"},{"name":"Date","value":"Mon, 12 Oct 2026 14:15:40 GMT"},{"name":"Connection","value":"keep-alive"},{"name":"Keep-Alive","value":"timeout=5"},{"name":"Transfer-Encoding","value":"chunked"}],"serverAddr":{"ipAddress":"127.0.0.1","port":3101},"timing":{"startTime":1791814539771,"domainLookupStart":-1,"domainLookupEnd":-1,"connectStart":-1,"secureConnectionStart":-1,"connectEnd":-1,"requestStart":0.5499999999956344,"responseStart":267.44199999999546},"responseEndTiming":274.2369999999937,"fetchUid":"02c3c3390d8eae6602644a692f2bdb89"}}}
+{"type":"before","callId":"sodu@697","startTime":51850.225,"class":"APIRequestContext","method":"fetch","params":{"url":"http://127.0.0.1:3101/help/timetables-assignments-and-attendance","method":"GET"}}
+{"type":"log","callId":"sodu@697","time":51850.978,"message":"→ GET http://127.0.0.1:3101/help/timetables-assignments-and-attendance"}
+{"type":"log","callId":"sodu@697","time":51851.002,"message":"  user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.8078.4 Safari/537.36"}
+{"type":"log","callId":"sodu@697","time":51851.011,"message":"  accept: */*"}
+{"type":"log","callId":"sodu@697","time":51851.018,"message":"  accept-encoding: gzip,deflate,br"}
+{"type":"log","callId":"sodu@697","time":52053.651,"message":"← 200 OK"}
+{"type":"log","callId":"sodu@697","time":52053.708,"message":"  cache-control: no-cache, must-revalidate"}
+{"type":"log","callId":"sodu@697","time":52053.746,"message":"  x-content-type-options: nosniff"}
+{"type":"log","callId":"sodu@697","time":52053.767,"message":"  x-frame-options: DENY"}
+{"type":"log","callId":"sodu@697","time":52053.78,"message":"  referrer-policy: strict-origin-when-cross-origin"}
+{"type":"log","callId":"sodu@697","time":52053.796,"message":"  permissions-policy: camera=(self), microphone=(self), display-capture=(self), geolocation=()"}
+{"type":"log","callId":"sodu@697","time":52053.806,"message":"  strict-transport-security: max-age=31536000; includeSubDomains; preload"}
+{"type":"log","callId":"sodu@697","time":52053.814,"message":"  vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding"}
+{"type":"log","callId":"sodu@697","time":52053.826,"message":"  link: </_next/static/media/fba5a26ea33df6a3-s.p.18rizl4rsrl42.woff2>; rel=preload; as=\"font\"; crossorigin=\"\"; type=\"font/woff2\", </_next/static/chunks/%5Broot-of-the-server%5D__0fi_bsf._.css>; rel=preload; as=\"style\""}
+{"type":"log","callId":"sodu@697","time":52053.836,"message":"  x-nextjs-cache: HIT"}
+{"type":"log","callId":"sodu@697","time":52053.849,"message":"  x-nextjs-prerender: 1"}
+{"type":"log","callId":"sodu@697","time":52053.858,"message":"  x-powered-by: Next.js"}
+{"type":"log","callId":"sodu@697","time":52053.87,"message":"  content-type: text/html; charset=utf-8"}
+{"type":"log","callId":"sodu@697","time":52053.881,"message":"  content-encoding: gzip"}
+{"type":"log","callId":"sodu@697","time":52053.889,"message":"  date: Mon, 12 Oct 2026 14:15:40 GMT"}
+{"type":"log","callId":"sodu@697","time":52053.903,"message":"  connection: keep-alive"}
+{"type":"log","callId":"sodu@697","time":52053.91,"message":"  keep-alive: timeout=5"}
+{"type":"log","callId":"sodu@697","time":52053.923,"message":"  transfer-encoding: chunked"}
+{"type":"after","callId":"sodu@697","endTime":52058.121,"result":{"response":{"url":"http://127.0.0.1:3101/help/timetables-assignments-and-attendance","status":200,"statusText":"OK","headers":[{"name":"Cache-Control","value":"no-cache, must-revalidate"},{"name":"X-Content-Type-Options","value":"nosniff"},{"name":"X-Frame-Options","value":"DENY"},{"name":"Referrer-Policy","value":"strict-origin-when-cross-origin"},{"name":"Permissions-Policy","value":"camera=(self), microphone=(self), display-capture=(self), geolocation=()"},{"name":"Strict-Transport-Security","value":"max-age=31536000; includeSubDomains; preload"},{"name":"Vary","value":"rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding"},{"name":"Link","value":"</_next/static/media/fba5a26ea33df6a3-s.p.18rizl4rsrl42.woff2>; rel=preload; as=\"font\"; crossorigin=\"\"; type=\"font/woff2\", </_next/static/chunks/%5Broot-of-the-server%5D__0fi_bsf._.css>; rel=preload; as=\"style\""},{"name":"x-nextjs-cache","value":"HIT"},{"name":"x-nextjs-prerender","value":"1"},{"name":"X-Powered-By","value":"Next.js"},{"name":"Content-Type","value":"text/html; charset=utf-8"},{"name":"Content-Encoding","value":"gzip"},{"name":"Date","value":"Mon, 12 Oct 2026 14:15:40 GMT"},{"name":"Connection","value":"keep-alive"},{"name":"Keep-Alive","value":"timeout=5"},{"name":"Transfer-Encoding","value":"chunked"}],"serverAddr":{"ipAddress":"127.0.0.1","port":3101},"timing":{"startTime":1791814540051,"domainLookupStart":-1,"domainLookupEnd":-1,"connectStart":-1,"secureConnectionStart":-1,"connectEnd":-1,"requestStart":0.5169999999998254,"responseStart":201.86500000000524},"responseEndTiming":206.7390000000014,"fetchUid":"9871591fe30b17cb59be2d10d58b1570"}}}
+{"type":"before","callId":"sodu@700","startTime":52062.046,"class":"APIRequestContext","method":"fetch","params":{"url":"http://127.0.0.1:3101/help/exams-results-and-fees","method":"GET"}}
+{"type":"log","callId":"sodu@700","time":52062.632,"message":"→ GET http://127.0.0.1:3101/help/exams-results-and-fees"}
+{"type":"log","callId":"sodu@700","time":52062.65,"message":"  user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.8078.4 Safari/537.36"}
+{"type":"log","callId":"sodu@700","time":52062.656,"message":"  accept: */*"}
+{"type":"log","callId":"sodu@700","time":52062.662,"message":"  accept-encoding: gzip,deflate,br"}
+{"type":"log","callId":"sodu@700","time":52289.922,"message":"← 200 OK"}
+{"type":"log","callId":"sodu@700","time":52289.956,"message":"  cache-control: no-cache, must-revalidate"}
+{"type":"log","callId":"sodu@700","time":52289.967,"message":"  x-content-type-options: nosniff"}
+{"type":"log","callId":"sodu@700","time":52289.974,"message":"  x-frame-options: DENY"}
+{"type":"log","callId":"sodu@700","time":52289.981,"message":"  referrer-policy: strict-origin-when-cross-origin"}
+{"type":"log","callId":"sodu@700","time":52289.987,"message":"  permissions-policy: camera=(self), microphone=(self), display-capture=(self), geolocation=()"}
+{"type":"log","callId":"sodu@700","time":52289.995,"message":"  strict-transport-security: max-age=31536000; includeSubDomains; preload"}
+{"type":"log","callId":"sodu@700","time":52290.002,"message":"  vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding"}
+{"type":"log","callId":"sodu@700","time":52290.011,"message":"  link: </_next/static/media/fba5a26ea33df6a3-s.p.18rizl4rsrl42.woff2>; rel=preload; as=\"font\"; crossorigin=\"\"; type=\"font/woff2\", </_next/static/chunks/%5Broot-of-the-server%5D__0fi_bsf._.css>; rel=preload; as=\"style\""}
+{"type":"log","callId":"sodu@700","time":52290.026,"message":"  x-nextjs-cache: HIT"}
+{"type":"log","callId":"sodu@700","time":52290.033,"message":"  x-nextjs-prerender: 1"}
+{"type":"log","callId":"sodu@700","time":52290.038,"message":"  x-powered-by: Next.js"}
+{"type":"log","callId":"sodu@700","time":52290.042,"message":"  content-type: text/html; charset=utf-8"}
+{"type":"log","callId":"sodu@700","time":52290.046,"message":"  content-encoding: gzip"}
+{"type":"log","callId":"sodu@700","time":52290.05,"message":"  date: Mon, 12 Oct 2026 14:15:40 GMT"}
+{"type":"log","callId":"sodu@700","time":52290.054,"message":"  connection: keep-alive"}
+{"type":"log","callId":"sodu@700","time":52290.057,"message":"  keep-alive: timeout=5"}
+{"type":"log","callId":"sodu@700","time":52290.06,"message":"  transfer-encoding: chunked"}
+{"type":"after","callId":"sodu@700","endTime":52293.194,"result":{"response":{"url":"http://127.0.0.1:3101/help/exams-results-and-fees","status":200,"statusText":"OK","headers":[{"name":"Cache-Control","value":"no-cache, must-revalidate"},{"name":"X-Content-Type-Options","value":"nosniff"},{"name":"X-Frame-Options","value":"DENY"},{"name":"Referrer-Policy","value":"strict-origin-when-cross-origin"},{"name":"Permissions-Policy","value":"camera=(self), microphone=(self), display-capture=(self), geolocation=()"},{"name":"Strict-Transport-Security","value":"max-age=31536000; includeSubDomains; preload"},{"name":"Vary","value":"rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding"},{"name":"Link","value":"</_next/static/media/fba5a26ea33df6a3-s.p.18rizl4rsrl42.woff2>; rel=preload; as=\"font\"; crossorigin=\"\"; type=\"font/woff2\", </_next/static/chunks/%5Broot-of-the-server%5D__0fi_bsf._.css>; rel=preload; as=\"style\""},{"name":"x-nextjs-cache","value":"HIT"},{"name":"x-nextjs-prerender","value":"1"},{"name":"X-Powered-By","value":"Next.js"},{"name":"Content-Type","value":"text/html; charset=utf-8"},{"name":"Content-Encoding","value":"gzip"},{"name":"Date","value":"Mon, 12 Oct 2026 14:15:40 GMT"},{"name":"Connection","value":"keep-alive"},{"name":"Keep-Alive","value":"timeout=5"},{"name":"Transfer-Encoding","value":"chunked"}],"serverAddr":{"ipAddress":"127.0.0.1","port":3101},"timing":{"startTime":1791814540262,"domainLookupStart":-1,"domainLookupEnd":-1,"connectStart":-1,"secureConnectionStart":-1,"connectEnd":-1,"requestStart":0.3899999999994179,"responseStart":226.87799999999697},"responseEndTiming":230.34599999999773,"fetchUid":"ad230e76c5e2545de9d6802836ff8e72"}}}
+{"type":"before","callId":"sodu@703","startTime":52295.649,"class":"APIRequestContext","method":"fetch","params":{"url":"http://127.0.0.1:3101/help/billing-and-subscriptions","method":"GET"}}
+{"type":"log","callId":"sodu@703","time":52296.177,"message":"→ GET http://127.0.0.1:3101/help/billing-and-subscriptions"}
+{"type":"log","callId":"sodu@703","time":52296.199,"message":"  user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.8078.4 Safari/537.36"}
+{"type":"log","callId":"sodu@703","time":52296.204,"message":"  accept: */*"}
+{"type":"log","callId":"sodu@703","time":52296.207,"message":"  accept-encoding: gzip,deflate,br"}
+{"type":"log","callId":"sodu@703","time":52462.753,"message":"← 200 OK"}
+{"type":"log","callId":"sodu@703","time":52462.771,"message":"  cache-control: no-cache, must-revalidate"}
+{"type":"log","callId":"sodu@703","time":52462.776,"message":"  x-content-type-options: nosniff"}
+{"type":"log","callId":"sodu@703","time":52462.78,"message":"  x-frame-options: DENY"}
+{"type":"log","callId":"sodu@703","time":52462.784,"message":"  referrer-policy: strict-origin-when-cross-origin"}
+{"type":"log","callId":"sodu@703","time":52462.787,"message":"  permissions-policy: camera=(self), microphone=(self), display-capture=(self), geolocation=()"}
+{"type":"log","callId":"sodu@703","time":52462.791,"message":"  strict-transport-security: max-age=31536000; includeSubDomains; preload"}
+{"type":"log","callId":"sodu@703","time":52462.794,"message":"  vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding"}
+{"type":"log","callId":"sodu@703","time":52462.798,"message":"  link: </_next/static/media/fba5a26ea33df6a3-s.p.18rizl4rsrl42.woff2>; rel=preload; as=\"font\"; crossorigin=\"\"; type=\"font/woff2\", </_next/static/chunks/%5Broot-of-the-server%5D__0fi_bsf._.css>; rel=preload; as=\"style\""}
+{"type":"log","callId":"sodu@703","time":52462.803,"message":"  x-nextjs-cache: HIT"}
+{"type":"log","callId":"sodu@703","time":52462.807,"message":"  x-nextjs-prerender: 1"}
+{"type":"log","callId":"sodu@703","time":52462.811,"message":"  x-powered-by: Next.js"}
+{"type":"log","callId":"sodu@703","time":52462.814,"message":"  content-type: text/html; charset=utf-8"}
+{"type":"log","callId":"sodu@703","time":52462.817,"message":"  content-encoding: gzip"}
+{"type":"log","callId":"sodu@703","time":52462.82,"message":"  date: Mon, 12 Oct 2026 14:15:40 GMT"}
+{"type":"log","callId":"sodu@703","time":52462.823,"message":"  connection: keep-alive"}
+{"type":"log","callId":"sodu@703","time":52462.826,"message":"  keep-alive: timeout=5"}
+{"type":"log","callId":"sodu@703","time":52462.829,"message":"  transfer-encoding: chunked"}
+{"type":"after","callId":"sodu@703","endTime":52465.46,"result":{"response":{"url":"http://127.0.0.1:3101/help/billing-and-subscriptions","status":200,"statusText":"OK","headers":[{"name":"Cache-Control","value":"no-cache, must-revalidate"},{"name":"X-Content-Type-Options","value":"nosniff"},{"name":"X-Frame-Options","value":"DENY"},{"name":"Referrer-Policy","value":"strict-origin-when-cross-origin"},{"name":"Permissions-Policy","value":"camera=(self), microphone=(self), display-capture=(self), geolocation=()"},{"name":"Strict-Transport-Security","value":"max-age=31536000; includeSubDomains; preload"},{"name":"Vary","value":"rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding"},{"name":"Link","value":"</_next/static/media/fba5a26ea33df6a3-s.p.18rizl4rsrl42.woff2>; rel=preload; as=\"font\"; crossorigin=\"\"; type=\"font/woff2\", </_next/static/chunks/%5Broot-of-the-server%5D__0fi_bsf._.css>; rel=preload; as=\"style\""},{"name":"x-nextjs-cache","value":"HIT"},{"name":"x-nextjs-prerender","value":"1"},{"name":"X-Powered-By","value":"Next.js"},{"name":"Content-Type","value":"text/html; charset=utf-8"},{"name":"Content-Encoding","value":"gzip"},{"name":"Date","value":"Mon, 12 Oct 2026 14:15:40 GMT"},{"name":"Connection","value":"keep-alive"},{"name":"Keep-Alive","value":"timeout=5"},{"name":"Transfer-Encoding","value":"chunked"}],"serverAddr":{"ipAddress":"127.0.0.1","port":3101},"timing":{"startTime":1791814540496,"domainLookupStart":-1,"domainLookupEnd":-1,"connectStart":-1,"secureConnectionStart":-1,"connectEnd":-1,"requestStart":0.341999999996915,"responseStart":166.48999999999796},"responseEndTiming":169.112000000001,"fetchUid":"cfcc4ccdbb856183757cfa899f4928b7"}}}
+{"type":"before","callId":"sodu@706","startTime":52467.758,"class":"APIRequestContext","method":"fetch","params":{"url":"http://127.0.0.1:3101/help/checkout-failed-payment-and-cancellation","method":"GET"}}
+{"type":"log","callId":"sodu@706","time":52468.281,"message":"→ GET http://127.0.0.1:3101/help/checkout-failed-payment-and-cancellation"}
+{"type":"log","callId":"sodu@706","time":52468.296,"message":"  user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.8078.4 Safari/537.36"}
+{"type":"log","callId":"sodu@706","time":52468.301,"message":"  accept: */*"}
+{"type":"log","callId":"sodu@706","time":52468.304,"message":"  accept-encoding: gzip,deflate,br"}
+{"type":"log","callId":"sodu@706","time":52619.296,"message":"← 200 OK"}
+{"type":"log","callId":"sodu@706","time":52619.35,"message":"  cache-control: no-cache, must-revalidate"}
+{"type":"log","callId":"sodu@706","time":52619.363,"message":"  x-content-type-options: nosniff"}
+{"type":"log","callId":"sodu@706","time":52619.373,"message":"  x-frame-options: DENY"}
+{"type":"log","callId":"sodu@706","time":52619.392,"message":"  referrer-policy: strict-origin-when-cross-origin"}
+{"type":"log","callId":"sodu@706","time":52619.402,"message":"  permissions-policy: camera=(self), microphone=(self), display-capture=(self), geolocation=()"}
+{"type":"log","callId":"sodu@706","time":52619.415,"message":"  strict-transport-security: max-age=31536000; includeSubDomains; preload"}
+{"type":"log","callId":"sodu@706","time":52619.433,"message":"  vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding"}
+{"type":"log","callId":"sodu@706","time":52619.44,"message":"  link: </_next/static/media/fba5a26ea33df6a3-s.p.18rizl4rsrl42.woff2>; rel=preload; as=\"font\"; crossorigin=\"\"; type=\"font/woff2\", </_next/static/chunks/%5Broot-of-the-server%5D__0fi_bsf._.css>; rel=preload; as=\"style\""}
+{"type":"log","callId":"sodu@706","time":52619.452,"message":"  x-nextjs-cache: HIT"}
+{"type":"log","callId":"sodu@706","time":52619.461,"message":"  x-nextjs-prerender: 1"}
+{"type":"log","callId":"sodu@706","time":52619.472,"message":"  x-powered-by: Next.js"}
+{"type":"log","callId":"sodu@706","time":52619.48,"message":"  content-type: text/html; charset=utf-8"}
+{"type":"log","callId":"sodu@706","time":52619.487,"message":"  content-encoding: gzip"}
+{"type":"log","callId":"sodu@706","time":52619.5,"message":"  date: Mon, 12 Oct 2026 14:15:40 GMT"}
+{"type":"log","callId":"sodu@706","time":52619.51,"message":"  connection: keep-alive"}
+{"type":"log","callId":"sodu@706","time":52619.525,"message":"  keep-alive: timeout=5"}
+{"type":"log","callId":"sodu@706","time":52619.533,"message":"  transfer-encoding: chunked"}
+{"type":"after","callId":"sodu@706","endTime":52624.207,"result":{"response":{"url":"http://127.0.0.1:3101/help/checkout-failed-payment-and-cancellation","status":200,"statusText":"OK","headers":[{"name":"Cache-Control","value":"no-cache, must-revalidate"},{"name":"X-Content-Type-Options","value":"nosniff"},{"name":"X-Frame-Options","value":"DENY"},{"name":"Referrer-Policy","value":"strict-origin-when-cross-origin"},{"name":"Permissions-Policy","value":"camera=(self), microphone=(self), display-capture=(self), geolocation=()"},{"name":"Strict-Transport-Security","value":"max-age=31536000; includeSubDomains; preload"},{"name":"Vary","value":"rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding"},{"name":"Link","value":"</_next/static/media/fba5a26ea33df6a3-s.p.18rizl4rsrl42.woff2>; rel=preload; as=\"font\"; crossorigin=\"\"; type=\"font/woff2\", </_next/static/chunks/%5Broot-of-the-server%5D__0fi_bsf._.css>; rel=preload; as=\"style\""},{"name":"x-nextjs-cache","value":"HIT"},{"name":"x-nextjs-prerender","value":"1"},{"name":"X-Powered-By","value":"Next.js"},{"name":"Content-Type","value":"text/html; charset=utf-8"},{"name":"Content-Encoding","value":"gzip"},{"name":"Date","value":"Mon, 12 Oct 2026 14:15:40 GMT"},{"name":"Connection","value":"keep-alive"},{"name":"Keep-Alive","value":"timeout=5"},{"name":"Transfer-Encoding","value":"chunked"}],"serverAddr":{"ipAddress":"127.0.0.1","port":3101},"timing":{"startTime":1791814540668,"domainLookupStart":-1,"domainLookupEnd":-1,"connectStart":-1,"secureConnectionStart":-1,"connectEnd":-1,"requestStart":0.27800000000570435,"responseStart":150.40499999999884},"responseEndTiming":155.5,"fetchUid":"bdd699b7f1247bc81d85a24d310ca7e7"}}}
+{"type":"before","callId":"sodu@709","startTime":52628.122,"class":"APIRequestContext","method":"fetch","params":{"url":"http://127.0.0.1:3101/help/trial-expiry-and-restricted-access","method":"GET"}}
+{"type":"log","callId":"sodu@709","time":52628.641,"message":"→ GET http://127.0.0.1:3101/help/trial-expiry-and-restricted-access"}
+{"type":"log","callId":"sodu@709","time":52628.658,"message":"  user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.8078.4 Safari/537.36"}
+{"type":"log","callId":"sodu@709","time":52628.664,"message":"  accept: */*"}
+{"type":"log","callId":"sodu@709","time":52628.669,"message":"  accept-encoding: gzip,deflate,br"}
+{"type":"log","callId":"sodu@709","time":52845.095,"message":"← 200 OK"}
+{"type":"log","callId":"sodu@709","time":52845.116,"message":"  cache-control: no-cache, must-revalidate"}
+{"type":"log","callId":"sodu@709","time":52845.121,"message":"  x-content-type-options: nosniff"}
+{"type":"log","callId":"sodu@709","time":52845.128,"message":"  x-frame-options: DENY"}
+{"type":"log","callId":"sodu@709","time":52845.131,"message":"  referrer-policy: strict-origin-when-cross-origin"}
+{"type":"log","callId":"sodu@709","time":52845.134,"message":"  permissions-policy: camera=(self), microphone=(self), display-capture=(self), geolocation=()"}
+{"type":"log","callId":"sodu@709","time":52845.14,"message":"  strict-transport-security: max-age=31536000; includeSubDomains; preload"}
+{"type":"log","callId":"sodu@709","time":52845.144,"message":"  vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding"}
+{"type":"log","callId":"sodu@709","time":52845.149,"message":"  link: </_next/static/media/fba5a26ea33df6a3-s.p.18rizl4rsrl42.woff2>; rel=preload; as=\"font\"; crossorigin=\"\"; type=\"font/woff2\", </_next/static/chunks/%5Broot-of-the-server%5D__0fi_bsf._.css>; rel=preload; as=\"style\""}
+{"type":"log","callId":"sodu@709","time":52845.153,"message":"  x-nextjs-cache: HIT"}
+{"type":"log","callId":"sodu@709","time":52845.157,"message":"  x-nextjs-prerender: 1"}
+{"type":"log","callId":"sodu@709","time":52845.168,"message":"  x-powered-by: Next.js"}
+{"type":"log","callId":"sodu@709","time":52845.172,"message":"  content-type: text/html; charset=utf-8"}
+{"type":"log","callId":"sodu@709","time":52845.181,"message":"  content-encoding: gzip"}
+{"type":"log","callId":"sodu@709","time":52845.185,"message":"  date: Mon, 12 Oct 2026 14:15:41 GMT"}
+{"type":"log","callId":"sodu@709","time":52845.194,"message":"  connection: keep-alive"}
+{"type":"log","callId":"sodu@709","time":52845.198,"message":"  keep-alive: timeout=5"}
+{"type":"log","callId":"sodu@709","time":52845.201,"message":"  transfer-encoding: chunked"}
+{"type":"after","callId":"sodu@709","endTime":52848.549,"result":{"response":{"url":"http://127.0.0.1:3101/help/trial-expiry-and-restricted-access","status":200,"statusText":"OK","headers":[{"name":"Cache-Control","value":"no-cache, must-revalidate"},{"name":"X-Content-Type-Options","value":"nosniff"},{"name":"X-Frame-Options","value":"DENY"},{"name":"Referrer-Policy","value":"strict-origin-when-cross-origin"},{"name":"Permissions-Policy","value":"camera=(self), microphone=(self), display-capture=(self), geolocation=()"},{"name":"Strict-Transport-Security","value":"max-age=31536000; includeSubDomains; preload"},{"name":"Vary","value":"rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding"},{"name":"Link","value":"</_next/static/media/fba5a26ea33df6a3-s.p.18rizl4rsrl42.woff2>; rel=preload; as=\"font\"; crossorigin=\"\"; type=\"font/woff2\", </_next/static/chunks/%5Broot-of-the-server%5D__0fi_bsf._.css>; rel=preload; as=\"style\""},{"name":"x-nextjs-cache","value":"HIT"},{"name":"x-nextjs-prerender","value":"1"},{"name":"X-Powered-By","value":"Next.js"},{"name":"Content-Type","value":"text/html; charset=utf-8"},{"name":"Content-Encoding","value":"gzip"},{"name":"Date","value":"Mon, 12 Oct 2026 14:15:41 GMT"},{"name":"Connection","value":"keep-alive"},{"name":"Keep-Alive","value":"timeout=5"},{"name":"Transfer-Encoding","value":"chunked"}],"serverAddr":{"ipAddress":"127.0.0.1","port":3101},"timing":{"startTime":1791814540829,"domainLookupStart":-1,"domainLookupEnd":-1,"connectStart":-1,"secureConnectionStart":-1,"connectEnd":-1,"requestStart":0.38500000000203727,"responseStart":216.32200000000012},"responseEndTiming":219.46100000000297,"fetchUid":"cfbf3e40f34634bfc78e005f77bfd6f7"}}}
+{"type":"before","callId":"sodu@712","startTime":52852.057,"class":"APIRequestContext","method":"fetch","params":{"url":"http://127.0.0.1:3101/help/tavro-ai-and-voice-troubleshooting","method":"GET"}}
+{"type":"log","callId":"sodu@712","time":52852.962,"message":"→ GET http://127.0.0.1:3101/help/tavro-ai-and-voice-troubleshooting"}
+{"type":"log","callId":"sodu@712","time":52853.005,"message":"  user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.8078.4 Safari/537.36"}
+{"type":"log","callId":"sodu@712","time":52853.02,"message":"  accept: */*"}
+{"type":"log","callId":"sodu@712","time":52853.027,"message":"  accept-encoding: gzip,deflate,br"}
+{"type":"log","callId":"sodu@712","time":53039.429,"message":"← 200 OK"}
+{"type":"log","callId":"sodu@712","time":53039.458,"message":"  cache-control: no-cache, must-revalidate"}
+{"type":"log","callId":"sodu@712","time":53039.467,"message":"  x-content-type-options: nosniff"}
+{"type":"log","callId":"sodu@712","time":53039.472,"message":"  x-frame-options: DENY"}
+{"type":"log","callId":"sodu@712","time":53039.478,"message":"  referrer-policy: strict-origin-when-cross-origin"}
+{"type":"log","callId":"sodu@712","time":53039.486,"message":"  permissions-policy: camera=(self), microphone=(self), display-capture=(self), geolocation=()"}
+{"type":"log","callId":"sodu@712","time":53039.491,"message":"  strict-transport-security: max-age=31536000; includeSubDomains; preload"}
+{"type":"log","callId":"sodu@712","time":53039.504,"message":"  vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding"}
+{"type":"log","callId":"sodu@712","time":53039.511,"message":"  link: </_next/static/media/fba5a26ea33df6a3-s.p.18rizl4rsrl42.woff2>; rel=preload; as=\"font\"; crossorigin=\"\"; type=\"font/woff2\", </_next/static/chunks/%5Broot-of-the-server%5D__0fi_bsf._.css>; rel=preload; as=\"style\""}
+{"type":"log","callId":"sodu@712","time":53039.52,"message":"  x-nextjs-cache: HIT"}
+{"type":"log","callId":"sodu@712","time":53039.526,"message":"  x-nextjs-prerender: 1"}
+{"type":"log","callId":"sodu@712","time":53039.531,"message":"  x-powered-by: Next.js"}
+{"type":"log","callId":"sodu@712","time":53039.537,"message":"  content-type: text/html; charset=utf-8"}
+{"type":"log","callId":"sodu@712","time":53039.542,"message":"  content-encoding: gzip"}
+{"type":"log","callId":"sodu@712","time":53039.547,"message":"  date: Mon, 12 Oct 2026 14:15:41 GMT"}
+{"type":"log","callId":"sodu@712","time":53039.552,"message":"  connection: keep-alive"}
+{"type":"log","callId":"sodu@712","time":53039.556,"message":"  keep-alive: timeout=5"}
+{"type":"log","callId":"sodu@712","time":53039.565,"message":"  transfer-encoding: chunked"}
+{"type":"after","callId":"sodu@712","endTime":53042.868,"result":{"response":{"url":"http://127.0.0.1:3101/help/tavro-ai-and-voice-troubleshooting","status":200,"statusText":"OK","headers":[{"name":"Cache-Control","value":"no-cache, must-revalidate"},{"name":"X-Content-Type-Options","value":"nosniff"},{"name":"X-Frame-Options","value":"DENY"},{"name":"Referrer-Policy","value":"strict-origin-when-cross-origin"},{"name":"Permissions-Policy","value":"camera=(self), microphone=(self), display-capture=(self), geolocation=()"},{"name":"Strict-Transport-Security","value":"max-age=31536000; includeSubDomains; preload"},{"name":"Vary","value":"rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding"},{"name":"Link","value":"</_next/static/media/fba5a26ea33df6a3-s.p.18rizl4rsrl42.woff2>; rel=preload; as=\"font\"; crossorigin=\"\"; type=\"font/woff2\", </_next/static/chunks/%5Broot-of-the-server%5D__0fi_bsf._.css>; rel=preload; as=\"style\""},{"name":"x-nextjs-cache","value":"HIT"},{"name":"x-nextjs-prerender","value":"1"},{"name":"X-Powered-By","value":"Next.js"},{"name":"Content-Type","value":"text/html; charset=utf-8"},{"name":"Content-Encoding","value":"gzip"},{"name":"Date","value":"Mon, 12 Oct 2026 14:15:41 GMT"},{"name":"Connection","value":"keep-alive"},{"name":"Keep-Alive","value":"timeout=5"},{"name":"Transfer-Encoding","value":"chunked"}],"serverAddr":{"ipAddress":"127.0.0.1","port":3101},"timing":{"startTime":1791814541053,"domainLookupStart":-1,"domainLookupEnd":-1,"connectStart":-1,"secureConnectionStart":-1,"connectEnd":-1,"requestStart":0.5860000000029686,"responseStart":186.42900000000373},"responseEndTiming":189.78600000000006,"fetchUid":"ae508ceaa039030fe53a63dd169bce8c"}}}
+{"type":"before","callId":"sodu@715","startTime":53045.29,"class":"APIRequestContext","method":"fetch","params":{"url":"http://127.0.0.1:3101/help/uploads-notifications-and-realtime","method":"GET"}}
+{"type":"log","callId":"sodu@715","time":53045.824,"message":"→ GET http://127.0.0.1:3101/help/uploads-notifications-and-realtime"}
+{"type":"log","callId":"sodu@715","time":53045.856,"message":"  user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.8078.4 Safari/537.36"}
+{"type":"log","callId":"sodu@715","time":53045.863,"message":"  accept: */*"}
+{"type":"log","callId":"sodu@715","time":53045.868,"message":"  accept-encoding: gzip,deflate,br"}
+{"type":"log","callId":"sodu@715","time":53231.081,"message":"← 200 OK"}
+{"type":"log","callId":"sodu@715","time":53231.147,"message":"  cache-control: no-cache, must-revalidate"}
+{"type":"log","callId":"sodu@715","time":53231.166,"message":"  x-content-type-options: nosniff"}
+{"type":"log","callId":"sodu@715","time":53231.172,"message":"  x-frame-options: DENY"}
+{"type":"log","callId":"sodu@715","time":53231.177,"message":"  referrer-policy: strict-origin-when-cross-origin"}
+{"type":"log","callId":"sodu@715","time":53231.181,"message":"  permissions-policy: camera=(self), microphone=(self), display-capture=(self), geolocation=()"}
+{"type":"log","callId":"sodu@715","time":53231.186,"message":"  strict-transport-security: max-age=31536000; includeSubDomains; preload"}
+{"type":"log","callId":"sodu@715","time":53231.19,"message":"  vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding"}
+{"type":"log","callId":"sodu@715","time":53231.194,"message":"  link: </_next/static/media/fba5a26ea33df6a3-s.p.18rizl4rsrl42.woff2>; rel=preload; as=\"font\"; crossorigin=\"\"; type=\"font/woff2\", </_next/static/chunks/%5Broot-of-the-server%5D__0fi_bsf._.css>; rel=preload; as=\"style\""}
+{"type":"log","callId":"sodu@715","time":53231.199,"message":"  x-nextjs-cache: HIT"}
+{"type":"log","callId":"sodu@715","time":53231.204,"message":"  x-nextjs-prerender: 1"}
+{"type":"log","callId":"sodu@715","time":53231.208,"message":"  x-powered-by: Next.js"}
+{"type":"log","callId":"sodu@715","time":53231.212,"message":"  content-type: text/html; charset=utf-8"}
+{"type":"log","callId":"sodu@715","time":53231.217,"message":"  content-encoding: gzip"}
+{"type":"log","callId":"sodu@715","time":53231.221,"message":"  date: Mon, 12 Oct 2026 14:15:41 GMT"}
+{"type":"log","callId":"sodu@715","time":53231.24,"message":"  connection: keep-alive"}
+{"type":"log","callId":"sodu@715","time":53231.245,"message":"  keep-alive: timeout=5"}
+{"type":"log","callId":"sodu@715","time":53231.248,"message":"  transfer-encoding: chunked"}
+{"type":"after","callId":"sodu@715","endTime":53234.93,"result":{"response":{"url":"http://127.0.0.1:3101/help/uploads-notifications-and-realtime","status":200,"statusText":"OK","headers":[{"name":"Cache-Control","value":"no-cache, must-revalidate"},{"name":"X-Content-Type-Options","value":"nosniff"},{"name":"X-Frame-Options","value":"DENY"},{"name":"Referrer-Policy","value":"strict-origin-when-cross-origin"},{"name":"Permissions-Policy","value":"camera=(self), microphone=(self), display-capture=(self), geolocation=()"},{"name":"Strict-Transport-Security","value":"max-age=31536000; includeSubDomains; preload"},{"name":"Vary","value":"rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding"},{"name":"Link","value":"</_next/static/media/fba5a26ea33df6a3-s.p.18rizl4rsrl42.woff2>; rel=preload; as=\"font\"; crossorigin=\"\"; type=\"font/woff2\", </_next/static/chunks/%5Broot-of-the-server%5D__0fi_bsf._.css>; rel=preload; as=\"style\""},{"name":"x-nextjs-cache","value":"HIT"},{"name":"x-nextjs-prerender","value":"1"},{"name":"X-Powered-By","value":"Next.js"},{"name":"Content-Type","value":"text/html; charset=utf-8"},{"name":"Content-Encoding","value":"gzip"},{"name":"Date","value":"Mon, 12 Oct 2026 14:15:41 GMT"},{"name":"Connection","value":"keep-alive"},{"name":"Keep-Alive","value":"timeout=5"},{"name":"Transfer-Encoding","value":"chunked"}],"serverAddr":{"ipAddress":"127.0.0.1","port":3101},"timing":{"startTime":1791814541246,"domainLookupStart":-1,"domainLookupEnd":-1,"connectStart":-1,"secureConnectionStart":-1,"connectEnd":-1,"requestStart":0.36899999999877764,"responseStart":184.97200000000157},"responseEndTiming":188.76000000000204,"fetchUid":"e4312aeafebfc4df555873b6e4f2655e"}}}
+{"type":"before","callId":"sodu@718","startTime":53239.471,"class":"APIRequestContext","method":"fetch","params":{"url":"http://127.0.0.1:3101/help/privacy-security-and-account-recovery","method":"GET"}}
+{"type":"log","callId":"sodu@718","time":53240.294,"message":"→ GET http://127.0.0.1:3101/help/privacy-security-and-account-recovery"}
+{"type":"log","callId":"sodu@718","time":53240.326,"message":"  user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.8078.4 Safari/537.36"}
+{"type":"log","callId":"sodu@718","time":53240.341,"message":"  accept: */*"}
+{"type":"log","callId":"sodu@718","time":53240.347,"message":"  accept-encoding: gzip,deflate,br"}
+{"type":"log","callId":"sodu@718","time":53401.467,"message":"← 200 OK"}
+{"type":"log","callId":"sodu@718","time":53401.503,"message":"  cache-control: no-cache, must-revalidate"}
+{"type":"log","callId":"sodu@718","time":53401.57,"message":"  x-content-type-options: nosniff"}
+{"type":"log","callId":"sodu@718","time":53401.584,"message":"  x-frame-options: DENY"}
+{"type":"log","callId":"sodu@718","time":53401.592,"message":"  referrer-policy: strict-origin-when-cross-origin"}
+{"type":"log","callId":"sodu@718","time":53401.597,"message":"  permissions-policy: camera=(self), microphone=(self), display-capture=(self), geolocation=()"}
+{"type":"log","callId":"sodu@718","time":53401.603,"message":"  strict-transport-security: max-age=31536000; includeSubDomains; preload"}
+{"type":"log","callId":"sodu@718","time":53401.609,"message":"  vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding"}
+{"type":"log","callId":"sodu@718","time":53401.614,"message":"  link: </_next/static/media/fba5a26ea33df6a3-s.p.18rizl4rsrl42.woff2>; rel=preload; as=\"font\"; crossorigin=\"\"; type=\"font/woff2\", </_next/static/chunks/%5Broot-of-the-server%5D__0fi_bsf._.css>; rel=preload; as=\"style\""}
+{"type":"log","callId":"sodu@718","time":53401.621,"message":"  x-nextjs-cache: HIT"}
+{"type":"log","callId":"sodu@718","time":53401.641,"message":"  x-nextjs-prerender: 1"}
+{"type":"log","callId":"sodu@718","time":53401.647,"message":"  x-powered-by: Next.js"}
+{"type":"log","callId":"sodu@718","time":53401.653,"message":"  content-type: text/html; charset=utf-8"}
+{"type":"log","callId":"sodu@718","time":53401.696,"message":"  content-encoding: gzip"}
+{"type":"log","callId":"sodu@718","time":53401.722,"message":"  date: Mon, 12 Oct 2026 14:15:41 GMT"}
+{"type":"log","callId":"sodu@718","time":53401.731,"message":"  connection: keep-alive"}
+{"type":"log","callId":"sodu@718","time":53401.739,"message":"  keep-alive: timeout=5"}
+{"type":"log","callId":"sodu@718","time":53401.747,"message":"  transfer-encoding: chunked"}
+{"type":"after","callId":"sodu@718","endTime":53406.641,"result":{"response":{"url":"http://127.0.0.1:3101/help/privacy-security-and-account-recovery","status":200,"statusText":"OK","headers":[{"name":"Cache-Control","value":"no-cache, must-revalidate"},{"name":"X-Content-Type-Options","value":"nosniff"},{"name":"X-Frame-Options","value":"DENY"},{"name":"Referrer-Policy","value":"strict-origin-when-cross-origin"},{"name":"Permissions-Policy","value":"camera=(self), microphone=(self), display-capture=(self), geolocation=()"},{"name":"Strict-Transport-Security","value":"max-age=31536000; includeSubDomains; preload"},{"name":"Vary","value":"rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding"},{"name":"Link","value":"</_next/static/media/fba5a26ea33df6a3-s.p.18rizl4rsrl42.woff2>; rel=preload; as=\"font\"; crossorigin=\"\"; type=\"font/woff2\", </_next/static/chunks/%5Broot-of-the-server%5D__0fi_bsf._.css>; rel=preload; as=\"style\""},{"name":"x-nextjs-cache","value":"HIT"},{"name":"x-nextjs-prerender","value":"1"},{"name":"X-Powered-By","value":"Next.js"},{"name":"Content-Type","value":"text/html; charset=utf-8"},{"name":"Content-Encoding","value":"gzip"},{"name":"Date","value":"Mon, 12 Oct 2026 14:15:41 GMT"},{"name":"Connection","value":"keep-alive"},{"name":"Keep-Alive","value":"timeout=5"},{"name":"Transfer-Encoding","value":"chunked"}],"serverAddr":{"ipAddress":"127.0.0.1","port":3101},"timing":{"startTime":1791814541440,"domainLookupStart":-1,"domainLookupEnd":-1,"connectStart":-1,"secureConnectionStart":-1,"connectEnd":-1,"requestStart":0.5580000000045402,"responseStart":160.91999999999825},"responseEndTiming":166.05099999999948,"fetchUid":"6297ff2554a2f4485cb8046cc190a03f"}}}
+{"type":"before","callId":"sodu@721","startTime":53411.105,"class":"APIRequestContext","method":"fetch","params":{"url":"http://127.0.0.1:3101/help/contact-support-and-report-an-error","method":"GET"}}
+{"type":"log","callId":"sodu@721","time":53411.587,"message":"→ GET http://127.0.0.1:3101/help/contact-support-and-report-an-error"}
+{"type":"log","callId":"sodu@721","time":53411.6,"message":"  user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.8078.4 Safari/537.36"}
+{"type":"log","callId":"sodu@721","time":53411.604,"message":"  accept: */*"}
+{"type":"log","callId":"sodu@721","time":53411.607,"message":"  accept-encoding: gzip,deflate,br"}
+{"type":"log","callId":"sodu@721","time":53574.044,"message":"← 200 OK"}
+{"type":"log","callId":"sodu@721","time":53574.094,"message":"  cache-control: no-cache, must-revalidate"}
+{"type":"log","callId":"sodu@721","time":53574.104,"message":"  x-content-type-options: nosniff"}
+{"type":"log","callId":"sodu@721","time":53574.11,"message":"  x-frame-options: DENY"}
+{"type":"log","callId":"sodu@721","time":53574.115,"message":"  referrer-policy: strict-origin-when-cross-origin"}
+{"type":"log","callId":"sodu@721","time":53574.123,"message":"  permissions-policy: camera=(self), microphone=(self), display-capture=(self), geolocation=()"}
+{"type":"log","callId":"sodu@721","time":53574.129,"message":"  strict-transport-security: max-age=31536000; includeSubDomains; preload"}
+{"type":"log","callId":"sodu@721","time":53574.148,"message":"  vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding"}
+{"type":"log","callId":"sodu@721","time":53574.154,"message":"  link: </_next/static/media/fba5a26ea33df6a3-s.p.18rizl4rsrl42.woff2>; rel=preload; as=\"font\"; crossorigin=\"\"; type=\"font/woff2\", </_next/static/chunks/%5Broot-of-the-server%5D__0fi_bsf._.css>; rel=preload; as=\"style\""}
+{"type":"log","callId":"sodu@721","time":53574.16,"message":"  x-nextjs-cache: HIT"}
+{"type":"log","callId":"sodu@721","time":53574.166,"message":"  x-nextjs-prerender: 1"}
+{"type":"log","callId":"sodu@721","time":53574.171,"message":"  x-powered-by: Next.js"}
+{"type":"log","callId":"sodu@721","time":53574.178,"message":"  content-type: text/html; charset=utf-8"}
+{"type":"log","callId":"sodu@721","time":53574.183,"message":"  content-encoding: gzip"}
+{"type":"log","callId":"sodu@721","time":53574.189,"message":"  date: Mon, 12 Oct 2026 14:15:41 GMT"}
+{"type":"log","callId":"sodu@721","time":53574.194,"message":"  connection: keep-alive"}
+{"type":"log","callId":"sodu@721","time":53574.201,"message":"  keep-alive: timeout=5"}
+{"type":"log","callId":"sodu@721","time":53574.207,"message":"  transfer-encoding: chunked"}
+{"type":"after","callId":"sodu@721","endTime":53577.683,"result":{"response":{"url":"http://127.0.0.1:3101/help/contact-support-and-report-an-error","status":200,"statusText":"OK","headers":[{"name":"Cache-Control","value":"no-cache, must-revalidate"},{"name":"X-Content-Type-Options","value":"nosniff"},{"name":"X-Frame-Options","value":"DENY"},{"name":"Referrer-Policy","value":"strict-origin-when-cross-origin"},{"name":"Permissions-Policy","value":"camera=(self), microphone=(self), display-capture=(self), geolocation=()"},{"name":"Strict-Transport-Security","value":"max-age=31536000; includeSubDomains; preload"},{"name":"Vary","value":"rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding"},{"name":"Link","value":"</_next/static/media/fba5a26ea33df6a3-s.p.18rizl4rsrl42.woff2>; rel=preload; as=\"font\"; crossorigin=\"\"; type=\"font/woff2\", </_next/static/chunks/%5Broot-of-the-server%5D__0fi_bsf._.css>; rel=preload; as=\"style\""},{"name":"x-nextjs-cache","value":"HIT"},{"name":"x-nextjs-prerender","value":"1"},{"name":"X-Powered-By","value":"Next.js"},{"name":"Content-Type","value":"text/html; charset=utf-8"},{"name":"Content-Encoding","value":"gzip"},{"name":"Date","value":"Mon, 12 Oct 2026 14:15:41 GMT"},{"name":"Connection","value":"keep-alive"},{"name":"Keep-Alive","value":"timeout=5"},{"name":"Transfer-Encoding","value":"chunked"}],"serverAddr":{"ipAddress":"127.0.0.1","port":3101},"timing":{"startTime":1791814541611,"domainLookupStart":-1,"domainLookupEnd":-1,"connectStart":-1,"secureConnectionStart":-1,"connectEnd":-1,"requestStart":0.31899999999586726,"responseStart":161.8770000000004},"responseEndTiming":165.762999999999,"fetchUid":"1466aef594e5852770eac094767cd026"}}}

@@ -1,0 +1,1 @@
+{"success":true,"user":{"_id":"help-test-user","fullName":"Help Test","email":"help-test@example.invalid","role":"owner","companyId":{"_id":"help-test-company","name":"Help Test Company","organizationType":"business","accountType":"company"}}}
