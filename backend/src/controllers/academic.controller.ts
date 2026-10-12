@@ -779,7 +779,16 @@ export const listClasses = async (req: AuthRequest, res: Response): Promise<void
     const [classes, total] = await Promise.all([
       AcademicClass.find(filter).sort({ academicYear: -1, name: 1 }).skip(skip).limit(limit)
         .populate({ path: 'departmentId', match: { companyId }, select: 'name code' })
-        .populate({ path: 'courseIds', match: { companyId }, select: 'name code' })
+        .populate({
+          path: 'courseIds',
+          match: {
+            companyId,
+            ...(req.academicDepartmentScope
+              ? { departmentId: { $in: req.academicDepartmentScope.departmentIds.map((id) => new mongoose.Types.ObjectId(id)) } }
+              : {}),
+          },
+          select: 'name code',
+        })
         .lean(),
       AcademicClass.countDocuments(filter),
     ]);
@@ -835,7 +844,7 @@ export const listGuardianLinks = async (req: AuthRequest, res: Response): Promis
     const filter = {
       companyId,
       ...(req.academicDepartmentScope
-        ? { studentId: { $in: req.academicDepartmentScope.studentIds.map((id) => new mongoose.Types.ObjectId(id)) } }
+        ? { studentId: { $in: req.academicDepartmentScope.departmentExclusiveStudentIds.map((id) => new mongoose.Types.ObjectId(id)) } }
         : {}),
     };
     const [links, total] = await Promise.all([
@@ -999,7 +1008,16 @@ export const listSchedules = async (req: AuthRequest, res: Response): Promise<vo
     const [schedules, total] = await Promise.all([
       AcademicSchedule.find(filter).sort({ dayOfWeek: 1, startTime: 1 }).skip(skip).limit(limit)
         .populate({ path: 'classId', match: { companyId }, select: 'name academicYear' })
-        .populate({ path: 'courseId', match: { companyId }, select: 'name code' })
+        .populate({
+          path: 'courseId',
+          match: {
+            companyId,
+            ...(req.academicDepartmentScope
+              ? { departmentId: { $in: req.academicDepartmentScope.departmentIds.map((id) => new mongoose.Types.ObjectId(id)) } }
+              : {}),
+          },
+          select: 'name code',
+        })
         .lean(),
       AcademicSchedule.countDocuments(filter),
     ]);
@@ -1069,7 +1087,16 @@ export const listAssignments = async (req: AuthRequest, res: Response): Promise<
     const [assignments, total] = await Promise.all([
       AcademicAssignment.find(filter).sort({ dueAt: 1, createdAt: -1 }).skip(skip).limit(limit)
         .populate({ path: 'classId', match: { companyId }, select: 'name academicYear' })
-        .populate({ path: 'courseId', match: { companyId }, select: 'name code' })
+        .populate({
+          path: 'courseId',
+          match: {
+            companyId,
+            ...(req.academicDepartmentScope
+              ? { departmentId: { $in: req.academicDepartmentScope.departmentIds.map((id) => new mongoose.Types.ObjectId(id)) } }
+              : {}),
+          },
+          select: 'name code',
+        })
         .lean(),
       AcademicAssignment.countDocuments(filter),
     ]);
@@ -1212,7 +1239,16 @@ export const listAssessments = async (req: AuthRequest, res: Response): Promise<
     const [assessments, total] = await Promise.all([
       AcademicAssessment.find(filter).sort({ scheduledAt: 1, createdAt: -1 }).skip(skip).limit(limit)
         .populate({ path: 'classId', match: { companyId }, select: 'name academicYear' })
-        .populate({ path: 'courseId', match: { companyId }, select: 'name code' })
+        .populate({
+          path: 'courseId',
+          match: {
+            companyId,
+            ...(req.academicDepartmentScope
+              ? { departmentId: { $in: req.academicDepartmentScope.departmentIds.map((id) => new mongoose.Types.ObjectId(id)) } }
+              : {}),
+          },
+          select: 'name code',
+        })
         .lean(),
       AcademicAssessment.countDocuments(filter),
     ]);
@@ -1346,7 +1382,7 @@ export const listFeeCharges = async (req: AuthRequest, res: Response): Promise<v
     const filter = {
       companyId,
       ...(req.academicDepartmentScope
-        ? { studentId: { $in: req.academicDepartmentScope.studentIds.map((id) => new mongoose.Types.ObjectId(id)) } }
+        ? { studentId: { $in: req.academicDepartmentScope.departmentExclusiveStudentIds.map((id) => new mongoose.Types.ObjectId(id)) } }
         : {}),
     };
     const [charges, total] = await Promise.all([

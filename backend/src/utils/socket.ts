@@ -14,8 +14,14 @@ import User from '../models/User';
 import Company from '../models/Company';
 import { getAllowedClientOrigins } from './clientOrigins';
 import { verifyCallSessionToken } from '../services/callSessionToken';
-import { getEffectiveSubscription } from '../services/companySubscription';
+import { getCompanySubscription, getEffectiveSubscription } from '../services/companySubscription';
 import { isAcademicOrganizationType, isOrganizationRoleEligible, roleMatches } from '../config/organization';
+import type { OrganizationFeature } from '../middleware/organizationAccess';
+import {
+  canSocketAccessFeature,
+  socketEventFeature,
+  socketUserEventFeature,
+} from './socketAuthorization';
 
 let io: SocketServer;
 let adapterReady: Promise<void> | null = null;
@@ -44,10 +50,46 @@ type GlobalCallTerminalStatus = 'completed' | 'missed' | 'rejected' | 'cancelled
 type PresenceStatus = 'online' | 'away' | 'busy' | 'offline';
 
 const MEETING_LINK_TTL_MS = 24 * 60 * 60 * 1000;
+const GLOBAL_CALLING_ROOM = 'calling:eligible';
 
 const userRoom = (userId: string) => `user:${userId}`;
+const userFeatureRoom = (userId: string, feature: OrganizationFeature) => `user:${userId}:feature:${feature}`;
 const meetingParticipantFor = (socket: Pick<Socket, 'data'>, meetingId: string) =>
   (socket.data.meetingParticipants as Record<string, MeetingParticipant> | undefined)?.[meetingId];
+
+function hasSocketFeature(
+  socket: Pick<Socket, 'data'>,
+  feature: OrganizationFeature,
+  entitlements = socket.data.subscriptionEntitlements as Record<string, boolean> | undefined,
+): boolean {
+  return canSocketAccessFeature({
+    organizationType: socket.data.organizationType as string | undefined,
+    accountType: socket.data.accountType as string | undefined,
+    role: socket.data.userRole as string | undefined,
+  }, feature, entitlements);
+}
+
+async function persistedUserHasFeature(userId: string, feature: OrganizationFeature): Promise<boolean> {
+  try {
+    const user = await User.findOne({
+      _id: userId,
+      isVerified: true,
+      isActive: true,
+      isDeleted: { $ne: true },
+    }).select('companyId role').lean();
+    if (!user?.companyId) return false;
+    const [company, subscription] = await Promise.all([
+      Company.findOne({ _id: user.companyId, isActive: true })
+        .select('organizationType accountType')
+        .lean(),
+      getCompanySubscription(user.companyId.toString()),
+    ]);
+    return Boolean(company && subscription.hasActiveAccess &&
+      canSocketAccessFeature({ ...company, role: user.role }, feature, subscription.planConfig.entitlements));
+  } catch {
+    return false;
+  }
+}
 
 export async function ensureSocketAdapterReady(): Promise<void> {
   if (!io) throw new Error('Socket.IO has not been initialized.');
@@ -125,6 +167,7 @@ function toCallingAvailability(status: PresenceStatus): 'offline' | 'busy' | 'aw
 
 async function sendPendingIncomingCalls(socket: Socket, userId: string): Promise<void> {
   try {
+    if (!await persistedUserHasFeature(userId, 'globalCalling')) return;
     const pendingCalls = await CallSession.find({
       calleeId: userId,
       status: 'ringing',
@@ -137,7 +180,7 @@ async function sendPendingIncomingCalls(socket: Socket, userId: string): Promise
         isActive: true,
         isDeleted: { $ne: true },
       }).select('callingId fullName avatar avatarStorageKey').lean();
-      if (!caller) continue;
+      if (!caller || !await persistedUserHasFeature(call.callerId.toString(), 'globalCalling')) continue;
       const avatar = isR2Configured() && caller.avatarStorageKey
         ? await generateSignedAvatarUrl(caller.avatarStorageKey)
         : caller.avatar;
@@ -209,7 +252,7 @@ export async function publishUserPresence(userId: string): Promise<void> {
   try {
     const [user, presence] = await Promise.all([
       User.findOne({ _id: userId, isActive: true, isDeleted: { $ne: true } })
-        .select('companyId callingId blockedUsers')
+        .select('companyId role callingId blockedUsers')
         .lean(),
       getUserPresence(userId),
     ]);
@@ -244,11 +287,21 @@ export async function publishUserPresence(userId: string): Promise<void> {
         emitToUser(peer._id.toString(), 'user:presence', presence);
       }
     }
-    if (user.callingId) {
-      io?.emit('calling:availability', {
-        callingId: user.callingId,
-        availability: presence.availability,
-      });
+    if (user.callingId && user.companyId) {
+      const [company, subscription] = await Promise.all([
+        Company.findOne({ _id: user.companyId, isActive: true }).select('organizationType accountType').lean(),
+        getCompanySubscription(user.companyId.toString()),
+      ]);
+      if (
+        company &&
+        subscription.hasActiveAccess &&
+        canSocketAccessFeature({ ...company, role: user.role }, 'globalCalling', subscription.planConfig.entitlements)
+      ) {
+        io?.to(GLOBAL_CALLING_ROOM).emit('calling:availability', {
+          callingId: user.callingId,
+          availability: presence.availability,
+        });
+      }
     }
   } catch (error) {
     console.error('[Socket] Failed to publish user presence:', error);
@@ -297,21 +350,29 @@ export async function broadcastCallingAvailability(userId: string): Promise<void
 
 const authorizeMeetingSocket = async (socket: Pick<Socket, 'data'>, meetingLink: unknown) => {
   if (typeof meetingLink !== 'string' || meetingLink.length < 20 || meetingLink.length > 128) return null;
+  if (!await persistedUserHasFeature(socket.data.userId as string, 'educationMeetings')) return null;
   const grants = socket.data.meetingGrants as Record<string, string> | undefined;
   const grant = grants?.[meetingLink];
   const userId = socket.data.userId as string;
+  const companyId = socket.data.companyId as string;
   if (!grant) return null;
   try {
-    const meeting = await Meeting.findOne({ meetingLink, status: 'active' }).select('_id companyId hostId startedAt scheduledAt');
+    const meeting = await Meeting.findOne({
+      meetingLink,
+      companyId,
+      status: 'active',
+    }).select('_id companyId hostId startedAt scheduledAt');
     if (!meeting) return null;
     const expirationAnchor = meeting.startedAt || meeting.scheduledAt;
     if (expirationAnchor && Date.now() - new Date(expirationAnchor).getTime() > MEETING_LINK_TTL_MS) return null;
     const user = await User.findOne({
       _id: userId,
+      companyId,
+      isVerified: true,
       isActive: true,
       isDeleted: { $ne: true },
-    }).select('_id fullName avatar avatarStorageKey companyId').lean();
-    if (!user) return null;
+    }).select('_id fullName avatar avatarStorageKey companyId role').lean();
+    if (!user || user.role !== socket.data.userRole) return null;
     if (isR2Configured() && user.avatarStorageKey) {
       user.avatar = await generateSignedAvatarUrl(user.avatarStorageKey);
     }
@@ -351,7 +412,7 @@ export const initSocket = (server: HTTPServer) => {
       decoded = verifyAccessToken(token);
       if (
         typeof decoded.userId !== 'string' || !decoded.userId ||
-        typeof decoded.companyId !== 'string' ||
+        typeof decoded.companyId !== 'string' || !decoded.companyId ||
         typeof decoded.role !== 'string' || !decoded.role
       ) {
         return next(new Error('Invalid token'));
@@ -389,6 +450,7 @@ export const initSocket = (server: HTTPServer) => {
       socket.data.userRole = user.role || decoded.role;
       socket.data.organizationType = company.organizationType;
       socket.data.accountType = company.accountType;
+      socket.data.subscriptionEntitlements = subscription.planConfig.entitlements;
       socket.data.wasOnline = await RealtimePresence.exists({
         userId: decoded.userId,
         expiresAt: { $gt: new Date() },
@@ -416,6 +478,58 @@ export const initSocket = (server: HTTPServer) => {
     const userRole = socket.data.userRole as string;
     let callSignalQueue = Promise.resolve();
     let subscriptionExpiryTimer: NodeJS.Timeout | undefined;
+
+    const refreshSocketAuthorization = async (eventName?: string): Promise<boolean> => {
+      try {
+        const [user, company] = await Promise.all([
+          User.findOne({
+            _id: userId,
+            companyId,
+            isVerified: true,
+            isActive: true,
+            isDeleted: { $ne: true },
+          }).select('role').lean(),
+          Company.findOne({ _id: companyId, isActive: true })
+            .select('organizationType accountType')
+            .lean(),
+        ]);
+        if (
+          !user ||
+          !company ||
+          user.role !== userRole ||
+          company.organizationType !== socket.data.organizationType ||
+          company.accountType !== socket.data.accountType
+        ) {
+          socket.disconnect(true);
+          return false;
+        }
+
+        const subscription = await getEffectiveSubscription(userId);
+        if (!subscription.hasActiveAccess) {
+          socket.emit('subscription:required', {
+            code: 'SUBSCRIPTION_REQUIRED',
+            subscriptionStatus: subscription.status,
+            plan: subscription.plan,
+          });
+          socket.disconnect(true);
+          return false;
+        }
+        if (JSON.stringify(subscription.planConfig.entitlements) !==
+            JSON.stringify(socket.data.subscriptionEntitlements)) {
+          socket.disconnect(true);
+          return false;
+        }
+        const requiredFeature = eventName ? socketEventFeature(eventName) : undefined;
+        if (requiredFeature && !hasSocketFeature(socket, requiredFeature, subscription.planConfig.entitlements)) {
+          return false;
+        }
+        return true;
+      } catch (error) {
+        console.error(`[Socket] Workspace authorization check failed for user ${userId}:`, error);
+        socket.disconnect(true);
+        return false;
+      }
+    };
 
     const disconnectForExpiredSubscription = async () => {
       try {
@@ -454,39 +568,47 @@ export const initSocket = (server: HTTPServer) => {
     }
 
     socket.use((packet, next) => {
-      void getEffectiveSubscription(userId).then((subscription) => {
-        if (subscription.hasActiveAccess) {
+      const eventName = typeof packet[0] === 'string' ? packet[0] : undefined;
+      void refreshSocketAuthorization(eventName).then((authorized) => {
+        if (authorized) {
           next();
           return;
         }
-        socket.emit('subscription:required', {
-          code: 'SUBSCRIPTION_REQUIRED',
-          subscriptionStatus: subscription.status,
-          plan: subscription.plan,
-        });
-        socket.disconnect(true);
-        next(new Error('subscription_required'));
-      }).catch((error) => {
-        console.error(`[Socket] Subscription access check failed for user ${userId}:`, error);
-        next(new Error('subscription_check_unavailable'));
+        if (socket.connected && eventName && socketEventFeature(eventName)) {
+          next(new Error('organization_feature_forbidden'));
+          return;
+        }
+        next(new Error('workspace_access_unavailable'));
       });
     });
 
     const wasOnline = Boolean(socket.data.wasOnline);
-    if (!wasOnline) io.to(`company:${companyId}`).emit('user:online', { userId });
     socket.join(userRoom(userId));
-    socket.join(`company:${companyId}`);
-    void sendPresenceSnapshot(socket, userId, companyId);
+    if (hasSocketFeature(socket, 'companyWorkspace')) {
+      socket.join(`company:${companyId}`);
+      if (!wasOnline) io.to(`company:${companyId}`).emit('user:online', { userId });
+    }
+    for (const feature of ['educationCommunication', 'educationMeetings', 'globalCalling'] as const) {
+      if (hasSocketFeature(socket, feature)) socket.join(userFeatureRoom(userId, feature));
+    }
+    if (hasSocketFeature(socket, 'globalCalling')) socket.join(GLOBAL_CALLING_ROOM);
+    if (hasSocketFeature(socket, 'educationCommunication')) {
+      void sendPresenceSnapshot(socket, userId, companyId);
+    }
     void publishUserPresence(userId);
-    void sendPendingIncomingCalls(socket, userId);
+    if (hasSocketFeature(socket, 'globalCalling')) void sendPendingIncomingCalls(socket, userId);
 
     const presenceHeartbeat = setInterval(() => {
-      void RealtimePresence.updateOne(
-        { socketId: socket.id, userId },
-        { $set: { expiresAt: new Date(Date.now() + PRESENCE_LEASE_MS) } },
-      ).catch((error: unknown) => {
+      void refreshSocketAuthorization().then((authorized) => {
+        if (!authorized) return;
+        return RealtimePresence.updateOne(
+          { socketId: socket.id, userId },
+          { $set: { expiresAt: new Date(Date.now() + PRESENCE_LEASE_MS) } },
+        );
+      }).catch((error: unknown) => {
         const errorName = error instanceof Error ? error.name : 'UnknownError';
         console.error('[Socket] Presence heartbeat failed.', { userId, errorName });
+        socket.disconnect(true);
       });
     }, PRESENCE_HEARTBEAT_MS);
     presenceHeartbeat.unref();
@@ -518,6 +640,7 @@ export const initSocket = (server: HTTPServer) => {
     socket.on('board:leave', (boardId: unknown) => {
       if (typeof boardId !== 'string' || !/^[a-f\d]{24}$/i.test(boardId)) return;
       const room = `board:${boardId}`;
+      if (!socket.rooms.has(room)) return;
       socket.leave(room);
       socket.to(room).emit('board:collaborator-left', { userId });
     });
@@ -536,16 +659,18 @@ export const initSocket = (server: HTTPServer) => {
       socket.to(room).emit('board:cursor', { userId, x, y });
     });
     
-    void (async () => {
-      const onlineLeases = await RealtimePresence.find({
-        companyId,
-        expiresAt: { $gt: new Date() },
-      }).distinct('userId');
-      socket.emit('users:online-list', onlineLeases.map((id) => id.toString()));
-    })().catch((error: unknown) => {
-      const errorName = error instanceof Error ? error.name : 'UnknownError';
-      console.error('[Socket] Online-user snapshot failed.', { userId, errorName });
-    });
+    if (hasSocketFeature(socket, 'educationCommunication')) {
+      void (async () => {
+        const onlineLeases = await RealtimePresence.find({
+          companyId,
+          expiresAt: { $gt: new Date() },
+        }).distinct('userId');
+        socket.emit('users:online-list', onlineLeases.map((id) => id.toString()));
+      })().catch((error: unknown) => {
+        const errorName = error instanceof Error ? error.name : 'UnknownError';
+        console.error('[Socket] Online-user snapshot failed.', { userId, errorName });
+      });
+    }
 
     socket.on('channel:join', async (id: string) => {
       // SECURITY: Verify the socket's company owns this channel before joining.
@@ -725,6 +850,11 @@ export const initSocket = (server: HTTPServer) => {
         const isCaller = session.callerId.toString() === userId;
         const isCallee = session.calleeId.toString() === userId;
         if (!isCaller && !isCallee) return;
+        const participantsCanCall = await Promise.all(
+          [session.callerId.toString(), session.calleeId.toString()]
+            .map((participantId) => persistedUserHasFeature(participantId, 'globalCalling')),
+        );
+        if (!participantsCanCall.every(Boolean)) return;
         if (session.status === 'ringing') {
           if (session.expiresAt <= new Date()) {
             await terminateGlobalCall(sessionId, 'missed');
@@ -851,6 +981,9 @@ export const initSocket = (server: HTTPServer) => {
     socket.on('meeting:leave', async (payload: { meetingId?: string } = {}) => {
       const meetingId = payload.meetingId;
       if (typeof meetingId !== 'string') return;
+      const room = `meeting:${meetingId}`;
+      const participant = meetingParticipantFor(socket, meetingId);
+      if (!socket.rooms.has(room) || !participant || participant.userId !== userId) return;
       const access = await authorizeMeetingSocket(socket, meetingId);
       socket.leave(`meeting:${meetingId}`);
       delete (socket.data.meetingGrants as Record<string, string> | undefined)?.[meetingId];
@@ -943,11 +1076,19 @@ export async function isUserOnline(userId: string): Promise<boolean> {
 
 export function disconnectCompanySockets(companyId: string): void {
   if (!io) return;
-  io.to(`company:${companyId}`).emit('subscription:required', {
-    code: 'SUBSCRIPTION_REQUIRED',
-    billingPath: '/billing',
+  void io.fetchSockets().then((sockets) => {
+    for (const socket of sockets) {
+      if (socket.data.companyId !== companyId) continue;
+      socket.emit('subscription:required', {
+        code: 'SUBSCRIPTION_REQUIRED',
+        billingPath: '/billing',
+      });
+      socket.disconnect(true);
+    }
+  }).catch((error: unknown) => {
+    const errorName = error instanceof Error ? error.name : 'UnknownError';
+    console.error('[Socket] Failed to disconnect expired workspace sockets.', { companyId, errorName });
   });
-  io.in(`company:${companyId}`).disconnectSockets(true);
 }
 export async function hasCallSessionSockets(sessionId: string): Promise<boolean> {
   if (!io) throw new Error('Socket.IO has not been initialized.');
@@ -964,4 +1105,28 @@ export async function getMeetingParticipants(meetingId: string): Promise<Meeting
 export const emitToCompany = (cid: string, ev: string, data: any) => io?.to(`company:${cid}`).emit(ev, data);
 export const emitToChannel = (cid: string, ev: string, data: any) => io?.to(`channel:${cid}`).emit(ev, data);
 export const emitToDM = (cid: string, ev: string, data: any) => io?.to(`dm:${cid}`).emit(ev, data);
-export const emitToUser = (uid: string, ev: string, data: any) => io?.to(userRoom(uid)).emit(ev, data);
+export const emitToUser = (uid: string, ev: string, data: any) => {
+  if (ev.startsWith('meeting:')) {
+    const meetingLink = typeof data?.meetingLink === 'string'
+      ? data.meetingLink
+      : typeof data?.meeting?.meetingLink === 'string' ? data.meeting.meetingLink : '';
+    if (!meetingLink) return;
+    void Promise.all([
+      User.findOne({ _id: uid, isVerified: true, isActive: true, isDeleted: { $ne: true } })
+        .select('companyId')
+        .lean(),
+      Meeting.findOne({ meetingLink }).select('companyId').lean(),
+    ]).then(([user, meeting]) => {
+      if (!io || !user?.companyId || !meeting ||
+          meeting.companyId.toString() !== user.companyId.toString()) return;
+      const feature = socketUserEventFeature(ev);
+      io.to(feature ? userFeatureRoom(uid, feature) : userRoom(uid)).emit(ev, data);
+    }).catch((error: unknown) => {
+      const errorName = error instanceof Error ? error.name : 'UnknownError';
+      console.error('[Socket] Meeting event recipient authorization failed.', { userId: uid, errorName });
+    });
+    return;
+  }
+  const feature = socketUserEventFeature(ev);
+  return io?.to(feature ? userFeatureRoom(uid, feature) : userRoom(uid)).emit(ev, data);
+};

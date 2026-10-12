@@ -217,7 +217,7 @@ export function GlobalSearchModal() {
     }, 250);
 
     return () => clearTimeout(timer);
-  }, [query, localAIStatus]);
+  }, [canSeeCrm, query, localAIStatus]);
 
   if (!isSearchOpen) return null;
 

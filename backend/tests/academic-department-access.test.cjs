@@ -21,6 +21,7 @@ const classId = new mongoose.Types.ObjectId();
 const otherClassId = new mongoose.Types.ObjectId();
 const courseId = new mongoose.Types.ObjectId();
 const studentId = new mongoose.Types.ObjectId();
+const crossDepartmentStudentId = new mongoose.Types.ObjectId();
 const teacherId = new mongoose.Types.ObjectId();
 const guardianId = new mongoose.Types.ObjectId();
 const assessmentId = new mongoose.Types.ObjectId();
@@ -48,6 +49,10 @@ function query(rows) {
     populate() { return this; },
     lean: async () => rows,
   };
+}
+
+function selected(rows) {
+  return { select: () => ({ lean: async () => rows }) };
 }
 
 test('department schema persists optional dean and HOD assignments', () => {
@@ -110,10 +115,21 @@ test('unassigned HOD is denied and an assigned Dean cannot mutate a class in ano
     replace(AcademicDepartment, 'find', () => ({ select: () => ({ lean: async () => [{ _id: departmentId }] }) })),
     replace(AcademicCourse, 'distinct', async () => [courseId]),
     replace(AcademicClass, 'distinct', async () => [classId]),
-    replace(AcademicEnrollment, 'distinct', async () => [studentId]),
+    replace(AcademicEnrollment, 'distinct', async () => [studentId, crossDepartmentStudentId]),
     replace(AcademicTeachingAssignment, 'distinct', async () => [teacherId]),
     replace(AcademicAssessment, 'distinct', async () => [assessmentId]),
     replace(AcademicGuardianLink, 'distinct', async () => [guardianId]),
+    replace(AcademicEnrollment, 'find', () => selected([
+      { studentId, classId },
+      { studentId: crossDepartmentStudentId, classId },
+      { studentId: crossDepartmentStudentId, classId: otherClassId },
+    ])),
+    replace(AcademicTeachingAssignment, 'find', () => selected([{ teacherId, classId }])),
+    replace(AcademicClass, 'find', () => selected([
+      { _id: classId, departmentId },
+      { _id: otherClassId, departmentId: otherDepartmentId },
+    ])),
+    replace(AcademicGuardianLink, 'find', () => selected([])),
     replace(AcademicClass, 'findOne', () => ({
       select: () => ({ lean: async () => ({ departmentId: otherDepartmentId }) }),
     })),
@@ -121,15 +137,18 @@ test('unassigned HOD is denied and an assigned Dean cannot mutate a class in ano
   try {
     const res = response();
     let nextCalled = false;
-    await requireAssignedAcademicDepartment({
+    const req = {
       user: { companyId: companyId.toString(), userId: userId.toString(), role: 'dean' },
       params: { resource: 'classes', id: otherClassId.toString() },
       path: `/classes/${otherClassId}`,
       method: 'PATCH',
       body: { name: 'Moved class' },
-    }, res, () => { nextCalled = true; });
+    };
+    await requireAssignedAcademicDepartment(req, res, () => { nextCalled = true; });
     assert.equal(res.statusCode, 404);
     assert.equal(nextCalled, false);
+    assert.deepEqual(req.academicDepartmentScope.studentIds, [studentId.toString(), crossDepartmentStudentId.toString()]);
+    assert.deepEqual(req.academicDepartmentScope.departmentExclusiveStudentIds, [studentId.toString()]);
   } finally {
     restore.reverse().forEach((undo) => undo());
   }

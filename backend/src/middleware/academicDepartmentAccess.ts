@@ -13,7 +13,7 @@ import AcademicPerson from '../models/AcademicPerson';
 import AcademicResult from '../models/AcademicResult';
 import AcademicSchedule from '../models/AcademicSchedule';
 import AcademicTeachingAssignment from '../models/AcademicTeachingAssignment';
-import { roleMatches } from '../config/organization';
+import { normalizeOrganizationRole, roleMatches } from '../config/organization';
 import { AuthRequest } from './auth';
 
 export interface AcademicDepartmentScope {
@@ -21,13 +21,13 @@ export interface AcademicDepartmentScope {
   courseIds: string[];
   classIds: string[];
   studentIds: string[];
+  departmentExclusiveStudentIds: string[];
   teacherIds: string[];
   guardianIds: string[];
   personIds: string[];
   assessmentIds: string[];
 }
 
-const TRUSTED_ASSIGNMENT_ROLES = ['owner', 'founder', 'principal', 'director', 'admin', 'office_staff'];
 
 function isDean(role: string): boolean {
   return roleMatches(role, ['dean'], 'university');
@@ -38,7 +38,7 @@ function isHod(role: string): boolean {
 }
 
 function isTrustedAssignmentActor(role: string): boolean {
-  return roleMatches(role, TRUSTED_ASSIGNMENT_ROLES, 'university');
+  return ['owner', 'principal', 'admin'].includes(normalizeOrganizationRole(role, 'university'));
 }
 
 function ids(values: unknown[]): string[] {
@@ -152,9 +152,9 @@ async function relationIsAllowed(
     }
     return true;
   }
-  if (resource === 'people') return false;
+  if (resource === 'people') return true;
   if (resource === 'guardians') {
-    if (supplied('studentId') && !isInScope(body.studentId, scope.studentIds)) return false;
+    if (supplied('studentId') && !isInScope(body.studentId, scope.departmentExclusiveStudentIds)) return false;
     if (supplied('guardianId')) {
       const guardian = await AcademicPerson.findOne({
         _id: body.guardianId, companyId, type: 'parent', status: 'active',
@@ -163,7 +163,7 @@ async function relationIsAllowed(
     }
     return true;
   }
-  if (resource === 'fees') return !supplied('studentId') || isInScope(body.studentId, scope.studentIds);
+  if (resource === 'fees') return !supplied('studentId') || isInScope(body.studentId, scope.departmentExclusiveStudentIds);
   if (resource === 'results') {
     if (supplied('assessmentId') && !isInScope(body.assessmentId, scope.assessmentIds)) return false;
     if (supplied('studentId')) {
@@ -197,7 +197,7 @@ async function buildScope(userId: string, role: string, companyId: mongoose.Type
   }).select('_id').lean();
   const departmentIds = departments.map((department) => department._id.toString());
   if (!departmentIds.length) return {
-    departmentIds, courseIds: [], classIds: [], studentIds: [], teacherIds: [],
+    departmentIds, courseIds: [], classIds: [], studentIds: [], departmentExclusiveStudentIds: [], teacherIds: [],
     guardianIds: [], personIds: [], assessmentIds: [],
   };
   const departmentFilter = { companyId, departmentId: { $in: departments.map((department) => department._id) } };
@@ -213,14 +213,78 @@ async function buildScope(userId: string, role: string, companyId: mongoose.Type
   const guardianIds = studentIds.length
     ? await AcademicGuardianLink.distinct('guardianId', { companyId, studentId: { $in: studentIds } })
     : [];
+  const enrollments = studentIds.length
+    ? await AcademicEnrollment.find({ companyId, studentId: { $in: studentIds } }).select('studentId classId').lean()
+    : [];
+  const teachingAssignments = teacherIds.length
+    ? await AcademicTeachingAssignment.find({ companyId, teacherId: { $in: teacherIds } }).select('teacherId classId').lean()
+    : [];
+  const relationClassIds = [...new Set([...enrollments, ...teachingAssignments].map((record) => record.classId.toString()))]
+    .map((id) => new mongoose.Types.ObjectId(id));
+  const relatedClasses = relationClassIds.length
+    ? await AcademicClass.find({ companyId, _id: { $in: relationClassIds } }).select('_id departmentId').lean()
+    : [];
+  const classDepartmentById = new Map(relatedClasses.map((academicClass) => [
+    academicClass._id.toString(),
+    academicClass.departmentId?.toString(),
+  ]));
+  const studentDepartments = new Map<string, Set<string>>();
+  const invalidStudents = new Set<string>();
+  for (const enrollment of enrollments) {
+    const student = enrollment.studentId.toString();
+    const department = classDepartmentById.get(enrollment.classId.toString());
+    if (!department) {
+      invalidStudents.add(student);
+      continue;
+    }
+    if (!studentDepartments.has(student)) studentDepartments.set(student, new Set());
+    studentDepartments.get(student)!.add(department);
+  }
+  const departmentExclusiveStudentIds = ids(studentIds).filter((studentId) => {
+    const departments = studentDepartments.get(studentId);
+    return !!departments?.size && !invalidStudents.has(studentId) &&
+      [...departments].every((department) => departmentIds.includes(department));
+  });
+  const safeStudents = new Set(departmentExclusiveStudentIds);
+  const guardianLinks = guardianIds.length
+    ? await AcademicGuardianLink.find({ companyId, guardianId: { $in: guardianIds } }).select('guardianId studentId').lean()
+    : [];
+  const guardianStudents = new Map<string, Set<string>>();
+  for (const link of guardianLinks) {
+    const guardian = link.guardianId.toString();
+    if (!guardianStudents.has(guardian)) guardianStudents.set(guardian, new Set());
+    guardianStudents.get(guardian)!.add(link.studentId.toString());
+  }
+  const safeGuardianIds = guardianIds.filter((guardian) => {
+    const relatedStudents = guardianStudents.get(guardian.toString());
+    return !!relatedStudents?.size && [...relatedStudents].every((student) => safeStudents.has(student));
+  });
+  const teacherDepartments = new Map<string, Set<string>>();
+  const invalidTeachers = new Set<string>();
+  for (const assignment of teachingAssignments) {
+    const teacher = assignment.teacherId.toString();
+    const department = classDepartmentById.get(assignment.classId.toString());
+    if (!department) {
+      invalidTeachers.add(teacher);
+      continue;
+    }
+    if (!teacherDepartments.has(teacher)) teacherDepartments.set(teacher, new Set());
+    teacherDepartments.get(teacher)!.add(department);
+  }
+  const safeTeacherIds = teacherIds.filter((teacher) => {
+    const departments = teacherDepartments.get(teacher.toString());
+    return !!departments?.size && !invalidTeachers.has(teacher.toString()) &&
+      [...departments].every((department) => departmentIds.includes(department));
+  });
   return {
     departmentIds,
     courseIds: ids(courseIds),
     classIds: ids(classIds),
     studentIds: ids(studentIds),
-    teacherIds: ids(teacherIds),
-    guardianIds: ids(guardianIds),
-    personIds: ids([...studentIds, ...teacherIds, ...guardianIds]),
+    departmentExclusiveStudentIds,
+    teacherIds: ids(safeTeacherIds),
+    guardianIds: ids(safeGuardianIds),
+    personIds: [...new Set([...departmentExclusiveStudentIds, ...ids(safeTeacherIds), ...ids(safeGuardianIds)])],
     assessmentIds: ids(assessmentIds),
   };
 }
@@ -271,6 +335,10 @@ export const requireAssignedAcademicDepartment = async (
     } else if (req.method !== 'GET') {
       if (resource === 'departments') {
         res.status(403).json({ success: false, message: 'Department creation is limited to trusted organization administrators.' });
+        return;
+      }
+      if (resource === 'people') {
+        res.status(403).json({ success: false, message: 'People records must be associated with an authorized academic relationship.' });
         return;
       }
       if (resource === 'fees' && req.path.endsWith('/payments')) {

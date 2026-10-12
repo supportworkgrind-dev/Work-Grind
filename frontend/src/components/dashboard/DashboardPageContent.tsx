@@ -227,7 +227,7 @@ export default function DashboardPage() {
       } catch { /* silent */ }
       finally { setLoading(false); }
     })();
-  }, []);
+  }, [canSeeCrm]);
 
   /* ── Helpers ── */
   const getGreeting = () => {
