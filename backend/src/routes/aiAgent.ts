@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { createHash } from 'node:crypto';
 import { asyncHandler } from '../middleware/asyncHandler';
 import { authenticate, requireCompany, requireEntitlement } from '../middleware/auth';
+import { requireOrganizationFeature } from '../middleware/organizationAccess';
 import { rateLimiter } from '../middleware/rateLimiter';
 import {
   runAgent,
@@ -22,7 +23,7 @@ router.post('/voice/turn', rateLimiter(60, 30, {
     .digest('hex'),
 }), asyncHandler(runVoiceTurn));
 
-router.use(authenticate, requireEntitlement('aiAssistant'));
+router.use(authenticate, requireOrganizationFeature('educationAi'), requireEntitlement('aiAssistant'));
 
 // 30 agent requests per hour — prevents abuse while keeping normal usage smooth
 router.use(rateLimiter(60, 30));

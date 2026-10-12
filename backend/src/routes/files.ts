@@ -7,11 +7,15 @@ import {
 import { authenticate, requireEntitlement } from '../middleware/auth';
 import { upload } from '../middleware/upload';
 import { validateObjectId } from '../middleware/validateObjectId';
-import { requireOrganizationFeature } from '../middleware/organizationAccess';
+import { requireAnyOrganizationFeature } from '../middleware/organizationAccess';
 
 const router = Router();
 
-router.use(authenticate, requireOrganizationFeature('workspaceContent'), requireEntitlement('fileStorage'));
+router.use(
+  authenticate,
+  requireAnyOrganizationFeature('workspaceContent', 'soloWorkspace', 'educationFiles'),
+  requireEntitlement('fileStorage'),
+);
 
 router.get('/',                              getFiles);
 router.post('/upload',                       upload.single('file'), uploadFile);

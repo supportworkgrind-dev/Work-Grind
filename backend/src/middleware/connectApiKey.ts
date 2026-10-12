@@ -5,6 +5,7 @@ import { DeveloperApiKey, DeveloperApiRateWindow, type ConnectScope } from '../m
 import Company from '../models/Company';
 import User from '../models/User';
 import { getEffectiveSubscription } from '../services/companySubscription';
+import { isOrganizationFeatureAllowed } from './organizationAccess';
 
 export interface ConnectApiRequest extends Request {
   connectApiKey?: {
@@ -42,10 +43,18 @@ export async function authenticateConnectApiKey(req: ConnectApiRequest, res: Res
     }
 
     const [company, creator] = await Promise.all([
-      Company.exists({ _id: record.companyId, isActive: true }),
-      User.exists({ _id: record.createdBy, companyId: record.companyId, isActive: true, role: { $in: ['owner', 'admin'] } }),
+      Company.findOne({ _id: record.companyId, isActive: true })
+        .select('organizationType accountType')
+        .lean(),
+      User.findOne({ _id: record.createdBy, companyId: record.companyId, isActive: true, role: { $in: ['owner', 'admin'] } })
+        .select('role')
+        .lean(),
     ]);
-    if (!company || !creator) {
+    if (
+      !company ||
+      !creator ||
+      !isOrganizationFeatureAllowed(company, creator.role, 'companyWorkspace')
+    ) {
       res.status(401).json({ success: false, error: { code: 'API_KEY_UNAVAILABLE', message: 'The API key is no longer authorized.' } });
       return;
     }

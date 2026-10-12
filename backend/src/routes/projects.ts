@@ -10,11 +10,15 @@ import {
   getProjectConnectedData,
 } from '../controllers/project.controller';
 import { authenticate, requireEntitlement, requireRole } from '../middleware/auth';
-import { requireOrganizationFeature } from '../middleware/organizationAccess';
+import { requireAnyOrganizationFeature } from '../middleware/organizationAccess';
 
 const router = Router();
 
-router.use(authenticate, requireOrganizationFeature('workspaceContent'), requireEntitlement('tasksProjects'));
+router.use(
+  authenticate,
+  requireAnyOrganizationFeature('workspaceContent', 'soloWorkspace'),
+  requireEntitlement('tasksProjects'),
+);
 
 router.get('/', getProjects);
 router.post('/', requireRole('owner', 'admin', 'manager'), createProject);

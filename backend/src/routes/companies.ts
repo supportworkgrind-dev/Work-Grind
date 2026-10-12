@@ -19,13 +19,13 @@ const router = Router();
 router.use(authenticate);
 
 router.get('/', getCompany);
-router.patch('/', requireRole('owner', 'admin'), updateCompany);
+router.patch('/', requireRole('owner', 'admin', 'principal'), requireOrganizationFeature('workspaceSettings'), updateCompany);
 router.get('/members', requireOrganizationFeature('memberDirectory'), getCompanyMembers);
-router.get('/invites', requireRole('owner', 'admin', 'manager'), getCompanyInvites);
-router.post('/invite', requireRole('owner', 'admin', 'manager'), inviteMember);
-router.delete('/invites/:token', requireRole('owner', 'admin'), revokeInvite);
-router.post('/invites/:token/resend', requireRole('owner', 'admin', 'manager'), resendInvite);
-router.post('/regenerate-invite-code', requireRole('owner', 'admin'), regenerateInviteCode);
+router.get('/invites', requireRole('owner', 'admin', 'manager', 'principal'), requireOrganizationFeature('memberDirectory'), getCompanyInvites);
+router.post('/invite', requireRole('owner', 'admin', 'manager', 'principal'), requireOrganizationFeature('memberDirectory'), inviteMember);
+router.delete('/invites/:token', requireRole('owner', 'admin', 'principal'), requireOrganizationFeature('memberDirectory'), revokeInvite);
+router.post('/invites/:token/resend', requireRole('owner', 'admin', 'manager', 'principal'), requireOrganizationFeature('memberDirectory'), resendInvite);
+router.post('/regenerate-invite-code', requireRole('owner', 'admin', 'principal'), requireOrganizationFeature('memberDirectory'), regenerateInviteCode);
 router.delete('/members/:userId', requireRole('owner', 'admin'), requireOrganizationFeature('memberDirectory'), removeMember);
 router.get('/stats', requireOrganizationFeature('memberDirectory'), getCompanyStats);
 

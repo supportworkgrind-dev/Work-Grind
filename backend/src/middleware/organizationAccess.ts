@@ -79,11 +79,39 @@ export const ORGANIZATION_FEATURE_POLICIES: Record<OrganizationFeature, FeatureP
   workspaceSettings: {
     organizationTypes: [...BUSINESS_TYPES, ...EDUCATION_TYPES],
     accountTypes: [...COMPANY_ACCOUNTS, ...INDIVIDUAL_ACCOUNTS],
-    roles: 'eligible',
+    roles: ['owner', 'admin', 'principal'],
   },
   globalCalling: { organizationTypes: BUSINESS_TYPES, accountTypes: COMPANY_ACCOUNTS, roles: 'eligible' },
   calendar: { organizationTypes: [...BUSINESS_TYPES, ...EDUCATION_TYPES], accountTypes: [...COMPANY_ACCOUNTS, ...INDIVIDUAL_ACCOUNTS], roles: 'eligible', entitlement: 'meetingsCalendar' },
 };
+
+function isSupportedOrganizationType(value: unknown): value is OrganizationType {
+  return value === 'business' || value === 'school' || value === 'college' || value === 'university';
+}
+
+export function requireAnyOrganizationFeature(...features: OrganizationFeature[]) {
+  return (req: AuthRequest, res: Response, next: NextFunction): void => {
+    const organizationType = req.user?.organizationType;
+    const accountType = req.user?.accountType;
+    const role = req.user?.role;
+    if (
+      !isSupportedOrganizationType(organizationType) ||
+      (accountType !== 'company' && accountType !== 'individual') ||
+      typeof role !== 'string'
+    ) {
+      res.status(403).json({ success: false, message: 'Active workspace context is required' });
+      return;
+    }
+
+    const organization = { organizationType, accountType };
+    if (features.some((feature) => isOrganizationFeatureAllowed(organization, role, feature))) {
+      next();
+      return;
+    }
+
+    res.status(403).json({ success: false, message: 'This feature is not available for your workspace role' });
+  };
+}
 
 export function isOrganizationFeatureAllowed(
   organization: { organizationType: OrganizationType; accountType: AccountType },

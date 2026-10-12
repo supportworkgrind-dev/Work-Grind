@@ -5,12 +5,16 @@ import {
   startTaskTimer, stopTaskTimer,
 } from '../controllers/task.controller';
 import { authenticate, requireEntitlement, requireRole } from '../middleware/auth';
-import { requireOrganizationFeature } from '../middleware/organizationAccess';
+import { requireAnyOrganizationFeature } from '../middleware/organizationAccess';
 import { validateObjectId } from '../middleware/validateObjectId';
 
 const router = Router();
 
-router.use(authenticate, requireOrganizationFeature('workspaceContent'), requireEntitlement('tasksProjects'));
+router.use(
+  authenticate,
+  requireAnyOrganizationFeature('workspaceContent', 'soloWorkspace'),
+  requireEntitlement('tasksProjects'),
+);
 
 router.get('/',      getTasks);
 router.get('/my',    getMyTasks);

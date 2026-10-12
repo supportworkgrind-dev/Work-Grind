@@ -20,6 +20,7 @@ import Folder from '../models/Folder';
 import Project from '../models/Project';
 import Company from '../models/Company';
 import { AuthRequest } from '../middleware/auth';
+import { isAcademicOrganizationType } from '../config/organization';
 import { releaseStorage, reserveStorage } from '../utils/planLimits';
 import { getEffectiveSubscription } from '../services/companySubscription';
 import {
@@ -29,6 +30,28 @@ import {
   generateSignedDownloadUrl,
   testR2Connection,
 } from '../services/r2Storage';
+
+function getAcademicFileAccessScope(req: AuthRequest, permission: 'view' | 'edit' = 'view'): Record<string, unknown> {
+  if (!isAcademicOrganizationType(req.user?.organizationType)) return {};
+
+  const role = req.user?.role ?? '';
+  if (['owner', 'admin', 'principal'].includes(role)) return {};
+
+  const userId = req.user!.userId;
+  return {
+    $or: [
+      { uploaderId: userId },
+      {
+        sharedWith: {
+          $elemMatch: {
+            userId,
+            permission: permission === 'edit' ? 'edit' : { $in: ['view', 'edit'] },
+          },
+        },
+      },
+    ],
+  };
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -49,6 +72,10 @@ export const getFiles = async (req: AuthRequest, res: Response): Promise<void> =
   try {
     const { folderId, projectId, isStarred, search } = req.query;
     const filter: any = { companyId: req.user!.companyId, isDeleted: false };
+    const accessScope = getAcademicFileAccessScope(req);
+    if (accessScope.$or) {
+      filter.$and = [...(filter.$and ?? []), accessScope];
+    }
 
     if (folderId)              filter.folderId  = folderId === 'root' ? null : folderId;
     if (projectId)             filter.projectId = projectId;
@@ -59,7 +86,12 @@ export const getFiles = async (req: AuthRequest, res: Response): Promise<void> =
       File.find(filter)
         .populate('uploaderId', 'fullName avatar')
         .populate('sharedWith.userId', 'fullName avatar')
-        .populate({ path: 'projectId', select: 'name color crmCompanyId', populate: { path: 'crmCompanyId', select: 'name' } })
+        .populate({
+          path: 'projectId',
+          match: { companyId: req.user!.companyId },
+          select: 'name color crmCompanyId',
+          populate: { path: 'crmCompanyId', match: { companyId: req.user!.companyId }, select: 'name' },
+        })
         .sort({ createdAt: -1 }),
       getEffectiveSubscription(req.user!.userId),
       req.user!.companyId
@@ -292,9 +324,23 @@ export const updateFile = async (req: AuthRequest, res: Response): Promise<void>
     const ALLOWED = ['name', 'isStarred', 'tags', 'folderId', 'projectId'];
     const updates: Record<string, any> = {};
     ALLOWED.forEach((f) => { if (req.body[f] !== undefined) updates[f] = req.body[f]; });
+    const companyId = req.user!.companyId;
+
+    if (updates.projectId != null &&
+        (!mongoose.Types.ObjectId.isValid(String(updates.projectId)) ||
+          !(await Project.exists({ _id: updates.projectId, companyId })))) {
+      res.status(400).json({ success: false, message: 'Project must belong to your workspace' });
+      return;
+    }
+    if (updates.folderId != null &&
+        (!mongoose.Types.ObjectId.isValid(String(updates.folderId)) ||
+          !(await Folder.exists({ _id: updates.folderId, companyId })))) {
+      res.status(400).json({ success: false, message: 'Folder must belong to your workspace' });
+      return;
+    }
 
     const file = await File.findOneAndUpdate(
-      { _id: req.params.id, companyId: req.user!.companyId },
+      { _id: req.params.id, companyId, ...getAcademicFileAccessScope(req, 'edit') },
       updates,
       { new: true }
     ).populate('uploaderId', 'fullName avatar');
@@ -319,6 +365,8 @@ export const deleteFile = async (req: AuthRequest, res: Response): Promise<void>
       _id:       req.params.id,
       companyId: req.user!.companyId,
       isDeleted: false,
+      ...getAcademicFileAccessScope(req, 'edit'),
+      ...getAcademicFileAccessScope(req),
     });
 
     if (!file) {

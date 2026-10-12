@@ -45,14 +45,19 @@ export const globalSearch = async (req: AuthRequest, res: Response): Promise<voi
     const organizationType = req.user?.organizationType;
     const accountType = req.user?.accountType;
     const role = req.user?.role;
-    const hasValidOrganizationType = organizationType === 'business' ||
-      organizationType === 'school' ||
-      organizationType === 'college' ||
-      organizationType === 'university';
-    const hasValidAccountType = accountType === 'company' || accountType === 'individual';
-    const canRequestCrm = hasValidOrganizationType && hasValidAccountType &&
-      typeof role === 'string' &&
-      isOrganizationFeatureAllowed({ organizationType, accountType }, role, 'businessCrm');
+    let canRequestCrm = false;
+    if (
+      (organizationType === 'business' || organizationType === 'school' ||
+        organizationType === 'college' || organizationType === 'university') &&
+      (accountType === 'company' || accountType === 'individual') &&
+      typeof role === 'string'
+    ) {
+      canRequestCrm = isOrganizationFeatureAllowed(
+        { organizationType, accountType },
+        role,
+        'businessCrm',
+      );
+    }
 
     // Escape regex special chars to prevent ReDoS
     const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
