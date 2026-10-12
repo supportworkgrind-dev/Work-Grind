@@ -31,6 +31,7 @@ function normalizeGeminiModel(model?: string): string {
     'gemini-2.5-flash-lite': DEFAULT_GEMINI_MODEL,
     'gemini-3.6-flash': DEFAULT_GEMINI_MODEL,
     'gemini-3.6-flash-preview': DEFAULT_GEMINI_MODEL,
+    'gemini-3.8-flash': DEFAULT_GEMINI_MODEL,
   };
 
   return legacyMap[trimmed] ?? trimmed;

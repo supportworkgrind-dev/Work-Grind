@@ -32,6 +32,8 @@ export interface ToolContext {
   companyId: string;
   userId:    string;
   userRole:  string;
+  accountType?: 'company' | 'individual';
+  organizationType?: string;
   planName?: string;
   planId?: string;
   enabledFeatures?: string[];
@@ -83,6 +85,7 @@ export interface AgentTool {
   name:        string;
   description: string;
   parameters:  Record<string, any>; // JSON Schema
+  readOnly?:   boolean;
   requiresVoiceConfirmation?: boolean;
   execute:     (args: Record<string, any>, ctx: ToolContext) => Promise<ToolResult>;
 }
@@ -93,6 +96,7 @@ export const TOOLS: AgentTool[] = [
 
   {
     name: 'searchTasks',
+    readOnly: true,
     description: 'Search tasks in the workspace. Can filter by status, priority, assignee, overdue, or free-text query.',
     parameters: {
       type: 'object',
@@ -222,6 +226,7 @@ export const TOOLS: AgentTool[] = [
 
   {
     name: 'searchProjects',
+    readOnly: true,
     description: 'Search projects in the workspace.',
     parameters: {
       type: 'object',
@@ -292,6 +297,7 @@ export const TOOLS: AgentTool[] = [
 
   {
     name: 'searchMeetings',
+    readOnly: true,
     description: 'Search meetings. Can filter by upcoming, past, or by title.',
     parameters: {
       type: 'object',
@@ -330,6 +336,7 @@ export const TOOLS: AgentTool[] = [
 
   {
     name: 'searchCalendarEvents',
+    readOnly: true,
     description: 'Search authorized workspace calendar events by title, type, and date range.',
     parameters: {
       type: 'object',
@@ -403,6 +410,7 @@ export const TOOLS: AgentTool[] = [
 
   {
     name: 'searchContacts',
+    readOnly: true,
     description: 'Search CRM contacts by name, email, job title, or company.',
     parameters: {
       type: 'object',
@@ -433,6 +441,7 @@ export const TOOLS: AgentTool[] = [
 
   {
     name: 'searchDeals',
+    readOnly: true,
     description: 'Search CRM deals. Can filter by stage, overdue close date, or title.',
     parameters: {
       type: 'object',
@@ -466,6 +475,7 @@ export const TOOLS: AgentTool[] = [
 
   {
     name: 'searchCrmCompanies',
+    readOnly: true,
     description: 'Search CRM companies/accounts by name, industry, or domain.',
     parameters: {
       type: 'object',
@@ -542,6 +552,7 @@ export const TOOLS: AgentTool[] = [
 
   {
     name: 'searchTeamMembers',
+    readOnly: true,
     description: 'Search team members in the workspace by name, email, department, or role.',
     parameters: {
       type: 'object',
@@ -576,6 +587,7 @@ export const TOOLS: AgentTool[] = [
 
   {
     name: 'searchDocuments',
+    readOnly: true,
     description: 'Search documents in the workspace by title or type.',
     parameters: {
       type: 'object',
@@ -603,6 +615,7 @@ export const TOOLS: AgentTool[] = [
 
   {
     name: 'searchFiles',
+    readOnly: true,
     description: 'Search files the current user can access in the authenticated workspace. Never returns file URLs, storage keys, or sharing credentials.',
     parameters: {
       type: 'object',
@@ -641,6 +654,7 @@ export const TOOLS: AgentTool[] = [
 
   {
     name: 'getWorkspaceSummary',
+    readOnly: true,
     description: 'Get a high-level summary of the workspace: task counts, active projects, upcoming meetings, and CRM overview.',
     parameters: { type: 'object', properties: {} },
     async execute(_args, ctx) {
@@ -682,6 +696,7 @@ export const TOOLS: AgentTool[] = [
 
   {
     name: 'getCrmAccountSummary',
+    readOnly: true,
     description: 'Get a full summary of a specific CRM company/account including contacts, deals, and recent activity.',
     parameters: {
       type: 'object',
@@ -754,6 +769,7 @@ const EXTRA_TOOLS: AgentTool[] = [
 
   {
     name: 'getWorkspacePlan',
+    readOnly: true,
     description: 'Get the authenticated user\'s current workspace plan, AI request usage, and enabled features.',
     parameters: { type: 'object', properties: {} },
     async execute(_args, ctx) {
@@ -868,6 +884,7 @@ const EXTRA_TOOLS: AgentTool[] = [
 
   {
     name: 'searchMessages',
+    readOnly: true,
     description: 'Search channel messages in the workspace (not private DMs).',
     parameters: {
       type: 'object',
@@ -943,6 +960,7 @@ const EXTRA_TOOLS: AgentTool[] = [
 
   {
     name: 'getTeamMembers',
+    readOnly: true,
     description: 'Get a list of all active team members in the workspace.',
     parameters: {
       type: 'object',

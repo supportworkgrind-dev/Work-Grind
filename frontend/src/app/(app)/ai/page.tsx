@@ -18,7 +18,7 @@ import {
   Search, BarChart2,
   CheckSquare, Briefcase, Users, Building2,
   Clock, Trash2, History, X,
-  Mic, MessageSquareText,
+  Mic, MessageSquareText, StopCircle,
 } from 'lucide-react';
 import { AIStatusBadge } from '@/components/common/AIStatusBadge';
 import type { AIProvider } from '@/components/common/AIStatusBadge';
@@ -296,7 +296,10 @@ export default function AIAgentPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef       = useRef<HTMLTextAreaElement>(null);
   const requestInFlight = useRef(false);
+  const requestAbortRef = useRef<AbortController | null>(null);
   const conversationStorageKey = user?._id ? `workgrind:ai:active-conversation:${user._id}` : null;
+
+  useEffect(() => () => requestAbortRef.current?.abort(), []);
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -382,6 +385,8 @@ export default function AIAgentPage() {
     setRequestError('');
     setRetryPrompt('');
     setInput('');
+    const abortController = new AbortController();
+    requestAbortRef.current = abortController;
 
     const userMsg: ChatMessage = {
       id:        Date.now().toString(),
@@ -468,6 +473,7 @@ export default function AIAgentPage() {
         stream: true,
       }, {
         timeout: 60_000,
+        signal: abortController.signal,
         onDownloadProgress: (progress) => {
           const xhr = progress.event.target as XMLHttpRequest | null;
           const body = xhr?.responseText;
@@ -513,7 +519,7 @@ export default function AIAgentPage() {
       ]);
     } catch (err: unknown) {
       const failure = err && typeof err === 'object'
-        ? err as { response?: { data?: unknown }; code?: string; message?: string }
+        ? err as { response?: { data?: unknown }; code?: string; message?: string; name?: string }
         : {};
       const responseMessage = typeof failure.response?.data === 'string'
         ? (() => {
@@ -523,13 +529,16 @@ export default function AIAgentPage() {
           'message' in failure.response.data && typeof failure.response.data.message === 'string'
           ? failure.response.data.message
           : undefined;
-      const errMsg = responseMessage ?? (
+      const cancelled = failure.code === 'ERR_CANCELED' || failure.name === 'CanceledError';
+      const errMsg = responseMessage ?? (cancelled
+        ? 'Response cancelled.'
+        : (
         failure.code === 'ECONNABORTED' || failure.code === 'ETIMEDOUT'
           ? 'Tavro AI timed out while waiting for the service. Please try again.'
           : failure.message && failure.message !== 'Network Error'
             ? failure.message
             : 'Tavro AI could not reach the service. Check your connection and try again.'
-      );
+        ));
       setMessages(prev => prev
         .filter(m => m.id !== 'loading')
         .map((message) => message.id === userMsg.id ? { ...message, requestStatus: 'failed' as const } : message));
@@ -538,9 +547,12 @@ export default function AIAgentPage() {
     } finally {
       setIsLoading(false);
       requestInFlight.current = false;
+      if (requestAbortRef.current === abortController) requestAbortRef.current = null;
       inputRef.current?.focus();
     }
   };
+
+  const cancelRequest = () => requestAbortRef.current?.abort();
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -729,13 +741,14 @@ export default function AIAgentPage() {
               }}
             />
             <button
-              onClick={() => send()}
-              disabled={!input.trim() || isLoading || aiLimitReached}
+              onClick={() => isLoading ? cancelRequest() : void send()}
+              disabled={!isLoading && (!input.trim() || aiLimitReached)}
               className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-all disabled:opacity-40 hover:opacity-90 active:scale-95"
               style={{ background: 'var(--accent)', color: 'var(--text-on-accent)' }}
-              aria-label="Send">
+              aria-label={isLoading ? 'Stop response' : 'Send'}
+              title={isLoading ? 'Stop response' : 'Send'}>
               {isLoading
-                ? <Loader2 className="h-4 w-4 animate-spin" />
+                ? <StopCircle className="h-4 w-4" />
                 : <Send className="h-4 w-4" />}
             </button>
           </div>

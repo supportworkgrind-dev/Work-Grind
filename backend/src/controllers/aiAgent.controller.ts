@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth';
 import { runAgentTurn, AIProviderUnavailableError } from '../ai/agentRuntime';
 import { TOOLS } from '../ai/tools';
+import Company from '../models/Company';
 import AiConversation from '../models/AiConversation';
 import { reserveAiRequest } from '../utils/planLimits';
 import { recordUsage } from '../services/aiUsageTracker';
@@ -63,13 +64,19 @@ export const runAgent = async (req: AuthRequest, res: Response): Promise<void> =
     if (!subscription) throw new Error('Subscription data was not available after the AI limit check.');
 
     // ── Load or create conversation ───────────────────────────────────────
-    let conversation = companyId && conversationId
-      ? await AiConversation.findOne({
-          _id:       conversationId,
-          companyId: new mongoose.Types.ObjectId(companyId),
-          userId:    new mongoose.Types.ObjectId(userId),
-        })
-      : null;
+    const [workspace, existingConversation] = await Promise.all([
+      companyId
+        ? Company.findById(companyId).select('accountType organizationType').lean()
+        : Promise.resolve(null),
+      companyId && conversationId
+        ? AiConversation.findOne({
+            _id:       conversationId,
+            companyId: new mongoose.Types.ObjectId(companyId),
+            userId:    new mongoose.Types.ObjectId(userId),
+          })
+        : Promise.resolve(null),
+    ]);
+    let conversation = existingConversation;
 
     if (companyId && !conversation) {
       conversation = await AiConversation.create({
@@ -97,6 +104,8 @@ export const runAgent = async (req: AuthRequest, res: Response): Promise<void> =
       companyId,
       userId,
       userRole,
+      accountType: workspace?.accountType,
+      organizationType: workspace?.organizationType,
       planName: subscription.planConfig.name,
       planId: subscription.plan,
       enabledFeatures: Object.entries(subscription.planConfig.entitlements)

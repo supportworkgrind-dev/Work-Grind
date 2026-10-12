@@ -337,7 +337,9 @@ export const runVoiceTurn = async (req: AuthRequest, res: Response): Promise<voi
     return;
   }
 
-  const company = await Company.findById(credential.companyId).select('isActive').lean();
+  const company = await Company.findById(credential.companyId)
+    .select('isActive accountType organizationType')
+    .lean();
   if (!company?.isActive) {
     res.status(403).json({
       success: false,
@@ -445,6 +447,8 @@ export const runVoiceTurn = async (req: AuthRequest, res: Response): Promise<voi
     companyId: credential.companyId,
     userId: credential.sub,
     userRole: role,
+    accountType: company.accountType,
+    organizationType: company.organizationType,
     planName: subscription.planConfig.name,
     planId: subscription.plan,
     enabledFeatures: Object.entries(subscription.planConfig.entitlements)
