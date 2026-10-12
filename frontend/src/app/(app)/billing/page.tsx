@@ -8,7 +8,7 @@ import { formatDate } from '@/lib/utils';
 import { SubscriptionInfo, PlanConfig } from '@/types';
 import type { EducationPlanPricing } from '@/types';
 import {
-  CreditCard, CheckCircle2, AlertCircle, Clock, Zap, ArrowUpRight,
+  CreditCard, CheckCircle2, AlertCircle, Clock, Zap,
   RefreshCw, XCircle, Loader2, Star, Infinity, Tag, Lock,
 } from 'lucide-react';
 
@@ -198,7 +198,7 @@ export default function BillingPage() {
       }
       const res = await api.post('/subscription/checkout', { planId });
       if (res.data.success && res.data.checkoutUrl) {
-        window.location.href = res.data.checkoutUrl;
+        window.location.assign(res.data.checkoutUrl);
       } else {
         setError(res.data.message || 'Failed to create checkout session.');
       }
@@ -320,6 +320,20 @@ export default function BillingPage() {
       {success && (
         <div className="flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
           <CheckCircle2 className="h-4 w-4 shrink-0" />{success}
+        </div>
+      )}
+      {sub?.subscriptionMismatch && (
+        <div className="alert-danger flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between" role="alert">
+          <span className="flex items-start gap-2">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            This workspace’s existing subscription does not match its education plan. Access is paused until the correct plan is active.
+          </span>
+          {isOwnerAdmin && (
+            <button onClick={handleCancel} disabled={cancelling} className="btn-secondary h-8 shrink-0 px-3 text-xs">
+              {cancelling ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+              Cancel existing subscription
+            </button>
+          )}
         </div>
       )}
       {!sub && !error && (

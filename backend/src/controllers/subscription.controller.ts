@@ -23,6 +23,7 @@ import {
   PLANS,
   TRIAL_DAYS,
   PlanId,
+  EducationPlanId,
   getPlan,
   getPolarProductId,
   getEducationPolarProductId,
@@ -51,6 +52,52 @@ function getPolar(): Polar {
   return new Polar({ accessToken: token, server });
 }
 
+const educationProductValidationCache = new Map<
+  EducationPlanId,
+  { checkedAt: number; checkoutAvailable: boolean; checkoutError?: string }
+>();
+
+async function getEducationCheckoutConfiguration(
+  planId: EducationPlanId,
+): Promise<{ checkoutAvailable: boolean; checkoutError?: string }> {
+  const productId = getEducationPolarProductId(planId);
+  if (!productId) {
+    return {
+      checkoutAvailable: false,
+      checkoutError: `Polar product ID is not configured. Set ${getEducationPolarProductIdEnv(planId)} after creating the matching monthly USD product in Polar.`,
+    };
+  }
+  const cached = educationProductValidationCache.get(planId);
+  if (cached && Date.now() - cached.checkedAt < 60_000) {
+    return { checkoutAvailable: cached.checkoutAvailable, checkoutError: cached.checkoutError };
+  }
+  if (!process.env.POLAR_ACCESS_TOKEN?.trim()) {
+    return {
+      checkoutAvailable: false,
+      checkoutError: 'Polar access is not configured; checkout cannot verify the education product price.',
+    };
+  }
+
+  let result: { checkoutAvailable: boolean; checkoutError?: string };
+  try {
+    const product = await getPolar().products.get({ id: productId });
+    result = matchesPolarProductPrice(product, planId)
+      ? { checkoutAvailable: true }
+      : {
+        checkoutAvailable: false,
+        checkoutError: `The configured Polar product must be active and priced at $${getEducationPlanConfig(planId).priceMonthly / 100} USD per month.`,
+      };
+  } catch (error) {
+    console.error(`[Subscription] Polar product verification failed for ${planId}:`, error instanceof Error ? error.name : 'UnknownError');
+    result = {
+      checkoutAvailable: false,
+      checkoutError: 'Polar could not verify this education product. Check the product ID and API configuration.',
+    };
+  }
+  educationProductValidationCache.set(planId, { ...result, checkedAt: Date.now() });
+  return result;
+}
+
 // ── Guard: must be owner or admin ─────────────────────────────────────────────
 function isBillingAdmin(role: string): boolean {
   return role === 'owner' || role === 'founder' || role === 'admin';
@@ -60,7 +107,12 @@ function isEducationPlan(planId: PlanId): planId is 'school' | 'college' | 'univ
   return planId === 'school' || planId === 'college' || planId === 'university';
 }
 
-function matchesPolarProductPrice(
+export function isCheckoutPlanAllowedForOrganization(organizationType: string, planId: PlanId): boolean {
+  const educationPlanId = educationPlanForOrganization(organizationType);
+  return educationPlanId ? planId === educationPlanId : !isEducationPlan(planId);
+}
+
+export function matchesPolarProductPrice(
   product: Awaited<ReturnType<Polar['products']['get']>>,
   planId: 'school' | 'college' | 'university',
 ): boolean {
@@ -77,7 +129,7 @@ function matchesPolarProductPrice(
     );
 }
 
-function resolveWebhookPlan(
+export function resolveWebhookPlan(
   company: ICompany,
   productId: string | undefined,
   metadataPlanId: string | undefined,
@@ -153,6 +205,7 @@ export const getSubscriptionStatus = async (
           plan:                 sub.plan,
           organizationType:     sub.organizationType,
           accountType:          sub.accountType,
+          subscriptionMismatch: sub.subscriptionMismatch,
           billingInterval:      sub.plan === 'school' || sub.plan === 'college' || sub.plan === 'university' ? 'month' : undefined,
           currency:             sub.plan === 'school' || sub.plan === 'college' || sub.plan === 'university' ? 'USD' : undefined,
           planName:             sub.status === 'expired'
@@ -302,12 +355,24 @@ export const createCheckout = async (
     if (!company) { res.status(404).json({ success: false, message: 'Company not found' }); return; }
 
     const educationPlanId = educationPlanForOrganization(company.organizationType);
-    if (educationPlanId ? planId !== educationPlanId : isEducationPlan(planId)) {
+    if (!isCheckoutPlanAllowedForOrganization(company.organizationType, planId)) {
       res.status(403).json({
         success: false,
         message: educationPlanId
           ? `This ${company.organizationType} workspace can only subscribe to the ${educationPlanId} plan.`
           : 'Education plans are only available to school, college, and university workspaces.',
+      });
+      return;
+    }
+    if (
+      educationPlanId &&
+      company.polarSubscriptionId &&
+      ['active', 'past_due', 'cancelled'].includes(company.subscriptionStatus) &&
+      company.polarProductId !== getEducationPolarProductId(educationPlanId)
+    ) {
+      res.status(409).json({
+        success: false,
+        message: 'A different subscription is still active for this workspace. Cancel it and wait for its billing period to end before starting the education plan.',
       });
       return;
     }
@@ -886,7 +951,8 @@ export const handleWebhook = async (
         if (!companyId) break;
         const company = await Company.findById(companyId);
         if (!company) break;
-        if (!resolveWebhookPlan(company, sub.productId, meta?.planId)) {
+        if (!resolveWebhookPlan(company, sub.productId, meta?.planId) &&
+            !(company.polarSubscriptionId === sub.id && company.polarProductId === sub.productId)) {
           console.warn(`[Webhook] subscription.canceled: product does not match workspace type for ${companyId}`);
           break;
         }
@@ -914,7 +980,8 @@ export const handleWebhook = async (
         if (!companyId) break;
         const company = await Company.findById(companyId);
         if (!company) break;
-        if (!resolveWebhookPlan(company, sub.productId, meta?.planId)) {
+        if (!resolveWebhookPlan(company, sub.productId, meta?.planId) &&
+            !(company.polarSubscriptionId === sub.id && company.polarProductId === sub.productId)) {
           console.warn(`[Webhook] subscription.uncanceled: product does not match workspace type for ${companyId}`);
           break;
         }
@@ -938,7 +1005,8 @@ export const handleWebhook = async (
         if (!companyId) break;
         const company = await Company.findById(companyId);
         if (!company) break;
-        if (!resolveWebhookPlan(company, sub.productId, meta?.planId)) {
+        if (!resolveWebhookPlan(company, sub.productId, meta?.planId) &&
+            !(company.polarSubscriptionId === sub.id && company.polarProductId === sub.productId)) {
           console.warn(`[Webhook] subscription.revoked: product does not match workspace type for ${companyId}`);
           break;
         }
@@ -979,5 +1047,9 @@ export const getPlans = async (_req: Request, res: Response): Promise<void> => {
     limits:       p.limits,
     features:     p.features,
   }));
-  res.json({ success: true, plans, educationPlans: getEducationPlanPricing() });
+  const educationPlans = await Promise.all(getEducationPlanPricing().map(async (plan) => ({
+    ...plan,
+    ...await getEducationCheckoutConfiguration(plan.id),
+  })));
+  res.json({ success: true, plans, educationPlans });
 };

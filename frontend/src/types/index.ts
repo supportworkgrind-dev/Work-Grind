@@ -496,6 +496,7 @@ export interface SubscriptionInfo {
   plan:                 SubscriptionPlan;
   organizationType?:    OrganizationType;
   accountType?:         'company' | 'individual';
+  subscriptionMismatch?: boolean;
   billingInterval?:     'month';
   currency?:            'USD';
   planName:             string;

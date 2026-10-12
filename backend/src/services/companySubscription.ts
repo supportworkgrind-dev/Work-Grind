@@ -16,7 +16,7 @@
 import mongoose from 'mongoose';
 import Company, { CompanySubscriptionStatus, CompanyPlan } from '../models/Company';
 import User from '../models/User';
-import { educationPlanForOrganization, getPlan, getPolarProductId, hasActiveAccess, PlanId, resolveEffectivePlanId, TRIAL_DAYS } from '../config/subscription';
+import { educationPlanForOrganization, getEducationPolarProductId, getPlan, getPolarProductId, hasActiveAccess, PlanId, resolveEffectivePlanId, TRIAL_DAYS } from '../config/subscription';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -24,6 +24,7 @@ export interface CompanySubscriptionInfo {
   companyId:            string;
   organizationType:     string;
   accountType:          'company' | 'individual';
+  subscriptionMismatch: boolean;
   status:               CompanySubscriptionStatus | 'never_subscribed';
   plan:                 PlanId;
   isLifetime:           boolean;
@@ -234,6 +235,25 @@ export async function getCompanySubscription(
     company.subscriptionEndDate,
   );
   const educationPlanId = educationPlanForOrganization(company.organizationType);
+  const hasPaidPlanHistory = Boolean(
+    company.polarSubscriptionId ||
+    company.polarOrderId ||
+    company.polarProductId ||
+    company.subscriptionPlan === 'starter' ||
+    company.subscriptionPlan === 'pro' ||
+    company.plan === 'starter' ||
+    company.plan === 'pro',
+  );
+  const subscriptionMismatch = Boolean(
+    educationPlanId &&
+    hasPaidPlanHistory &&
+    status !== 'trialing' &&
+    status !== 'lifetime' &&
+    status !== 'never_subscribed' &&
+    (company.subscriptionPlan !== educationPlanId ||
+      company.polarProductId !== getEducationPolarProductId(educationPlanId))
+  );
+  if (subscriptionMismatch) status = 'expired';
   const effectivePlanId = educationPlanId ?? effectiveBusinessPlanId;
 
   const activeAccess = hasActiveAccess(
@@ -265,6 +285,7 @@ export async function getCompanySubscription(
     companyId:            company._id.toString(),
     organizationType:     company.organizationType,
     accountType:          company.accountType,
+    subscriptionMismatch,
     status,
     plan:                 effectivePlanId,
     isLifetime:           company.isLifetime,

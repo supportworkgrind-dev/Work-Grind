@@ -19,6 +19,11 @@ const {
   educationPlanForOrganization,
 } = require('../dist/config/subscription');
 const { withCompanyCapacityLock } = require('../dist/utils/planLimits');
+const {
+  matchesPolarProductPrice,
+  resolveWebhookPlan,
+  isCheckoutPlanAllowedForOrganization,
+} = require('../dist/controllers/subscription.controller');
 const mongoose = require('mongoose');
 
 test('new and legacy-shaped companies default to a business organization without changing account type', () => {
@@ -109,6 +114,68 @@ test('education subscription configs map workspace types to the specified monthl
   }
   assert.equal(educationPlanForOrganization('business'), undefined);
   assert.equal(educationPlanForOrganization('individual'), undefined);
+});
+
+test('Polar education product validation requires an active monthly USD fixed price at the configured amount', () => {
+  const product = {
+    isArchived: false,
+    isRecurring: true,
+    recurringInterval: 'month',
+    recurringIntervalCount: 1,
+    prices: [{
+      amountType: 'fixed',
+      isArchived: false,
+      priceCurrency: 'USD',
+      priceAmount: 9900,
+    }],
+  };
+  assert.equal(matchesPolarProductPrice(product, 'university'), true);
+  assert.equal(matchesPolarProductPrice({ ...product, recurringInterval: 'year' }, 'university'), false);
+  assert.equal(matchesPolarProductPrice({
+    ...product,
+    prices: [{ ...product.prices[0], priceAmount: 1900 }],
+  }, 'university'), false);
+  assert.equal(matchesPolarProductPrice({
+    ...product,
+    prices: [{ ...product.prices[0], isArchived: true }],
+  }, 'university'), false);
+});
+
+test('Polar webhook plan mapping requires product/workspace match and ignores education metadata claims', () => {
+  const keys = [
+    ['POLAR_SCHOOL_PRODUCT_ID', 'school-product'],
+    ['POLAR_COLLEGE_PRODUCT_ID', 'college-product'],
+    ['POLAR_UNIVERSITY_PRODUCT_ID', 'university-product'],
+  ];
+  const previousValues = keys.map(([key]) => process.env[key]);
+  try {
+    keys.forEach(([key, value]) => { process.env[key] = value; });
+    assert.equal(resolveWebhookPlan({ organizationType: 'university' }, 'university-product', 'starter'), 'university');
+    assert.equal(resolveWebhookPlan({ organizationType: 'school' }, 'university-product', 'school'), undefined);
+    assert.equal(resolveWebhookPlan({ organizationType: 'business' }, 'university-product', 'pro'), undefined);
+    assert.equal(resolveWebhookPlan({ organizationType: 'business' }, undefined, 'pro'), 'pro');
+  } finally {
+    keys.forEach(([key], index) => {
+      if (previousValues[index] === undefined) delete process.env[key];
+      else process.env[key] = previousValues[index];
+    });
+  }
+});
+
+test('checkout plans are selected from persisted organization type for every workspace category', () => {
+  for (const type of ['business']) {
+    for (const plan of ['free', 'starter', 'pro']) {
+      assert.equal(isCheckoutPlanAllowedForOrganization(type, plan), true);
+    }
+    for (const plan of ['school', 'college', 'university']) {
+      assert.equal(isCheckoutPlanAllowedForOrganization(type, plan), false);
+    }
+  }
+  for (const type of ['school', 'college', 'university']) {
+    for (const plan of ['free', 'starter', 'pro', 'school', 'college', 'university']) {
+      assert.equal(isCheckoutPlanAllowedForOrganization(type, plan), plan === type);
+    }
+  }
 });
 
 test('workspace capacity lock serializes concurrent capacity changes', async () => {
