@@ -31,6 +31,9 @@ import {
   getLinkedInApiVersion,
 } from '../services/linkedinPublishing';
 
+const MAX_SCHEDULE_RETRIES = 2;
+const SCHEDULE_RETRY_DELAY_MS = 5 * 60_000;
+
 function companyIdOf(req: AuthRequest): mongoose.Types.ObjectId {
   return new mongoose.Types.ObjectId(req.user!.companyId);
 }
@@ -731,11 +734,36 @@ async function publishScheduledPost(postId: mongoose.Types.ObjectId): Promise<'p
     console.error('[SocialPublishing] Scheduled subscription check failed.', {
       errorName: error instanceof Error ? error.name : 'UnknownError',
     });
-    await SocialPost.updateOne(
-      { _id: post._id, status: 'publishing' },
-      { $set: { status: 'scheduled', scheduledAt: new Date(Date.now() + 5 * 60_000) } },
-    );
-    return 'retrying';
+    if (post.scheduleAttempts < MAX_SCHEDULE_RETRIES) {
+      await SocialPost.updateOne(
+        { _id: post._id, status: 'publishing' },
+        {
+          $set: {
+            status: 'scheduled',
+            scheduledAt: new Date(Date.now() + SCHEDULE_RETRY_DELAY_MS),
+            failureCode: 'subscription_check_retry',
+          },
+          $inc: { scheduleAttempts: 1 },
+        },
+      );
+      return 'retrying';
+    }
+    await markPostFailed(post, 'subscription_check_unavailable');
+    try {
+      await AuditLog.create({
+        companyId: post.companyId,
+        userId: publisher._id,
+        action: 'SOCIAL_POST_PUBLISH_FAILED',
+        resource: 'SocialPost',
+        resourceId: post._id.toString(),
+        details: { platform: post.platform, failureCode: 'subscription_check_unavailable', scheduled: true },
+      });
+    } catch (auditError) {
+      console.error('[SocialPublishing] Scheduled failure audit could not be created.', {
+        errorName: auditError instanceof Error ? auditError.name : 'UnknownError',
+      });
+    }
+    return 'failed';
   }
   if (!subscription.hasActiveAccess) {
     await markPostFailed(post, 'subscription_inactive');
@@ -799,14 +827,20 @@ async function publishScheduledPost(postId: mongoose.Types.ObjectId): Promise<'p
         },
       },
     );
-    await AuditLog.create({
-      companyId: post.companyId,
-      userId: publisher._id,
-      action: 'SOCIAL_POST_PUBLISHED',
-      resource: 'SocialPost',
-      resourceId: post._id.toString(),
-      details: { platform: adapter.id, scheduled: true },
-    });
+    try {
+      await AuditLog.create({
+        companyId: post.companyId,
+        userId: publisher._id,
+        action: 'SOCIAL_POST_PUBLISHED',
+        resource: 'SocialPost',
+        resourceId: post._id.toString(),
+        details: { platform: adapter.id, scheduled: true },
+      });
+    } catch (auditError) {
+      console.error('[SocialPublishing] Scheduled publication audit could not be created.', {
+        errorName: auditError instanceof Error ? auditError.name : 'UnknownError',
+      });
+    }
     await notifyPublishingUser({
         companyId: post.companyId.toString(),
         userId: post.authorId.toString(),
@@ -825,13 +859,13 @@ async function publishScheduledPost(postId: mongoose.Types.ObjectId): Promise<'p
       return 'failed';
     }
     const status = error instanceof LinkedInApiError ? error.status : undefined;
-    if (status === 429 && post.scheduleAttempts < 2) {
+    if (status === 429 && post.scheduleAttempts < MAX_SCHEDULE_RETRIES) {
       await SocialPost.updateOne(
         { _id: post._id, status: 'publishing' },
         {
           $set: {
             status: 'scheduled',
-            scheduledAt: new Date(Date.now() + 5 * 60_000),
+            scheduledAt: new Date(Date.now() + SCHEDULE_RETRY_DELAY_MS),
             failureCode: 'rate_limited_retry',
           },
           $inc: { scheduleAttempts: 1 },
@@ -892,10 +926,46 @@ export const dispatchScheduledSocialPosts = async (req: AuthRequest, res: Respon
         errorName: error instanceof Error ? error.name : 'UnknownError',
       });
       try {
-        await SocialPost.updateOne(
+        const failedPost = await SocialPost.findOneAndUpdate(
           { _id, status: 'publishing' },
-          { $set: { status: 'failed', failureCode: 'scheduler_error' } },
-        );
+          {
+            $set: {
+              status: 'failed',
+              failureCode: 'scheduler_error',
+              'destinations.$[destination].status': 'failed',
+              'destinations.$[destination].errorCode': 'scheduler_error',
+            },
+          },
+          {
+            new: true,
+            arrayFilters: [{ 'destination.provider': 'linkedin', 'destination.status': 'publishing' }],
+          },
+        ).select('companyId authorId scheduledBy');
+        if (failedPost) {
+          try {
+            await AuditLog.create({
+              companyId: failedPost.companyId,
+              userId: failedPost.scheduledBy ?? failedPost.authorId,
+              action: 'SOCIAL_POST_PUBLISH_FAILED',
+              resource: 'SocialPost',
+              resourceId: failedPost._id.toString(),
+              details: { platform: 'linkedin', failureCode: 'scheduler_error', scheduled: true },
+            });
+          } catch (auditError) {
+            console.error('[SocialPublishing] Scheduler failure audit could not be created.', {
+              errorName: auditError instanceof Error ? auditError.name : 'UnknownError',
+            });
+          }
+          await notifyPublishingUser({
+            companyId: failedPost.companyId.toString(),
+            userId: failedPost.authorId.toString(),
+            type: 'system',
+            title: 'Scheduled social post needs attention',
+            body: 'WorkGrind could not complete scheduled publishing. Review the post before retrying.',
+            actionUrl: '/social-publishing',
+            metadata: { postId: failedPost._id.toString(), failureCode: 'scheduler_error' },
+          });
+        }
       } catch (persistError) {
         console.error('[SocialPublishing] Scheduled failure state could not be persisted.', {
           errorName: persistError instanceof Error ? persistError.name : 'UnknownError',
