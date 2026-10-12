@@ -18,6 +18,8 @@ import AcademicPerson, { AcademicPersonType } from '../models/AcademicPerson';
 import { GuardianRelationshipType } from '../models/AcademicGuardianLink';
 import User from '../models/User';
 import { checkMemberLimit, withCompanyCapacityLock } from '../utils/planLimits';
+import { isTrustedAcademicAssignmentActor } from '../middleware/academicDepartmentAccess';
+import { roleMatches } from '../config/organization';
 
 const PAGE_SIZE = 100;
 const ACADEMIC_PERSON_TYPES: AcademicPersonType[] = ['student', 'teacher', 'parent'];
@@ -167,6 +169,7 @@ const academicCrud: Record<AcademicCrudResource, AcademicCrudDefinition> = {
   }),
   departments: defineAcademicCrud(AcademicDepartment, 'department', {
     name: 'string', code: 'string', description: 'string',
+    authorizedDeanUserIds: 'idArray', authorizedHodUserIds: 'idArray',
   }, async (id, companyId) => (
     await Promise.all([
       AcademicCourse.countDocuments({ companyId, departmentId: id }),
@@ -396,6 +399,35 @@ export const updateAcademicRecord = async (req: AuthRequest, res: Response): Pro
   }
   const companyId = getCompanyId(req);
   try {
+    const assignmentFields = ['authorizedDeanUserIds', 'authorizedHodUserIds'];
+    const changesAssignments = assignmentFields.some((field) => Object.prototype.hasOwnProperty.call(values, field));
+    if (resource === 'departments' && changesAssignments) {
+      if (!isTrustedAcademicAssignmentActor(req.user!.role)) {
+        res.status(403).json({ success: false, message: 'Only trusted organization administrators may change department assignments.' });
+        return;
+      }
+      for (const [field, requiredRole] of [
+        ['authorizedDeanUserIds', 'dean'],
+        ['authorizedHodUserIds', 'hod'],
+      ] as const) {
+        const assignedIds = values[field];
+        if (!Array.isArray(assignedIds)) continue;
+        const users = assignedIds.length ? await User.find({
+          _id: { $in: assignedIds },
+          companyId,
+          isActive: true,
+          isVerified: true,
+          isDeleted: { $ne: true },
+        }).select('_id role').lean() : [];
+        if (
+          users.length !== assignedIds.length ||
+          users.some((user) => !roleMatches(user.role, [requiredRole], 'university'))
+        ) {
+          res.status(400).json({ success: false, message: `Department assignments must reference active ${requiredRole.toUpperCase()} members of this university.` });
+          return;
+        }
+      }
+    }
     values._id = new mongoose.Types.ObjectId(id);
     if (!await academicRelationsBelongToTenant(resource, values, companyId)) {
       res.status(400).json({ success: false, message: 'Related academic records must belong to this organization.' });
@@ -557,7 +589,10 @@ export const deleteAcademicRecord = async (req: AuthRequest, res: Response): Pro
 
 export const listPeople = async (req: AuthRequest, res: Response): Promise<void> => {
   const { skip, limit } = listOptions(req);
-  const filter: { companyId: mongoose.Types.ObjectId; type?: AcademicPersonType } = { companyId: getCompanyId(req) };
+  const filter: { companyId: mongoose.Types.ObjectId; type?: AcademicPersonType; _id?: { $in: mongoose.Types.ObjectId[] } } = { companyId: getCompanyId(req) };
+  if (req.academicDepartmentScope) {
+    filter._id = { $in: req.academicDepartmentScope.personIds.map((id) => new mongoose.Types.ObjectId(id)) };
+  }
   if (typeof req.query.type === 'string') {
     if (!ACADEMIC_PERSON_TYPES.includes(req.query.type as AcademicPersonType)) {
       res.status(400).json({ success: false, message: 'Invalid academic person type.' });
@@ -639,9 +674,15 @@ export const listDepartments = async (req: AuthRequest, res: Response): Promise<
   const { skip, limit } = listOptions(req);
   const companyId = getCompanyId(req);
   try {
+    const filter = {
+      companyId,
+      ...(req.academicDepartmentScope
+        ? { _id: { $in: req.academicDepartmentScope.departmentIds.map((id) => new mongoose.Types.ObjectId(id)) } }
+        : {}),
+    };
     const [departments, total] = await Promise.all([
-      AcademicDepartment.find({ companyId }).sort({ name: 1 }).skip(skip).limit(limit).lean(),
-      AcademicDepartment.countDocuments({ companyId }),
+      AcademicDepartment.find(filter).sort({ name: 1 }).skip(skip).limit(limit).lean(),
+      AcademicDepartment.countDocuments(filter),
     ]);
     res.json({ success: true, departments, total, page: Math.floor(skip / limit) + 1, pageSize: limit });
   } catch (error) {
@@ -673,11 +714,17 @@ export const listCourses = async (req: AuthRequest, res: Response): Promise<void
   const { skip, limit } = listOptions(req);
   const companyId = getCompanyId(req);
   try {
+    const filter = {
+      companyId,
+      ...(req.academicDepartmentScope
+        ? { departmentId: { $in: req.academicDepartmentScope.departmentIds.map((id) => new mongoose.Types.ObjectId(id)) } }
+        : {}),
+    };
     const [courses, total] = await Promise.all([
-      AcademicCourse.find({ companyId }).sort({ name: 1 }).skip(skip).limit(limit)
+      AcademicCourse.find(filter).sort({ name: 1 }).skip(skip).limit(limit)
         .populate({ path: 'departmentId', match: { companyId }, select: 'name code' })
         .lean(),
-      AcademicCourse.countDocuments({ companyId }),
+      AcademicCourse.countDocuments(filter),
     ]);
     res.json({ success: true, courses, total, page: Math.floor(skip / limit) + 1, pageSize: limit });
   } catch (error) {
@@ -723,12 +770,18 @@ export const listClasses = async (req: AuthRequest, res: Response): Promise<void
   const { skip, limit } = listOptions(req);
   const companyId = getCompanyId(req);
   try {
+    const filter = {
+      companyId,
+      ...(req.academicDepartmentScope
+        ? { departmentId: { $in: req.academicDepartmentScope.departmentIds.map((id) => new mongoose.Types.ObjectId(id)) } }
+        : {}),
+    };
     const [classes, total] = await Promise.all([
-      AcademicClass.find({ companyId }).sort({ academicYear: -1, name: 1 }).skip(skip).limit(limit)
+      AcademicClass.find(filter).sort({ academicYear: -1, name: 1 }).skip(skip).limit(limit)
         .populate({ path: 'departmentId', match: { companyId }, select: 'name code' })
         .populate({ path: 'courseIds', match: { companyId }, select: 'name code' })
         .lean(),
-      AcademicClass.countDocuments({ companyId }),
+      AcademicClass.countDocuments(filter),
     ]);
     res.json({ success: true, classes, total, page: Math.floor(skip / limit) + 1, pageSize: limit });
   } catch (error) {
@@ -779,9 +832,15 @@ export const listGuardianLinks = async (req: AuthRequest, res: Response): Promis
   const { skip, limit } = listOptions(req);
   const companyId = getCompanyId(req);
   try {
+    const filter = {
+      companyId,
+      ...(req.academicDepartmentScope
+        ? { studentId: { $in: req.academicDepartmentScope.studentIds.map((id) => new mongoose.Types.ObjectId(id)) } }
+        : {}),
+    };
     const [links, total] = await Promise.all([
-      AcademicGuardianLink.find({ companyId }).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
-      AcademicGuardianLink.countDocuments({ companyId }),
+      AcademicGuardianLink.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+      AcademicGuardianLink.countDocuments(filter),
     ]);
     res.json({ success: true, links, total, page: Math.floor(skip / limit) + 1, pageSize: limit });
   } catch (error) {
@@ -817,15 +876,21 @@ export const listEnrollments = async (req: AuthRequest, res: Response): Promise<
   const { skip, limit } = listOptions(req);
   const companyId = getCompanyId(req);
   try {
+    const filter = {
+      companyId,
+      ...(req.academicDepartmentScope
+        ? { classId: { $in: req.academicDepartmentScope.classIds.map((id) => new mongoose.Types.ObjectId(id)) } }
+        : {}),
+    };
     const [enrollments, total] = await Promise.all([
-      AcademicEnrollment.find({ companyId })
+      AcademicEnrollment.find(filter)
         .sort({ enrolledAt: -1 })
         .skip(skip)
         .limit(limit)
         .populate({ path: 'studentId', match: { companyId }, select: 'firstName lastName externalId type' })
         .populate({ path: 'classId', match: { companyId }, select: 'name academicYear departmentId' })
         .lean(),
-      AcademicEnrollment.countDocuments({ companyId }),
+      AcademicEnrollment.countDocuments(filter),
     ]);
     res.json({ success: true, enrollments, total, page: Math.floor(skip / limit) + 1, pageSize: limit });
   } catch (error) {
@@ -863,15 +928,21 @@ export const listTeachingAssignments = async (req: AuthRequest, res: Response): 
   const { skip, limit } = listOptions(req);
   const companyId = getCompanyId(req);
   try {
+    const filter = {
+      companyId,
+      ...(req.academicDepartmentScope
+        ? { classId: { $in: req.academicDepartmentScope.classIds.map((id) => new mongoose.Types.ObjectId(id)) } }
+        : {}),
+    };
     const [teachingAssignments, total] = await Promise.all([
-      AcademicTeachingAssignment.find({ companyId })
+      AcademicTeachingAssignment.find(filter)
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
         .populate({ path: 'teacherId', match: { companyId, type: 'teacher' }, select: 'firstName lastName' })
         .populate({ path: 'classId', match: { companyId }, select: 'name academicYear' })
         .lean(),
-      AcademicTeachingAssignment.countDocuments({ companyId }),
+      AcademicTeachingAssignment.countDocuments(filter),
     ]);
     res.json({
       success: true,
@@ -919,12 +990,18 @@ export const listSchedules = async (req: AuthRequest, res: Response): Promise<vo
   const { skip, limit } = listOptions(req);
   const companyId = getCompanyId(req);
   try {
+    const filter = {
+      companyId,
+      ...(req.academicDepartmentScope
+        ? { classId: { $in: req.academicDepartmentScope.classIds.map((id) => new mongoose.Types.ObjectId(id)) } }
+        : {}),
+    };
     const [schedules, total] = await Promise.all([
-      AcademicSchedule.find({ companyId }).sort({ dayOfWeek: 1, startTime: 1 }).skip(skip).limit(limit)
+      AcademicSchedule.find(filter).sort({ dayOfWeek: 1, startTime: 1 }).skip(skip).limit(limit)
         .populate({ path: 'classId', match: { companyId }, select: 'name academicYear' })
         .populate({ path: 'courseId', match: { companyId }, select: 'name code' })
         .lean(),
-      AcademicSchedule.countDocuments({ companyId }),
+      AcademicSchedule.countDocuments(filter),
     ]);
     res.json({ success: true, schedules: schedules.filter((schedule) => schedule.classId), total, page: Math.floor(skip / limit) + 1, pageSize: limit });
   } catch (error) {
@@ -983,12 +1060,18 @@ export const listAssignments = async (req: AuthRequest, res: Response): Promise<
   const { skip, limit } = listOptions(req);
   const companyId = getCompanyId(req);
   try {
+    const filter = {
+      companyId,
+      ...(req.academicDepartmentScope
+        ? { classId: { $in: req.academicDepartmentScope.classIds.map((id) => new mongoose.Types.ObjectId(id)) } }
+        : {}),
+    };
     const [assignments, total] = await Promise.all([
-      AcademicAssignment.find({ companyId }).sort({ dueAt: 1, createdAt: -1 }).skip(skip).limit(limit)
+      AcademicAssignment.find(filter).sort({ dueAt: 1, createdAt: -1 }).skip(skip).limit(limit)
         .populate({ path: 'classId', match: { companyId }, select: 'name academicYear' })
         .populate({ path: 'courseId', match: { companyId }, select: 'name code' })
         .lean(),
-      AcademicAssignment.countDocuments({ companyId }),
+      AcademicAssignment.countDocuments(filter),
     ]);
     res.json({ success: true, assignments: assignments.filter((assignment) => assignment.classId), total, page: Math.floor(skip / limit) + 1, pageSize: limit });
   } catch (error) {
@@ -1040,13 +1123,23 @@ export const createAssignment = async (req: AuthRequest, res: Response): Promise
 export const listAttendance = async (req: AuthRequest, res: Response): Promise<void> => {
   const { skip, limit } = listOptions(req);
   const companyId = getCompanyId(req);
-  const filter: { companyId: mongoose.Types.ObjectId; classId?: mongoose.Types.ObjectId } = { companyId };
+  const classScopeIds = req.academicDepartmentScope?.classIds.map((id) => new mongoose.Types.ObjectId(id));
+  const filter: {
+    companyId: mongoose.Types.ObjectId;
+    classId?: mongoose.Types.ObjectId | { $in: mongoose.Types.ObjectId[] };
+  } = {
+    companyId,
+    ...(classScopeIds ? { classId: { $in: classScopeIds } } : {}),
+  };
   if (typeof req.query.classId === 'string') {
     if (!isObjectId(req.query.classId)) {
       res.status(400).json({ success: false, message: 'Invalid class identifier.' });
       return;
     }
-    filter.classId = new mongoose.Types.ObjectId(req.query.classId);
+    const requestedClassId = new mongoose.Types.ObjectId(req.query.classId);
+    filter.classId = classScopeIds
+      ? { $in: classScopeIds.filter((classId) => classId.equals(requestedClassId)) }
+      : requestedClassId;
   }
   try {
     const [attendance, total] = await Promise.all([
@@ -1110,12 +1203,18 @@ export const listAssessments = async (req: AuthRequest, res: Response): Promise<
   const { skip, limit } = listOptions(req);
   const companyId = getCompanyId(req);
   try {
+    const filter = {
+      companyId,
+      ...(req.academicDepartmentScope
+        ? { classId: { $in: req.academicDepartmentScope.classIds.map((id) => new mongoose.Types.ObjectId(id)) } }
+        : {}),
+    };
     const [assessments, total] = await Promise.all([
-      AcademicAssessment.find({ companyId }).sort({ scheduledAt: 1, createdAt: -1 }).skip(skip).limit(limit)
+      AcademicAssessment.find(filter).sort({ scheduledAt: 1, createdAt: -1 }).skip(skip).limit(limit)
         .populate({ path: 'classId', match: { companyId }, select: 'name academicYear' })
         .populate({ path: 'courseId', match: { companyId }, select: 'name code' })
         .lean(),
-      AcademicAssessment.countDocuments({ companyId }),
+      AcademicAssessment.countDocuments(filter),
     ]);
     res.json({ success: true, assessments: assessments.filter((assessment) => assessment.classId), total, page: Math.floor(skip / limit) + 1, pageSize: limit });
   } catch (error) {
@@ -1168,12 +1267,18 @@ export const listResults = async (req: AuthRequest, res: Response): Promise<void
   const { skip, limit } = listOptions(req);
   const companyId = getCompanyId(req);
   try {
+    const filter = {
+      companyId,
+      ...(req.academicDepartmentScope
+        ? { assessmentId: { $in: req.academicDepartmentScope.assessmentIds.map((id) => new mongoose.Types.ObjectId(id)) } }
+        : {}),
+    };
     const [results, total] = await Promise.all([
-      AcademicResult.find({ companyId }).sort({ gradedAt: -1 }).skip(skip).limit(limit)
+      AcademicResult.find(filter).sort({ gradedAt: -1 }).skip(skip).limit(limit)
         .populate({ path: 'studentId', match: { companyId, type: 'student' }, select: 'firstName lastName externalId' })
         .populate({ path: 'assessmentId', match: { companyId }, select: 'title type pointsPossible classId' })
         .lean(),
-      AcademicResult.countDocuments({ companyId }),
+      AcademicResult.countDocuments(filter),
     ]);
     res.json({ success: true, results: results.filter((result) => result.studentId && result.assessmentId), total, page: Math.floor(skip / limit) + 1, pageSize: limit });
   } catch (error) {
@@ -1238,11 +1343,17 @@ export const listFeeCharges = async (req: AuthRequest, res: Response): Promise<v
   const { skip, limit } = listOptions(req);
   const companyId = getCompanyId(req);
   try {
+    const filter = {
+      companyId,
+      ...(req.academicDepartmentScope
+        ? { studentId: { $in: req.academicDepartmentScope.studentIds.map((id) => new mongoose.Types.ObjectId(id)) } }
+        : {}),
+    };
     const [charges, total] = await Promise.all([
-      AcademicFeeCharge.find({ companyId }).sort({ dueAt: 1, createdAt: -1 }).skip(skip).limit(limit)
+      AcademicFeeCharge.find(filter).sort({ dueAt: 1, createdAt: -1 }).skip(skip).limit(limit)
         .populate({ path: 'studentId', match: { companyId, type: 'student' }, select: 'firstName lastName externalId' })
         .lean(),
-      AcademicFeeCharge.countDocuments({ companyId }),
+      AcademicFeeCharge.countDocuments(filter),
     ]);
     res.json({ success: true, charges: charges.filter((charge) => charge.studentId), total, page: Math.floor(skip / limit) + 1, pageSize: limit });
   } catch (error) {

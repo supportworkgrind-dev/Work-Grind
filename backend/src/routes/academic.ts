@@ -32,10 +32,11 @@ import {
 } from '../controllers/academic.controller';
 import { authenticate } from '../middleware/auth';
 import { requireAcademicAdmin } from '../middleware/academicOrganization';
+import { requireAssignedAcademicDepartment } from '../middleware/academicDepartmentAccess';
 
 const router = Router();
 
-router.use(authenticate, requireAcademicAdmin);
+router.use(authenticate, requireAcademicAdmin, requireAssignedAcademicDepartment);
 
 router.get('/people', listPeople);
 router.post('/people', createPerson);

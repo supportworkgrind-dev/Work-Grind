@@ -40,8 +40,7 @@ import { ThemeAwareLogo } from '@/components/common/ThemeAwareLogo';
 import { ACADEMIC_SECTIONS } from '@/lib/academicSections';
 import {
   canAccessAcademicSection,
-  canAccessOrganizationFeature,
-  getRouteOrganizationFeature,
+  canAccessRoute,
   isEducationOrganization,
 } from '@/lib/organizationAccess';
 
@@ -181,10 +180,7 @@ export const Sidebar = memo(function Sidebar() {
           )) &&
           (!item.managerOrAbove || canManageClientPortal) &&
           (!item.ownerOrAdmin || ['owner', 'admin'].includes(user?.role ?? '')) &&
-          (() => {
-            const feature = getRouteOrganizationFeature(item.href.split('?')[0]);
-            return !feature || canAccessOrganizationFeature(company, user?.role, feature);
-          })() &&
+          canAccessRoute(company, user?.role, item.href.split('?')[0]) &&
           (!item.entitlement || canUse(item.entitlement)),
         ),
       }))

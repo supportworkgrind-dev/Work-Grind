@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useAppStore } from '@/store/useAppStore';
 import { api } from '@/lib/api';
+import { canAccessRoute } from '@/lib/organizationAccess';
 import { Task, Project, Meeting, Message, CrmPipelineStats, DealStage } from '@/types';
 import { DailyFocusCard } from '@/components/dashboard/DailyFocusCard';
 import { TrialBanner } from '@/components/subscription/TrialBanner';
@@ -190,6 +191,7 @@ function DashboardSkeleton() {
 export default function DashboardPage() {
   const { user, company } = useAuthStore();
   const { openCreateModal } = useAppStore();
+  const canSeeCrm = canAccessRoute(company, user?.role, '/crm');
 
   const [stats, setStats]             = useState({ totalTasks: 0, completedTasks: 0, pendingTasks: 0, activeProjects: 0, upcomingMeetings: 0 });
   const [myTasks, setMyTasks]         = useState<Task[]>([]);
@@ -211,7 +213,7 @@ export default function DashboardPage() {
           api.get('/projects?limit=4'),
           api.get('/meetings?limit=4'),
           api.get('/messages?limit=5'),
-          api.get('/crm/stats').catch(() => null),
+          canSeeCrm ? api.get('/crm/stats').catch(() => null) : Promise.resolve(null),
         ]);
         if (statsRes.data.success) setStats({
           ...statsRes.data.stats,
@@ -545,7 +547,7 @@ export default function DashboardPage() {
 
       {/* ═══ CRM SNAPSHOT ═══ */}
       {/* scroll-reveal: enters from bottom when scrolled into view */}
-      {crmStats && (
+      {canSeeCrm && crmStats && (
         <CrmSnapshot crmStats={crmStats} />
       )}
 

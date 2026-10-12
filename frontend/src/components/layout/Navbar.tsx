@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, memo } from 'react';
 import Link from 'next/link';
 import { useAuthStore } from '@/store/useAuthStore';
+import { canAccessRoute } from '@/lib/organizationAccess';
 import { useAppStore } from '@/store/useAppStore';
 import { api } from '@/lib/api';
 import { getSocket } from '@/lib/socket';
@@ -42,6 +43,7 @@ const notifIcons: Record<string, React.ReactNode> = {
 
 export const Navbar = memo(function Navbar() {
   const user           = useAuthStore((s) => s.user);
+  const company        = useAuthStore((s) => s.company);
   const { toggleSidebar, setSearchOpen, openCreateModal } = useAppStore();
   const { isOnline, pendingCount, isSyncing } = useSyncStore();
 
@@ -229,7 +231,7 @@ export const Navbar = memo(function Navbar() {
             >
               <p className="section-label px-3 pt-1.5 pb-1">Create new</p>
 
-              {isOwnerAdmin && (
+              {isOwnerAdmin && canAccessRoute(company, user?.role, '/tasks') && (
                 <>
                   <MenuAction
                     icon={<CheckSquare className="h-4 w-4 theme-text-secondary" />}
@@ -241,18 +243,18 @@ export const Navbar = memo(function Navbar() {
                     label="Project"
                     onClick={() => { openCreateModal('project'); setShowCreate(false); }}
                   />
-                  <MenuAction
+                  {canAccessRoute(company, user?.role, '/chat') && <MenuAction
                     icon={<Hash className="h-4 w-4 theme-text-secondary" />}
                     label="Channel"
                     onClick={() => { openCreateModal('channel'); setShowCreate(false); }}
-                  />
+                  />}
                 </>
               )}
-              <MenuAction
+              {canAccessRoute(company, user?.role, '/meetings') && <MenuAction
                 icon={<Video className="h-4 w-4 theme-text-secondary" />}
                 label="Meeting"
                 onClick={() => { openCreateModal('meeting'); setShowCreate(false); }}
-              />
+              />}
             </div>
           )}
         </div>

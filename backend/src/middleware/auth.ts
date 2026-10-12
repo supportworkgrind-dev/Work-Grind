@@ -5,6 +5,7 @@ import Company from '../models/Company';
 import { EntitlementId, PlanId } from '../config/subscription';
 import { getEffectiveSubscription } from '../services/companySubscription';
 import { roleMatches } from '../config/organization';
+import type { AcademicDepartmentScope } from './academicDepartmentAccess';
 
 export interface AuthRequest extends Request {
   user?: {
@@ -17,6 +18,7 @@ export interface AuthRequest extends Request {
     mfaPending?: boolean;
     mfaAuthenticated?: boolean;
   };
+  academicDepartmentScope?: AcademicDepartmentScope;
 }
 
 const BILLING_AND_BOOTSTRAP_PATHS = new Set([

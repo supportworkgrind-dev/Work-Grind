@@ -18,6 +18,8 @@ import { CrmContact } from '../models/CrmContact';
 import { CrmDeal } from '../models/CrmDeal';
 import { CrmCompany } from '../models/CrmCompany';
 import { AuthRequest } from '../middleware/auth';
+import { isOrganizationFeatureAllowed } from '../middleware/organizationAccess';
+import { getCompanySubscription } from '../services/companySubscription';
 import mongoose from 'mongoose';
 
 export const globalSearch = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -40,12 +42,31 @@ export const globalSearch = async (req: AuthRequest, res: Response): Promise<voi
 
     const companyId   = req.user!.companyId;
     const companyOId  = new mongoose.Types.ObjectId(companyId);
+    const organizationType = req.user?.organizationType;
+    const accountType = req.user?.accountType;
+    const role = req.user?.role;
+    const hasValidOrganizationType = organizationType === 'business' ||
+      organizationType === 'school' ||
+      organizationType === 'college' ||
+      organizationType === 'university';
+    const hasValidAccountType = accountType === 'company' || accountType === 'individual';
+    const canRequestCrm = hasValidOrganizationType && hasValidAccountType &&
+      typeof role === 'string' &&
+      isOrganizationFeatureAllowed({ organizationType, accountType }, role, 'businessCrm');
 
     // Escape regex special chars to prevent ReDoS
     const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const queryRegex = { $regex: escaped, $options: 'i' };
 
     const should = (cat: string) => !type || type === 'all' || type === cat;
+    const needsCrmSearch = ['contacts', 'deals', 'crmCompanies'].some(should);
+    const crmSubscription = needsCrmSearch && canRequestCrm
+      ? await getCompanySubscription(companyId.toString())
+      : null;
+    const canSearchCrm = !!(
+      crmSubscription?.hasActiveAccess &&
+      crmSubscription.planConfig.entitlements.crm
+    );
 
     const [
       people, tasks, projects, channels, messages,
@@ -108,7 +129,7 @@ export const globalSearch = async (req: AuthRequest, res: Response): Promise<voi
         $or: [{ title: queryRegex }, { description: queryRegex }],
       }).select('title type startDate endDate color').limit(6).lean() : [],
 
-      should('contacts') ? CrmContact.find({
+      should('contacts') && canSearchCrm ? CrmContact.find({
         companyId: companyOId,
         $or: [
           { firstName: queryRegex }, { lastName: queryRegex },
@@ -117,13 +138,13 @@ export const globalSearch = async (req: AuthRequest, res: Response): Promise<voi
       }).select('firstName lastName email jobTitle status avatarUrl')
         .populate('crmCompanyId', 'name').limit(8).lean() : [],
 
-      should('deals') ? CrmDeal.find({
+      should('deals') && canSearchCrm ? CrmDeal.find({
         companyId: companyOId,
         $or: [{ title: queryRegex }],
       }).select('title value stage priority closeDate')
         .populate('crmCompanyId', 'name').limit(6).lean() : [],
 
-      should('crmCompanies') ? CrmCompany.find({
+      should('crmCompanies') && canSearchCrm ? CrmCompany.find({
         companyId: companyOId,
         $or: [{ name: queryRegex }, { domain: queryRegex }, { industry: queryRegex }],
       }).select('name domain industry country logoUrl').limit(6).lean() : [],

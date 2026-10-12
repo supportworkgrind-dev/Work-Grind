@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, memo, useState } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useAppStore } from '@/store/useAppStore';
 import { normalizeTheme, useThemeStore } from '@/lib/themeStore';
@@ -64,6 +64,7 @@ const AppShell = memo(function AppShell({
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [hasHydrated, setHasHydrated] = useState(false);
   // Read user + isLoading with a selector to avoid re-rendering on unrelated store changes
   const user      = useAuthStore((s) => s.user);
@@ -76,11 +77,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const fetchCurrentUser = useAuthStore((s) => s.fetchCurrentUser);
   const refreshSubscription = useAuthStore((s) => s.refreshSubscription);
   const pathname = usePathname();
+  const academicSection = searchParams.get('section');
   const setTheme = useThemeStore((s) => s.setTheme);
   const { setLang } = useI18n();
   const isSidebarOpen    = useAppStore((s) => s.isSidebarOpen);
   const organization = company ?? (user?.companyId && typeof user.companyId === 'object' ? user.companyId : null);
-  const routeAllowed = canAccessRoute(organization, user?.role, pathname);
+  const routeAllowed = canAccessRoute(organization, user?.role, pathname, academicSection);
   useEffect(() => {
     if (!user) return;
     setTheme(normalizeTheme(user.theme));
@@ -114,7 +116,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     if (user && !routeAllowed) {
       router.replace(getWorkspaceHome(organization));
     }
-  }, [organization, routeAllowed, router, user]);
+  }, [academicSection, organization, routeAllowed, router, user]);
 
   useEffect(() => {
     if (user && !subscription && !subscriptionLoading && !subscriptionError) {

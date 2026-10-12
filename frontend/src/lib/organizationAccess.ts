@@ -67,11 +67,11 @@ const FEATURE_POLICIES: Record<OrganizationFeature, (experience: Experience, rol
       experience === 'company' ? ['owner', 'admin'].includes(role) : role === 'owner',
   memberDirectory: (experience, role) =>
     experience === 'company' ? ['owner', 'admin', 'manager'].includes(role) :
-      experience !== 'solo' && experience !== 'company' && INSTITUTION_ADMINS.has(role),
+      experience !== 'solo' && INSTITUTION_ADMINS.has(role),
   workspaceSettings: (experience, role) =>
     experience === 'solo' ? role === 'owner' :
       experience === 'company' ? ['owner', 'admin'].includes(role) :
-        experience !== 'solo' && experience !== 'company' && INSTITUTION_ADMINS.has(role),
+        INSTITUTION_ADMINS.has(role),
 };
 
 function canonicalRole(role: UserRole | string | undefined): string {
@@ -146,11 +146,18 @@ export function canAccessRoute(
   organization: OrganizationInfo | null | undefined,
   role: UserRole | string | undefined,
   pathname: string,
+  section?: string | null,
 ): boolean {
-  if (pathname === '/dashboard') return getWorkspaceExperience(organization) !== null;
-  const feature = getRouteOrganizationFeature(pathname);
-  if (!feature) return true;
   const experience = getWorkspaceExperience(organization);
+  if (!experience) return false;
+  if (pathname === '/dashboard') return experience === 'solo' || experience === 'company';
+  if (pathname === '/settings' || pathname === '/notifications') return true;
+  if (pathname === '/academic') {
+    return canAccessOrganizationFeature(organization, role, 'academic') &&
+      canAccessAcademicSection(role, section || 'overview', organization?.organizationType);
+  }
+  const feature = getRouteOrganizationFeature(pathname);
+  if (!feature) return false;
 
   if (pathname === '/calendar') {
     return canAccessOrganizationFeature(organization, role, 'soloWorkspace') ||
@@ -168,6 +175,14 @@ export function canAccessRoute(
       canAccessOrganizationFeature(organization, role, 'educationFiles');
   }
   if (pathname === '/docs') {
+    return canAccessOrganizationFeature(organization, role, 'soloWorkspace') ||
+      canAccessOrganizationFeature(organization, role, 'companyWorkspace');
+  }
+  if (pathname === '/tasks' || pathname.startsWith('/tasks/')) {
+    return canAccessOrganizationFeature(organization, role, 'soloWorkspace') ||
+      canAccessOrganizationFeature(organization, role, 'companyWorkspace');
+  }
+  if (pathname === '/projects' || pathname.startsWith('/projects/')) {
     return canAccessOrganizationFeature(organization, role, 'soloWorkspace') ||
       canAccessOrganizationFeature(organization, role, 'companyWorkspace');
   }

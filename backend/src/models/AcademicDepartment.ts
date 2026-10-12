@@ -5,6 +5,8 @@ export interface IAcademicDepartment extends Document {
   name: string;
   code: string;
   description?: string;
+  authorizedDeanUserIds: mongoose.Types.ObjectId[];
+  authorizedHodUserIds: mongoose.Types.ObjectId[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -15,6 +17,8 @@ const AcademicDepartmentSchema = new Schema<IAcademicDepartment>(
     name: { type: String, required: true, trim: true, maxlength: 120 },
     code: { type: String, required: true, trim: true, uppercase: true, maxlength: 30 },
     description: { type: String, trim: true, maxlength: 1000 },
+    authorizedDeanUserIds: [{ type: Schema.Types.ObjectId, ref: 'User' }],
+    authorizedHodUserIds: [{ type: Schema.Types.ObjectId, ref: 'User' }],
   },
   { timestamps: true }
 );

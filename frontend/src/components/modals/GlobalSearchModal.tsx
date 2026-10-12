@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAppStore } from '@/store/useAppStore';
 import { useAuthStore } from '@/store/useAuthStore';
+import { canAccessRoute } from '@/lib/organizationAccess';
 import { api, aiRouter } from '@/lib/api';
 import {
   Search,
@@ -24,6 +25,8 @@ export function GlobalSearchModal() {
   const router = useRouter();
   const { isSearchOpen, setSearchOpen } = useAppStore();
   const user = useAuthStore((state) => state.user);
+  const company = useAuthStore((state) => state.company);
+  const canSeeCrm = canAccessRoute(company, user?.role, '/crm');
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<{
@@ -144,6 +147,7 @@ export function GlobalSearchModal() {
           const normalizedResults = {
             ...backendResults,
             users: backendResults.users ?? backendResults.people ?? [],
+            ...(canSeeCrm ? {} : { crmCompanies: [], deals: [], contacts: [] }),
           };
           setResults(normalizedResults);
 
@@ -401,7 +405,7 @@ export function GlobalSearchModal() {
           )}
 
           {/* CRM Companies */}
-          {results.crmCompanies && (results.crmCompanies?.length ?? 0) > 0 && (
+          {canSeeCrm && results.crmCompanies && (results.crmCompanies?.length ?? 0) > 0 && (
             <div>
               {intentHint === 'crm_lookup' && (
                 <div className="mb-1 px-2">
@@ -428,7 +432,7 @@ export function GlobalSearchModal() {
           )}
 
           {/* Deals */}
-          {results.deals && (results.deals?.length ?? 0) > 0 && (
+          {canSeeCrm && results.deals && (results.deals?.length ?? 0) > 0 && (
             <div>
               {intentHint === 'crm_lookup' && !results.crmCompanies?.length && (
                 <div className="mb-1 px-2">
@@ -458,7 +462,7 @@ export function GlobalSearchModal() {
           )}
 
           {/* Contacts */}
-          {results.contacts && (results.contacts?.length ?? 0) > 0 && (
+          {canSeeCrm && results.contacts && (results.contacts?.length ?? 0) > 0 && (
             <div>
               {intentHint === 'crm_lookup' && !results.crmCompanies?.length && !results.deals?.length && (
                 <div className="mb-1 px-2">
