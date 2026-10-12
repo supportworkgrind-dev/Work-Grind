@@ -39,7 +39,7 @@ export interface ICompany extends Document {
   };
   ownerId: mongoose.Types.ObjectId;
   inviteCode: string;
-  pendingInvites: { email: string; token: string; expiresAt: Date; role: string }[];
+  pendingInvites: { email: string; token: string; expiresAt: Date; role: string; inviterId?: mongoose.Types.ObjectId }[];
 
   /** Legacy workspace-level plan field (kept for backward compat). */
   plan: CompanyPlan;
@@ -115,6 +115,7 @@ const CompanySchema = new Schema<ICompany>(
         token:     String,
         expiresAt: Date,
         role:      { type: String, default: 'employee' },
+        inviterId: { type: Schema.Types.ObjectId, ref: 'User' },
       },
     ],
 

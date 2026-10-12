@@ -27,7 +27,12 @@ import { sendVerificationEmail, sendVerificationCodeEmail, sendPasswordResetEmai
 import { AuthRequest } from '../middleware/auth';
 import { refreshAvatarUrls } from '../services/avatarUrls';
 import { clearRefreshCookie, getRefreshCookie, setRefreshCookie } from '../utils/authCookie';
-import { isOrganizationType, normalizeOrganizationRole } from '../config/organization';
+import {
+  canAssignOrganizationRole,
+  isOrganizationRoleEligible,
+  isOrganizationType,
+  normalizeOrganizationRole,
+} from '../config/organization';
 const issue = (userId: string, companyId: string, role: string) => ({
   accessToken: generateAccessToken({ userId, companyId, role }),
   refreshToken: generateRefreshToken({ userId, companyId, role }),
@@ -1045,10 +1050,32 @@ export const joinCompany = async (req: AuthRequest, res: Response): Promise<void
           });
           return;
         }
-        // Role ceiling: keep invite assignments within the workspace type's allowed role matrix.
-        const safeRoles = ['principal', 'director', 'admin', 'office_staff', 'teacher', 'faculty', 'student', 'parent', 'guardian', 'dean', 'hod', 'manager', 'employee', 'guest'];
-        const requestedRole = normalizeOrganizationRole(invite.role, company.organizationType, 'employee');
-        assignedRole = safeRoles.includes(requestedRole) ? requestedRole : 'employee';
+        const requestedRole = normalizeOrganizationRole(invite.role, company.organizationType, '');
+        if (invite.inviterId) {
+          const inviter = await User.findOne({
+            _id: invite.inviterId,
+            companyId: company._id,
+            isActive: true,
+            isDeleted: { $ne: true },
+          }).select('role');
+          const inviterOwnsOrganization = company.ownerId.toString() === invite.inviterId.toString();
+          if (
+            !inviter ||
+            !canAssignOrganizationRole(inviter.role, requestedRole, company.organizationType, inviterOwnsOrganization)
+          ) {
+            res.status(403).json({ success: false, message: 'This invitation role is no longer authorized.' });
+            return;
+          }
+        } else {
+          // Legacy invitations lack inviter provenance, so only retain low-privilege assignments.
+          const legacyRoles = ['employee', 'guest', 'student'];
+          if (!legacyRoles.includes(requestedRole) || !isOrganizationRoleEligible(requestedRole, company.organizationType)) {
+            assignedRole = 'employee';
+          } else {
+            assignedRole = requestedRole;
+          }
+        }
+        if (invite.inviterId) assignedRole = requestedRole;
       }
       // Consume the invite token so it cannot be reused
       company.pendingInvites = company.pendingInvites.filter((i) => i.token !== codeOrToken);
@@ -1059,10 +1086,12 @@ export const joinCompany = async (req: AuthRequest, res: Response): Promise<void
       });
 
       if (company) {
-        const defaultRole = company.settings?.defaultRole || 'employee';
-        const requestedRole = normalizeOrganizationRole(defaultRole, company.organizationType, 'employee');
-        const safeRoles = ['principal', 'director', 'admin', 'office_staff', 'teacher', 'faculty', 'student', 'parent', 'guardian', 'dean', 'hod', 'manager', 'employee', 'guest'];
-        assignedRole = safeRoles.includes(requestedRole) ? requestedRole : 'employee';
+        const requestedRole = normalizeOrganizationRole(company.settings?.defaultRole, company.organizationType, '');
+        const safeRoles = ['employee', 'guest', 'student'];
+        assignedRole = safeRoles.includes(requestedRole) &&
+          isOrganizationRoleEligible(requestedRole, company.organizationType)
+          ? requestedRole
+          : 'employee';
       }
     }
 

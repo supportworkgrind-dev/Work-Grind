@@ -81,7 +81,7 @@ export function isOrganizationRoleEligible(role: unknown, organizationType: Orga
 }
 
 export function normalizeOrganizationRole(role: unknown, organizationType: OrganizationType | string | null | undefined, fallback = 'employee'): string {
-  if (!isOrganizationRoleEligible(role, organizationType)) return fallback;
+  if (typeof role !== 'string' || !isOrganizationRoleEligible(role, organizationType)) return fallback;
 
   const normalized = keyForRole(role);
   return ROLE_ALIASES[normalized] ?? normalized;
@@ -123,4 +123,27 @@ export function roleMatches(role: unknown, requestedRoles: readonly string[], or
     return normalized === 'admin' || normalized === 'manager';
   }
   return false;
+}
+
+export function canAssignOrganizationRole(
+  actorRole: unknown,
+  targetRole: unknown,
+  organizationType: OrganizationType | string,
+  actorOwnsOrganization: boolean,
+): boolean {
+  if (!isOrganizationRoleEligible(targetRole, organizationType)) return false;
+  const normalizedTarget = normalizeOrganizationRole(targetRole, organizationType, '');
+  if (!normalizedTarget || normalizedTarget === 'owner') return false;
+  if (actorOwnsOrganization) return true;
+
+  const isElevated = roleMatches(
+    normalizedTarget,
+    ['owner', 'admin', 'manager', 'principal', 'dean', 'hod'],
+    organizationType,
+  );
+  if (isElevated) return false;
+
+  if (roleMatches(actorRole, ['admin'], organizationType)) return true;
+  return roleMatches(actorRole, ['manager'], organizationType) &&
+    ['employee', 'guest'].includes(normalizedTarget);
 }

@@ -16,6 +16,7 @@ import { refreshAvatarUrls } from '../services/avatarUrls';
 import { ensureUserCallingId, isValidCallingId, normalizeCallingId } from '../services/callingId';
 import { publishUserPresence } from '../utils/socket';
 import { parsePhoneNumberFromString } from 'libphonenumber-js/max';
+import { canAssignOrganizationRole, normalizeOrganizationRole } from '../config/organization';
 
 export const getUsers = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -331,9 +332,22 @@ export const updateStatus = async (req: AuthRequest, res: Response): Promise<voi
 export const inviteMember = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { email, role = 'employee' } = req.body;
-    if (!email) { res.status(400).json({ success: false, message: 'Email required' }); return; }
+    if (typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      res.status(400).json({ success: false, message: 'A valid email address is required.' });
+      return;
+    }
     const company = await Company.findById(req.user!.companyId);
     if (!company) { res.status(404).json({ success: false, message: 'Company not found' }); return; }
+
+    const assignedRole = normalizeOrganizationRole(role, company.organizationType, '');
+    const isOwner = company.ownerId.toString() === req.user!.userId;
+    if (!canAssignOrganizationRole(req.user!.role, role, company.organizationType, isOwner)) {
+      res.status(403).json({
+        success: false,
+        message: 'This role is not eligible for the organization or cannot be assigned by your role.',
+      });
+      return;
+    }
 
     // ── Plan-based member limit check ─────────────────────────────────────
     const memberCheck = await checkMemberLimit(req.user!.userId, company._id.toString());
@@ -349,9 +363,15 @@ export const inviteMember = async (req: AuthRequest, res: Response): Promise<voi
 
     const inviter = await User.findById(req.user!.userId);
     const token = uuidv4();
-    company.pendingInvites.push({ email, token, expiresAt: new Date(Date.now() + 7 * 86400000), role });
+    company.pendingInvites.push({
+      email: email.trim().toLowerCase(),
+      token,
+      expiresAt: new Date(Date.now() + 7 * 86400000),
+      role: assignedRole,
+      inviterId: new mongoose.Types.ObjectId(req.user!.userId),
+    });
     await company.save();
-    await sendInviteEmail(email, inviter?.fullName || 'Someone', company.name, token);
+    await sendInviteEmail(email.trim().toLowerCase(), inviter?.fullName || 'Someone', company.name, token);
     res.json({ success: true, message: 'Invitation sent' });
   } catch (e: any) { res.status(500).json({ success: false, message: e.message }); }
 };

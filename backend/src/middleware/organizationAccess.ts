@@ -95,7 +95,7 @@ export function requireOrganizationFeature(feature: OrganizationFeature) {
           break;
         case 'memberDirectory':
           allowed = isAcademic
-            ? eligible && roleMatches(role, ['owner', 'principal', 'admin', 'dean', 'hod'], company.organizationType)
+            ? eligible && roleMatches(role, ['owner', 'principal', 'admin'], company.organizationType)
             : roleMatches(role, ['owner', 'admin', 'manager'], company.organizationType);
           break;
         case 'workspaceContent':

@@ -6,7 +6,10 @@ import Task from '../models/Task';
 import { AuthRequest } from '../middleware/auth';
 import { sendInviteEmail } from '../utils/email';
 import { v4 as uuidv4 } from 'uuid';
-import { isOrganizationType } from '../config/organization';
+import {
+  isOrganizationRoleEligible,
+  isOrganizationType,
+} from '../config/organization';
 
 export const getCompany = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -23,9 +26,41 @@ export const getCompany = async (req: AuthRequest, res: Response): Promise<void>
 
 export const updateCompany = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
+    const company = await Company.findById(req.user!.companyId);
+    if (!company) {
+      res.status(404).json({ success: false, message: 'Company not found' });
+      return;
+    }
+
     if (req.body.organizationType !== undefined && !isOrganizationType(req.body.organizationType)) {
       res.status(400).json({ success: false, message: 'Organization type must be business, school, college, or university.' });
       return;
+    }
+    if (req.body.accountType !== undefined && !['company', 'individual'].includes(req.body.accountType)) {
+      res.status(400).json({ success: false, message: 'Account type must be company or individual.' });
+      return;
+    }
+    const requestedOrganizationType = req.body.organizationType ?? company.organizationType;
+    const requestedAccountType = req.body.accountType ?? company.accountType;
+    const classificationChanged = requestedOrganizationType !== company.organizationType ||
+      requestedAccountType !== company.accountType;
+    if (classificationChanged && company.ownerId.toString() !== req.user!.userId) {
+      res.status(403).json({ success: false, message: 'Only the workspace owner can change organization classification.' });
+      return;
+    }
+    if (requestedAccountType === 'individual' && requestedOrganizationType !== 'business') {
+      res.status(400).json({ success: false, message: 'Solo workspaces must use the business organization type.' });
+      return;
+    }
+    if (classificationChanged) {
+      const members = await User.find({ companyId: company._id, isActive: true }).select('role');
+      if (members.some((member) => !isOrganizationRoleEligible(member.role, requestedOrganizationType))) {
+        res.status(409).json({
+          success: false,
+          message: 'Organization type cannot be changed while active members have roles that are not eligible for the new type.',
+        });
+        return;
+      }
     }
     if (req.body.currency !== undefined && (typeof req.body.currency !== 'string' || !/^[A-Za-z]{3}$/.test(req.body.currency))) {
       res.status(400).json({ success: false, message: 'Currency must be a three-letter ISO currency code.' });
@@ -55,22 +90,46 @@ export const updateCompany = async (req: AuthRequest, res: Response): Promise<vo
         return;
       }
     }
-    const allowed = ['name', 'logo', 'industry', 'size', 'country', 'timeZone', 'currency', 'settings', 'accountType', 'organizationType'];
+    if (req.body.settings !== undefined) {
+      const settings = req.body.settings;
+      const allowedDefaultRoles = requestedOrganizationType === 'business'
+        ? ['employee', 'guest']
+        : ['employee', 'guest', 'student'];
+      if (
+        !settings ||
+        typeof settings !== 'object' ||
+        Array.isArray(settings) ||
+        (settings.allowGuestAccess !== undefined && typeof settings.allowGuestAccess !== 'boolean') ||
+        (settings.defaultRole !== undefined &&
+          (!allowedDefaultRoles.includes(settings.defaultRole) ||
+            !isOrganizationRoleEligible(settings.defaultRole, requestedOrganizationType))) ||
+        Object.keys(settings).some((key) => !['allowGuestAccess', 'defaultRole'].includes(key))
+      ) {
+        res.status(400).json({ success: false, message: 'Workspace settings contain an unsupported value.' });
+        return;
+      }
+    }
+
+    const allowed = ['name', 'logo', 'industry', 'size', 'country', 'timeZone', 'currency', 'accountType', 'organizationType'];
     const updates: any = {};
     allowed.forEach((field) => {
       if (req.body[field] !== undefined) updates[field] = req.body[field];
     });
+    if (req.body.settings !== undefined) {
+      if (req.body.settings.allowGuestAccess !== undefined) updates['settings.allowGuestAccess'] = req.body.settings.allowGuestAccess;
+      if (req.body.settings.defaultRole !== undefined) updates['settings.defaultRole'] = req.body.settings.defaultRole;
+    }
     if (req.body.academicSettings !== undefined) {
       Object.entries(req.body.academicSettings).forEach(([key, value]) => {
         updates[`academicSettings.${key}`] = value;
       });
     }
 
-    const company = await Company.findByIdAndUpdate(req.user!.companyId, updates, { new: true, runValidators: true });
-    if (updates.accountType) {
-      await User.findByIdAndUpdate(req.user!.userId, { accountType: updates.accountType });
+    const updatedCompany = await Company.findByIdAndUpdate(req.user!.companyId, updates, { new: true, runValidators: true });
+    if (classificationChanged) {
+      await User.updateMany({ companyId: company!._id }, { accountType: requestedAccountType });
     }
-    res.json({ success: true, company });
+    res.json({ success: true, company: updatedCompany });
   } catch (err: any) {
     res.status(500).json({ success: false, message: err.message });
   }

@@ -11,6 +11,7 @@ import { CrmCompany } from '../models/CrmCompany';
 import { ClientUser } from '../models/ClientPortal';
 import { AuthRequest } from '../middleware/auth';
 import { getCompanySubscription } from '../services/companySubscription';
+import { isOrganizationRoleEligible, normalizeOrganizationRole, roleMatches } from '../config/organization';
 
 export const getAdminMembers = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -32,11 +33,38 @@ export const getAdminMembers = async (req: AuthRequest, res: Response): Promise<
 export const updateMemberRole = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { userId } = req.params;
-    const { role } = req.body;
+    const requestedRole = req.body?.role;
+    const [company, target] = await Promise.all([
+      Company.findById(req.user!.companyId).select('ownerId organizationType'),
+      User.findOne({ _id: userId, companyId: req.user!.companyId }).select('_id role'),
+    ]);
+    if (!company || !target) {
+      res.status(404).json({ success: false, message: 'Organization member not found.' });
+      return;
+    }
+    if (target._id.toString() === company.ownerId.toString()) {
+      res.status(403).json({ success: false, message: 'The workspace owner role is tied to organization ownership.' });
+      return;
+    }
 
-    const validRoles = ['owner', 'admin', 'manager', 'employee', 'guest'];
-    if (!validRoles.includes(role)) {
-      res.status(400).json({ success: false, message: 'Invalid role' });
+    const role = normalizeOrganizationRole(requestedRole, company.organizationType, '');
+    if (
+      !role ||
+      role === 'owner' ||
+      !isOrganizationRoleEligible(requestedRole, company.organizationType)
+    ) {
+      res.status(400).json({ success: false, message: 'This role is not eligible for the organization.' });
+      return;
+    }
+
+    const actorOwnsOrganization = company.ownerId.toString() === req.user!.userId;
+    const isElevatedRole = roleMatches(
+      role,
+      ['admin', 'manager', 'principal', 'dean', 'hod'],
+      company.organizationType,
+    );
+    if (isElevatedRole && !actorOwnsOrganization) {
+      res.status(403).json({ success: false, message: 'Only the workspace owner can assign elevated organization roles.' });
       return;
     }
 
@@ -70,13 +98,34 @@ export const updateMemberStatus = async (req: AuthRequest, res: Response): Promi
   try {
     const { userId } = req.params;
     const { isActive } = req.body;
-
+    if (typeof isActive !== 'boolean') {
+      res.status(400).json({ success: false, message: 'A valid active status is required.' });
+      return;
+    }
+    const company = await Company.findById(req.user!.companyId).select('ownerId organizationType');
+    const target = await User.findOne({ _id: userId, companyId: req.user!.companyId }).select('_id role');
+    if (!company || !target) {
+      res.status(404).json({ success: false, message: 'Organization member not found.' });
+      return;
+    }
+    const actorOwnsOrganization = company.ownerId.toString() === req.user!.userId;
+    if (
+      target._id.toString() === company.ownerId.toString() ||
+      target._id.toString() === req.user!.userId ||
+      (!actorOwnsOrganization && roleMatches(
+        target.role,
+        ['owner', 'admin', 'manager', 'principal', 'dean', 'hod'],
+        company.organizationType,
+      ))
+    ) {
+      res.status(403).json({ success: false, message: 'You cannot change this member’s access status.' });
+      return;
+    }
     const member = await User.findOneAndUpdate(
       { _id: userId, companyId: req.user!.companyId },
       { isActive },
-      { new: true }
+      { new: true },
     ).select('-password -phone -refreshTokens');
-
     if (!member) {
       res.status(404).json({ success: false, message: 'User not found' });
       return;
