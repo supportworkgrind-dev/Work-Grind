@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { AlertCircle, LoaderCircle } from 'lucide-react';
 import { api } from '@/lib/api';
-import { getApiEndpointUrl } from '@/lib/apiConfig';
 
 type SocialAuthButtonsProps = {
   intent?: 'login' | 'link' | 'signup';
@@ -63,24 +62,19 @@ export function SocialAuthButtons({
         : requestedReturnTo && requestedReturnTo.startsWith('/') && !requestedReturnTo.startsWith('//')
           ? requestedReturnTo
           : '/dashboard';
-      if (intent !== 'link') {
-        const startUrl = getApiEndpointUrl(`/auth/oauth/${provider}/start`, {
-          returnTo,
-          ...(audience === 'client' ? { audience: 'client' } : {}),
-          ...(intent === 'signup' && signupSelection
-            ? { intent: 'signup', ...signupSelection }
-            : {}),
-        });
-        window.location.assign(startUrl);
-        return;
-      }
-
       const response = await api.get(`/auth/oauth/${provider}/start`, {
         withCredentials: true,
+        headers: { Accept: 'application/json' },
         params: {
           returnTo,
           ...(audience === 'client' ? { audience: 'client' } : {}),
-          ...(intent === 'link' ? { intent: 'link' } : {}),
+          ...(intent !== 'login' ? { intent } : {}),
+          ...(intent === 'signup' && signupSelection
+            ? {
+              accountType: signupSelection.accountType,
+              organizationType: signupSelection.organizationType,
+            }
+            : {}),
         },
         ...(audience === 'client'
           ? { headers: { Authorization: `Bearer ${localStorage.getItem('workgrind_client_token') || ''}` } }

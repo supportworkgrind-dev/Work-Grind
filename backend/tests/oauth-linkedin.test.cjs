@@ -1,0 +1,132 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const {
+  generateKeyPairSync,
+  sign,
+} = require('node:crypto');
+const {
+  buildAuthorizationUrl,
+  exchangeAuthorizationCode,
+  getOAuthConfiguration,
+  getOAuthConfigurationIssue,
+} = require('../dist/services/oauth');
+
+function configureLinkedIn() {
+  process.env.NODE_ENV = 'production';
+  process.env.BACKEND_URL = 'https://backend.example.test';
+  process.env.LINKEDIN_CLIENT_ID = 'test-linkedin-client';
+  process.env.LINKEDIN_CLIENT_SECRET = 'test-linkedin-secret';
+  process.env.LINKEDIN_CALLBACK_URL = 'https://backend.example.test/api/auth/oauth/linkedin/callback';
+}
+
+function createIdToken(privateKey, overrides = {}) {
+  const now = Math.floor(Date.now() / 1000);
+  const header = Buffer.from(JSON.stringify({ alg: 'RS256', kid: 'linkedin-test-key' })).toString('base64url');
+  const payload = Buffer.from(JSON.stringify({
+    iss: 'https://www.linkedin.com',
+    aud: 'test-linkedin-client',
+    sub: 'linkedin-subject-1',
+    exp: now + 300,
+    iat: now,
+    nonce: 'test-nonce',
+    email: 'person@example.test',
+    email_verified: true,
+    name: 'Example Person',
+    given_name: 'Example',
+    family_name: 'Person',
+    picture: 'https://media.licdn.com/dms/image/example',
+    ...overrides,
+  })).toString('base64url');
+  const unsigned = `${header}.${payload}`;
+  return `${unsigned}.${sign('RSA-SHA256', Buffer.from(unsigned), privateKey).toString('base64url')}`;
+}
+
+test('LinkedIn configuration requires credentials and the implemented callback route', () => {
+  configureLinkedIn();
+  delete process.env.LINKEDIN_CLIENT_SECRET;
+  assert.equal(getOAuthConfigurationIssue('linkedin')?.includes('LINKEDIN_CLIENT_SECRET'), true);
+  assert.equal(getOAuthConfiguration('linkedin'), null);
+
+  configureLinkedIn();
+  process.env.LINKEDIN_CALLBACK_URL = 'https://backend.example.test/api/auth/other';
+  assert.notEqual(getOAuthConfigurationIssue('linkedin'), null);
+  configureLinkedIn();
+  assert.equal(getOAuthConfigurationIssue('linkedin'), null);
+
+  const configuration = getOAuthConfiguration('linkedin');
+  assert.equal(configuration.clientId, 'test-linkedin-client');
+  assert.equal(configuration.callbackUrl, process.env.LINKEDIN_CALLBACK_URL);
+});
+
+test('LinkedIn authorization requests ask only for OIDC profile/email and use state, nonce, and PKCE', () => {
+  configureLinkedIn();
+  const configuration = getOAuthConfiguration('linkedin');
+  const url = new URL(buildAuthorizationUrl(
+    'linkedin',
+    configuration,
+    'opaque-state',
+    'opaque-nonce',
+    'opaque-verifier',
+  ));
+
+  assert.equal(url.origin, 'https://www.linkedin.com');
+  assert.equal(url.pathname, '/oauth/v2/authorization');
+  assert.equal(url.searchParams.get('scope'), 'openid profile email');
+  assert.equal(url.searchParams.get('state'), 'opaque-state');
+  assert.equal(url.searchParams.get('nonce'), 'opaque-nonce');
+  assert.equal(url.searchParams.get('code_challenge_method'), 'S256');
+  assert.ok(url.searchParams.get('code_challenge'));
+  assert.equal(url.searchParams.has('client_secret'), false);
+});
+
+test('LinkedIn code exchange validates the signed ID token and nonce and sends PKCE', async (context) => {
+  configureLinkedIn();
+  const configuration = getOAuthConfiguration('linkedin');
+  const { publicKey, privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+  const jwk = {
+    ...publicKey.export({ format: 'jwk' }),
+    kid: 'linkedin-test-key',
+    use: 'sig',
+    kty: 'RSA',
+    alg: 'RS256',
+  };
+  const originalFetch = global.fetch;
+  let submittedForm;
+  global.fetch = async (input, init = {}) => {
+    if (String(input) === 'https://www.linkedin.com/oauth/v2/accessToken') {
+      submittedForm = new URLSearchParams(init.body);
+      return new Response(JSON.stringify({ id_token: createIdToken(privateKey) }), { status: 200 });
+    }
+    if (String(input) === 'https://www.linkedin.com/oauth/openid/jwks') {
+      return new Response(JSON.stringify({ keys: [jwk] }), { status: 200 });
+    }
+    throw new Error('Unexpected OAuth endpoint');
+  };
+  context.after(() => { global.fetch = originalFetch; });
+
+  const result = await exchangeAuthorizationCode(
+    'linkedin',
+    configuration,
+    'authorization-code',
+    'test-verifier',
+    'test-nonce',
+  );
+  assert.equal(result.claims.sub, 'linkedin-subject-1');
+  assert.equal(result.claims.email_verified, true);
+  assert.equal(result.claims.given_name, 'Example');
+  assert.equal(result.claims.family_name, 'Person');
+  assert.equal(submittedForm.get('client_id'), 'test-linkedin-client');
+  assert.equal(submittedForm.get('client_secret'), 'test-linkedin-secret');
+  assert.equal(submittedForm.get('code_verifier'), 'test-verifier');
+
+  await assert.rejects(
+    exchangeAuthorizationCode(
+      'linkedin',
+      configuration,
+      'authorization-code',
+      'test-verifier',
+      'different-nonce',
+    ),
+    /nonce was invalid/,
+  );
+});
