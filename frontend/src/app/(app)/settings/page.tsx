@@ -43,6 +43,7 @@ import { formatBytes, formatDate, getInitials } from '@/lib/utils';
 import { CountrySelect } from '@/components/common/CountrySelect';
 import { SocialAuthButtons } from '@/components/auth/SocialAuthButtons';
 import { canAccessOrganizationFeature } from '@/lib/organizationAccess';
+import { LinkedInConnectionCard } from '@/components/automation/LinkedInConnectionCard';
 
 const NOTIFICATION_DEFAULTS = {
   taskAssigned: true,
@@ -1659,6 +1660,11 @@ export default function SettingsPage() {
                 </p>
                 <SocialAuthButtons intent="link" />
               </section>
+              {company?.accountType === 'company' &&
+                company.organizationType === 'business' &&
+                ['owner', 'admin', 'manager'].includes(user?.role ?? '') && (
+                  <LinkedInConnectionCard />
+                )}
 
               {passError && (
                 <div className="flex items-center gap-2 rounded-xl bg-rose-50 p-3 text-xs text-rose-700 border border-rose-200">
