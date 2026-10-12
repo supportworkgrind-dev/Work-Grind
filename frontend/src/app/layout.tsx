@@ -19,8 +19,8 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_BASE_URL || 'https://workgrind.app'),
-  title: 'WorkGrind | All-in-One Business Workspace',
-  description: 'WorkGrind is an all-in-one business workspace combining CRM, team collaboration, tasks, projects, meetings, AI, client portals, and analytics — all in one connected platform.',
+  title: 'WorkGrind | Connected Workspaces for Work and Learning',
+  description: 'WorkGrind offers separate workspaces for personal productivity, businesses, schools, colleges, and universities, with capabilities suited to each.',
   manifest: '/manifest.json',
   icons: {
     icon:    [{ url: '/icon.svg', type: 'image/svg+xml' }],
@@ -28,8 +28,8 @@ export const metadata: Metadata = {
     apple:   [{ url: '/apple-touch-icon.png', sizes: '180x180' }],
   },
   openGraph: {
-    title:       'WorkGrind | All-in-One Business Workspace',
-    description: 'Run your team. Grow your business. CRM, tasks, projects, chat, meetings, AI, client portals, and analytics — all connected in one workspace.',
+    title:       'WorkGrind | Connected Workspaces for Work and Learning',
+    description: 'Choose a workspace for personal productivity, business collaboration, or academic administration.',
     url:         'https://workgrind.app',
     siteName:    'WorkGrind',
     images: [
@@ -44,8 +44,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card:        'summary',
-    title:       'WorkGrind | All-in-One Business Workspace',
-    description: 'CRM, team collaboration, tasks, projects, meetings, and AI — one connected workspace.',
+    title:        'WorkGrind | Connected Workspaces for Work and Learning',
+    description: 'Personal productivity, business collaboration, and academic administration in purpose-specific workspaces.',
     images:      ['/workgrind-icon.svg'],
   },
 };

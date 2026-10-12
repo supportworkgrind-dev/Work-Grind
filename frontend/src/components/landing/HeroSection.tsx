@@ -4,7 +4,7 @@
  * WorkGrind Hero Section — Premium animated product demo
  *
  * Visual strategy:
- *   LEFT  — Strong copy: CRM · Team · Work headline + CTAs
+ *   LEFT  — Choose a workspace for personal work, business, or education
  *   RIGHT — 7-scene live product walkthrough cycling every ~2.2 s
  *           (Overview → CRM → Team → Tasks → Chat → AI → Overview)
  *
@@ -17,9 +17,7 @@
  *   - prefers-reduced-motion respected throughout
  *
  * Data:
- *   All demo data reflects real WorkGrind features.
- *   No fake metrics, no unsupported claims.
- *   Sample records clearly use fictional company names.
+ *   The preview uses illustrative sample content, not live account data.
  */
 
 import React, {
@@ -36,6 +34,8 @@ import {
   Bell, Search, Plus, CheckCircle2, Clock,
   Building2, TrendingUp, Target, Circle,
   Hash, Send, AtSign,
+  BookOpen, GraduationCap,
+  School,
 } from 'lucide-react';
 import styles from '@/app/landing.module.css';
 
@@ -122,10 +122,10 @@ const SCENES: { key: SceneKey; label: string; icon: React.ElementType; col: stri
 const STORY_SCENES: SceneKey[] = ['overview', 'tasks', 'crm', 'chat', 'ai'];
 
 const WORKSPACE_AREAS = [
-  { label: 'CRM', icon: Building2, color: '#60a5fa' },
-  { label: 'Tasks', icon: CheckSquare, color: '#34d399' },
-  { label: 'Calendar', icon: Calendar, color: '#a78bfa' },
-  { label: 'Team', icon: Users, color: '#c084fc' },
+  { label: 'Personal', icon: CheckSquare, color: '#34d399' },
+  { label: 'Business', icon: Building2, color: '#60a5fa' },
+  { label: 'Classes', icon: BookOpen, color: '#a78bfa' },
+  { label: 'Academics', icon: GraduationCap, color: '#c084fc' },
   { label: 'Tavro AI', icon: Sparkles, color: '#67e8f9' },
 ];
 
@@ -175,7 +175,7 @@ function Chrome({ label }: { label: string }) {
       <div className="h-2 w-2 rounded-full bg-emerald-400/50" />
       <div className="ml-3 flex items-center gap-1.5">
         <div className="h-5 w-5 rounded-md bg-indigo-600 flex items-center justify-center">
-          <span className="text-[7px] font-black text-white">TF</span>
+          <span className="text-[7px] font-black text-white">WG</span>
         </div>
         <span className="text-[10px] text-slate-500">WorkGrind — {label}</span>
       </div>
@@ -672,7 +672,7 @@ function ProductDemo({ reduced }: { reduced: boolean }) {
         </div>
         <div className="flex items-center gap-1.5">
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-          <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-400">Live Preview</span>
+          <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-400">Illustrative Preview</span>
         </div>
       </div>
 
@@ -704,7 +704,7 @@ function ProductDemo({ reduced }: { reduced: boolean }) {
 
       <div
         role="img"
-        aria-label="WorkGrind connects CRM, Tasks, Calendar, Team, and Tavro AI"
+        aria-label="Illustrative WorkGrind preview spanning personal work, business, and academic workspaces"
         className="relative border-t border-white/[0.05] bg-gradient-to-b from-[#0b0f19] to-[#090c13] px-2 py-3 sm:px-4"
       >
         <div className="absolute left-[12%] right-[12%] top-[28px] h-px bg-gradient-to-r from-blue-400/20 via-indigo-300/60 to-cyan-300/20" aria-hidden="true" />
@@ -744,7 +744,7 @@ export function HeroSection() {
     <section
       className="landing-hero relative flex items-center overflow-hidden"
       style={{ paddingTop: '4rem' }}
-      aria-label="WorkGrind — CRM, team and work management"
+      aria-label="WorkGrind — connected workspaces for personal work, business, and education"
     >
       <div className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 lg:py-14">
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.2fr] gap-10 lg:gap-16 items-center">
@@ -759,7 +759,7 @@ export function HeroSection() {
             {/* Eyebrow */}
             <motion.div variants={lineVariant} className="mb-5">
               <span className={`${styles.heroEyebrow} inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-xs font-bold tracking-wide`}>
-                The Connected Workspace for Modern Teams
+                One platform. Five ways to work and learn.
               </span>
             </motion.div>
 
@@ -768,10 +768,10 @@ export function HeroSection() {
               variants={lineVariant}
               className={`${styles.heroTitle} font-black text-white mb-5`}
             >
-              Run your team.<br />
-              Manage customers.<br />
+              Connect work,<br />
+              business, and<br />
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-blue-400 to-cyan-400">
-                Move work forward.
+                education.
               </span>
             </motion.h1>
 
@@ -780,8 +780,8 @@ export function HeroSection() {
               variants={lineVariant}
               className={`${styles.heroDescription} text-slate-400 max-w-[65ch] mx-auto lg:mx-0 mb-7`}
             >
-              WorkGrind brings CRM, team collaboration, tasks, projects, meetings,
-              documents and AI into one connected workspace for serious businesses.
+              Choose a personal workspace, tools for running a business, or academic
+              capabilities for your school, college, or university.
             </motion.p>
 
             {/* CTAs */}
@@ -793,33 +793,38 @@ export function HeroSection() {
                 href="/signup"
                 className={`${styles.heroPrimaryCta} group inline-flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-7 py-3 rounded-xl shadow-lg shadow-indigo-600/25 transition-all active:scale-[0.97]`}
               >
-                Start Free Trial
+                Get Started
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
               </Link>
               <Link
-                href="/how-it-works"
+                href="/features"
                 className={`${styles.heroSecondaryCta} inline-flex items-center justify-center gap-2 border border-white/[0.12] bg-white/[0.04] hover:bg-white/[0.08] text-white font-semibold px-7 py-3 rounded-xl transition-all active:scale-[0.97]`}
               >
-                See How It Works
+                Explore Features
                 <ChevronRight className="h-4 w-4" />
               </Link>
             </motion.div>
 
-            {/* Feature proof row */}
+            {/* Workspace choices */}
             <motion.div
               variants={lineVariant}
-              className={`${styles.heroProof} flex flex-wrap gap-x-5 gap-y-2 justify-center lg:justify-start`}
+              className="grid grid-cols-2 gap-2 sm:grid-cols-3"
             >
               {([
-                { icon: Building2,   label: 'CRM & Contacts'   },
-                { icon: Users,       label: 'Team Management'  },
-                { icon: CheckSquare, label: 'Tasks & Projects' },
-                { icon: Sparkles,    label: 'Tavro AI'          },
-              ] as const).map(({ icon: Icon, label }) => (
-                <div key={label} className="flex items-center gap-1.5 text-[12px] text-slate-500">
-                  <Icon className="h-3.5 w-3.5 text-indigo-400 shrink-0" />
+                { id: 'solo', label: 'Solo', icon: CheckSquare },
+                { id: 'business', label: 'Company', icon: Building2 },
+                { id: 'school', label: 'School / Academy', icon: School },
+                { id: 'college', label: 'College', icon: BookOpen },
+                { id: 'university', label: 'University', icon: GraduationCap },
+              ] as const).map(({ id, label, icon: Icon }) => (
+                <Link
+                  key={id}
+                  href={`/signup?workspace=${id}`}
+                  className="flex min-h-10 items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.035] px-2 text-xs font-semibold text-slate-300 transition-colors hover:border-indigo-400/50 hover:bg-indigo-400/10 hover:text-white"
+                >
+                  <Icon className="h-3.5 w-3.5 shrink-0 text-indigo-300" />
                   {label}
-                </div>
+                </Link>
               ))}
             </motion.div>
           </motion.div>

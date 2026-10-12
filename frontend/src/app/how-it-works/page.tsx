@@ -12,11 +12,11 @@ import { PublicNavbar } from '@/components/landing/PublicNavbar';
 import { RevealOnScroll } from '@/components/landing/RevealOnScroll';
 
 export const metadata: Metadata = {
-  title: 'How WorkGrind Works | One Workspace for Your Business',
-  description: 'See how WorkGrind connects daily work, CRM, the Client Portal, global calling, and scoped API access for external apps.',
+  title: 'How WorkGrind Works | Work, Business, and Education',
+  description: 'Learn how WorkGrind provides separate Solo, Company, School / Academy, College, and University workspaces.',
   openGraph: {
-    title: 'How WorkGrind Works | One Workspace for Your Business',
-    description: 'Explore how WorkGrind connects company work, CRM, client access, global calling, and external applications.',
+    title: 'How WorkGrind Works | Work, Business, and Education',
+    description: 'Explore distinct workspaces for personal productivity, company collaboration, and academic administration.',
     url: '/how-it-works',
     siteName: 'WorkGrind',
     type: 'website',
@@ -24,8 +24,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary',
-    title: 'How WorkGrind Works | One Workspace for Your Business',
-    description: 'See how WorkGrind connects work, customers, communication, phone activity, and external apps.',
+    title: 'How WorkGrind Works | Work, Business, and Education',
+    description: 'Choose capabilities and access appropriate to a Solo, Company, School, College, or University workspace.',
     images: ['/workgrind-icon.svg'],
   },
 };
@@ -34,7 +34,7 @@ const flow = [
   { label: 'Plan', description: 'Set priorities in Daily Focus and see the work ahead.', href: '#workspace', color: '#57c7a5', icon: ListChecks },
   { label: 'Organize', description: 'Shape tasks, owners, deadlines, and projects.', href: '#workspace', color: '#6f86e8', icon: PanelsTopLeft },
   { label: 'Collaborate', description: 'Bring conversations, meetings, and shared knowledge together.', href: '#collaboration', color: '#48a9d8', icon: MessageSquare },
-  { label: 'Manage Customers', description: 'Keep contacts, deals, and client-facing work connected.', href: '#customers', color: '#e5a64d', icon: Handshake },
+  { label: 'Manage Customers', description: 'Company workspaces can connect contacts, deals, and client-facing work.', href: '#customers', color: '#e5a64d', icon: Handshake },
   { label: 'Automate', description: 'Turn supported triggers into repeatable team actions.', href: '#resources', color: '#5bb7a4', icon: Workflow },
   { label: 'Analyze', description: 'Review activity and performance from workspace data.', href: '#resources', color: '#cf7d93', icon: BarChart3 },
   { label: 'Improve with Tavro AI', description: 'Ask questions about workspace information you are allowed to access.', href: '#tavro', color: '#8e91ee', icon: Sparkles },
@@ -120,13 +120,13 @@ export default function HowItWorksPage() {
           <div className="mx-auto grid max-w-7xl items-center gap-12 px-4 py-16 sm:px-6 sm:py-20 lg:grid-cols-[1.1fr_0.9fr] lg:px-8 lg:py-24">
             <div>
               <p className="mb-5 inline-flex items-center gap-2 border border-white/15 bg-white/[0.04] px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-indigo-200">
-                <PanelsTopLeft className="h-4 w-4" aria-hidden="true" /> A connected business workspace
+                <PanelsTopLeft className="h-4 w-4" aria-hidden="true" /> Workspaces for different kinds of work
               </p>
               <h1 className="max-w-3xl text-4xl font-extrabold leading-tight sm:text-5xl lg:text-6xl">
-                Everything Your Team Needs. In One Workspace.
+                A workspace for personal work, business, or education.
               </h1>
               <p className="mt-6 max-w-2xl text-base leading-relaxed text-slate-300 sm:text-lg">
-                WorkGrind brings work, customers, projects, communication, files, automation, and AI together so your team can see what is happening and move it forward.
+                WorkGrind brings together tools suited to individuals, businesses, and educational institutions. The available modules and access depend on the workspace type, role, and plan.
               </p>
               <div className="mt-8 flex flex-col gap-3 xs:flex-row">
                 <Link href="/signup" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-indigo-500">
@@ -136,7 +136,7 @@ export default function HowItWorksPage() {
                   Explore WorkGrind <ArrowDown className="h-4 w-4" aria-hidden="true" />
                 </a>
               </div>
-              <p className="mt-5 text-xs text-slate-400">For teams coordinating delivery, customers, and day-to-day operations.</p>
+              <p className="mt-5 text-xs text-slate-400">Select Solo, Company, School / Academy, College, or University during signup.</p>
             </div>
 
             <div className="border border-white/10 bg-white/[0.035] p-5 sm:p-7" aria-label="WorkGrind workflow from planning to improvement">
@@ -156,6 +156,26 @@ export default function HowItWorksPage() {
                 ))}
               </div>
               <p className="mt-4 text-xs leading-relaxed text-slate-400">A product map, not a screenshot: each step connects to a real WorkGrind area below.</p>
+            </div>
+          </div>
+        </section>
+
+        <section className="border-b py-14 sm:py-16" style={{ borderColor: 'var(--border-color)' }}>
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <SectionHeading eyebrow="Five workspace types" title="Start with the experience that fits" description="WorkGrind uses the selected workspace type to shape the available areas. Role and plan also affect access." />
+            <div className="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {[
+                ['Solo', 'Personal focus, tasks, planning, documents, and AI assistance.', 'solo'],
+                ['Company', 'Team collaboration, projects, CRM, client access, and business workflows.', 'business'],
+                ['School / Academy', 'Students, teachers, classes, attendance, assignments, exams, results, and fees.', 'school'],
+                ['College', 'Students, faculty, departments, courses, timetables, and academic administration.', 'college'],
+                ['University', 'University academic operations with department workflows for authorized Deans and HODs.', 'university'],
+              ].map(([name, summary, workspace]) => (
+                <Link key={workspace} href={`/signup?workspace=${workspace}`} className="flex min-h-32 flex-col border p-4 transition-colors hover:border-[var(--accent)]" style={{ borderColor: 'var(--border-color)', background: 'var(--bg-card)' }}>
+                  <span className="text-sm font-bold">{name}</span>
+                  <span className="mt-2 text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{summary}</span>
+                </Link>
+              ))}
             </div>
           </div>
         </section>
@@ -189,7 +209,7 @@ export default function HowItWorksPage() {
 
         <section id="customers" className="border-y py-14 sm:py-16" style={{ borderColor: 'var(--border-color)', background: 'var(--bg-card)' }}>
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <SectionHeading eyebrow="Customers" title="Keep customer context close to delivery" description="Move from a customer conversation to the people, opportunities, and work connected to it." />
+            <SectionHeading eyebrow="Company workspaces" title="Keep customer context close to delivery" description="Company workspaces can connect customer conversations, opportunities, and delivery work. CRM and Client Portal are not education modules." />
             <div className="mt-8 grid grid-cols-1 gap-3 lg:grid-cols-2">
               <RevealOnScroll>
                 <Link href="/crm" className="group flex h-full min-h-64 flex-col border p-6 transition-colors hover:border-[var(--accent)]" style={{ borderColor: 'var(--border-color)', background: 'var(--bg-base)' }}>
@@ -281,7 +301,7 @@ export default function HowItWorksPage() {
 
         <section id="day" className="border-y py-14 sm:py-16" style={{ borderColor: 'var(--border-color)', background: 'var(--bg-card)' }}>
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <SectionHeading eyebrow="A day with WorkGrind" title="A practical rhythm for a busy team" description="An illustrative workflow, not customer activity or a claim about how every team works." />
+            <SectionHeading eyebrow="Illustrative Company workflow" title="A possible rhythm for business work" description="This is an example of how a Company workspace may be used, not customer activity or a claim about every organization." />
             <div className="relative mt-9 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {day.map(([time, title, description], index) => (
                 <RevealOnScroll key={time}>
@@ -300,7 +320,7 @@ export default function HowItWorksPage() {
 
         <section id="connections" className="py-14 sm:py-16">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <SectionHeading eyebrow="One connected workspace" title="How the modules connect" description="WorkGrind keeps related information near the work instead of scattering it across disconnected tools." />
+            <SectionHeading eyebrow="Company workspace example" title="How business modules connect" description="These Company-oriented examples connect related customer and collaboration information. Education workspaces use academic areas instead." />
             <div className="mt-8 space-y-3">
               <ConnectionRow label="Delivery" items={[["Tasks", '/tasks'], ["Projects", '/projects'], ["Calendar", '/calendar']]} />
               <ConnectionRow label="Customers" items={[["CRM", '/crm'], ["Client Portal", '/client-portal'], ["Projects", '/projects']]} />

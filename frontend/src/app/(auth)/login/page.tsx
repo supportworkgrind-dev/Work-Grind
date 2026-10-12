@@ -65,7 +65,7 @@ export default function LoginPage() {
     <AuthShell>
       <p className="auth-kicker !mb-3 !text-[9px]">YOUR WORKSPACE AWAITS</p>
       <h1 className="auth-form-title">Good to have you back.</h1>
-      <p className="auth-form-subtitle">Sign in to pick up where your team left off.</p>
+      <p className="auth-form-subtitle">Sign in to continue in your WorkGrind workspace.</p>
 
       <SocialAuthButtons className="mt-5" />
       <div className="my-5 flex items-center gap-3 text-[9px] font-bold uppercase tracking-[.14em] text-stone-400">
@@ -86,7 +86,7 @@ export default function LoginPage() {
           <div className="auth-input-wrap">
             <Mail size={16} className="auth-icon" />
             <input id="login-email" className="auth-input" type="email" required autoComplete="email"
-              placeholder="you@company.com" value={email} onChange={(event) => setEmail(event.target.value)} />
+              placeholder="you@example.com" value={email} onChange={(event) => setEmail(event.target.value)} />
           </div>
         </div>
         <div className="auth-field">
@@ -123,9 +123,9 @@ export default function LoginPage() {
       </div>
 
       <p className="mt-7 text-center text-xs text-stone-500">
-        New to WorkGrind? <Link href="/signup" className="auth-link">Start your free trial</Link>
+        New to WorkGrind? <Link href="/signup" className="auth-link">Choose a workspace and get started</Link>
       </p>
-      <p className="mt-5 text-center text-[10px] text-stone-400">Protected sign-in · Your team data stays yours</p>
+      <p className="mt-5 text-center text-[10px] text-stone-400">Protected sign-in · Workspace access is role-based</p>
     </AuthShell>
   );
 }

@@ -216,6 +216,7 @@ export default function PricingPage() {
 
   const authReady = mounted && isAuthenticated;
   const canManageBilling = user?.role === 'owner' || user?.role === 'founder' || user?.role === 'admin';
+  const activeEducationPlan = educationPlans.find((plan) => plan.id === workspaceType);
 
   const handleSelect = async (planId: string) => {
     if (!isAuthenticated) {
@@ -241,7 +242,7 @@ export default function PricingPage() {
       {/* ── Navbar ── */}
       <nav className="sticky top-0 z-30 flex h-14 items-center justify-between px-6 border-b border-white/[0.06] bg-[#06080f]/80 backdrop-blur-xl">
         <Link href="/" className="flex items-center gap-2 text-white font-bold text-lg tracking-tight">
-          <div className="h-7 w-7 rounded-lg bg-indigo-600 flex items-center justify-center text-[11px] font-black">TF</div>
+          <div className="h-7 w-7 rounded-lg bg-indigo-600 flex items-center justify-center text-[11px] font-black">WG</div>
           WorkGrind
         </Link>
         <div className="flex items-center gap-3">
@@ -258,7 +259,7 @@ export default function PricingPage() {
             <>
               <Link href="/login" className="text-sm text-slate-400 hover:text-white transition-colors">Log in</Link>
               <Link href="/signup" className="rounded-xl bg-indigo-600 hover:bg-indigo-500 px-4 py-1.5 text-sm font-semibold transition-colors">
-                Start free trial
+                View plans
               </Link>
             </>
           )}
@@ -273,14 +274,14 @@ export default function PricingPage() {
             Simple, transparent pricing
           </span>
           <h1 className="text-[2.75rem] sm:text-5xl font-black tracking-tight leading-tight mb-4">
-            Try it free for 7 days.<br />
+            Plans for the workspace you choose.<br />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-blue-400 to-cyan-400">
-              Scale when you&apos;re ready.
+              Clear pricing, no guesswork.
             </span>
           </h1>
           <p className="text-[15px] text-slate-400 max-w-xl mx-auto leading-relaxed">
-            Every account starts with a full 7-day free trial with access to all features.
-            Choose a paid plan before your trial ends to keep your access.
+            Solo and Company plans are listed separately from backend-configured education plans.
+            Plan features, limits, prices, and applicable trial terms are shown with each plan.
           </p>
         </div>
 
@@ -320,7 +321,10 @@ export default function PricingPage() {
           </div>
         ) : workspaceTypeError ? null : workspaceType === 'school' || workspaceType === 'college' || workspaceType === 'university' ? (
           <div className="mx-auto mb-20 grid max-w-lg grid-cols-1 gap-6">
-            {educationPlans.filter((plan) => plan.id === workspaceType).map((plan) => (
+            {activeEducationPlan ? (
+              (() => {
+                const plan = activeEducationPlan;
+                return (
               <article key={plan.id} className="rounded-3xl border border-indigo-500/40 bg-[#0d1117] p-7 shadow-xl shadow-indigo-500/10">
                 <h2 className="text-sm font-bold uppercase tracking-widest text-slate-300">{plan.name}</h2>
                 <p className="mt-4 text-4xl font-black text-white">{plan.priceDisplay.replace('/month', '')} {plan.currency}<span className="ml-1.5 text-sm font-medium text-slate-400">/{plan.billingInterval}</span></p>
@@ -350,7 +354,13 @@ export default function PricingPage() {
                   </button>
                 )}
               </article>
-            ))}
+                );
+              })()
+            ) : (
+              <p className="rounded-2xl border border-amber-400/30 bg-amber-400/10 px-5 py-4 text-sm text-amber-200" role="alert">
+                Education pricing is not configured for this workspace type. Checkout is unavailable; contact WorkGrind support for assistance.
+              </p>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-20">
@@ -386,8 +396,8 @@ export default function PricingPage() {
                     {plan.name}
                   </h3>
                   <p className="mt-4 text-4xl font-black text-white">
-                    {plan.priceDisplay.replace('/month', '')}
-                    <span className="ml-1.5 text-sm font-medium text-slate-400">/month</span>
+                    {plan.priceDisplay.replace('/month', '')} {plan.currency}
+                    <span className="ml-1.5 text-sm font-medium text-slate-400">/{plan.billingInterval}</span>
                   </p>
                   <p className="mt-3 min-h-10 text-[13px] leading-relaxed text-slate-400">
                     {plan.description}

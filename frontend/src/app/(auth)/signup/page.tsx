@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { AxiosError } from 'axios';
@@ -51,6 +51,12 @@ export default function SignUpPage() {
   const [error, setError] = useState('');
   const [selectedOption, setSelectedOption] = useState<SignupSelection | null>(null);
 
+  useEffect(() => {
+    const requestedWorkspace = new URLSearchParams(window.location.search).get('workspace');
+    const matchingOption = signupOptions.find(({ id }) => id === requestedWorkspace);
+    if (matchingOption) setSelectedOption(matchingOption);
+  }, []);
+
   const checks = [
     password.length >= 8,
     /[A-Z]/.test(password) && /[a-z]/.test(password),
@@ -100,8 +106,8 @@ export default function SignUpPage() {
   return (
     <AuthShell>
       <div className="auth-step"><b>01&nbsp; DETAILS</b><i /><span>02&nbsp; VERIFY EMAIL</span><i /><span>03&nbsp; WORKSPACE</span></div>
-      <h1 className="auth-form-title">Start with a clear slate.</h1>
-      <p className="auth-form-subtitle">Create your account. We’ll email you a verification code before your workspace is activated.</p>
+      <h1 className="auth-form-title">Choose how you’ll use WorkGrind.</h1>
+      <p className="auth-form-subtitle">Create your account and choose a Solo, Company, School / Academy, College, or University workspace. We’ll email a verification code before activation.</p>
 
       <fieldset className="mt-6">
         <legend className="mb-2 text-xs font-semibold text-stone-800">What are you setting up?</legend>

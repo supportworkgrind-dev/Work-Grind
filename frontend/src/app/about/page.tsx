@@ -11,24 +11,18 @@ import { ArrowLeft, Users, ShieldCheck, Zap, Globe, Sparkles, CheckCircle2, Arro
 export default function AboutPage() {
   const { t } = useI18n();
 
-  const stats = [
-    { label: t('about.stats.workspaces'), value: '12,000+' },
-    { label: t('about.stats.messages'),   value: '50M+'    },
-    { label: t('about.stats.tasks'),      value: '3.8M+'   },
-    { label: t('about.stats.uptime'),     value: '99.99%'  },
-  ];
-
   const pillars = [
     { icon: Zap,        key: 'sync',     color: '#6366f1' },
     { icon: ShieldCheck,key: 'security', color: '#10b981' },
     { icon: Globe,      key: 'scale',    color: '#3b82f6' },
   ] as const;
 
-  const features = [
-    'CRM & deal pipeline', 'Team chat & channels', 'Video meetings & conferencing',
-    'Kanban task management', 'Project roadmaps', 'Built-in Tavro AI',
-    'Client portal', 'File management', 'Collaborative docs',
-    'Business analytics', 'Workflow automation', 'Calendar & scheduling',
+  const audiences = [
+    { name: 'Solo', description: 'Personal planning, tasks, documents, and AI assistance.', workspace: 'solo' },
+    { name: 'Company', description: 'Team collaboration, projects, customer tools, and business workflows.', workspace: 'business' },
+    { name: 'School / Academy', description: 'Students, teachers, classes, attendance, assignments, and academic administration.', workspace: 'school' },
+    { name: 'College', description: 'Students, faculty, departments, courses, and academic administration.', workspace: 'college' },
+    { name: 'University', description: 'University academic operations and authorized department-level workflows.', workspace: 'university' },
   ];
 
   return (
@@ -97,21 +91,6 @@ export default function AboutPage() {
           </p>
         </div>
 
-        {/* Stats */}
-        <div className="stagger-grid grid grid-cols-2 md:grid-cols-4 gap-4 mb-14">
-          {stats.map(st => (
-            <div key={st.label} className="stat-tile text-center">
-              <div className="text-3xl sm:text-4xl font-extrabold tracking-tight mb-1"
-                style={{ color: 'var(--accent)', letterSpacing: '-0.04em' }}>
-                {st.value}
-              </div>
-              <div className="text-[11px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>
-                {st.label}
-              </div>
-            </div>
-          ))}
-        </div>
-
         {/* Story */}
         <div className="surface-premium rounded-2xl p-8 sm:p-12 mb-8">
           <h2 className="text-2xl font-extrabold tracking-tight mb-6"
@@ -153,13 +132,17 @@ export default function AboutPage() {
           <p className="text-sm mb-6" style={{ color: 'var(--text-secondary)' }}>
             {t('about.workspace.subheading')}
           </p>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
-            {features.map(f => (
-              <div key={f} className="flex items-center gap-2 rounded-xl px-3 py-2.5"
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {audiences.map(({ name, description, workspace }) => (
+              <Link key={workspace} href={`/signup?workspace=${workspace}`}
+                className="flex min-h-32 flex-col rounded-xl p-4 transition-colors hover:border-[var(--accent)]"
                 style={{ background: 'var(--bg-base)', border: '1px solid var(--border-subtle)' }}>
-                <CheckCircle2 className="h-3.5 w-3.5 shrink-0" style={{ color: 'var(--accent)' }} />
-                <span className="text-[12px] font-medium" style={{ color: 'var(--text-secondary)' }}>{f}</span>
-              </div>
+                <span className="flex items-center gap-2 font-semibold" style={{ color: 'var(--text-primary)' }}>
+                  <CheckCircle2 className="h-4 w-4 shrink-0" style={{ color: 'var(--accent)' }} />{name}
+                </span>
+                <span className="mt-2 text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{description}</span>
+                <span className="mt-auto pt-3 text-xs font-semibold" style={{ color: 'var(--accent)' }}>Choose this workspace <ArrowRight className="inline h-3 w-3" /></span>
+              </Link>
             ))}
           </div>
         </div>

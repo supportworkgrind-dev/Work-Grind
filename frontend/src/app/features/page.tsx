@@ -31,11 +31,11 @@ import { PublicNavbar } from '@/components/landing/PublicNavbar';
 import { RevealOnScroll } from '@/components/landing/RevealOnScroll';
 
 export const metadata: Metadata = {
-  title: 'WorkGrind Features | Real Workflow, CRM, AI, and Client Portal Tools',
-  description: 'Explore the actual WorkGrind feature set: daily focus, tasks, projects, CRM, client portal, chat, meetings, documents, files, analytics, automation, and Tavro AI.',
+  title: 'WorkGrind Features | Personal, Business, and Education Workspaces',
+  description: 'Explore WorkGrind capabilities for Solo productivity, Company collaboration, and School, College, and University administration.',
   openGraph: {
-    title: 'WorkGrind Features | Real Workflow, CRM, AI, and Client Portal Tools',
-    description: 'See the modules WorkGrind includes today: daily planning, customer context, secure client access, automation, analytics, and Tavro AI.',
+    title: 'WorkGrind Features | Personal, Business, and Education Workspaces',
+    description: 'Compare personal productivity, company operations, and academic administration capabilities.',
     url: '/features',
     siteName: 'WorkGrind',
     type: 'website',
@@ -44,7 +44,7 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary',
     title: 'WorkGrind Features',
-    description: 'A practical overview of the WorkGrind workspace and client-facing tools that are implemented today.',
+    description: 'Capabilities vary by workspace type, role, and subscription plan.',
     images: ['/workgrind-icon.svg'],
   },
 };
@@ -98,6 +98,14 @@ const governanceModules: FeatureTile[] = [
   { name: 'Files + Docs', href: '/files', icon: FileText, color: '#d78857', summary: 'Keep shared, client-facing, and internal documents in the same operating system.', tag: 'Knowledge' },
 ];
 
+const workspaceChoices = [
+  { name: 'Solo', workspace: 'solo', summary: 'Personal productivity, daily planning, tasks, documents, and AI assistance.' },
+  { name: 'Company', workspace: 'business', summary: 'Team collaboration, projects, CRM, client collaboration, meetings, and business workflows.' },
+  { name: 'School / Academy', workspace: 'school', summary: 'Students, teachers, classes, timetables, attendance, assignments, exams, results, and fees.' },
+  { name: 'College', workspace: 'college', summary: 'Students, faculty, departments, courses, schedules, and academic administration.' },
+  { name: 'University', workspace: 'university', summary: 'Students, faculty, departments, courses, academic administration, and authorized Dean / HOD workflows.' },
+];
+
 function ModuleGrid({ modules }: { modules: FeatureTile[] }) {
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -146,7 +154,7 @@ export default function FeaturesPage() {
                 A workspace built around the real work.
               </h1>
               <p className="mt-6 text-base leading-relaxed text-slate-300 sm:text-lg">
-                WorkGrind brings planning, delivery, customer context, collaboration, secure external access, automation, and AI into a single operating system that matches the way teams already work.
+                WorkGrind offers separate experiences for personal productivity, company operations, and academic administration. Features depend on workspace type, role, and plan.
               </p>
               <div className="mt-8 flex flex-col justify-center gap-3 xs:flex-row">
                 <Link href="/signup" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-indigo-500">
@@ -163,9 +171,9 @@ export default function FeaturesPage() {
         <section className="py-14 sm:py-16">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <SectionHeading
-              eyebrow="Operating system"
+              eyebrow="Personal and Company capabilities"
               title="Core work, customer context, and daily execution"
-              description="These are the main product areas WorkGrind includes for day-to-day business operations."
+              description="Daily Focus, tasks, calendar, and projects support eligible workspaces. CRM is a Company capability; access depends on role and plan."
             />
             <div className="mt-8"><ModuleGrid modules={operatingModules} /></div>
           </div>
@@ -196,11 +204,29 @@ export default function FeaturesPage() {
         <section className="border-y py-14 sm:py-16" style={{ borderColor: 'var(--border-color)', background: 'var(--bg-card)' }}>
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <SectionHeading
-              eyebrow="Business connections"
-              title="Connect company operations and external apps"
-              description="Global Calling and the WorkGrind Connect API extend the workspace without exposing workspace-only data through a company-phone concept."
+              eyebrow="Company capabilities"
+              title="Business tools for company workspaces"
+              description="CRM, Client Portal, and business integrations are company-oriented capabilities. Their availability depends on the workspace role and plan."
             />
             <div className="mt-8"><ModuleGrid modules={connectionFeatures} /></div>
+          </div>
+        </section>
+
+        <section className="border-y py-14 sm:py-16" style={{ borderColor: 'var(--border-color)', background: 'var(--bg-card)' }}>
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <SectionHeading
+              eyebrow="Choose a workspace"
+              title="Different needs, distinct experiences"
+              description="Choose an account type during signup. Available features depend on the persisted workspace type, your role, and plan."
+            />
+            <div className="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {workspaceChoices.map(({ name, workspace, summary }) => (
+                <Link key={workspace} href={`/signup?workspace=${workspace}`} className="group flex min-h-36 flex-col border p-5 transition-colors hover:border-[var(--accent)]" style={{ borderColor: 'var(--border-color)', background: 'var(--bg-base)' }}>
+                  <span className="flex items-center justify-between text-base font-bold">{name}<ArrowRight className="h-4 w-4 opacity-0 transition-opacity group-hover:opacity-100" aria-hidden="true" /></span>
+                  <span className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{summary}</span>
+                </Link>
+              ))}
+            </div>
           </div>
         </section>
 
@@ -218,9 +244,9 @@ export default function FeaturesPage() {
         <section className="bg-[#070b15] px-4 py-16 text-center text-white sm:px-6 sm:py-20">
           <RevealOnScroll>
             <div className="mx-auto max-w-3xl">
-              <p className="text-xs font-bold uppercase tracking-wider text-indigo-300">Built for real operating teams</p>
-              <h2 className="mt-3 text-3xl font-extrabold sm:text-4xl">Everything your team needs to run work and client relationships together.</h2>
-              <p className="mx-auto mt-4 max-w-xl text-sm leading-relaxed text-slate-300">WorkGrind brings the essentials into one workspace without adding fake promises or unsupported features.</p>
+              <p className="text-xs font-bold uppercase tracking-wider text-indigo-300">WorkGrind workspaces</p>
+              <h2 className="mt-3 text-3xl font-extrabold sm:text-4xl">Start with the workspace that fits your work.</h2>
+              <p className="mx-auto mt-4 max-w-xl text-sm leading-relaxed text-slate-300">Choose Solo, Company, School / Academy, College, or University during signup.</p>
               <div className="mt-7 flex flex-col justify-center gap-3 xs:flex-row">
                 <Link href="/signup" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-indigo-500">Get Started <ArrowRight className="h-4 w-4" aria-hidden="true" /></Link>
                 <Link href="/how-it-works" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-white/20 px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-white/10">Learn the workflow <ArrowRight className="h-4 w-4" aria-hidden="true" /></Link>

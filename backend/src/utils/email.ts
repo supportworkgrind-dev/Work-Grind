@@ -254,14 +254,14 @@ export const sendWelcomeEmail = async (email: string, name: string) => {
     const html = emailWrapper(`
     <h2 style="margin:0 0 8px;color:#0f172a;font-size:24px;font-weight:800;">Welcome to WorkGrind, ${safeName}! 🎉</h2>
     <p style="margin:0 0 20px;color:#64748b;font-size:15px;line-height:1.7;">
-      We're thrilled to have you on board. WorkGrind is your all-in-one team workspace — bringing together <strong>chat</strong>, <strong>project management</strong>, <strong>tasks</strong>, <strong>files</strong>, and <strong>meetings</strong> in one place so your team can move faster and stay aligned.
+      We're glad you're here. WorkGrind provides distinct workspaces for personal productivity, business collaboration, and academic administration. The features available to you depend on your workspace type, role, and plan.
     </p>
     <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:12px;padding:20px 24px;margin:0 0 28px;">
       <p style="margin:0 0 12px;color:#0369a1;font-size:14px;font-weight:700;">🚀 Get started in 3 steps:</p>
       <ol style="margin:0;padding-left:20px;color:#475569;font-size:14px;line-height:2;">
         <li>Create or join your workspace</li>
-        <li>Invite your team members</li>
-        <li>Create your first project or start a conversation</li>
+        <li>Review the tools available in your workspace</li>
+        <li>Start with a task, class, project, or conversation that fits your work</li>
       </ol>
     </div>
     <div style="text-align:center;margin:32px 0;">
@@ -345,7 +345,7 @@ export const sendInviteEmail = async (email: string, inviterName: string, compan
   const html = emailWrapper(`
     <h2 style="margin:0 0 8px;color:#0f172a;font-size:24px;font-weight:800;">You're invited! 🎊</h2>
     <p style="margin:0 0 20px;color:#64748b;font-size:15px;">
-      <strong>${inviterName}</strong> has invited you to join <strong>${companyName}</strong> on WorkGrind.
+      <strong>${inviterName}</strong> has invited you to join the <strong>${companyName}</strong> workspace on WorkGrind.
     </p>
     <div style="text-align:center;margin:32px 0;">
       <a href="${link}" style="display:inline-block;background:#2563eb;color:#ffffff;font-size:15px;font-weight:700;text-decoration:none;padding:14px 36px;border-radius:12px;">
@@ -354,7 +354,7 @@ export const sendInviteEmail = async (email: string, inviterName: string, compan
     </div>
     <p style="margin:0;color:#94a3b8;font-size:13px;">This invitation expires in <strong>7 days</strong>. If you weren't expecting this, you can safely ignore it.</p>
   `);
-  return safeSend(email, `${inviterName} invited you to ${companyName} on WorkGrind`, html);
+  return safeSend(email, `${inviterName} invited you to the ${companyName} workspace on WorkGrind`, html);
 };
 
 // ─── 5b. Client Portal Invite ────────────────────────────────────────────────
@@ -529,7 +529,7 @@ export const sendDemoRequestEmail = async (demo: {
       Hi <strong>${demo.name}</strong>, thank you for your interest in WorkGrind. We have received your demo request.
     </p>
     <p style="margin:0 0 24px;color:#64748b;font-size:14px;line-height:1.6;">
-      One of our workspace solution specialists will reach out to you shortly to coordinate a convenient time for your personalized 1-on-1 walkthrough.
+      The WorkGrind team will review your request and follow up using the contact details you provided.
     </p>
 
     ${demo.message ? `
