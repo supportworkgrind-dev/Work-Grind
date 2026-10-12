@@ -6,15 +6,15 @@ import { Sparkles, ArrowRight, MessageSquare, CheckSquare } from 'lucide-react';
 import Link from 'next/link';
 
 const PROMPTS = [
-  "Summarize today's meetings.",
-  'Show overdue tasks.',
-  'What should I focus on today?',
+  'Help me prioritize the work due today.',
+  'Summarize information I can access.',
+  'Find the next step in my work.',
 ] as const;
 
 const AI_RESPONSES = [
-  '3 tasks need review before sprint ends Friday. The #engineering meeting produced 5 action items.',
-  '2 high-priority tasks are overdue: "API docs" (3 days) and "Design review" (1 day).',
-  'Top priority: complete the auth flow review (due today), then join the 3 PM sprint call.',
+  'Tavro AI can help review tasks and deadlines available in your workspace.',
+  'Summaries use supported workspace information your role can access.',
+  'Available suggestions depend on the records and actions enabled for your workspace.',
 ] as const;
 
 export function AISection() {
@@ -77,7 +77,7 @@ export function AISection() {
                   <div className="mb-2 flex items-center gap-2 text-xs font-semibold text-violet-200">
                     <Sparkles className="h-4 w-4" aria-hidden="true" /> Tavro AI
                   </div>
-                  <p className="text-xs leading-5 text-slate-400">Understands your tasks, CRM, calendar, and team activity.</p>
+                  <p className="text-xs leading-5 text-slate-400">Works with supported information available to your account.</p>
                 </div>
                 <ArrowRight className="mx-auto h-4 w-4 rotate-90 text-slate-500 sm:rotate-0" aria-hidden="true" />
                 <div className="min-w-0 rounded-xl border border-emerald-400/15 bg-emerald-400/[0.045] p-3">
@@ -121,7 +121,7 @@ export function AISection() {
             </h2>
 
             <p className="text-base sm:text-lg text-slate-400 leading-relaxed">
-              Tavro AI is built into WorkGrind to understand your workspace and help your team focus on what matters most — every single day.
+              Tavro AI can assist with supported workspace information and actions. What it can access depends on your workspace, role, and plan.
             </p>
 
             <Link

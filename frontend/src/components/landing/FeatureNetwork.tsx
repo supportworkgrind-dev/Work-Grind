@@ -59,12 +59,12 @@ export function FeatureNetwork() {
             </div>
 
             <h2 id="crm-heading" className="text-3xl sm:text-4xl font-black text-white tracking-tight leading-tight">
-              Know every customer.<br />
+              Company workspace CRM.<br />
               <span className="text-blue-400">Move every opportunity forward.</span>
             </h2>
 
             <p className="text-base text-slate-400 leading-relaxed max-w-md">
-              Every contact, company, conversation and follow-up — in one organised place. WorkGrind keeps your customer relationships moving.
+              Keep contacts, companies, conversations, and follow-ups connected in the Company workspace. CRM is not part of School, College, or University experiences.
             </p>
 
             <ul className="space-y-3">

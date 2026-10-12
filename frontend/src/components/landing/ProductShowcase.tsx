@@ -2,56 +2,56 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { ArrowRight, Users, Briefcase, CheckSquare, Sparkles, Building2, BarChart3, MessageSquare, Calendar, Grid3X3 } from 'lucide-react';
+import { ArrowRight, Users, Briefcase, CheckSquare, Sparkles, Building2, BarChart3, MessageSquare, Calendar, Grid3X3, GraduationCap, BookOpen, UserRound } from 'lucide-react';
 
 const PILLARS = [
   {
-    id: 'crm',
-    label: 'CRM',
+    id: 'solo',
+    label: 'Solo',
     color: '#3b82f6',
     bg: 'bg-blue-500/10',
     border: 'border-blue-500/20',
-    icon: Building2,
-    headline: 'Customer Relationships',
-    items: ['Contacts & companies', 'Activity timeline', 'Follow-ups & tasks', 'Deal tracking'],
+    icon: UserRound,
+    headline: 'Personal Productivity',
+    items: ['Daily focus & priorities', 'Personal tasks & projects', 'Calendar & planning', 'Documents & AI assistance'],
   },
   {
-    id: 'team',
-    label: 'Team',
+    id: 'company',
+    label: 'Company',
     color: '#8b5cf6',
     bg: 'bg-violet-500/10',
     border: 'border-violet-500/20',
     icon: Users,
-    headline: 'People & Teams',
-    items: ['Departments & roles', 'Workload visibility', 'Member profiles', 'Status & presence'],
+    headline: 'Business Collaboration',
+    items: ['Team communication', 'Projects & shared work', 'CRM & client collaboration', 'Meetings & workflows'],
   },
   {
-    id: 'work',
-    label: 'Work',
+    id: 'education',
+    label: 'Education',
     color: '#10b981',
     bg: 'bg-emerald-500/10',
     border: 'border-emerald-500/20',
-    icon: CheckSquare,
-    headline: 'Tasks & Projects',
-    items: ['Kanban & list views', 'Project milestones', 'Meetings & calendar', 'Files & documents'],
+    icon: GraduationCap,
+    headline: 'Academic Administration',
+    items: ['Students, teachers & faculty', 'Classes, courses & departments', 'Attendance, assignments & exams', 'Results & fees'],
   },
   {
     id: 'ai',
-    label: 'AI',
+    label: 'Tavro AI',
     color: '#a78bfa',
     bg: 'bg-purple-500/10',
     border: 'border-purple-500/20',
     icon: Sparkles,
-    headline: 'Intelligence Layer',
-    items: ['Daily focus & priorities', 'Meeting summaries', 'Smart task creation', 'Workspace search'],
+    headline: 'Workspace Assistance',
+    items: ['Ask about accessible information', 'Summarize supported records', 'Use available actions', 'Respect role and plan access'],
   },
 ] as const;
 
 const WORKFLOW = [
-  { label: 'CRM', detail: 'Customer context', icon: Building2, color: '#60a5fa' },
-  { label: 'Team', detail: 'People aligned', icon: Users, color: '#c084fc' },
-  { label: 'Work', detail: 'Tasks in motion', icon: CheckSquare, color: '#34d399' },
-  { label: 'AI', detail: 'Tavro intelligence', icon: Sparkles, color: '#a78bfa' },
+  { label: 'Personal', detail: 'Focus & planning', icon: UserRound, color: '#60a5fa' },
+  { label: 'Company', detail: 'Teams & customers', icon: Building2, color: '#c084fc' },
+  { label: 'Education', detail: 'Academic work', icon: BookOpen, color: '#34d399' },
+  { label: 'Tavro AI', detail: 'Workspace assistance', icon: Sparkles, color: '#a78bfa' },
 ] as const;
 
 export function ProductShowcase() {
@@ -74,15 +74,15 @@ export function ProductShowcase() {
           className="max-w-2xl mb-16"
         >
           <h2 id="product-heading" className="text-3xl sm:text-4xl lg:text-[2.6rem] font-black text-white tracking-tight leading-tight mb-4">
-            Everything your business needs.{' '}
-            <span className="text-slate-400">Connected.</span>
+            Work and learning,{' '}
+            <span className="text-slate-400">connected.</span>
           </h2>
           <p className="text-base text-slate-400 leading-relaxed">
-            From customer relationships to team execution, WorkGrind keeps the entire workflow in one place.
+            Choose a workspace for personal productivity, business collaboration, or academic administration.
           </p>
         </motion.div>
 
-        {/* 4-column pillars */}
+        {/* Workspace-specific capability groups */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
           {PILLARS.map((p, i) => {
             const Icon = p.icon;
@@ -150,7 +150,7 @@ export function ProductShowcase() {
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">One connected workspace</p>
             <p className="text-sm text-slate-400">All connected. No switching tabs.</p>
           </div>
-          <ol aria-label="CRM to Team to Work to AI workflow" className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <ol aria-label="Personal, Company, Education, and Tavro AI workspaces" className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {WORKFLOW.map(({ label, detail, icon: Icon, color }, index) => (
               <li key={label} className="relative min-w-0">
                 <div className="flex h-full items-center gap-3 rounded-xl border border-white/[0.07] bg-[#0b0f19]/85 p-3">
