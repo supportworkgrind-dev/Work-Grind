@@ -1333,7 +1333,10 @@ export default function SettingsPage() {
                   <a href="/billing" className="shrink-0 text-xs font-semibold text-indigo-600 underline">Member limit reached · Upgrade</a>
                 ) : (
                   <button
-                    onClick={() => setIsInviteModalOpen(true)}
+                    onClick={() => {
+                      setInviteRole(assignableRoles[0] ?? 'employee');
+                      setIsInviteModalOpen(true);
+                    }}
                     className="flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3.5 py-2 text-xs font-semibold text-white shadow-xs hover:bg-indigo-500 transition-all shrink-0"
                   >
                     <UserPlus className="h-4 w-4" />
@@ -1361,11 +1364,7 @@ export default function SettingsPage() {
                   className="rounded-xl border border-slate-200 bg-white py-1.5 px-3 text-xs text-slate-700 shadow-2xs"
                 >
                   <option value="all">All Roles</option>
-                  <option value="owner">Owner</option>
-                  {!assignableRoles.includes(m.role) && (
-                    <option value={m.role} disabled>{m.role}</option>
-                  )}
-                  {assignableRoles.map((role) => (
+                  {[...new Set(members.map((member) => member.role))].map((role) => (
                     <option key={role} value={role}>
                       {role.charAt(0).toUpperCase() + role.slice(1)}
                     </option>
@@ -1441,10 +1440,14 @@ export default function SettingsPage() {
                                     onChange={(e) => handleChangeRole(m._id, e.target.value)}
                                     className="rounded-lg border border-slate-200 bg-white py-1 px-2 text-xs font-semibold text-slate-800 shadow-2xs focus:ring-1 focus:ring-indigo-600"
                                   >
-                                    <option value="admin">Admin</option>
-                                    <option value="manager">Manager</option>
-                                    <option value="employee">Employee</option>
-                                    <option value="guest">Guest</option>
+                                    {!assignableRoles.includes(m.role) && (
+                                      <option value={m.role} disabled>{m.role}</option>
+                                    )}
+                                    {assignableRoles.map((role) => (
+                                      <option key={role} value={role}>
+                                        {role.charAt(0).toUpperCase() + role.slice(1)}
+                                      </option>
+                                    ))}
                                   </select>
                                 ) : (
                                   <span
