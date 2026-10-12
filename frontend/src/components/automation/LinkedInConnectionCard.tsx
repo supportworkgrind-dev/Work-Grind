@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { AlertCircle, CheckCircle2, LoaderCircle, Unplug } from 'lucide-react';
 import { api } from '@/lib/api';
 import { SocialAuthButtons } from '@/components/auth/SocialAuthButtons';
@@ -31,14 +31,13 @@ export function LinkedInConnectionCard({
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
 
-  const refresh = async () => {
-    setLoading(true);
-    setError('');
+  const refresh = useCallback(async () => {
     try {
       const response = await api.get('/social-publishing/connection');
       const next = response.data.connection as LinkedInConnection;
       setConnection(next);
       onConnectionChange?.(next);
+      setError('');
     } catch (requestError: unknown) {
       const message = (requestError as { response?: { data?: { message?: string } } }).response?.data?.message;
       setConnection(null);
@@ -47,27 +46,59 @@ export function LinkedInConnectionCard({
     } finally {
       setLoading(false);
     }
-  };
+  }, [onConnectionChange]);
 
   useEffect(() => {
-    void refresh();
+    let active = true;
+    api.get('/social-publishing/connection')
+      .then((response) => {
+        if (!active) return;
+        const next = response.data.connection as LinkedInConnection;
+        setConnection(next);
+        onConnectionChange?.(next);
+      })
+      .catch((requestError: unknown) => {
+        if (!active) return;
+        const message = (requestError as { response?: { data?: { message?: string } } }).response?.data?.message;
+        setConnection(null);
+        onConnectionChange?.(null);
+        setError(message || 'LinkedIn connection status could not be loaded.');
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
     const url = new URL(window.location.href);
+    let message = '';
     if (url.searchParams.get('oauth') === 'connected') {
-      setNotice('LinkedIn publishing permission connected.');
+      message = 'LinkedIn publishing permission connected.';
       url.searchParams.delete('oauth');
-      window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
     }
     const issue = url.searchParams.get('oauth_error');
+    const isError = Boolean(issue);
     if (issue) {
-      setError(issue === 'publishing_permission_denied'
+      message = issue === 'publishing_permission_denied'
         ? 'LinkedIn did not grant member-post permission. Check app access and approve the requested permission.'
         : issue === 'cancelled'
           ? 'LinkedIn authorization was cancelled.'
-          : 'LinkedIn could not be connected. Confirm account ownership and try again.');
+          : 'LinkedIn could not be connected. Confirm account ownership and try again.';
       url.searchParams.delete('oauth_error');
+    }
+    if (message) {
+      const timer = window.setTimeout(() => {
+        if (isError) setError(message);
+        else setNotice(message);
+      }, 0);
+      window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+      return () => {
+        active = false;
+        window.clearTimeout(timer);
+      };
+    }
+    if (url.searchParams.has('oauth') || url.searchParams.has('oauth_error')) {
       window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
     }
-  }, []);
+    return () => { active = false; };
+  }, [onConnectionChange]);
 
   const disconnect = async () => {
     if (!window.confirm('Disconnect LinkedIn publishing for this workspace? Existing posts will remain published.')) return;

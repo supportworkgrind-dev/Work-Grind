@@ -76,7 +76,8 @@ export const getLinkedInConnection = async (req: AuthRequest, res: Response): Pr
       identityName: connection?.config?.identityName ?? null,
       identityEmail: connection?.config?.identityEmail ?? null,
       scopes,
-      canPublishMemberPosts: scopes.includes(LINKEDIN_PUBLISHING_SCOPE) && tokenValid,
+      canPublishMemberPosts: connection?.status === 'connected' &&
+        scopes.includes(LINKEDIN_PUBLISHING_SCOPE) && tokenValid,
       expiresAt,
       errorCode: connection?.errorMessage ?? null,
     },

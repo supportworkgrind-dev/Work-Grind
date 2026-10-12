@@ -274,7 +274,7 @@ export async function exchangeAuthorizationCode(
     throw new Error('Identity token nonce was invalid.');
   }
   const scopes = typeof tokenResponse.scope === 'string'
-    ? tokenResponse.scope.split(/\s+/).filter(Boolean)
+    ? tokenResponse.scope.split(/[,\s]+/).filter(Boolean)
     : [];
   return {
     claims,
@@ -285,6 +285,54 @@ export async function exchangeAuthorizationCode(
       ? { expiresIn: tokenResponse.expires_in }
       : {}),
   };
+}
+
+export async function introspectLinkedInAccessToken(
+  configuration: OAuthConfiguration,
+  accessToken: string,
+): Promise<{ scopes: string[]; expiresAt: Date }> {
+  if (!configuration.clientSecret) throw new Error('LinkedIn client credentials are unavailable.');
+  const form = new URLSearchParams({
+    client_id: configuration.clientId,
+    client_secret: configuration.clientSecret,
+    token: accessToken,
+  });
+  const response = await timedFetch('https://www.linkedin.com/oauth/v2/introspectToken', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: form.toString(),
+  });
+  if (!response.ok) throw new OAuthServiceError('token_endpoint_rejected', response.status);
+  let tokenInfo: {
+    active?: boolean;
+    scope?: string;
+    client_id?: string;
+    auth_type?: string;
+    expires_at?: number;
+  };
+  try {
+    tokenInfo = await response.json() as typeof tokenInfo;
+  } catch {
+    throw new OAuthServiceError('token_response_invalid');
+  }
+  const expiresAt = typeof tokenInfo.expires_at === 'number'
+    ? new Date(tokenInfo.expires_at * 1000)
+    : new Date(Number.NaN);
+  const scopes = typeof tokenInfo.scope === 'string'
+    ? tokenInfo.scope.split(/[,\s]+/).filter(Boolean)
+    : [];
+  if (
+    tokenInfo.active !== true ||
+    (tokenInfo.client_id !== undefined && tokenInfo.client_id !== configuration.clientId) ||
+    (tokenInfo.auth_type !== undefined && tokenInfo.auth_type !== '3L') ||
+    !Number.isFinite(expiresAt.getTime()) ||
+    expiresAt.getTime() <= Date.now() ||
+    expiresAt.getTime() > Date.now() + 365 * 24 * 60 * 60_000 ||
+    !scopes.length
+  ) {
+    throw new Error('publishing_permission_denied');
+  }
+  return { scopes, expiresAt };
 }
 
 const jwksCache = new Map<OAuthProvider, { expiresAt: number; keys: Array<Record<string, unknown>> }>();

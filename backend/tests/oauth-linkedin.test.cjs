@@ -9,6 +9,7 @@ const {
   exchangeAuthorizationCode,
   getOAuthConfiguration,
   getOAuthConfigurationIssue,
+  introspectLinkedInAccessToken,
 } = require('../dist/services/oauth');
 
 function configureLinkedIn() {
@@ -95,6 +96,32 @@ test('LinkedIn publishing consent keeps OIDC scopes and adds only member-post pe
   assert.equal(url.searchParams.get('state'), 'publishing-state');
   assert.equal(url.searchParams.get('nonce'), 'publishing-nonce');
   assert.ok(url.searchParams.get('code_challenge'));
+});
+
+test('LinkedIn publishing consent stores only scopes confirmed by token introspection', async (context) => {
+  configureLinkedIn();
+  const configuration = getOAuthConfiguration('linkedin');
+  const originalFetch = global.fetch;
+  let submittedForm;
+  global.fetch = async (input, init = {}) => {
+    assert.equal(String(input), 'https://www.linkedin.com/oauth/v2/introspectToken');
+    submittedForm = new URLSearchParams(init.body);
+    return new Response(JSON.stringify({
+      active: true,
+      client_id: configuration.clientId,
+      auth_type: '3L',
+      expires_at: Math.floor(Date.now() / 1000) + 3600,
+      scope: 'openid,profile,email,w_member_social',
+    }), { status: 200 });
+  };
+  context.after(() => { global.fetch = originalFetch; });
+
+  const result = await introspectLinkedInAccessToken(configuration, 'provider-access-token');
+  assert.equal(submittedForm.get('client_id'), configuration.clientId);
+  assert.equal(submittedForm.get('client_secret'), configuration.clientSecret);
+  assert.equal(submittedForm.get('token'), 'provider-access-token');
+  assert.deepEqual(result.scopes, ['openid', 'profile', 'email', 'w_member_social']);
+  assert.ok(result.expiresAt.getTime() > Date.now());
 });
 
 test('LinkedIn code exchange validates the signed ID token and nonce and sends PKCE', async (context) => {

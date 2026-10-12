@@ -27,6 +27,7 @@ import {
   getOAuthConfigurationIssue,
   hashOAuthValue,
   identityTokenHasVerifiedEmail,
+  introspectLinkedInAccessToken,
   OAuthServiceError,
   OidcClaims,
 } from '../services/oauth';
@@ -429,10 +430,10 @@ async function finishLinkedInPublishingConnection(
   claims: OidcClaims,
   accessToken: string | undefined,
   scopes: string[],
-  expiresIn: number | undefined,
+  expiresAt: Date,
 ): Promise<IIntegration> {
   if (!accessToken || accessToken.length > 16_384 ||
-      !Number.isInteger(expiresIn) || expiresIn! < 60 || expiresIn! > 365 * 24 * 60 * 60 ||
+      !Number.isFinite(expiresAt.getTime()) || expiresAt.getTime() <= Date.now() ||
       !scopes.includes(LINKEDIN_PUBLISHING_SCOPE)) {
     throw new Error('publishing_permission_denied');
   }
@@ -480,7 +481,7 @@ async function finishLinkedInPublishingConnection(
         createdBy: user._id,
         status: 'connected',
         accessToken: encryptProviderToken(accessToken),
-        tokenExpiresAt: new Date(Date.now() + expiresIn! * 1000),
+        tokenExpiresAt: expiresAt,
         config: {
           linkedinSubject: claims.sub,
           identityName: (claims.name || [claims.given_name, claims.family_name].filter(Boolean).join(' ') ||
@@ -561,7 +562,7 @@ export const completeOAuthCallback = async (req: Request, res: Response): Promis
   }
   let stage = 'authorization_code_exchange_and_id_token_validation';
   try {
-    const { claims, accessToken, scopes, expiresIn } = await exchangeAuthorizationCode(
+    const { claims, accessToken } = await exchangeAuthorizationCode(
       provider,
       configuration,
       code,
@@ -569,12 +570,15 @@ export const completeOAuthCallback = async (req: Request, res: Response): Promis
       transaction.nonce,
     );
     if (transaction.intent === 'publishing' && transaction.audience === 'user') {
+      stage = 'linkedin_token_introspection';
+      if (!accessToken) throw new Error('publishing_permission_denied');
+      const tokenInfo = await introspectLinkedInAccessToken(configuration, accessToken);
       const connection = await finishLinkedInPublishingConnection(
         transaction.userId?.toString() || '',
         claims,
         accessToken,
-        scopes,
-        expiresIn,
+        tokenInfo.scopes,
+        tokenInfo.expiresAt,
       );
       await AuditLog.create({
         companyId: connection.companyId,
@@ -582,7 +586,7 @@ export const completeOAuthCallback = async (req: Request, res: Response): Promis
         action: 'LINKEDIN_PUBLISHING_CONNECTED',
         resource: 'Integration',
         resourceId: connection._id.toString(),
-        details: { grantedScopes: scopes },
+        details: { grantedScopes: tokenInfo.scopes },
         ipAddress: req.ip,
       });
       const destination = getClientRedirect(transaction.returnTo);
