@@ -1,4 +1,5 @@
 import type { MetadataRoute } from 'next';
+import { HELP_ARTICLES } from '@/lib/helpArticles';
 
 const publicRoutes = [
   '',
@@ -26,7 +27,7 @@ const publicRoutes = [
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://workgrind.app';
-  return publicRoutes.map((route) => ({
+  return [...publicRoutes, ...HELP_ARTICLES.map((article) => `/help/${article.slug}`)].map((route) => ({
     url: new URL(route, baseUrl).toString(),
   }));
 }
