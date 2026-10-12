@@ -18,6 +18,7 @@ export type OrganizationFeature =
   | 'clientPortal'
   | 'businessAnalytics'
   | 'businessAutomation'
+  | 'socialPublishing'
   | 'billingAdmin'
   | 'memberDirectory'
   | 'workspaceSettings';
@@ -62,6 +63,11 @@ const FEATURE_POLICIES: Record<OrganizationFeature, (experience: Experience, rol
   clientPortal: (experience, role) => experience === 'company' && ['owner', 'admin', 'manager'].includes(role),
   businessAnalytics: (experience, role) => experience === 'company' && ['owner', 'admin', 'manager'].includes(role),
   businessAutomation: (experience, role) => experience === 'company' && ['owner', 'admin', 'manager'].includes(role),
+  socialPublishing: (experience, role) =>
+    experience === 'solo' ? role === 'owner' :
+      experience === 'company'
+        ? ['owner', 'admin', 'manager', 'employee'].includes(role)
+        : ['owner', 'principal', 'admin', 'teacher', 'dean', 'hod'].includes(role),
   billingAdmin: (experience, role) =>
     experience === 'solo' ? role === 'owner' :
       experience === 'company' ? ['owner', 'admin'].includes(role) : role === 'owner',
@@ -117,6 +123,7 @@ export function getRouteOrganizationFeature(pathname: string): OrganizationFeatu
     ['/team', 'memberDirectory'],
     ['/analytics', 'businessAnalytics'],
     ['/workflows', 'businessAutomation'],
+    ['/social-publishing', 'socialPublishing'],
     ['/calendar', 'educationMeetings'],
     ['/chat', 'educationCommunication'],
     ['/calling', 'companyWorkspace'],

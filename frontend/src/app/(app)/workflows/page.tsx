@@ -12,7 +12,6 @@ import {
   Edit, FlaskConical,
 } from 'lucide-react';
 import { formatTimeAgo } from '@/lib/utils';
-import { SocialPublishingPanel } from '@/components/automation/SocialPublishingPanel';
 
 const TRIGGER_LABELS: Record<string, string> = {
   deal_created: 'When a deal is created',
@@ -259,7 +258,6 @@ function ExecutionHistory({ workflowId, onClose }: { workflowId: string; onClose
 export default function WorkflowsPage() {
   const { user } = useAuthStore();
   const canManage = ['owner','admin','manager'].includes(user?.role ?? '');
-  const [activeSection, setActiveSection] = useState<'workflows' | 'social'>('workflows');
 
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [loading,   setLoading]   = useState(true);
@@ -272,12 +270,6 @@ export default function WorkflowsPage() {
       .then(r => setWorkflows(r.data.workflows))
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
-
-  useEffect(() => {
-    if (new URLSearchParams(window.location.search).get('tab') === 'social') {
-      setActiveSection('social');
-    }
   }, []);
 
   async function toggleEnabled(wf: Workflow) {
@@ -320,35 +312,14 @@ export default function WorkflowsPage() {
         title="Workflow Automation"
         subtitle="Automate repetitive tasks with trigger-based workflows"
         icon={Zap}
-        actions={canManage && activeSection === 'workflows' ? (
+        actions={canManage ? (
           <button onClick={() => setShowForm(true)} className="btn-primary h-9 px-4">
             <Plus className="h-3.5 w-3.5" /> New Workflow
           </button>
         ) : undefined}
       />
 
-      <div role="tablist" aria-label="Automation sections" className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={activeSection === 'workflows'}
-          onClick={() => setActiveSection('workflows')}
-          className={`rounded-lg px-3 py-2 text-sm font-medium ${activeSection === 'workflows' ? 'bg-[var(--bg-elevated)] theme-text-primary' : 'btn-ghost theme-text-muted'}`}
-        >
-          Workflows
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={activeSection === 'social'}
-          onClick={() => setActiveSection('social')}
-          className={`rounded-lg px-3 py-2 text-sm font-medium ${activeSection === 'social' ? 'bg-[var(--bg-elevated)] theme-text-primary' : 'btn-ghost theme-text-muted'}`}
-        >
-          Social Publishing
-        </button>
-      </div>
-
-      {activeSection === 'social' ? <SocialPublishingPanel /> : loading ? (
+      {loading ? (
         <div className="space-y-4">
           {[1,2,3].map(i=>(
             <div key={i} className="surface rounded-2xl p-5">

@@ -27,5 +27,11 @@
       "src": "/health",
       "dest": "/api/index.ts"
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/social-publishing/dispatch",
+      "schedule": "* * * * *"
+    }
   ]
 }

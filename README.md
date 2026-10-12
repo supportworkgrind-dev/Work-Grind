@@ -370,28 +370,83 @@ Automation can connect workspace events with actions such as:
 
 Automation is designed to work within existing workspace permissions.
 
-### LinkedIn Social Publishing
+### Universal Social Publishing
 
-Company workspaces can connect one LinkedIn member profile from Settings → Security
-or Workflow Automation → Social Publishing. The connection reuses WorkGrind's LinkedIn
-OAuth callback and requests `openid profile email w_member_social` only for the
-publishing-consent flow. Access tokens are encrypted server-side and never returned
-to the browser. Text posts are submitted through LinkedIn's versioned Posts API; an
-API-confirmed `201` is required before WorkGrind marks a post Published.
+Social Publishing reuses the existing workspace (`Company`) tenant, encrypted
+`Integration` credentials, subscription checks, role policies, Tavro runtime, and
+notification system. It is available to Solo owners, business owners/admins/managers
+and employees (with approval where needed), and education owners, administrators,
+teachers and faculty. Students, parents/guardians and guests cannot access posts or
+connected accounts. Education staff drafts require an authorized reviewer before
+publication; Solo owners are not forced through approvals.
 
-The MVP supports member-profile text posts, Tavro-generated/editable drafts, draft
-review by an owner/admin, and publishing by an owner/admin or by a manager after
-approval. It does not yet support media, organization-page publishing, automatic
-scheduling, or LinkedIn Events. LinkedIn's app products, granted scopes, member
-eligibility, and rate limits still apply; requesting `w_member_social` alone does
-not guarantee API access. Reauthorize after access expires or is revoked. Disconnect
-removes WorkGrind's stored token; revoke WorkGrind separately in LinkedIn's app
-authorization settings if provider-side revocation is needed.
+The shared post record now holds a provider, selected integration, destination result
+records, media metadata, platform-specific data, reviewer, and scheduling metadata.
+Existing LinkedIn posts remain readable through defaults and their legacy LinkedIn
+result fields. There is one connected account per provider per workspace in the
+current `Integration` model; multi-account selection and multi-provider partial
+publishing are not exposed until the storage/index model supports multiple accounts.
+
+LinkedIn is the only connected/publishing provider. The publishing-consent flow
+reuses LinkedIn OIDC and requests `openid profile email w_member_social`; it does
+not change the WorkGrind user's LinkedIn sign-in identity. Tokens remain encrypted
+server-side. Only member-profile text posts are enabled. LinkedIn must confirm the
+Posts API request before a post is marked published. Media, LinkedIn organization
+pages, event management, and LinkedIn analytics are not enabled.
+
+Tavro uses WorkGrind's existing AI runtime, entitlement and usage accounting to
+generate or revise professional updates, product announcements, marketing posts and
+event promotions. Output remains an editable draft. Draft deletion, review,
+scheduling, status notifications and publishing history are available. Scheduled
+posts are displayed as distinct items in WorkGrind Calendar. The Vercel Cron
+dispatcher claims due records atomically; only explicit LinkedIn `429` responses
+receive up to two delayed retries. A timeout or other ambiguous result is not
+retried automatically because LinkedIn does not provide a verified idempotency
+mechanism for this integration.
+
+#### Scheduling deployment configuration
+
+The backend Vercel project must use Pro or Enterprise: the dispatcher is configured
+for a once-per-minute Cron, which is unavailable on Hobby (Hobby supports daily
+execution only and cannot provide reliable scheduled-post timing). Configure a
+high-entropy `CRON_SECRET` in the backend Vercel project's Production and Preview
+environment settings. Vercel sends it as `Authorization: Bearer ...`; the endpoint
+fails closed when it is absent or invalid. Verify the Cron appears in the deployed
+project before enabling schedules for users. The API stores the scheduled instant
+in UTC together with the IANA timezone used for display. Keep the Vercel Function
+duration and MongoDB connectivity sufficient to dispatch the bounded batch.
+
+#### Provider capability and setup status
+
+The provider catalog declares unsupported capabilities as disabled instead of
+pretending those networks are connected:
+
+* **Instagram** — future work requires Instagram professional accounts, Meta Login,
+  the Instagram content-publishing permission/product, app review/advanced access,
+  and publicly fetchable media for the documented publishing flow. The current API
+  supports media containers and publishing, not the text-only LinkedIn adapter.
+* **Facebook Pages** — future work requires Facebook Login, a Page access token,
+  Page content-management permissions (including `pages_manage_posts`) and the
+  relevant Page tasks. Video publishing additionally requires `publish_video`.
+  Page publishing and its native scheduling endpoint have not been implemented.
+* **YouTube** — future work requires Google OAuth consent and YouTube Data API
+  project access (including the `youtube.upload` scope for video upload). It is a
+  video-upload workflow, not a text-post destination; upload, processing status,
+  channel analytics and quota handling have not been implemented.
+
+These requirements are based on the providers' published documentation:
+[Instagram content publishing](https://developers.facebook.com/documentation/instagram-platform/content-publishing),
+[Facebook Page posts](https://developers.facebook.com/documentation/pages-api/posts),
+[YouTube video uploads](https://developers.google.com/youtube/v3/guides/uploading_a_video),
+and [Vercel Cron availability and frequency](https://vercel.com/docs/cron-jobs/usage-and-pricing).
+Provider API access and app review are external prerequisites; no unsupported
+features or metrics are simulated.
 
 `LINKEDIN_API_VERSION` selects the monthly Posts API version. It defaults to
-`202609` (the version documented for this release) and must be updated before
-LinkedIn retires it. No background scheduler is configured in the current backend
-deployment, so scheduled posts are deliberately not accepted.
+`202609` for this release and must be updated before LinkedIn retires it. LinkedIn's
+app products, granted scopes, member eligibility, and rate limits still apply.
+Disconnect removes WorkGrind's stored token; revoke WorkGrind separately in
+LinkedIn's app authorization settings if provider-side revocation is needed.
 
 ---
 

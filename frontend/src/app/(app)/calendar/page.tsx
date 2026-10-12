@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { api } from '@/lib/api';
 import { CalendarEvent } from '@/types';
 import {
-  Calendar as CalendarIcon, ChevronLeft, ChevronRight,
+  Calendar as CalendarIcon, ChevronLeft, ChevronRight, Share2,
   Plus, Video, X,
 } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
@@ -21,7 +21,11 @@ export default function CalendarPage() {
   const [description, setDescription] = useState('');
 
   useEffect(() => {
-    api.get('/calendar').then((r) => { if (r.data.success) setEvents(r.data.events); }).catch(() => {});
+    const start = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+    const end = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0, 23, 59, 59, 999);
+    api.get('/calendar', { params: { start: start.toISOString(), end: end.toISOString() } })
+      .then((r) => { if (r.data.success) setEvents(r.data.events); })
+      .catch(() => {});
   }, [currentDate]);
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -48,6 +52,7 @@ export default function CalendarPage() {
     deadline: 'event-chip-deadline',
     reminder: 'event-chip-reminder',
     event:    'event-chip-event',
+    social_post: 'bg-teal-100 text-teal-900 dark:bg-teal-950 dark:text-teal-100',
   };
 
   return (
@@ -123,6 +128,7 @@ export default function CalendarPage() {
                       className={`flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold truncate ${typeChipClass[evt.type] ?? typeChipClass.event}`}
                     >
                       {evt.type === 'meeting' && <Video className="h-2.5 w-2.5 shrink-0" />}
+                      {evt.type === 'social_post' && <Share2 className="h-2.5 w-2.5 shrink-0" />}
                       <span className="truncate">{evt.title}</span>
                     </div>
                   ))}

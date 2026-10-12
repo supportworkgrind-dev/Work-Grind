@@ -305,7 +305,7 @@ export interface CalendarEvent {
   creatorId: User;
   title: string;
   description?: string;
-  type: 'meeting' | 'task' | 'deadline' | 'event' | 'reminder';
+  type: 'meeting' | 'task' | 'deadline' | 'event' | 'reminder' | 'social_post';
   startDate: string;
   endDate: string;
   allDay: boolean;
@@ -315,6 +315,7 @@ export interface CalendarEvent {
   color?: string;
   meetingId?: { _id: string; meetingLink: string; title: string };
   projectId?: { _id: string; name: string; color: string };
+  scheduleTimeZone?: string;
 }
 
 export interface FileItem {

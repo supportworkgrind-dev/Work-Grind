@@ -9,6 +9,7 @@ import {
   deleteSocialDraft,
   disconnectLinkedIn,
   generateSocialDraft,
+  getSocialAccounts,
   getLinkedInConnection,
   getSocialProviders,
   listSocialPosts,
@@ -32,6 +33,7 @@ router.use(
 );
 
 router.get('/providers', asyncHandler(getSocialProviders));
+router.get('/accounts', asyncHandler(getSocialAccounts));
 router.get('/connection', asyncHandler(getLinkedInConnection));
 router.delete('/connection', asyncHandler(disconnectLinkedIn));
 router.get('/posts', asyncHandler(listSocialPosts));

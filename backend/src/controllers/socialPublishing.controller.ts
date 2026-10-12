@@ -4,7 +4,6 @@ import { Response } from 'express';
 import AuditLog from '../models/AuditLog';
 import Company from '../models/Company';
 import Integration from '../models/Integration';
-import { IIntegration } from '../models/Integration';
 import SocialPost from '../models/SocialPost';
 import User from '../models/User';
 import { AuthRequest } from '../middleware/auth';
@@ -58,7 +57,9 @@ function getProviderId(value: unknown): string {
 
 function validateProviderText(providerId: string, value: unknown): string | null {
   if (typeof value !== 'string') return null;
-  return getSocialProviderAdapter(providerId)?.validateText(value) ?? null;
+  const adapter = getSocialProviderAdapter(providerId);
+  if (!adapter) return 'This provider is not configured for publishing.';
+  return adapter.validateText(value);
 }
 
 function validTimeZone(value: unknown): value is string {
@@ -109,12 +110,22 @@ async function markPostFailed(post: {
       type: 'system',
       title: 'Social post needs attention',
       body: `LinkedIn could not confirm publication (${failureCode.replaceAll('_', ' ')}). Review the post before retrying.`,
-      actionUrl: '/workflows?tab=social',
+      actionUrl: '/social-publishing',
       metadata: { postId: post._id.toString(), failureCode },
     });
   } catch (notificationError) {
     console.error('[SocialPublishing] Failure notification could not be created.', {
       errorName: notificationError instanceof Error ? notificationError.name : 'UnknownError',
+    });
+  }
+}
+
+async function notifyPublishingUser(data: Parameters<typeof createNotification>[0]): Promise<void> {
+  try {
+    await createNotification(data);
+  } catch (error) {
+    console.error('[SocialPublishing] Notification could not be created.', {
+      errorName: error instanceof Error ? error.name : 'UnknownError',
     });
   }
 }
@@ -164,6 +175,34 @@ export const getLinkedInConnection = async (req: AuthRequest, res: Response): Pr
 
 export const getSocialProviders = async (_req: AuthRequest, res: Response): Promise<void> => {
   res.json({ success: true, providers: getSocialProviderCatalog() });
+};
+
+export const getSocialAccounts = async (req: AuthRequest, res: Response): Promise<void> => {
+  const integrations = await Integration.find({
+    companyId: companyIdOf(req),
+    provider: { $in: ['linkedin', 'instagram', 'facebook', 'youtube'] },
+  }).select('provider status config tokenExpiresAt errorMessage').lean();
+  const now = Date.now();
+  const accounts = integrations.map((integration) => {
+    const adapter = getSocialProviderAdapter(integration.provider);
+    const scopes = Array.isArray(integration.config?.grantedScopes)
+      ? integration.config.grantedScopes.filter((scope: unknown): scope is string => typeof scope === 'string')
+      : [];
+    const tokenValid = Boolean(integration.tokenExpiresAt && integration.tokenExpiresAt.getTime() > now);
+    return {
+      id: integration._id.toString(),
+      provider: integration.provider,
+      status: integration.status,
+      displayName: integration.config?.identityName ?? null,
+      displayEmail: integration.config?.identityEmail ?? null,
+      expiresAt: integration.tokenExpiresAt ?? null,
+      scopes,
+      canPublish: integration.status === 'connected' && tokenValid &&
+        Boolean(adapter?.capabilities.publishText) &&
+        (integration.provider !== 'linkedin' || scopes.includes(LINKEDIN_PUBLISHING_SCOPE)),
+    };
+  });
+  res.json({ success: true, accounts });
 };
 
 export const disconnectLinkedIn = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -325,13 +364,13 @@ export const requestSocialPostApproval = async (req: AuthRequest, res: Response)
   }).select('_id role').lean();
   await Promise.all(approvers
     .filter((approver) => roleMatches(approver.role, ['owner', 'admin'], req.user!.organizationType))
-    .map((approver) => createNotification({
+    .map((approver) => notifyPublishingUser({
       companyId: post.companyId.toString(),
       userId: approver._id.toString(),
       type: 'system',
       title: 'Social post awaiting review',
       body: `${req.user!.role} submitted a ${post.platform} post for approval.`,
-      actionUrl: '/workflows?tab=social',
+      actionUrl: '/social-publishing',
       metadata: { postId: post._id.toString() },
     })));
   res.json({ success: true, post });
@@ -369,13 +408,13 @@ export const reviewSocialPost = async (req: AuthRequest, res: Response): Promise
     return;
   }
   await audit(req, decision === 'approve' ? 'SOCIAL_POST_APPROVED' : 'SOCIAL_POST_REJECTED', post._id.toString(), { platform: post.platform });
-  await createNotification({
+  await notifyPublishingUser({
     companyId: post.companyId.toString(),
     userId: post.authorId.toString(),
     type: 'system',
     title: decision === 'approve' ? 'Social post approved' : 'Social post needs changes',
     body: decision === 'approve' ? 'Your social post was approved for publishing.' : reason || 'Your social post was rejected for changes.',
-    actionUrl: '/workflows?tab=social',
+    actionUrl: '/social-publishing',
     metadata: { postId: post._id.toString(), decision },
   });
   res.json({ success: true, post });
@@ -397,8 +436,8 @@ export const publishSocialPost = async (req: AuthRequest, res: Response): Promis
     companyId: companyIdOf(req),
     provider: 'linkedin',
     status: 'connected',
-    ...(req.body?.integrationId && mongoose.isValidObjectId(req.body.integrationId)
-      ? { _id: req.body.integrationId }
+    ...(req.body?.integrationId
+      ? mongoose.isValidObjectId(req.body.integrationId) ? { _id: req.body.integrationId } : { _id: null }
       : {}),
   }).select('+accessToken');
   if (!connection?.accessToken ||
@@ -485,21 +524,15 @@ export const publishSocialPost = async (req: AuthRequest, res: Response): Promis
       });
       return;
     }
-    try {
-      await createNotification({
+    await notifyPublishingUser({
         companyId: post.companyId.toString(),
         userId: post.authorId.toString(),
         type: 'system',
         title: 'Social post published',
         body: 'LinkedIn confirmed publication.',
-        actionUrl: '/workflows?tab=social',
+        actionUrl: '/social-publishing',
         metadata: { postId: post._id.toString(), platform: adapter.id },
       });
-    } catch (notificationError) {
-      console.error('[SocialPublishing] Publish notification could not be created.', {
-        errorName: notificationError instanceof Error ? notificationError.name : 'UnknownError',
-      });
-    }
     res.json({
       success: true,
       post: {
@@ -575,23 +608,6 @@ export const scheduleSocialPost = async (req: AuthRequest, res: Response): Promi
     return;
   }
 
-  const connection = await Integration.findOne({
-    companyId: companyIdOf(req),
-    provider: 'linkedin',
-    status: 'connected',
-  }).select('config tokenExpiresAt');
-  if (!connection ||
-      !connection.config?.grantedScopes?.includes(LINKEDIN_PUBLISHING_SCOPE) ||
-      !connection.tokenExpiresAt ||
-      connection.tokenExpiresAt.getTime() <= scheduledAt.getTime()) {
-    res.status(409).json({
-      success: false,
-      code: 'LINKEDIN_RECONNECT_REQUIRED',
-      message: 'Connect LinkedIn with member-post permission and ensure authorization remains valid through the scheduled time.',
-    });
-    return;
-  }
-
   const allowedStatuses = canReview(req) ? ['draft', 'approved'] : ['approved'];
   const post = await SocialPost.findOne({
     _id: req.params.id,
@@ -609,6 +625,25 @@ export const scheduleSocialPost = async (req: AuthRequest, res: Response): Promi
     });
     return;
   }
+
+  const connection = await Integration.findOne({
+    companyId: companyIdOf(req),
+    provider: 'linkedin',
+    status: 'connected',
+    ...(post.integrationId ? { _id: post.integrationId } : {}),
+  }).select('config tokenExpiresAt');
+  if (!connection ||
+      !connection.config?.grantedScopes?.includes(LINKEDIN_PUBLISHING_SCOPE) ||
+      !connection.tokenExpiresAt ||
+      connection.tokenExpiresAt.getTime() <= scheduledAt.getTime()) {
+    res.status(409).json({
+      success: false,
+      code: 'LINKEDIN_RECONNECT_REQUIRED',
+      message: 'Connect LinkedIn with member-post permission and ensure authorization remains valid through the scheduled time.',
+    });
+    return;
+  }
+
   const adapter = getSocialProviderAdapter(post.platform);
   const validationError = adapter?.validateText(post.text);
   if (!adapter?.capabilities.schedule || validationError) {
@@ -772,21 +807,15 @@ async function publishScheduledPost(postId: mongoose.Types.ObjectId): Promise<'p
       resourceId: post._id.toString(),
       details: { platform: adapter.id, scheduled: true },
     });
-    try {
-      await createNotification({
+    await notifyPublishingUser({
         companyId: post.companyId.toString(),
         userId: post.authorId.toString(),
         type: 'system',
         title: 'Scheduled social post published',
         body: 'LinkedIn confirmed publication.',
-        actionUrl: '/workflows?tab=social',
+        actionUrl: '/social-publishing',
         metadata: { postId: post._id.toString(), platform: adapter.id },
       });
-    } catch (notificationError) {
-      console.error('[SocialPublishing] Scheduled success notification failed.', {
-        errorName: notificationError instanceof Error ? notificationError.name : 'UnknownError',
-      });
-    }
     return 'published';
   } catch (error) {
     if (providerConfirmed) {
@@ -891,6 +920,12 @@ export const generateSocialDraft = async (req: AuthRequest, res: Response): Prom
   const operation = typeof req.body?.operation === 'string' ? req.body.operation : 'generate';
   const sourceText = typeof req.body?.text === 'string' ? req.body.text.trim() : '';
   const tone = typeof req.body?.tone === 'string' ? req.body.tone : 'professional';
+  const platform = getProviderId(req.body?.platform);
+  const adapter = getSocialProviderAdapter(platform);
+  if (!adapter?.capabilities.publishText) {
+    res.status(422).json({ success: false, code: 'PROVIDER_UNAVAILABLE', message: 'Tavro can only prepare drafts for configured publishing providers.' });
+    return;
+  }
   if ((operation === 'generate' ? !topic : !sourceText) ||
       !['generate', 'rewrite', 'shorten', 'improve', 'tone'].includes(operation) ||
       topic.length > 500 || details.length > 1500 || sourceText.length > LINKEDIN_TEXT_POST_MAX_LENGTH ||

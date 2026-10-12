@@ -22,6 +22,7 @@ import {
   Sparkles,
   BarChart3,
   Workflow,
+  Share2,
   ShieldCheck,
   Users2,
   Bell,
@@ -100,6 +101,7 @@ const navSections: readonly SidebarSection[] = [
       { name: 'Sheets', href: '/sheets', icon: Table2, entitlement: 'fileStorage' },
       { name: 'Analytics', href: '/analytics', icon: BarChart3, entitlement: 'advancedAnalytics' },
       { name: 'Automation', href: '/workflows', icon: Workflow },
+      { name: 'Social Publishing', href: '/social-publishing', icon: Share2 },
     ],
   },
   {
