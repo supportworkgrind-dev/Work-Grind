@@ -27,7 +27,7 @@ import { sendVerificationEmail, sendVerificationCodeEmail, sendPasswordResetEmai
 import { AuthRequest } from '../middleware/auth';
 import { refreshAvatarUrls } from '../services/avatarUrls';
 import { clearRefreshCookie, getRefreshCookie, setRefreshCookie } from '../utils/authCookie';
-import { isOrganizationType } from '../config/organization';
+import { isOrganizationType, normalizeOrganizationRole } from '../config/organization';
 const issue = (userId: string, companyId: string, role: string) => ({
   accessToken: generateAccessToken({ userId, companyId, role }),
   refreshToken: generateRefreshToken({ userId, companyId, role }),
@@ -1045,9 +1045,10 @@ export const joinCompany = async (req: AuthRequest, res: Response): Promise<void
           });
           return;
         }
-        // Role ceiling: never assign a role higher than 'admin' via invite (owner is set only on workspace creation)
-        const safeRoles = ['employee', 'manager', 'admin', 'guest'];
-        assignedRole = safeRoles.includes(invite.role) ? invite.role : 'employee';
+        // Role ceiling: keep invite assignments within the workspace type's allowed role matrix.
+        const safeRoles = ['principal', 'director', 'admin', 'office_staff', 'teacher', 'faculty', 'student', 'parent', 'guardian', 'dean', 'hod', 'manager', 'employee', 'guest'];
+        const requestedRole = normalizeOrganizationRole(invite.role, company.organizationType, 'employee');
+        assignedRole = safeRoles.includes(requestedRole) ? requestedRole : 'employee';
       }
       // Consume the invite token so it cannot be reused
       company.pendingInvites = company.pendingInvites.filter((i) => i.token !== codeOrToken);
@@ -1058,9 +1059,10 @@ export const joinCompany = async (req: AuthRequest, res: Response): Promise<void
       });
 
       if (company) {
-        const safeRoles = ['employee', 'manager', 'admin', 'guest'];
         const defaultRole = company.settings?.defaultRole || 'employee';
-        assignedRole = safeRoles.includes(defaultRole) ? defaultRole : 'employee';
+        const requestedRole = normalizeOrganizationRole(defaultRole, company.organizationType, 'employee');
+        const safeRoles = ['principal', 'director', 'admin', 'office_staff', 'teacher', 'faculty', 'student', 'parent', 'guardian', 'dean', 'hod', 'manager', 'employee', 'guest'];
+        assignedRole = safeRoles.includes(requestedRole) ? requestedRole : 'employee';
       }
     }
 
