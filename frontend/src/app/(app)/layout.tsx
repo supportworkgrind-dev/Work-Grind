@@ -108,9 +108,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   // Redirect unauthenticated users after auth state is resolved
   useEffect(() => {
     if (!isLoading && !authError && !user) {
-      router.replace('/login');
+      const returnTo = `${pathname}${window.location.search}`;
+      router.replace(`/login?redirect=${encodeURIComponent(returnTo)}`);
     }
-  }, [authError, isLoading, user, router]);
+  }, [authError, isLoading, pathname, user, router]);
 
   useEffect(() => {
     if (user && !routeAllowed) {

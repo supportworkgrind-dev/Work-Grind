@@ -1,11 +1,12 @@
 ﻿'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import axios from 'axios';
 import { api } from '@/lib/api';
 import { getAuthValue, updateAuthTokens } from '@/lib/authSession';
 import { useAuthStore } from '@/store/useAuthStore';
+import { getSafeReturnPath } from '@/lib/authRedirect';
 import { ThemeAwareLogo } from '@/components/common/ThemeAwareLogo';
 import { CountrySelect } from '@/components/common/CountrySelect';
 import {
@@ -25,6 +26,7 @@ import {
 
 export default function CreateCompanyPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, setCompany, fetchCurrentUser } = useAuthStore();
 
   const hasPersistedSignupContext = Boolean(user?.signupOrganizationType);
@@ -111,7 +113,8 @@ export default function CreateCompanyPage() {
         if (res.data.user) {
           useAuthStore.getState().setUser(res.data.user);
         }
-        router.push('/onboarding');
+        const returnTo = getSafeReturnPath(searchParams.get('redirect'));
+        router.push(returnTo ? `/onboarding?redirect=${encodeURIComponent(returnTo)}` : '/onboarding');
       }
     } catch (err: unknown) {
       setError(axios.isAxiosError<{ message?: string }>(err)

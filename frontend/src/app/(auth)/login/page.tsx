@@ -10,6 +10,7 @@ import { AuthShell } from '@/components/auth/AuthShell';
 import { SocialAuthButtons } from '@/components/auth/SocialAuthButtons';
 import { useAuthStore } from '@/store/useAuthStore';
 import type { User } from '@/types';
+import { getSafeReturnPath } from '@/lib/authRedirect';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -20,10 +21,16 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const getReturnTo = () => {
+    if (typeof window === 'undefined') return undefined;
+    return getSafeReturnPath(new URLSearchParams(window.location.search).get('redirect'));
+  };
+
   const completeLogin = async (response: { data: { user: User; accessToken: string } }) => {
     login(response.data.user, response.data.accessToken);
+    const returnTo = getReturnTo();
     if (!response.data.user.companyId) {
-      router.push('/create-company');
+      router.push(returnTo ? `/create-company?redirect=${encodeURIComponent(returnTo)}` : '/create-company');
       return;
     }
     try {
@@ -32,13 +39,13 @@ export default function LoginPage() {
       if (user) {
         login(user, response.data.accessToken);
         const company = typeof user.companyId === 'object' ? user.companyId : undefined;
-        router.push(company?.organizationType && company.organizationType !== 'business' ? '/academic' : '/dashboard');
+        router.push(returnTo || (company?.organizationType && company.organizationType !== 'business' ? '/academic' : '/dashboard'));
         return;
       }
     } catch {
       // Authentication succeeded; if profile hydration is temporarily unavailable, keep the standard dashboard entry.
     }
-    router.push('/dashboard');
+    router.push(returnTo || '/dashboard');
   };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {

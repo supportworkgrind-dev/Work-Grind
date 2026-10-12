@@ -1,8 +1,9 @@
 ﻿'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/store/useAuthStore';
+import { getSafeReturnPath } from '@/lib/authRedirect';
 import { api } from '@/lib/api';
 import { normalizeTheme, useThemeStore } from '@/lib/themeStore';
 import { getWorkspaceProfile, WORKSPACE_PROFILES, type WorkspaceProfile } from '@/lib/workspaceProfiles';
@@ -46,6 +47,7 @@ const PROFILE_ICONS: Record<WorkspaceProfile, LucideIcon> = {
 
 export default function OnboardingPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, company, isLoading, fetchCurrentUser, setUser } = useAuthStore();
   const setTheme = useThemeStore((state) => state.setTheme);
   const isIndividual = company?.accountType === 'individual' || user?.accountType === 'individual';
@@ -141,6 +143,8 @@ export default function OnboardingPage() {
 
   const handleFinishOnboarding = async () => {
     setIsCompleting(true);
+    const returnTo = getSafeReturnPath(searchParams.get('redirect'));
+    const defaultDestination = company?.organizationType && company.organizationType !== 'business' ? '/academic' : '/dashboard';
     try {
       if (company?._id && projectTemplate !== 'Welcome to WorkGrind') {
         const profile = getWorkspaceProfile(selectedProfile);
@@ -154,10 +158,10 @@ export default function OnboardingPage() {
         });
       }
       await fetchCurrentUser();
-      router.push(company?.organizationType && company.organizationType !== 'business' ? '/academic' : '/dashboard');
+      router.push(returnTo || defaultDestination);
     } catch (err) {
       console.error(err);
-      router.push(company?.organizationType && company.organizationType !== 'business' ? '/academic' : '/dashboard');
+      router.push(returnTo || defaultDestination);
     } finally {
       setIsCompleting(false);
     }
