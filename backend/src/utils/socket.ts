@@ -11,9 +11,11 @@ import Conversation from '../models/Conversation';
 import RealtimePresence from '../models/RealtimePresence';
 import { generateSignedAvatarUrl, isR2Configured } from '../services/r2Storage';
 import User from '../models/User';
+import Company from '../models/Company';
 import { getAllowedClientOrigins } from './clientOrigins';
 import { verifyCallSessionToken } from '../services/callSessionToken';
 import { getEffectiveSubscription } from '../services/companySubscription';
+import { isAcademicOrganizationType, isOrganizationRoleEligible, roleMatches } from '../config/organization';
 
 let io: SocketServer;
 let adapterReady: Promise<void> | null = null;
@@ -365,10 +367,17 @@ export const initSocket = (server: HTTPServer) => {
       const user = await User.findOne({
         _id: decoded.userId,
         companyId: decoded.companyId,
+        isVerified: true,
         isActive: true,
         isDeleted: { $ne: true },
       }).select('_id companyId role').lean();
       if (!user) return next(new Error('Invalid user session'));
+      const company = await Company.findOne({ _id: decoded.companyId, isActive: true })
+        .select('organizationType accountType')
+        .lean();
+      if (!company || !isOrganizationRoleEligible(user.role, company.organizationType)) {
+        return next(new Error('Invalid organization role'));
+      }
       const subscription = await getEffectiveSubscription(decoded.userId);
       if (!subscription.hasActiveAccess) return next(new Error('subscription_required'));
       socket.data.subscriptionStatus = subscription.status;
@@ -378,6 +387,8 @@ export const initSocket = (server: HTTPServer) => {
       socket.data.userId = decoded.userId;
       socket.data.companyId = decoded.companyId;
       socket.data.userRole = user.role || decoded.role;
+      socket.data.organizationType = company.organizationType;
+      socket.data.accountType = company.accountType;
       socket.data.wasOnline = await RealtimePresence.exists({
         userId: decoded.userId,
         expiresAt: { $gt: new Date() },
@@ -481,6 +492,9 @@ export const initSocket = (server: HTTPServer) => {
     presenceHeartbeat.unref();
 
     socket.on('board:join', async (boardId: unknown) => {
+      const organizationType = socket.data.organizationType as string | undefined;
+      if (isAcademicOrganizationType(organizationType) &&
+          roleMatches(userRole, ['student', 'parent'], organizationType)) return;
       if (typeof boardId !== 'string' || !/^[a-f\d]{24}$/i.test(boardId)) return;
       try {
         const { verifyBoardSocketAccess } = await import('../controllers/whiteboard.controller');
@@ -553,7 +567,11 @@ export const initSocket = (server: HTTPServer) => {
         // Channel not found or DB error — deny silently
       }
     });
-    socket.on('channel:leave', (id: string) => socket.leave(`channel:${id}`));
+    socket.on('channel:leave', (id: string) => {
+      if (typeof id !== 'string' || !/^[a-f\d]{24}$/i.test(id)) return;
+      const room = `channel:${id}`;
+      if (socket.rooms.has(room)) socket.leave(room);
+    });
 
     socket.on('presence:sync', () => {
       void sendPresenceSnapshot(socket, userId, companyId);
@@ -584,13 +602,21 @@ export const initSocket = (server: HTTPServer) => {
       socket.leave(`dm:${id}`);
     });
     
-    socket.on('typing:start', ({ channelId, dmId, userName }: any) => {
-      if (channelId) socket.to(`channel:${channelId}`).emit('typing:start', { userId, userName, channelId });
-      if (dmId) socket.to(`dm:${dmId}`).emit('typing:start', { userId, userName, dmId });
+    socket.on('typing:start', ({ channelId, dmId }: any) => {
+      if (typeof channelId === 'string' && socket.rooms.has(`channel:${channelId}`)) {
+        socket.to(`channel:${channelId}`).emit('typing:start', { userId, channelId });
+      }
+      if (typeof dmId === 'string' && socket.rooms.has(`dm:${dmId}`)) {
+        socket.to(`dm:${dmId}`).emit('typing:start', { userId, dmId });
+      }
     });
     socket.on('typing:stop', ({ channelId, dmId }: any) => {
-      if (channelId) socket.to(`channel:${channelId}`).emit('typing:stop', { userId, channelId });
-      if (dmId) socket.to(`dm:${dmId}`).emit('typing:stop', { userId, dmId });
+      if (typeof channelId === 'string' && socket.rooms.has(`channel:${channelId}`)) {
+        socket.to(`channel:${channelId}`).emit('typing:stop', { userId, channelId });
+      }
+      if (typeof dmId === 'string' && socket.rooms.has(`dm:${dmId}`)) {
+        socket.to(`dm:${dmId}`).emit('typing:stop', { userId, dmId });
+      }
     });
 
     socket.on('user:status', async (payload: { status?: unknown }) => {
@@ -605,8 +631,14 @@ export const initSocket = (server: HTTPServer) => {
     });
 
     socket.on('message:read', ({ channelId, dmId, messageId }: any) => {
-      if (channelId) socket.to(`channel:${channelId}`).emit('message:read', { userId, channelId, messageId });
-      if (dmId) socket.to(`dm:${dmId}`).emit('dm:read', { userId, dmId, messageId });
+      if (typeof channelId === 'string' && socket.rooms.has(`channel:${channelId}`) &&
+          typeof messageId === 'string' && /^[a-f\d]{24}$/i.test(messageId)) {
+        socket.to(`channel:${channelId}`).emit('message:read', { userId, channelId, messageId });
+      }
+      if (typeof dmId === 'string' && socket.rooms.has(`dm:${dmId}`) &&
+          typeof messageId === 'string' && /^[a-f\d]{24}$/i.test(messageId)) {
+        socket.to(`dm:${dmId}`).emit('dm:read', { userId, dmId, messageId });
+      }
     });
 
     // ── REAL-TIME WEBRTC MEETING MANAGEMENT & SIGNALING ──────────────────────

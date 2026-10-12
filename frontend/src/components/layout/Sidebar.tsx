@@ -38,6 +38,12 @@ import { getInitials } from '@/lib/utils';
 import { useState, memo, useCallback, useMemo, useEffect } from 'react';
 import { ThemeAwareLogo } from '@/components/common/ThemeAwareLogo';
 import { ACADEMIC_SECTIONS } from '@/lib/academicSections';
+import {
+  canAccessAcademicSection,
+  canAccessOrganizationFeature,
+  getRouteOrganizationFeature,
+  isEducationOrganization,
+} from '@/lib/organizationAccess';
 
 type SidebarNavItem = {
   name: string;
@@ -165,14 +171,25 @@ export const Sidebar = memo(function Sidebar() {
       .map((section) => ({
         ...section,
         items: section.items.filter((item) =>
-          (!section.educationOnly || (!!company?.organizationType && company.organizationType !== 'business')) &&
+          (!section.educationOnly || (
+            isEducationOrganization(company) &&
+            canAccessAcademicSection(
+              user?.role,
+              item.href.includes('?section=') ? item.href.split('?section=')[1] : 'overview',
+              company?.organizationType,
+            )
+          )) &&
           (!item.managerOrAbove || canManageClientPortal) &&
           (!item.ownerOrAdmin || ['owner', 'admin'].includes(user?.role ?? '')) &&
+          (() => {
+            const feature = getRouteOrganizationFeature(item.href.split('?')[0]);
+            return !feature || canAccessOrganizationFeature(company, user?.role, feature);
+          })() &&
           (!item.entitlement || canUse(item.entitlement)),
         ),
       }))
       .filter((section) => section.items.length > 0),
-    [canManageClientPortal, canUse, company?.organizationType, subscription, user?.role],
+    [canManageClientPortal, canUse, company?.organizationType, company?.accountType, subscription, user?.role],
   );
 
   const handleStatusChange = useCallback(

@@ -18,6 +18,7 @@ import { IncomingCallManager } from '@/components/calling/IncomingCallManager';
 import { ThemeAwareLogo } from '@/components/common/ThemeAwareLogo';
 import { ExpiredSubscriptionExperience } from '@/components/subscription/ExpiredSubscriptionExperience';
 import { DeveloperShell } from '@/components/layout/DeveloperShell';
+import { canAccessOrganizationFeature, getRouteOrganizationFeature, isEducationOrganization } from '@/lib/organizationAccess';
 import Link from 'next/link';
 
 // How long a cached user is considered "fresh" before we re-validate with the server.
@@ -66,6 +67,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [hasHydrated, setHasHydrated] = useState(false);
   // Read user + isLoading with a selector to avoid re-rendering on unrelated store changes
   const user      = useAuthStore((s) => s.user);
+  const company   = useAuthStore((s) => s.company);
   const isLoading = useAuthStore((s) => s.isLoading);
   const authError = useAuthStore((s) => s.authError);
   const subscription = useAuthStore((s) => s.subscription);
@@ -77,6 +79,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const setTheme = useThemeStore((s) => s.setTheme);
   const { setLang } = useI18n();
   const isSidebarOpen    = useAppStore((s) => s.isSidebarOpen);
+  const routeFeature = getRouteOrganizationFeature(pathname);
+  const organization = company ?? (user?.companyId && typeof user.companyId === 'object' ? user.companyId : null);
+  const hasOrganizationContext = !!organization;
+  const routeAllowed = !routeFeature || canAccessOrganizationFeature(organization, user?.role, routeFeature);
   useEffect(() => {
     if (!user) return;
     setTheme(normalizeTheme(user.theme));
@@ -105,6 +111,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       router.replace('/login');
     }
   }, [authError, isLoading, user, router]);
+
+  useEffect(() => {
+    if (user && hasOrganizationContext && routeFeature && !routeAllowed) {
+      router.replace(isEducationOrganization(organization) ? '/academic' : '/dashboard');
+    }
+  }, [hasOrganizationContext, organization, routeAllowed, routeFeature, router, user]);
 
   useEffect(() => {
     if (user && !subscription && !subscriptionLoading && !subscriptionError) {
@@ -199,6 +211,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   if (!user) return null;
+  if (hasOrganizationContext && routeFeature && !routeAllowed) return null;
 
   if (pathname === '/billing' && (subscriptionError || (subscription && !subscription.hasActiveAccess))) {
     if (subscription?.status === 'expired' && subscription.hasActiveAccess === false) {

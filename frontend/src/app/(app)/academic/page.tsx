@@ -9,6 +9,7 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { PageHeader } from '@/components/common/PageHeader';
 import { BookOpen, GraduationCap, Loader2, Pencil, Plus, Trash2, Users } from 'lucide-react';
 import { ACADEMIC_SECTIONS, isAcademicSection } from '@/lib/academicSections';
+import { canAccessAcademicSection, canAccessOrganizationFeature, isEducationOrganization } from '@/lib/organizationAccess';
 
 type AcademicPerson = {
   _id: string;
@@ -162,8 +163,11 @@ export default function AcademicPage() {
   const activeSection = isAcademicSection(requestedSection) ? requestedSection : 'overview';
   const user = useAuthStore((state) => state.user);
   const company = useAuthStore((state) => state.company);
-  const isEducationWorkspace = !!company?.organizationType && company.organizationType !== 'business';
-  const isAdmin = user?.role === 'owner' || user?.role === 'admin';
+  const isEducationWorkspace = isEducationOrganization(company);
+  const isAdmin = canAccessOrganizationFeature(company, user?.role, 'academicAdmin');
+  const visibleAcademicSections = ACADEMIC_SECTIONS.filter((section) =>
+    canAccessAcademicSection(user?.role, section.id, company?.organizationType),
+  );
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -360,7 +364,7 @@ export default function AcademicPage() {
       {error && <div role="alert" className="rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-800">{error}</div>}
       {success && <div role="status" className="rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{success}</div>}
       <nav aria-label="Academic sections" className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 lg:hidden">
-        {ACADEMIC_SECTIONS.map((section) => (
+        {visibleAcademicSections.map((section) => (
           <Link key={section.id} href={`/academic?section=${section.id}`} aria-current={activeSection === section.id ? 'page' : undefined} className={`shrink-0 rounded-full border px-3 py-2 text-xs font-medium ${activeSection === section.id ? 'border-[var(--accent)] bg-[var(--accent-subtle)]' : 'theme-border'}`}>
             {section.label}
           </Link>
