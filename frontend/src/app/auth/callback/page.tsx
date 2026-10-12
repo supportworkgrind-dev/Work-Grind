@@ -15,10 +15,10 @@ const errorMessages: Record<string, string> = {
   cancelled: 'Sign-in was cancelled. You can try again whenever you’re ready.',
   provider_unavailable: 'This sign-in provider is temporarily unavailable. Please try again later.',
   invalid_request: 'This sign-in link is invalid or expired. Please start again.',
-  account_exists: 'An account with this email already exists. Sign in with your existing method instead.',
-  signup_required: 'Choose an account type on the sign-up page before creating a new account with Google.',
-  identity_in_use: 'This Google account is already linked to a different WorkGrind account.',
-  verified_email_required: 'Google must confirm your email address before WorkGrind can use this account.',
+  account_exists: 'An account with this email already exists. Sign in with that account first, then connect this provider in Settings → Security.',
+  signup_required: 'Choose an account type on the sign-up page before creating a new account with a provider.',
+  identity_in_use: 'This provider account is already linked to a different WorkGrind account.',
+  verified_email_required: 'The provider must confirm your email address before WorkGrind can use this account.',
   try_again: 'We could not complete secure sign-in. Please try again.',
 };
 

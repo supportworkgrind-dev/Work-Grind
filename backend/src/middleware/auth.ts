@@ -29,6 +29,7 @@ const BILLING_AND_BOOTSTRAP_PATHS = new Set([
   '/api/auth/join-company',
   '/api/auth/oauth/google/start',
   '/api/auth/oauth/apple/start',
+  '/api/auth/oauth/linkedin/start',
   '/api/subscription/status',
   '/api/subscription/checkout',
   '/api/subscription/cancel',

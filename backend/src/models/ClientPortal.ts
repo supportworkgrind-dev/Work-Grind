@@ -9,6 +9,9 @@ export interface IClientUser extends Document {
   fullName:     string;
   password:     string;                  // bcrypt
   avatar?:      string;
+  googleId?:    string;
+  appleId?:     string;
+  linkedinId?:  string;
   isActive:     boolean;
   isVerified:   boolean;
   inviteToken?: string;
@@ -30,6 +33,9 @@ const ClientUserSchema = new Schema<IClientUser>({
   fullName:    { type: String, required: true, trim: true },
   password:    { type: String, required: true, select: false },
   avatar:      String,
+  googleId:    String,
+  appleId:     String,
+  linkedinId:  String,
   isActive:    { type: Boolean, default: false },
   isVerified:  { type: Boolean, default: false },
   inviteToken: { type: String, select: false },
@@ -44,6 +50,13 @@ const ClientUserSchema = new Schema<IClientUser>({
 
 ClientUserSchema.index({ companyId: 1, email: 1 }, { unique: true });
 ClientUserSchema.index({ inviteToken: 1 }, { sparse: true });
+for (const field of ['googleId', 'appleId', 'linkedinId'] as const) {
+  ClientUserSchema.index({ [field]: 1 }, {
+    unique: true,
+    partialFilterExpression: { [field]: { $type: 'string', $gt: '' } },
+    name: `${field}_unique`,
+  });
+}
 
 // bcrypt on save
 import bcrypt from 'bcryptjs';

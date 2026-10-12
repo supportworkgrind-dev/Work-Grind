@@ -23,10 +23,22 @@ import {
 import { authenticate } from '../middleware/auth';
 import { rateLimiter } from '../middleware/rateLimiter';
 import { invalidateAnalyticsOverviewCache } from '../middleware/invalidateAnalyticsCache';
+import { authenticateClient, ClientRequest } from '../controllers/clientPortal.controller';
 
 const router = Router();
 const startOAuthRoute: RequestHandler = (req, res, next) => {
-  if (req.query.intent === 'link') return authenticate(req, res, next);
+  if (req.query.audience === 'client' && req.query.intent === 'link') {
+    return authenticateClient(req as ClientRequest, res, (error?: unknown) => {
+      if (error) return next(error);
+      void startOAuth(req, res).catch(next);
+    });
+  }
+  if (req.query.intent === 'link') {
+    return authenticate(req, res, (error?: unknown) => {
+      if (error) return next(error);
+      void startOAuth(req, res).catch(next);
+    });
+  }
   return startOAuth(req, res).catch(next);
 };
 const completeOAuthCallbackRoute: RequestHandler = (req, res, next) =>

@@ -14,6 +14,8 @@ type OidcClaims = {
   email?: string;
   email_verified?: boolean | string;
   name?: string;
+  given_name?: string;
+  family_name?: string;
   picture?: string;
   nonce?: string;
   iss?: string;
@@ -56,6 +58,12 @@ const providers: Record<OAuthProvider, {
     tokenEndpoint: 'https://appleid.apple.com/auth/token',
     jwksEndpoint: 'https://appleid.apple.com/auth/keys',
   },
+  linkedin: {
+    issuer: 'https://www.linkedin.com',
+    authorizationEndpoint: 'https://www.linkedin.com/oauth/v2/authorization',
+    tokenEndpoint: 'https://www.linkedin.com/oauth/v2/accessToken',
+    jwksEndpoint: 'https://www.linkedin.com/oauth/openid/jwks',
+  },
 };
 
 const base64Url = (value: Buffer | string) =>
@@ -69,15 +77,17 @@ export const createOAuthToken = randomToken;
 export function getOAuthConfigurationIssue(provider: OAuthProvider): string | null {
   const backendUrl = process.env.BACKEND_URL?.trim();
   if (!backendUrl) return 'BACKEND_URL is missing.';
-  const redirectUri = (provider === 'google'
-    ? process.env.GOOGLE_REDIRECT_URI
-    : process.env.APPLE_REDIRECT_URI)?.trim();
+  const redirectKey = provider === 'google'
+    ? 'GOOGLE_REDIRECT_URI'
+    : provider === 'apple' ? 'APPLE_REDIRECT_URI' : 'LINKEDIN_CALLBACK_URL';
+  const redirectUri = process.env[redirectKey]?.trim();
   const required = provider === 'google'
     ? ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET']
-    : ['APPLE_CLIENT_ID', 'APPLE_TEAM_ID', 'APPLE_KEY_ID', 'APPLE_PRIVATE_KEY'];
+    : provider === 'apple'
+      ? ['APPLE_CLIENT_ID', 'APPLE_TEAM_ID', 'APPLE_KEY_ID', 'APPLE_PRIVATE_KEY']
+      : ['LINKEDIN_CLIENT_ID', 'LINKEDIN_CLIENT_SECRET'];
   const missing = required.filter((key) => !process.env[key]?.trim());
   if (missing.length) return `Missing required environment variable(s): ${missing.join(', ')}.`;
-  const redirectKey = provider === 'google' ? 'GOOGLE_REDIRECT_URI' : 'APPLE_REDIRECT_URI';
   if (!redirectUri) return `${redirectKey} is missing.`;
   try {
     const base = new URL(backendUrl);
@@ -102,9 +112,10 @@ export function getOAuthConfigurationIssue(provider: OAuthProvider): string | nu
 export function getOAuthConfiguration(provider: OAuthProvider): OAuthConfiguration | null {
   if (getOAuthConfigurationIssue(provider)) return null;
   const backendUrl = process.env.BACKEND_URL!.trim();
-  const redirectUri = (provider === 'google'
-    ? process.env.GOOGLE_REDIRECT_URI
-    : process.env.APPLE_REDIRECT_URI)!.trim();
+  const redirectKey = provider === 'google'
+    ? 'GOOGLE_REDIRECT_URI'
+    : provider === 'apple' ? 'APPLE_REDIRECT_URI' : 'LINKEDIN_CALLBACK_URL';
+  const redirectUri = process.env[redirectKey]!.trim();
   const callbackUrl = new URL(redirectUri, backendUrl).toString();
   if (provider === 'google') {
     const clientId = process.env.GOOGLE_CLIENT_ID?.trim();
@@ -112,7 +123,12 @@ export function getOAuthConfiguration(provider: OAuthProvider): OAuthConfigurati
     return { clientId: clientId!, clientSecret: clientSecret!, callbackUrl };
   }
 
-  return { clientId: process.env.APPLE_CLIENT_ID!.trim(), callbackUrl };
+  if (provider === 'apple') return { clientId: process.env.APPLE_CLIENT_ID!.trim(), callbackUrl };
+  return {
+    clientId: process.env.LINKEDIN_CLIENT_ID!.trim(),
+    clientSecret: process.env.LINKEDIN_CLIENT_SECRET!.trim(),
+    callbackUrl,
+  };
 }
 
 export function getClientRedirect(returnTo: string): URL | null {
@@ -164,14 +180,19 @@ export function buildAuthorizationUrl(
   url.searchParams.set('client_id', configuration.clientId);
   url.searchParams.set('redirect_uri', configuration.callbackUrl);
   url.searchParams.set('response_type', 'code');
-  url.searchParams.set('scope', provider === 'google' ? 'openid email profile' : 'name email');
+  url.searchParams.set(
+    'scope',
+    provider === 'apple' ? 'name email' : 'openid profile email',
+  );
   url.searchParams.set('state', state);
   url.searchParams.set('nonce', nonce);
-  if (provider === 'google') {
+  if (provider !== 'apple') {
     url.searchParams.set('code_challenge', base64Url(createHash('sha256').update(verifier).digest()));
     url.searchParams.set('code_challenge_method', 'S256');
+  }
+  if (provider === 'google') {
     url.searchParams.set('prompt', 'select_account');
-  } else {
+  } else if (provider === 'apple') {
     url.searchParams.set('response_mode', 'form_post');
   }
   return url.toString();
@@ -203,9 +224,13 @@ export async function exchangeAuthorizationCode(
   };
   if (provider === 'google') {
     formValues.client_secret = configuration.clientSecret!;
-    formValues.code_verifier = verifier;
+  } else if (provider === 'linkedin') {
+    formValues.client_secret = configuration.clientSecret!;
   } else {
     formValues.client_secret = createAppleClientSecret(configuration);
+  }
+  if (provider !== 'apple') {
+    formValues.code_verifier = verifier;
   }
   const form = new URLSearchParams(formValues);
 
@@ -292,7 +317,7 @@ async function verifyIdentityToken(
   const audiences = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
   const validIssuer = provider === 'google'
     ? claims.iss === providers.google.issuer || claims.iss === 'accounts.google.com'
-    : claims.iss === providers.apple.issuer;
+    : claims.iss === providers[provider].issuer;
   if (!verified || !validIssuer || !audiences.includes(clientId) ||
       (audiences.length > 1 && claims.azp !== clientId) ||
       (claims.azp !== undefined && claims.azp !== clientId) ||

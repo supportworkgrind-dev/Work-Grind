@@ -4,6 +4,7 @@ import User, { IUser } from '../models/User';
 import Company from '../models/Company';
 import OAuthTransaction, { IOAuthTransaction, OAuthProvider } from '../models/OAuthTransaction';
 import OAuthExchange, { IOAuthExchange } from '../models/OAuthExchange';
+import { ClientUser } from '../models/ClientPortal';
 import { AuthRequest } from '../middleware/auth';
 import { createWorkGrindUser } from '../services/callingId';
 import { TRIAL_DAYS } from '../config/subscription';
@@ -11,6 +12,7 @@ import { isOrganizationType } from '../config/organization';
 import { sendWelcomeEmail } from '../utils/email';
 import { restoreWorkspaceCreatorRole, sessionForUser } from './auth.controller';
 import { setRefreshCookie } from '../utils/authCookie';
+import { issueClientToken } from '../utils/clientPortalAuth';
 import {
   buildAuthorizationUrl,
   createOAuthToken,
@@ -24,19 +26,40 @@ import {
   OidcClaims,
 } from '../services/oauth';
 
-const providerField: Record<OAuthProvider, 'googleId' | 'appleId'> = {
+const providerField: Record<OAuthProvider, 'googleId' | 'appleId' | 'linkedinId'> = {
   google: 'googleId',
   apple: 'appleId',
+  linkedin: 'linkedinId',
 };
 const validEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+const isOAuthProvider = (provider: string): provider is OAuthProvider =>
+  provider === 'google' || provider === 'apple' || provider === 'linkedin';
+
+function providerPicture(provider: OAuthProvider, picture?: string): string | undefined {
+  if (!picture || picture.length > 2048) return undefined;
+  try {
+    const url = new URL(picture);
+    const host = url.hostname.toLowerCase();
+    const allowed = provider === 'google'
+      ? host === 'googleusercontent.com' || host.endsWith('.googleusercontent.com')
+      : provider === 'linkedin'
+        ? host === 'licdn.com' || host.endsWith('.licdn.com')
+        : false;
+    return url.protocol === 'https:' && allowed && !url.username && !url.password &&
+      !url.port ? url.toString() : undefined;
+  } catch {
+    return undefined;
+  }
+}
 const safeError = (value: string) =>
   ['cancelled', 'mfa_required', 'provider_unavailable', 'invalid_request', 'account_exists', 'signup_required',
-    'identity_in_use', 'verified_email_required', 'try_again'].includes(value)
+    'identity_in_use', 'verified_email_required', 'client_invitation_required', 'try_again'].includes(value)
     ? value
     : 'try_again';
 
 const knownOAuthFailures = new Set([
   'account_exists',
+  'client_invitation_required',
   'signup_required',
   'account_unavailable',
   'cancelled',
@@ -94,8 +117,15 @@ function logOAuthFailure(provider: OAuthProvider | 'oauth', stage: string, error
   console.error('[OAuth] Callback step failed.', { provider, stage, reason });
 }
 
-function errorRedirect(res: Response, code: string, returnTo?: string, link = false) {
-  const destination = getClientRedirect(link && returnTo ? returnTo : '/auth/callback');
+function errorRedirect(
+  res: Response,
+  code: string,
+  returnTo?: string,
+  link = false,
+  audience: 'user' | 'client' = 'user',
+) {
+  const fallback = audience === 'client' ? '/client-portal/oauth/callback' : '/auth/callback';
+  const destination = getClientRedirect(link && returnTo ? returnTo : fallback);
   if (!destination) {
     res.status(503).json({ success: false, code: 'OAUTH_UNAVAILABLE', message: 'Sign-in is temporarily unavailable.' });
     return;
@@ -133,20 +163,32 @@ function stateCookieMatches(cookieValue: string, state: string) {
 
 export const startOAuth = async (req: Request, res: Response): Promise<void> => {
   const provider = req.params.provider as OAuthProvider;
-  if (provider !== 'google' && provider !== 'apple') {
+  if (!isOAuthProvider(provider)) {
     res.status(404).json({ success: false, code: 'OAUTH_PROVIDER_UNAVAILABLE', message: 'This sign-in provider is unavailable.' });
     return;
   }
   const requestedIntent = req.query.intent;
   const intent = requestedIntent === 'link' ? 'link' : requestedIntent === 'signup' ? 'signup' : 'login';
+  if (req.query.audience !== undefined &&
+      req.query.audience !== 'user' && req.query.audience !== 'client') {
+    res.status(400).json({ success: false, code: 'OAUTH_INVALID_REQUEST', message: 'The sign-in request could not be started.' });
+    return;
+  }
+  const audience = req.query.audience === 'client' ? 'client' : 'user';
   const authRequest = req as AuthRequest;
   const userId = intent === 'link' ? authRequest.user?.userId : undefined;
+  const clientUserId = intent === 'link'
+    ? (req as Request & { client?: { clientUserId: string } }).client?.clientUserId
+    : undefined;
   const requestedAccountType = typeof req.query.accountType === 'string' ? req.query.accountType : '';
   const requestedOrganizationType = typeof req.query.organizationType === 'string' ? req.query.organizationType : '';
-  if (intent === 'signup' &&
+  if ((audience === 'client' && intent === 'signup') ||
+      (audience === 'user' && intent === 'link' && !userId) ||
+      (audience === 'client' && intent === 'link' && !clientUserId) ||
+      (intent === 'signup' &&
       (!['company', 'individual'].includes(requestedAccountType) ||
         !isOrganizationType(requestedOrganizationType) ||
-        (requestedAccountType === 'individual' && requestedOrganizationType !== 'business'))) {
+        (requestedAccountType === 'individual' && requestedOrganizationType !== 'business')))) {
     res.status(400).json({
       success: false,
       code: 'OAUTH_INVALID_REQUEST',
@@ -154,12 +196,17 @@ export const startOAuth = async (req: Request, res: Response): Promise<void> => 
     });
     return;
   }
+  const defaultReturnTo = audience === 'client'
+    ? intent === 'link' ? '/client-portal/portal' : '/client-portal/oauth/callback'
+    : '/dashboard';
   const returnTo = intent === 'signup'
     ? '/create-company'
-    : typeof req.query.returnTo === 'string' ? req.query.returnTo : '/dashboard';
+    : typeof req.query.returnTo === 'string' ? req.query.returnTo : defaultReturnTo;
   const redirect = getClientRedirect(returnTo);
   const configuration = getOAuthConfiguration(provider);
-  if ((intent === 'link' && !userId) || !redirect || !configuration) {
+  if ((audience === 'user' && intent === 'link' && !userId) ||
+      (audience === 'client' && intent === 'link' && !clientUserId) ||
+      !redirect || !configuration) {
     if (!configuration) {
       console.error(`[OAuth] ${provider} sign-in unavailable: ${getOAuthConfigurationIssue(provider) || 'configuration could not be loaded.'}`);
     }
@@ -167,7 +214,7 @@ export const startOAuth = async (req: Request, res: Response): Promise<void> => 
       success: false,
       code: !configuration ? 'OAUTH_NOT_CONFIGURED' : 'OAUTH_INVALID_REQUEST',
       message: !configuration
-        ? `${provider === 'google' ? 'Google' : 'Apple'} sign-in is not configured on this server.`
+        ? `${provider === 'google' ? 'Google' : provider === 'linkedin' ? 'LinkedIn' : 'Apple'} sign-in is not configured on this server.`
         : 'The sign-in request could not be started.',
     });
     return;
@@ -180,6 +227,7 @@ export const startOAuth = async (req: Request, res: Response): Promise<void> => 
     await OAuthTransaction.create({
       stateHash: hashOAuthValue(state),
       provider,
+      audience,
       nonce,
       codeVerifier,
       returnTo: redirect.pathname + redirect.search,
@@ -189,6 +237,7 @@ export const startOAuth = async (req: Request, res: Response): Promise<void> => 
         organizationType: requestedOrganizationType,
       } : {}),
       ...(userId ? { userId } : {}),
+      ...(clientUserId ? { clientUserId } : {}),
       expiresAt: new Date(Date.now() + 10 * 60_000),
     });
     res.setHeader('Cache-Control', 'no-store');
@@ -210,7 +259,7 @@ export const startOAuth = async (req: Request, res: Response): Promise<void> => 
   }
 };
 
-async function useExistingSocialUser(user: IUser | null, field: 'googleId' | 'appleId', subject: string): Promise<IUser> {
+async function useExistingSocialUser(user: IUser | null, field: 'googleId' | 'appleId' | 'linkedinId', subject: string): Promise<IUser> {
   if (!user || !user.isActive || user.isDeleted || !user.isVerified) throw new Error('account_unavailable');
   if (user.isSuperAdmin || user.mfaEnabled) throw new Error('mfa_required');
 
@@ -237,11 +286,7 @@ async function findOrCreateSocialUser(
   if (!validEmail(email) || email.length > 254) throw new Error('invalid_email');
   const emailUser = await User.findOne({ email });
   if (emailUser) {
-    const providerOwner = await User.findOne({ [field]: claims.sub });
-    if (providerOwner && providerOwner._id.toString() !== emailUser._id.toString()) {
-      throw new Error('identity_in_use');
-    }
-    return useExistingSocialUser(emailUser, field, claims.sub);
+    throw new Error('account_exists');
   }
 
   if (!signup?.accountType || !isOrganizationType(signup.organizationType) ||
@@ -250,16 +295,19 @@ async function findOrCreateSocialUser(
   }
 
   const now = new Date();
-  const fullName = (claims.name || email.split('@')[0] || 'WorkGrind user')
+  const fullName = (claims.name || [claims.given_name, claims.family_name].filter(Boolean).join(' ') ||
+    email.split('@')[0] || 'WorkGrind user')
     .replace(/\s+/g, ' ')
     .trim()
     .slice(0, 100) || 'WorkGrind user';
   try {
     const user = await createWorkGrindUser({
       fullName,
+      ...(claims.given_name ? { givenName: claims.given_name.slice(0, 100) } : {}),
+      ...(claims.family_name ? { familyName: claims.family_name.slice(0, 100) } : {}),
       email,
       [field]: claims.sub,
-      ...(provider === 'google' && claims.picture ? { avatar: claims.picture.slice(0, 2048) } : {}),
+      ...(providerPicture(provider, claims.picture) ? { avatar: providerPicture(provider, claims.picture) } : {}),
       isVerified: true,
       isActive: true,
       isDeleted: false,
@@ -286,7 +334,7 @@ async function findOrCreateSocialUser(
       const racedUser = await User.findOne({ [field]: claims.sub });
       if (racedUser) return useExistingSocialUser(racedUser, field, claims.sub);
       const racedEmailUser = await User.findOne({ email });
-      if (racedEmailUser) return useExistingSocialUser(racedEmailUser, field, claims.sub);
+      if (racedEmailUser) throw new Error('account_exists');
     }
     throw error;
   }
@@ -300,20 +348,57 @@ async function finishLink(provider: OAuthProvider, transactionUserId: string, cl
       claims.email.trim().toLowerCase() !== user.email.toLowerCase())) {
     throw new Error('link_email_mismatch');
   }
-  if (!claims.email && provider === 'google') throw new Error('verified_email_required');
+  if (!claims.email && provider !== 'apple') throw new Error('verified_email_required');
   const existing = await User.findOne({ [field]: claims.sub });
   if (existing && existing._id.toString() !== user._id.toString()) throw new Error('identity_in_use');
   const currentIdentity = user.get(field) as string | undefined;
   if (currentIdentity && currentIdentity !== claims.sub) throw new Error('provider_already_linked');
   user.set(field, claims.sub);
+  if (!user.avatar) user.avatar = providerPicture(provider, claims.picture);
+  if (!user.givenName && claims.given_name) user.givenName = claims.given_name.slice(0, 100);
+  if (!user.familyName && claims.family_name) user.familyName = claims.family_name.slice(0, 100);
   await user.save();
+}
+
+async function findClientForOAuth(provider: OAuthProvider, claims: OidcClaims) {
+  const field = providerField[provider];
+  const client = await ClientUser.findOne({ [field]: claims.sub });
+  if (client) {
+    if (!client.isActive || !client.isVerified) throw new Error('account_unavailable');
+    return client;
+  }
+  if (!claims.email || !identityTokenHasVerifiedEmail(claims)) {
+    throw new Error('verified_email_required');
+  }
+  const email = claims.email.trim().toLowerCase();
+  if (!validEmail(email) || email.length > 254) throw new Error('invalid_email');
+  if (await ClientUser.exists({ email })) throw new Error('account_exists');
+  throw new Error('client_invitation_required');
+}
+
+async function finishClientLink(provider: OAuthProvider, clientUserId: string, claims: OidcClaims) {
+  const field = providerField[provider];
+  const client = await ClientUser.findById(clientUserId);
+  if (!client || !client.isActive || !client.isVerified) throw new Error('account_unavailable');
+  if (claims.email && (!identityTokenHasVerifiedEmail(claims) ||
+      claims.email.trim().toLowerCase() !== client.email.toLowerCase())) {
+    throw new Error('link_email_mismatch');
+  }
+  if (!claims.email && provider !== 'apple') throw new Error('verified_email_required');
+  const existing = await ClientUser.findOne({ [field]: claims.sub });
+  if (existing && existing._id.toString() !== client._id.toString()) throw new Error('identity_in_use');
+  const currentIdentity = client.get(field) as string | undefined;
+  if (currentIdentity && currentIdentity !== claims.sub) throw new Error('provider_already_linked');
+  client.set(field, claims.sub);
+  if (!client.avatar) client.avatar = providerPicture(provider, claims.picture);
+  await client.save();
 }
 
 export const completeOAuthCallback = async (req: Request, res: Response): Promise<void> => {
   res.setHeader('Cache-Control', 'no-store');
   res.setHeader('Referrer-Policy', 'no-referrer');
   const provider = req.params.provider as OAuthProvider;
-  if (provider !== 'google' && provider !== 'apple') {
+  if (!isOAuthProvider(provider)) {
     res.status(404).json({ success: false, message: 'Not found.' });
     return;
   }
@@ -347,7 +432,7 @@ export const completeOAuthCallback = async (req: Request, res: Response): Promis
     typeof req.body?.error === 'string' ? req.body.error : '';
   if (providerError) {
     logOAuthFailure(provider, 'provider_callback', new Error(providerError === 'access_denied' ? 'cancelled' : 'provider_error'));
-    errorRedirect(res, providerError === 'access_denied' ? 'cancelled' : 'try_again', transaction.returnTo, transaction.intent === 'link');
+    errorRedirect(res, providerError === 'access_denied' ? 'cancelled' : 'try_again', transaction.returnTo, transaction.intent === 'link', transaction.audience);
     return;
   }
   const code = typeof req.query.code === 'string' ? req.query.code :
@@ -355,7 +440,7 @@ export const completeOAuthCallback = async (req: Request, res: Response): Promis
   const configuration = getOAuthConfiguration(provider);
   if (!configuration || !code || code.length > 4096) {
     logOAuthFailure(provider, 'callback_configuration_or_code', new Error('invalid_request'));
-    errorRedirect(res, 'provider_unavailable', transaction.returnTo, transaction.intent === 'link');
+    errorRedirect(res, 'provider_unavailable', transaction.returnTo, transaction.intent === 'link', transaction.audience);
     return;
   }
   let stage = 'authorization_code_exchange_and_id_token_validation';
@@ -367,11 +452,38 @@ export const completeOAuthCallback = async (req: Request, res: Response): Promis
       transaction.codeVerifier,
       transaction.nonce,
     );
+    if (transaction.intent === 'link' && transaction.audience === 'client') {
+      await finishClientLink(provider, transaction.clientUserId?.toString() || '', claims);
+      const destination = getClientRedirect(transaction.returnTo);
+      if (!destination) throw new Error('invalid_return_to');
+      destination.searchParams.set('oauth', 'linked');
+      res.redirect(303, destination.toString());
+      return;
+    }
     if (transaction.intent === 'link') {
       await finishLink(provider, transaction.userId?.toString() || '', claims);
       const destination = getClientRedirect(transaction.returnTo);
       if (!destination) throw new Error('invalid_return_to');
       destination.searchParams.set('oauth', 'linked');
+      res.redirect(303, destination.toString());
+      return;
+    }
+
+    if (transaction.audience === 'client') {
+      stage = 'client_user_lookup';
+      const client = await findClientForOAuth(provider, claims);
+      const exchangeCode = createOAuthToken();
+      stage = 'exchange_code_persistence';
+      await OAuthExchange.create({
+        codeHash: hashOAuthValue(exchangeCode),
+        audience: 'client',
+        clientUserId: client._id,
+        returnTo: '/client-portal/oauth/callback',
+        expiresAt: new Date(Date.now() + 2 * 60_000),
+      });
+      const destination = getClientRedirect('/client-portal/oauth/callback');
+      if (!destination) throw new Error('invalid_return_to');
+      destination.searchParams.set('code', exchangeCode);
       res.redirect(303, destination.toString());
       return;
     }
@@ -403,15 +515,16 @@ export const completeOAuthCallback = async (req: Request, res: Response): Promis
     logOAuthFailure(provider, stage, error);
     const destination = transaction.intent === 'link'
       ? transaction.returnTo
-      : undefined;
+      : transaction.audience === 'client' ? '/client-portal/oauth/callback' : undefined;
     const errorCode = error?.message === 'account_exists'
       ? 'account_exists'
+      : error?.message === 'client_invitation_required' ? 'client_invitation_required'
       : error?.message === 'signup_required' ? 'signup_required'
       : error?.message === 'mfa_required' ? 'mfa_required'
       : error?.message === 'identity_in_use' ? 'identity_in_use'
       : error?.message === 'verified_email_required' ? 'verified_email_required'
       : error?.message === 'cancelled' ? 'cancelled' : 'try_again';
-    errorRedirect(res, errorCode, destination, transaction.intent === 'link');
+    errorRedirect(res, errorCode, destination, transaction.intent === 'link', transaction.audience);
   }
 };
 
@@ -441,6 +554,27 @@ export const exchangeOAuthSession = async (req: Request, res: Response): Promise
   }
   let stage = 'user_lookup';
   try {
+    if (exchange.audience === 'client') {
+      const client = exchange.clientUserId
+        ? await ClientUser.findById(exchange.clientUserId)
+        : null;
+      if (!client || !client.isActive || !client.isVerified) {
+        logOAuthFailure('oauth', stage, new Error('account_unavailable'));
+        res.status(403).json({ success: false, code: 'OAUTH_ACCOUNT_UNAVAILABLE', message: 'This client portal account cannot sign in right now.' });
+        return;
+      }
+      const accessToken = issueClientToken(client._id.toString(), client.companyId.toString());
+      client.lastSeen = new Date();
+      await client.save();
+      res.json({
+        success: true,
+        audience: 'client',
+        accessToken,
+        client: { _id: client._id, email: client.email, fullName: client.fullName, avatar: client.avatar },
+        returnTo: exchange.returnTo,
+      });
+      return;
+    }
     const user = await User.findById(exchange.userId);
     if (!user || !user.isActive || user.isDeleted || !user.isVerified || user.isSuperAdmin || user.mfaEnabled) {
       logOAuthFailure('oauth', stage, new Error('account_unavailable'));

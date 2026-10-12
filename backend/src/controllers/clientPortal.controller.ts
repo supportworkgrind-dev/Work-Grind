@@ -15,7 +15,6 @@
 import { NextFunction, Request, Response } from 'express';
 import crypto from 'crypto';
 import mongoose from 'mongoose';
-import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { ClientUser, ClientMessage } from '../models/ClientPortal';
 import ClientRequestModel from '../models/ClientRequest';
@@ -27,22 +26,9 @@ import Document from '../models/Document';
 import AuditLog from '../models/AuditLog';
 import { AuthRequest } from '../middleware/auth';
 import { getCompanySubscription } from '../services/companySubscription';
+import { issueClientToken, verifyClientToken } from '../utils/clientPortalAuth';
 
 // ── JWT helpers for client sessions ──────────────────────────────────────────
-
-const CLIENT_JWT_SECRET = process.env.CLIENT_JWT_SECRET || process.env.JWT_SECRET + '_client';
-
-function issueClientToken(clientUserId: string, companyId: string): string {
-  return jwt.sign(
-    { clientUserId, companyId, type: 'client' },
-    CLIENT_JWT_SECRET,
-    { expiresIn: '7d' },
-  );
-}
-
-function verifyClientToken(token: string): { clientUserId: string; companyId: string; type: string } {
-  return jwt.verify(token, CLIENT_JWT_SECRET) as any;
-}
 
 // ── Client auth middleware (used inline) ──────────────────────────────────────
 

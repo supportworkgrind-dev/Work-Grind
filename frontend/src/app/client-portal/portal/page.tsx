@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
 import { ThemeAwareLogo } from '@/components/common/ThemeAwareLogo';
+import { SocialAuthButtons } from '@/components/auth/SocialAuthButtons';
 import { SkeletonLine } from '@/components/common/LoadingSkeleton';
 import {
   Briefcase, FolderClosed, Video, FileText,
@@ -209,6 +210,18 @@ export default function ClientPortalPage() {
         <ThemeAwareLogo size="sm" showWordmark />
         <div className="flex items-center gap-3">
           <span className="text-sm font-semibold theme-text-primary hidden sm:block">{portal?.client?.fullName}</span>
+          <details className="relative">
+            <summary className="btn-secondary cursor-pointer list-none rounded-lg px-2.5 py-1.5 text-xs font-semibold">
+              Sign-in options
+            </summary>
+            <div className="absolute right-0 z-30 mt-2 w-72 rounded-xl border p-3 shadow-lg"
+              style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+              <p className="mb-3 text-xs theme-text-secondary">
+                Link a provider after signing in to keep your portal account private.
+              </p>
+              <SocialAuthButtons intent="link" audience="client" />
+            </div>
+          </details>
           <button onClick={logout} className="btn-ghost h-8 w-8 p-0 rounded-lg" title="Sign out">
             <LogOut className="h-4 w-4" />
           </button>

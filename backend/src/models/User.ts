@@ -9,7 +9,8 @@ export interface IUser extends Document {
   incomingCallPrivacy?: 'everyone' | 'contacts' | 'nobody';
   contacts?: mongoose.Types.ObjectId[];
   blockedUsers?: mongoose.Types.ObjectId[];
-  fullName: string; email: string; password?: string; googleId?: string; appleId?: string;
+  fullName: string; givenName?: string; familyName?: string;
+  email: string; password?: string; googleId?: string; appleId?: string; linkedinId?: string;
   avatar?: string; avatarStorageKey?: string; jobTitle?: string; department?: string; phone?: string;
   phoneVerified: boolean;
   phoneVerificationCodeHash?: string;
@@ -67,6 +68,8 @@ export interface IUser extends Document {
 
 const S = new Schema<IUser>({
   fullName: { type: String, required: true, trim: true },
+  givenName: { type: String, trim: true, maxlength: 100 },
+  familyName: { type: String, trim: true, maxlength: 100 },
   callingId: { type: String, trim: true, uppercase: true, match: /^WG-\d{5,8}$/ },
   incomingCallPrivacy: { type: String, enum: ['everyone', 'contacts', 'nobody'], default: 'everyone' },
   contacts: [{ type: Schema.Types.ObjectId, ref: 'User' }],
@@ -75,6 +78,7 @@ const S = new Schema<IUser>({
   password: { type: String, select: false },
   googleId: String,
   appleId: String,
+  linkedinId: String,
   avatar: String, avatarStorageKey: String, jobTitle: String, department: String,
   phone: { type: String, trim: true },
   // Retained for compatibility with existing account records.
@@ -194,6 +198,11 @@ S.index({ appleId: 1 }, {
   unique: true,
   partialFilterExpression: { appleId: { $type: 'string', $gt: '' } },
   name: 'appleId_unique',
+});
+S.index({ linkedinId: 1 }, {
+  unique: true,
+  partialFilterExpression: { linkedinId: { $type: 'string', $gt: '' } },
+  name: 'linkedinId_unique',
 });
 
 export default mongoose.model<IUser>('User', S);

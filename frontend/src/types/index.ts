@@ -8,6 +8,8 @@ export interface User {
   _id: string;
   callingId?: string;
   fullName: string;
+  givenName?: string;
+  familyName?: string;
   email: string;
   avatar?: string;
   jobTitle?: string;

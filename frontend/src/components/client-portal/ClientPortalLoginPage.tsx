@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
+import { SocialAuthButtons } from '@/components/auth/SocialAuthButtons';
 import { ThemeAwareLogo } from '@/components/common/ThemeAwareLogo';
 import {
   AlertCircle, ArrowRight, Lock, Mail, Shield, CheckCircle2,
@@ -203,6 +204,16 @@ export function ClientPortalLoginPage() {
                 <span>{error}</span>
               </div>
             )}
+
+            <p className="mb-3 text-center text-xs" style={{ color: 'var(--text-secondary)' }}>
+              Continue with a provider already linked to your client account
+            </p>
+            <SocialAuthButtons audience="client" />
+            <div className="my-5 flex items-center gap-3 text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
+              <span className="h-px flex-1" style={{ background: 'var(--border-subtle)' }} />
+              or sign in with your password
+              <span className="h-px flex-1" style={{ background: 'var(--border-subtle)' }} />
+            </div>
 
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
