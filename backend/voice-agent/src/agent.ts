@@ -113,7 +113,7 @@ export default defineAgent({
       stage = 'session_initialization';
       await session.start({
         agent: voice.Agent.create({
-          instructions: 'You are Tavro AI. Listen to the user and let the WorkGrind Tavro backend answer. Do not use a separate model or claim workspace actions outside backend confirmation.',
+          instructions: 'You are Tavro AI. Wait for the user to speak, then let the WorkGrind Tavro backend answer in the language and writing style of that latest message. Do not use a separate model or claim workspace actions outside backend confirmation.',
         }),
         room: ctx.room,
       });
@@ -130,8 +130,7 @@ export default defineAgent({
         dispatchId,
         stage: 'agent_room_connect',
       });
-      stage = 'greeting';
-      await session.say('Hello, I am Tavro AI. How can I help you?');
+      stage = 'awaiting_user';
     } catch (error) {
       console.error('[Tavro Voice Agent] Session failed.', {
         roomId: roomName,

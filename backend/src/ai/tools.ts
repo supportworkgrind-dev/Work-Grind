@@ -26,6 +26,7 @@ import { CrmCompany } from '../models/CrmCompany';
 import Document  from '../models/Document';
 import File      from '../models/File';
 import { roleMatches } from '../config/organization';
+import type { TavroLanguagePreference } from './language';
 
 // ── Tool context injected server-side ─────────────────────────────────────────
 
@@ -38,6 +39,7 @@ export interface ToolContext {
   planName?: string;
   planId?: string;
   enabledFeatures?: string[];
+  preferredLanguage?: TavroLanguagePreference;
   aiRequestsLimit?: number;
   aiRequestsUsed?: number;
 }

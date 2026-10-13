@@ -281,7 +281,7 @@ export default function AIAgentPage() {
   const [messages,        setMessages]        = useState<ChatMessage[]>(() => [{
     id:        'welcome',
     role:      'assistant',
-    content:   `Hello ${user?.fullName?.split(' ')[0] ?? 'there'}! 👋 I'm Tavro AI, built into WorkGrind.\n\nI can help you find information, create tasks and meetings, analyze your CRM, and much more — all from your workspace.`,
+    content:   `Hello ${user?.fullName?.split(' ')[0] ?? 'there'}! 👋 I'm Tavro AI, WorkGrind's assistant for business and education workspaces.\n\nAsk me about WorkGrind, or request help with information and actions available to your role and plan.`,
     createdAt: new Date(0),
   }]);
   const [input,           setInput]           = useState('');
@@ -372,7 +372,7 @@ export default function AIAgentPage() {
     setMessages([{
       id:        'welcome-new',
       role:      'assistant',
-      content:   'New conversation started. What can I help you with?',
+      content:   "New conversation started. I'm Tavro AI, WorkGrind's assistant for business and education workspaces. What can I help you with?",
       createdAt: new Date(),
     }]);
     setShowHistory(false);

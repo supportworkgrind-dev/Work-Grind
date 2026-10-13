@@ -3,6 +3,7 @@ import { AuthRequest } from '../middleware/auth';
 import { runAgentTurn, AIProviderUnavailableError } from '../ai/agentRuntime';
 import { TOOLS } from '../ai/tools';
 import Company from '../models/Company';
+import User from '../models/User';
 import AiConversation from '../models/AiConversation';
 import { reserveAiRequest } from '../utils/planLimits';
 import { recordUsage } from '../services/aiUsageTracker';
@@ -64,10 +65,11 @@ export const runAgent = async (req: AuthRequest, res: Response): Promise<void> =
     if (!subscription) throw new Error('Subscription data was not available after the AI limit check.');
 
     // ── Load or create conversation ───────────────────────────────────────
-    const [workspace, existingConversation] = await Promise.all([
+    const [workspace, profile, existingConversation] = await Promise.all([
       companyId
         ? Company.findById(companyId).select('accountType organizationType').lean()
         : Promise.resolve(null),
+      User.findById(userId).select('preferredLanguage').lean(),
       companyId && conversationId
         ? AiConversation.findOne({
             _id:       conversationId,
@@ -111,6 +113,7 @@ export const runAgent = async (req: AuthRequest, res: Response): Promise<void> =
       enabledFeatures: Object.entries(subscription.planConfig.entitlements)
         .filter(([, enabled]) => enabled)
         .map(([feature]) => feature),
+      preferredLanguage: profile?.preferredLanguage,
       aiRequestsLimit: limitCheck.limit,
       aiRequestsUsed: limitCheck.current,
     };

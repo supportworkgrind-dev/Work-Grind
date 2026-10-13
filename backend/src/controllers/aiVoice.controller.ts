@@ -142,7 +142,7 @@ export const createVoiceSession = async (req: AuthRequest, res: Response): Promi
   let failureStage = 'user_lookup';
   try {
     const user = await User.findById(req.user!.userId)
-      .select('companyId role isActive isVerified isDeleted')
+      .select('companyId role isActive isVerified isDeleted preferredLanguage')
       .lean();
     const companyId = user?.companyId?.toString();
     const role = user?.role?.toLowerCase();
@@ -449,6 +449,7 @@ export const runVoiceTurn = async (req: AuthRequest, res: Response): Promise<voi
     userRole: role,
     accountType: company.accountType,
     organizationType: company.organizationType,
+    preferredLanguage: user.preferredLanguage,
     planName: subscription.planConfig.name,
     planId: subscription.plan,
     enabledFeatures: Object.entries(subscription.planConfig.entitlements)
@@ -459,7 +460,7 @@ export const runVoiceTurn = async (req: AuthRequest, res: Response): Promise<voi
   };
   const validateVoiceAction = async (): Promise<ToolContext | null> => {
     const currentUser = await User.findById(credential.sub)
-      .select('companyId role isActive isVerified isDeleted')
+      .select('companyId role isActive isVerified isDeleted preferredLanguage')
       .lean();
     const currentRole = currentUser?.role?.toLowerCase();
     if (
@@ -487,6 +488,7 @@ export const runVoiceTurn = async (req: AuthRequest, res: Response): Promise<voi
     return {
       ...ctx,
       userRole: currentRole,
+      preferredLanguage: currentUser.preferredLanguage,
       accountType: currentCompany.accountType,
       organizationType: currentCompany.organizationType,
       planName: currentPlan.planConfig.name,
