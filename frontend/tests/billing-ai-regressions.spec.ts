@@ -426,11 +426,11 @@ test('refresh requests from two tabs are serialized while refresh-token cookies 
 
 test('production CSP connection sources include only the configured API and LiveKit origins plus ICE schemes', () => {
   expect(getTrustedConnectionSources(
-    'https://backend-rho-vert-59.vercel.app/api',
+    'https://backend-workgrind.vercel.app/api',
     'wss://work-grind-bjshvbs1.livekit.cloud',
   )).toEqual([
-    'https://backend-rho-vert-59.vercel.app',
-    'wss://backend-rho-vert-59.vercel.app',
+    'https://backend-workgrind.vercel.app',
+    'wss://backend-workgrind.vercel.app',
     'wss://work-grind-bjshvbs1.livekit.cloud',
     'https://work-grind-bjshvbs1.livekit.cloud',
     'stun:',
@@ -442,10 +442,10 @@ test('production CSP connection sources include only the configured API and Live
 test('Socket.IO targets the configured backend and uses the Vercel function socket path', () => {
   expect(resolveSocketUrl(
     undefined,
-    'https://backend-rho-vert-59.vercel.app/api',
+    'https://backend-workgrind.vercel.app/api',
     'https://workgrind.vercel.app',
     false,
-  )).toBe('https://backend-rho-vert-59.vercel.app');
+  )).toBe('https://backend-workgrind.vercel.app');
   expect(SOCKET_IO_PATH).toBe('/api/socket-io/socket.io');
 });
 
