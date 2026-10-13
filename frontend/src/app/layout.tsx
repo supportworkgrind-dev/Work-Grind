@@ -22,6 +22,10 @@ export const metadata: Metadata = {
   title: 'WorkGrind | Connected Workspaces for Work and Learning',
   description: 'WorkGrind offers separate workspaces for personal productivity, businesses, schools, colleges, and universities, with capabilities suited to each.',
   manifest: '/manifest.json',
+  robots: {
+    index: true,
+    follow: true,
+  },
   icons: {
     icon:    [{ url: '/icon.svg', type: 'image/svg+xml' }],
     shortcut:[{ url: '/icon.svg', type: 'image/svg+xml' }],
@@ -34,19 +38,19 @@ export const metadata: Metadata = {
     siteName:    'WorkGrind',
     images: [
       {
-        url:    '/workgrind-icon.svg',
-        width:  512,
-        height: 512,
-        alt:    'WorkGrind logo',
+        url:    '/workgrind-og.png',
+        width:  1200,
+        height: 630,
+        alt:    'WorkGrind — Connected Workspaces for Work and Learning',
       },
     ],
     type: 'website',
   },
   twitter: {
-    card:        'summary',
+    card:        'summary_large_image',
     title:        'WorkGrind | Connected Workspaces for Work and Learning',
     description: 'Personal productivity, business collaboration, and academic administration in purpose-specific workspaces.',
-    images:      ['/workgrind-icon.svg'],
+    images:      ['/workgrind-og.png'],
   },
 };
 

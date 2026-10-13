@@ -20,13 +20,13 @@ export const metadata: Metadata = {
     url: '/how-it-works',
     siteName: 'WorkGrind',
     type: 'website',
-    images: [{ url: '/workgrind-icon.svg', width: 512, height: 512, alt: 'WorkGrind logo' }],
+    images: [{ url: '/workgrind-og.png', width: 1200, height: 630, alt: 'WorkGrind — Connected Workspaces for Work and Learning' }],
   },
   twitter: {
-    card: 'summary',
+    card: 'summary_large_image',
     title: 'How WorkGrind Works | Work, Business, and Education',
     description: 'Choose capabilities and access appropriate to a Solo, Company, School, College, or University workspace.',
-    images: ['/workgrind-icon.svg'],
+    images: ['/workgrind-og.png'],
   },
 };
 

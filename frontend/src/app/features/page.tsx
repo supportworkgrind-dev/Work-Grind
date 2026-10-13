@@ -39,13 +39,13 @@ export const metadata: Metadata = {
     url: '/features',
     siteName: 'WorkGrind',
     type: 'website',
-    images: [{ url: '/workgrind-icon.svg', width: 512, height: 512, alt: 'WorkGrind logo' }],
+    images: [{ url: '/workgrind-og.png', width: 1200, height: 630, alt: 'WorkGrind — Connected Workspaces for Work and Learning' }],
   },
   twitter: {
-    card: 'summary',
+    card: 'summary_large_image',
     title: 'WorkGrind Features',
     description: 'Capabilities vary by workspace type, role, and subscription plan.',
-    images: ['/workgrind-icon.svg'],
+    images: ['/workgrind-og.png'],
   },
 };
 

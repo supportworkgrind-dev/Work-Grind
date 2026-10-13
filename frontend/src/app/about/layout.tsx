@@ -8,6 +8,7 @@ export const metadata: Metadata = {
     description: 'Separate Solo, Company, School / Academy, College, and University workspaces.',
     url: '/about',
     siteName: 'WorkGrind',
+    images: [{ url: '/workgrind-og.png', width: 1200, height: 630, alt: 'WorkGrind — Connected Workspaces for Work and Learning' }],
     type: 'website',
   },
 };

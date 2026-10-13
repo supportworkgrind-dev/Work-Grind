@@ -8,6 +8,7 @@ export const metadata: Metadata = {
     description: 'Plan availability, prices, and limits are provided by WorkGrind billing configuration.',
     url: '/pricing',
     siteName: 'WorkGrind',
+    images: [{ url: '/workgrind-og.png', width: 1200, height: 630, alt: 'WorkGrind — Connected Workspaces for Work and Learning' }],
     type: 'website',
   },
 };

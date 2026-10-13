@@ -8,6 +8,7 @@ export const metadata: Metadata = {
     description: 'Send a question about WorkGrind workspaces, plans, or support.',
     url: '/contact',
     siteName: 'WorkGrind',
+    images: [{ url: '/workgrind-og.png', width: 1200, height: 630, alt: 'WorkGrind — Connected Workspaces for Work and Learning' }],
     type: 'website',
   },
 };
