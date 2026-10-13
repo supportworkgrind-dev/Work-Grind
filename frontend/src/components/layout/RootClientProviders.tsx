@@ -84,8 +84,9 @@ export function RootClientProviders({ children }: { children: React.ReactNode })
   }, []);
 
   useEffect(() => {
+    if (pathname === '/auth/callback' || pathname === '/client-portal/oauth/callback') return;
     void useAuthStore.getState().restoreSession();
-  }, []);
+  }, [pathname]);
 
   useEffect(() => {
     const handleSubscriptionRequired = () => {

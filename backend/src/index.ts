@@ -296,7 +296,7 @@ app.use(
 // OAuth callback query strings contain one-time authorization codes and state;
 // never write those callback URLs to request logs.
 const skipOAuthCallbackLogs = (req: express.Request) =>
-  /^\/api\/auth\/oauth\/(?:google|apple)\/callback(?:\?|$)/.test(req.originalUrl);
+  /^\/api\/auth\/oauth\/(?:google|apple|linkedin)\/callback(?:\?|$)/.test(req.originalUrl);
 if (process.env.NODE_ENV !== 'production') {
   app.use(morgan('dev', { skip: skipOAuthCallbackLogs }));
 } else {

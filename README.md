@@ -713,7 +713,7 @@ Never commit real secrets to Git.
 
 Use `.env.example` for safe placeholder values.
 
-## Production Vercel API and Google OAuth
+## Production Vercel API and OAuth
 
 The backend Vercel project uses `backend` as its Root Directory. Its
 `backend/vercel.json` routes requests through `backend/api/index.ts` to the
@@ -728,7 +728,7 @@ redeploy both projects so build-time and runtime configuration is applied:
 | Frontend | `NEXT_PUBLIC_API_URL` | `https://backend-rho-vert-59.vercel.app` |
 | Frontend | `NEXT_PUBLIC_LIVEKIT_URL` | The same LiveKit Cloud WSS URL configured as backend `LIVEKIT_URL` |
 | Backend | `BACKEND_URL` | `https://backend-rho-vert-59.vercel.app` |
-| Backend | `CLIENT_URL` | `https://frontend-mu-rosy-fb41u8nrz0.vercel.app` |
+| Backend | `CLIENT_URL` | `https://workgrind.vercel.app` |
 | Backend | `TAVRO_VOICE_AGENT_SECRET` | Unique random secret with at least 32 characters |
 | Backend | `GOOGLE_REDIRECT_URI` | `https://backend-rho-vert-59.vercel.app/api/auth/oauth/google/callback` |
 | Backend | `MONGODB_URI` | MongoDB connection string (secret) |
@@ -736,6 +736,9 @@ redeploy both projects so build-time and runtime configuration is applied:
 | Backend | `JWT_REFRESH_SECRET` | Separate production refresh-token signing key (secret) |
 | Backend | `GOOGLE_CLIENT_ID` | The Google OAuth client ID |
 | Backend | `GOOGLE_CLIENT_SECRET` | The matching Google OAuth client secret |
+| Backend | `LINKEDIN_CALLBACK_URL` | `https://backend-rho-vert-59.vercel.app/api/auth/oauth/linkedin/callback` |
+| Backend | `LINKEDIN_CLIENT_ID` | The LinkedIn developer application client ID |
+| Backend | `LINKEDIN_CLIENT_SECRET` | The matching LinkedIn developer application client secret |
 | Backend | `WAAPI_WEBHOOK_SECRET` | Secret used to verify the independent `POST /api/whatsapp/webhook` endpoint |
 
 In Google Cloud Console, add the backend callback URL above as an authorized
@@ -745,6 +748,15 @@ in the frontend build; it may be set to the backend origin (recommended) or its
 `/api` URL. The legacy `NEXT_PUBLIC_API_BASE_URL` alias is also accepted; if
 both public variables are set, they must use the same backend origin. Remove
 any conflicting value and redeploy. OAuth client secrets must remain backend-only.
+In the LinkedIn Developer Portal, configure this exact authorized redirect URL:
+`https://backend-rho-vert-59.vercel.app/api/auth/oauth/linkedin/callback`.
+The LinkedIn app must have the **Sign In with LinkedIn using OpenID Connect**
+product enabled for `openid`, `profile`, and `email`. Both `BACKEND_URL` and
+`LINKEDIN_CALLBACK_URL` must use the backend origin shown above. Login and signup
+start with a top-level navigation to the backend so the browser-bound OAuth
+state cookie is created on the same origin that receives LinkedIn's callback.
+Keep the API rewrite in place for normal application requests; do not route the
+OAuth callback through the frontend deployment.
 Set `NEXT_PUBLIC_LIVEKIT_URL` to the same public `wss://` LiveKit project URL as
 the backend's `LIVEKIT_URL`; the frontend uses it to allow only that LiveKit
 origin in its production CSP. The backend voice-session endpoint also requires

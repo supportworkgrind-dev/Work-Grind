@@ -57,7 +57,7 @@ function providerPicture(provider: OAuthProvider, picture?: string): string | un
   }
 }
 const safeError = (value: string) =>
-  ['cancelled', 'mfa_required', 'provider_unavailable', 'invalid_request', 'account_exists', 'signup_required',
+  ['cancelled', 'mfa_required', 'provider_unavailable', 'authorization_failed', 'invalid_request', 'attempt_expired', 'account_exists', 'signup_required',
     'identity_in_use', 'verified_email_required', 'client_invitation_required', 'publishing_permission_denied',
     'provider_already_linked', 'try_again'].includes(value)
     ? value
@@ -88,6 +88,7 @@ const knownOAuthFailures = new Set([
   'link_email_mismatch',
   'mfa_required',
   'provider_error',
+  'attempt_expired',
   'provider_already_linked',
   'verified_email_required',
   'publishing_permission_denied',
@@ -118,7 +119,10 @@ function logOAuthFailure(provider: OAuthProvider | 'oauth', stage: string, error
     return;
   }
 
-  if (error instanceof Error && knownOAuthFailures.has(error.message)) {
+  if (error instanceof Error && (
+    knownOAuthFailures.has(error.message) ||
+    /^provider_error_[a-zA-Z0-9_.-]{1,80}$/.test(error.message)
+  )) {
     console.error('[OAuth] Callback step failed.', {
       provider,
       stage,
@@ -154,25 +158,38 @@ function errorRedirect(
   res.redirect(303, destination.toString());
 }
 
-function clearStateCookie(res: Response, provider: OAuthProvider) {
-  const sameSite = provider === 'apple' || process.env.NODE_ENV === 'production' ? 'None' : 'Lax';
-  const secure = sameSite === 'None' ? '; Secure' : '';
-  res.append('Set-Cookie', `wg_oauth_${provider}_state=; Path=/api/auth/oauth; Max-Age=0; HttpOnly; SameSite=${sameSite}${secure}`);
+function stateCookieName(provider: OAuthProvider, state: string) {
+  return `wg_oauth_${provider}_state_${state}`;
 }
 
-function readStateCookie(req: Request, provider: OAuthProvider) {
-  const name = `wg_oauth_${provider}_state`;
+function clearStateCookie(res: Response, provider: OAuthProvider, state: string, legacy = false) {
+  const sameSite = provider === 'apple' || process.env.NODE_ENV === 'production' ? 'None' : 'Lax';
+  const secure = sameSite === 'None' ? '; Secure' : '';
+  const cookieNames = [stateCookieName(provider, state)];
+  if (legacy) cookieNames.push(`wg_oauth_${provider}_state`);
+  for (const name of cookieNames) {
+    res.append('Set-Cookie', `${name}=; Path=/api/auth/oauth; Max-Age=0; HttpOnly; SameSite=${sameSite}${secure}`);
+  }
+}
+
+function readStateCookie(req: Request, provider: OAuthProvider, state: string): { value: string; legacy: boolean } {
+  const names = [
+    { name: stateCookieName(provider, state), legacy: false },
+    { name: `wg_oauth_${provider}_state`, legacy: true },
+  ];
   const cookies = req.headers.cookie?.split(';') || [];
-  for (const cookie of cookies) {
-    const separator = cookie.indexOf('=');
-    if (separator < 0 || cookie.slice(0, separator).trim() !== name) continue;
-    try {
-      return decodeURIComponent(cookie.slice(separator + 1).trim());
-    } catch {
-      return '';
+  for (const expected of names) {
+    for (const cookie of cookies) {
+      const separator = cookie.indexOf('=');
+      if (separator < 0 || cookie.slice(0, separator).trim() !== expected.name) continue;
+      try {
+        return { value: decodeURIComponent(cookie.slice(separator + 1).trim()), legacy: expected.legacy };
+      } catch {
+        return { value: '', legacy: expected.legacy };
+      }
     }
   }
-  return '';
+  return { value: '', legacy: false };
 }
 
 function stateCookieMatches(cookieValue: string, state: string) {
@@ -278,7 +295,7 @@ export const startOAuth = async (req: Request, res: Response): Promise<void> => 
     const secure = sameSite === 'None' ? '; Secure' : '';
     res.append(
       'Set-Cookie',
-      `wg_oauth_${provider}_state=${encodeURIComponent(state)}; Path=/api/auth/oauth; Max-Age=600; HttpOnly; SameSite=${sameSite}${secure}`,
+      `${stateCookieName(provider, state)}=${encodeURIComponent(state)}; Path=/api/auth/oauth; Max-Age=600; HttpOnly; SameSite=${sameSite}${secure}`,
     );
     const authUrl = buildAuthorizationUrl(
       provider,
@@ -503,13 +520,18 @@ export const completeOAuthCallback = async (req: Request, res: Response): Promis
     res.status(404).json({ success: false, message: 'Not found.' });
     return;
   }
-  clearStateCookie(res, provider);
   const state = typeof req.query.state === 'string' ? req.query.state :
     typeof req.body?.state === 'string' ? req.body.state : '';
-  const browserState = readStateCookie(req, provider);
-  if (!state || state.length > 256 || !stateCookieMatches(browserState, state)) {
+  if (!state || !/^[A-Za-z0-9_-]{32,128}$/.test(state)) {
     logOAuthFailure(provider, 'state_validation', new Error('invalid_request'));
     errorRedirect(res, 'invalid_request');
+    return;
+  }
+  const stateCookie = readStateCookie(req, provider, state);
+  clearStateCookie(res, provider, state, stateCookie.legacy);
+  if (!stateCookieMatches(stateCookie.value, state)) {
+    logOAuthFailure(provider, 'state_cookie_validation', new Error('invalid_request'));
+    errorRedirect(res, 'attempt_expired');
     return;
   }
   let transaction: IOAuthTransaction | null;
@@ -525,17 +547,24 @@ export const completeOAuthCallback = async (req: Request, res: Response): Promis
     return;
   }
   if (!transaction) {
-    logOAuthFailure(provider, 'transaction_lookup', new Error('invalid_request'));
-    errorRedirect(res, 'invalid_request');
+    logOAuthFailure(provider, 'transaction_lookup', new Error('attempt_expired'));
+    errorRedirect(res, 'attempt_expired');
     return;
   }
   const providerError = typeof req.query.error === 'string' ? req.query.error :
     typeof req.body?.error === 'string' ? req.body.error : '';
   if (providerError) {
-    logOAuthFailure(provider, 'provider_callback', new Error(providerError === 'access_denied' ? 'cancelled' : 'provider_error'));
+    const safeProviderError = /^[a-zA-Z0-9_.-]{1,80}$/.test(providerError)
+      ? providerError
+      : 'unrecognized_provider_error';
+    logOAuthFailure(
+      provider,
+      'provider_callback',
+      new Error(providerError === 'access_denied' ? 'cancelled' : `provider_error_${safeProviderError}`),
+    );
     errorRedirect(
       res,
-      providerError === 'access_denied' ? 'cancelled' : 'try_again',
+      providerError === 'access_denied' ? 'cancelled' : 'authorization_failed',
       transaction.returnTo,
       transaction.intent === 'link' || transaction.intent === 'publishing',
       transaction.audience,
@@ -545,11 +574,22 @@ export const completeOAuthCallback = async (req: Request, res: Response): Promis
   const code = typeof req.query.code === 'string' ? req.query.code :
     typeof req.body?.code === 'string' ? req.body.code : '';
   const configuration = getOAuthConfiguration(provider);
-  if (!configuration || !code || code.length > 4096) {
-    logOAuthFailure(provider, 'callback_configuration_or_code', new Error('invalid_request'));
+  if (!configuration) {
+    logOAuthFailure(provider, 'callback_configuration', new Error('provider_unavailable'));
     errorRedirect(
       res,
       'provider_unavailable',
+      transaction.returnTo,
+      transaction.intent === 'link' || transaction.intent === 'publishing',
+      transaction.audience,
+    );
+    return;
+  }
+  if (!code || code.length > 4096) {
+    logOAuthFailure(provider, 'callback_authorization_code', new Error('attempt_expired'));
+    errorRedirect(
+      res,
+      'attempt_expired',
       transaction.returnTo,
       transaction.intent === 'link' || transaction.intent === 'publishing',
       transaction.audience,
