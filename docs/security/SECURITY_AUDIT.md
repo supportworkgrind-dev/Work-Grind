@@ -51,6 +51,30 @@ No claim is made that no other vulnerabilities exist. Deployment-dependent contr
 - **Fix:** Downloads now apply the view scope; deletes retain the edit scope as an explicit conjunctive filter.
 - **Regression evidence:** `backend/tests/security-boundaries.test.cjs` asserts the exact uploader/shared-view and uploader/shared-edit filters.
 
+### WG-SEC-03 — Medium — Unsigned inbound integration webhook (fixed)
+
+- **Evidence before fix:** `receiveWebhook` accepted requests without `X-Webhook-Signature`, treating the URL token as the only credential.
+- **Fix:** All inbound requests now require a stored webhook secret and a matching, constant-time HMAC comparison.
+- **Regression evidence:** Tests reject both absent and invalid signatures before emitting an event.
+
+### WG-SEC-04 — Low/Medium — Client-declared upload type (fixed)
+
+- **Evidence before fix:** General, avatar, and whiteboard uploads checked client MIME and extension but did not verify file bytes.
+- **Fix:** Shared post-multipart validation now checks an allowlisted MIME/extension pair against signatures for image, PDF, Office/archive, media, and UTF-8 text formats.
+- **Regression evidence:** Tests accept a valid PNG/PDF signature and reject mismatched or spoofed content. No malware-scanning claim is made.
+
+### WG-SEC-05 — Medium — Serverless rate-limit isolation (mitigated)
+
+- **Evidence before fix:** Vercel trusted all forwarded hops and the rate limiter used per-process memory.
+- **Fix:** Vercel now trusts one proxy hop. When configured, an atomic Redis store shares counters across instances; without `REDIS_URL`, the fallback logs that counters are local.
+- **Regression evidence:** Store tests verify the shared key prefix and atomic expiry command. Vercel header and Redis behavior still require deployment verification.
+
+### WG-SEC-06 — Critical — Legacy local AI dependency chain (fixed)
+
+- **Evidence before fix:** `@xenova/transformers` brought in a vulnerable `protobufjs`/legacy ONNX dependency path.
+- **Fix:** Local AI dynamic imports now use the already-installed `@huggingface/transformers`, and the legacy package was removed.
+- **Validation:** The frontend production build passed; the production dependency audit no longer reports a Critical advisory. Remaining frontend advisories are listed below.
+
 ## Other reviewed boundaries
 
 - **Authentication / authorization:** `backend/src/middleware/auth.ts` verifies access JWTs, rejects MFA-pending tokens, reloads active/verified/deleted state and the current workspace/role from MongoDB, and compares the token workspace. `requireSuperAdmin` separately checks persisted super-admin status and MFA completion when enabled. JWT helpers fail closed when secrets are absent. Password, reset, refresh, and OAuth edge cases were not exhaustively penetration-tested.
@@ -89,7 +113,7 @@ OWASP references: [ASVS 5.0.0](https://owasp.org/www-project-application-securit
 
 Remaining items are deployment-dependent or require broader validation:
 
-1. **Unverified billing reliability concern — Polar raw-body capture ordering.** `backend/src/index.ts` installs `express.json()` before mounting `subscriptionRoutes`; `backend/src/routes/subscription.ts` then installs `express.raw()` for the webhook and expects a Buffer. Validate a real signed Polar sandbox event through the deployed middleware path. This is an integration gap, not a confirmed signature bypass.
+1. **Unverified billing integration.** Raw Polar webhook bytes are now captured by the global JSON parser's endpoint-specific `verify` callback and the route rejects requests without a captured buffer. Unit tests verify the exact bytes are preserved, but an actual signed Polar sandbox event through the deployed middleware path is still required.
 2. **Deployment-dependent rate limiting.** Shared counters are used only when `REDIS_URL` is configured. Vercel without that setting falls back to per-instance memory and therefore does not enforce a global quota. Verify the intended production Redis configuration and one-hop edge forwarding behavior.
 3. **Remaining frontend advisories.** Production audit reports 6 High, 8 Moderate, and 2 Low advisories. The suggested npm remediation for Excalidraw downgrades to a release incompatible with the React 19 peer range; ExcelJS/Mermaid and development-tool advisories also remain.
 4. **Unverified billing reliability concern — Raw-body capture ordering.** `backend/src/index.ts` installs `express.json()` before mounting `subscriptionRoutes`; `backend/src/routes/subscription.ts` then installs `express.raw()` for the webhook and expects a Buffer. Validate an actual signed Polar test event in an isolated sandbox to ensure the raw bytes survive this middleware order. This is recorded as an integration test gap, not a confirmed signature bypass.

@@ -58,10 +58,10 @@ WorkGrind is a multi-tenant workspace application with:
 ## Residual risks and assumptions
 
 - Tenant correctness still depends on every controller/query adding object-level scope; a source review cannot prove all endpoints or combinations are safe.
-- The generic inbound integration endpoint treats HMAC as optional and relies on its high-entropy URL token as a bearer credential. Leaked URLs could permit forged integration events.
-- Proxy trust and default in-memory rate limiting need deployment-specific review, particularly across serverless instances.
-- Upload validation checks extension and client MIME, not actual file signatures or malware.
-- Production OAuth, billing, webhook, storage, proxy, and realtime settings were not exercised with real provider accounts. The Polar raw-body parser ordering needs a sandbox test.
+- The generic inbound integration endpoint now requires a valid HMAC in addition to its high-entropy URL token; test that all current senders sign requests before rollout.
+- Vercel trusts one proxy hop. Redis-backed rate limiting requires `REDIS_URL`; without it, the fallback remains process-local and is not a global quota.
+- Upload routes validate content signatures against allowed MIME/extension pairs, but do not scan for malware.
+- Production OAuth, billing, webhook, storage, proxy, and realtime settings were not exercised with real provider accounts. Polar signature interoperability still needs a sandbox test.
 - AI prompt injection, browser/client manipulation, concurrency races, and resource-exhaustion behaviors require adversarial integration testing.
 - This model does not cover infrastructure/vendor controls, employee access, incident response, backups, disaster recovery, or live production configuration.
 
