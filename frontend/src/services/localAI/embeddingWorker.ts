@@ -1,7 +1,7 @@
 /**
  * embeddingWorker.ts
  *
- * Runs @xenova/transformers feature-extraction entirely in a Web Worker
+ * Runs Transformers.js feature-extraction entirely in a Web Worker
  * so embedding computation never blocks the main thread / UI.
  *
  * USAGE (from main thread):
@@ -61,7 +61,7 @@ async function getModel(): Promise<any> {
   if (!loadingPromise) {
     loadingPromise = (async () => {
       try {
-        const { pipeline: createPipeline, env } = await import('@xenova/transformers');
+        const { pipeline: createPipeline, env } = await import('@huggingface/transformers');
 
         env.allowLocalModels = false;
         env.allowRemoteModels = true;

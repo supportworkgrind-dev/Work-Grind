@@ -10,7 +10,7 @@ import {
   deactivateMe,
 } from '../controllers/user.controller';
 import { authenticate, requireCompany, requireRole } from '../middleware/auth';
-import { avatarUpload } from '../middleware/upload';
+import { avatarUpload, validateUploadedContent } from '../middleware/upload';
 import { asyncHandler } from '../middleware/asyncHandler';
 import { rateLimiter } from '../middleware/rateLimiter';
 import { requireOrganizationFeature } from '../middleware/organizationAccess';
@@ -41,7 +41,7 @@ router.get('/calling-id/:callingId', asyncHandler(resolveCallingId));
 router.get('/public-id/:callingId', rateLimiter(1, 30), asyncHandler(getUserByPublicId));
 router.patch('/me', updateMe);
 router.patch('/me/deactivate', deactivateMe);
-router.patch('/me/avatar', avatarUpload.single('avatar'), uploadAvatar);
+router.patch('/me/avatar', avatarUpload.single('avatar'), validateUploadedContent, uploadAvatar);
 router.patch('/me/status', updateStatus);
 // Role guard: only owners, admins, and managers can invite members
 router.post('/invite', requireRole('owner', 'admin', 'manager'), inviteMember);

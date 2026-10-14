@@ -20,7 +20,7 @@ import {
 	uploadBoardAsset,
 } from '../controllers/whiteboard.controller';
 import { validateObjectId } from '../middleware/validateObjectId';
-import { upload } from '../middleware/upload';
+import { upload, validateUploadedContent } from '../middleware/upload';
 import { requireOrganizationFeature } from '../middleware/organizationAccess';
 
 const router = Router();
@@ -31,7 +31,7 @@ router.get('/', getBoards);
 router.post('/', createBoard);
 router.get('/:id/versions', validateObjectId('id'), getVersions);
 router.post('/:id/versions/:versionId/restore', validateObjectId('id', 'versionId'), restoreVersion);
-router.post('/:id/assets', validateObjectId('id'), requireEntitlement('fileStorage'), upload.single('file'), uploadBoardAsset);
+router.post('/:id/assets', validateObjectId('id'), requireEntitlement('fileStorage'), upload.single('file'), validateUploadedContent, uploadBoardAsset);
 router.get('/:id/assets/:assetId', validateObjectId('id'), getBoardAsset);
 router.post('/:id/comments', validateObjectId('id'), addComment);
 router.post('/:id/comments/:commentId/reactions', validateObjectId('id', 'commentId'), reactToComment);

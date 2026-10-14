@@ -184,23 +184,29 @@ export const receiveWebhook = async (req: Request, res: Response): Promise<void>
       return;
     }
 
-    // HMAC signature verification (optional — only if X-Webhook-Signature header is present)
-    const signature = req.headers['x-webhook-signature'] as string;
-    if (signature && integration.webhookSecret) {
-      try {
-        const secret = decryptProviderToken(integration.webhookSecret);
-        const expected = crypto
-          .createHmac('sha256', secret)
-          .update(JSON.stringify(req.body))
-          .digest('hex');
-        if (signature !== `sha256=${expected}`) {
-          res.status(401).json({ success: false, message: 'Invalid webhook signature' });
-          return;
-        }
-      } catch {
-        res.status(401).json({ success: false, message: 'Signature verification failed' });
-        return;
-      }
+    const signature = req.headers['x-webhook-signature'];
+    if (typeof signature !== 'string' || !integration.webhookSecret) {
+      res.status(401).json({ success: false, message: 'Webhook signature required' });
+      return;
+    }
+
+    let signatureValid = false;
+    try {
+      const secret = decryptProviderToken(integration.webhookSecret);
+      const expected = Buffer.from(`sha256=${crypto
+        .createHmac('sha256', secret)
+        .update(JSON.stringify(req.body) ?? '')
+        .digest('hex')}`);
+      const received = Buffer.from(signature);
+      signatureValid = received.length === expected.length &&
+        crypto.timingSafeEqual(received, expected);
+    } catch {
+      res.status(401).json({ success: false, message: 'Signature verification failed' });
+      return;
+    }
+    if (!signatureValid) {
+      res.status(401).json({ success: false, message: 'Invalid webhook signature' });
+      return;
     }
 
     // Emit to company room so the frontend can react in real-time

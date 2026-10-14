@@ -7,7 +7,7 @@
  * or routed to the WorkGrind backend (Gemini).
  *
  * ALL imports of localAI services are lazy (inside function bodies) so that
- * @xenova/transformers is NEVER included in the initial bundle or traced by
+ * Transformers.js is NEVER included in the initial bundle or traced by
  * Webpack during SSR compilation.  The 'use client' directive ensures this
  * module is only compiled for browser builds.
  */

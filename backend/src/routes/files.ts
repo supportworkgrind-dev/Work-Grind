@@ -5,7 +5,7 @@ import {
   storageHealth,
 } from '../controllers/file.controller';
 import { authenticate, requireEntitlement } from '../middleware/auth';
-import { upload } from '../middleware/upload';
+import { upload, validateUploadedContent } from '../middleware/upload';
 import { validateObjectId } from '../middleware/validateObjectId';
 import { requireAnyOrganizationFeature } from '../middleware/organizationAccess';
 
@@ -18,7 +18,7 @@ router.use(
 );
 
 router.get('/',                              getFiles);
-router.post('/upload',                       upload.single('file'), uploadFile);
+router.post('/upload',                       upload.single('file'), validateUploadedContent, uploadFile);
 router.get('/folders/list',                  getFolders);
 router.post('/folders',                      createFolder);
 router.delete('/folders/:id',                validateObjectId('id'), deleteFolder);

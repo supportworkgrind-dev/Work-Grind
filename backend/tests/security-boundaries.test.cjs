@@ -5,8 +5,12 @@ const mongoose = require('mongoose');
 const Channel = require('../dist/models/Channel').default;
 const Message = require('../dist/models/Message').default;
 const File = require('../dist/models/File').default;
+const Integration = require('../dist/models/Integration').default;
 const { getChannel, getMessages } = require('../dist/controllers/channel.controller');
 const { deleteFile, downloadFile } = require('../dist/controllers/file.controller');
+const { receiveWebhook } = require('../dist/controllers/integration.controller');
+const { encryptProviderToken } = require('../dist/utils/providerTokenEncryption');
+const { fileContentMatches } = require('../dist/middleware/upload');
 
 const companyId = new mongoose.Types.ObjectId().toString();
 const otherCompanyId = new mongoose.Types.ObjectId().toString();
@@ -20,6 +24,8 @@ const originalChannelFindOne = Channel.findOne;
 const originalMessageCountDocuments = Message.countDocuments;
 const originalMessageFind = Message.find;
 const originalFileFindOne = File.findOne;
+const originalIntegrationFindOne = Integration.findOne;
+const originalIntegrationUpdateOne = Integration.updateOne;
 
 function response() {
   return {
@@ -35,6 +41,8 @@ test.afterEach(() => {
   Message.countDocuments = originalMessageCountDocuments;
   Message.find = originalMessageFind;
   File.findOne = originalFileFindOne;
+  Integration.findOne = originalIntegrationFindOne;
+  Integration.updateOne = originalIntegrationUpdateOne;
 });
 
 test('private channel details require workspace membership', async () => {
@@ -181,4 +189,62 @@ test('file download scopes a foreign-workspace ID to the caller workspace', asyn
   assert.equal(res.statusCode, 404);
   assert.equal(filter._id, foreignFile.id);
   assert.equal(filter.companyId, companyId);
+});
+
+test('inbound integration webhooks reject missing HMAC signatures', async () => {
+  Integration.findOne = () => ({
+    select() { return this; },
+    lean: async () => ({
+      _id: new mongoose.Types.ObjectId(),
+      status: 'connected',
+      webhookSecret: 'encrypted-secret',
+      companyId,
+    }),
+  });
+
+  const res = response();
+  await receiveWebhook({
+    params: { token: 'synthetic-webhook-token' },
+    headers: {},
+    body: { event: 'test' },
+  }, res);
+
+  assert.equal(res.statusCode, 401);
+  assert.equal(res.body.message, 'Webhook signature required');
+});
+
+test('inbound integration webhooks reject invalid HMAC signatures', async () => {
+  const previousEncryptionKey = process.env.MFA_ENCRYPTION_KEY;
+  process.env.MFA_ENCRYPTION_KEY = 'security-boundary-test-key';
+  Integration.findOne = () => ({
+    select() { return this; },
+    lean: async () => ({
+      _id: new mongoose.Types.ObjectId(),
+      status: 'connected',
+      webhookSecret: encryptProviderToken('synthetic-webhook-secret'),
+      companyId,
+    }),
+  });
+
+  const res = response();
+  try {
+    await receiveWebhook({
+      params: { token: 'synthetic-webhook-token' },
+      headers: { 'x-webhook-signature': 'sha256=invalid' },
+      body: { event: 'test' },
+    }, res);
+  } finally {
+    if (previousEncryptionKey === undefined) delete process.env.MFA_ENCRYPTION_KEY;
+    else process.env.MFA_ENCRYPTION_KEY = previousEncryptionKey;
+  }
+  assert.equal(res.statusCode, 401);
+  assert.equal(res.body.message, 'Invalid webhook signature');
+});
+
+test('file upload content validation rejects mismatched or spoofed file types', () => {
+  const pngSignature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 0]);
+  assert.equal(fileContentMatches(pngSignature, 'image/png', '.png'), true);
+  assert.equal(fileContentMatches(pngSignature, 'image/jpeg', '.jpg'), false);
+  assert.equal(fileContentMatches(Buffer.from('not a PDF'), 'application/pdf', '.pdf'), false);
+  assert.equal(fileContentMatches(Buffer.from('%PDF-1.7'), 'application/pdf', '.pdf'), true);
 });

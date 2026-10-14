@@ -8,10 +8,9 @@
  *
  * IMPORTANT — no static top-level import of localAI services here.
  * All localAI imports are done lazily inside the `initialize` action so that:
- *   1. The @xenova/transformers package is NEVER imported during SSR.
+ *   1. The Transformers.js package is NEVER imported during SSR.
  *   2. Webpack does not trace the dynamic import during server compilation.
- *   3. The native `sharp` .node binary inside @xenova/transformers never
- *      enters the Next.js client or server bundle.
+ *   3. Native model-runtime dependencies never enter the initial SSR bundle.
  *
  * The 'use client' directive ensures this module is only compiled for the
  * browser bundle, giving webpack the correct resolution conditions.
@@ -88,7 +87,7 @@ export const useLocalAIStore = create<LocalAIState>((set) => ({
       set({ isInitializing: true });
 
       // Lazy dynamic import — only resolved in the browser, never during SSR.
-      // This prevents @xenova/transformers (and its transitive native deps)
+      // This prevents Transformers.js (and its transitive native deps)
       // from entering the server or client Webpack bundle at build time.
       const { getLocalAICapabilities, healthcheck } = await import(
         '../services/localAI/localAIService'

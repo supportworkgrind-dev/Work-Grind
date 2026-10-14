@@ -13,7 +13,7 @@ export function initEnv(): void {
   if (envInitialized) return;
 
   try {
-    import('@xenova/transformers').then(({ env }) => {
+    import('@huggingface/transformers').then(({ env }) => {
       try {
         env.allowLocalModels = false;
         env.allowRemoteModels = true;
@@ -59,7 +59,7 @@ export async function loadModel(
 
     const caps = await getLocalAICapabilities();
     const runtime = caps.webgpu ? 'webgpu' : caps.wasm ? 'wasm' : 'cpu';
-    const { pipeline, env } = await import('@xenova/transformers');
+    const { pipeline, env } = await import('@huggingface/transformers');
 
     env.allowLocalModels = false;
     env.allowRemoteModels = true;
