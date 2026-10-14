@@ -78,8 +78,7 @@ export function GlobalSearchModal() {
         (async () => {
           try {
             // Directly check local AI capabilities via lazy import.
-            // Import only capabilityService (no modelManager / @xenova/transformers)
-            // so Webpack never traces into the native .node binary path.
+            // Import only capabilityService so Webpack does not trace the model runtime.
             const { getLocalAICapabilities } = await import('@/services/localAI/capabilityService');
             const caps = await getLocalAICapabilities();
             setLocalAIStatus(caps.localAI ? 'ready' : 'degraded');
