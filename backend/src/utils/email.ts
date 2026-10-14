@@ -1,7 +1,8 @@
 import nodemailer from 'nodemailer';
+import type { Transporter } from 'nodemailer';
 import { escapeHtml } from '../services/pendingRegistration';
 
-let transporter: nodemailer.Transporter | null = null;
+let transporter: Transporter | null = null;
 
 export interface EmailSendResult {
   success: boolean;
@@ -21,7 +22,7 @@ export class EmailProviderConfigurationError extends Error {
 
 export const createSmtpTransporter = (
   env: NodeJS.ProcessEnv = process.env,
-): nodemailer.Transporter => {
+): Transporter => {
   const host = env.SMTP_HOST?.trim();
   const portValue = env.SMTP_PORT?.trim();
   const port = portValue ? Number(portValue) : NaN;
@@ -51,7 +52,7 @@ export const createSmtpTransporter = (
   });
 };
 
-export const getTransporter = async (): Promise<nodemailer.Transporter> => {
+export const getTransporter = async (): Promise<Transporter> => {
   if (transporter) return transporter;
   transporter = createSmtpTransporter();
   return transporter;

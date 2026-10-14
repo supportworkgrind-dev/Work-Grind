@@ -169,7 +169,7 @@ let serverlessInitialized = false;
 
 // Trust the Vercel proxy chain in serverless; locally trust only the frontend
 // development proxy so clients cannot spoof forwarded IP headers.
-app.set('trust proxy', isVercelRuntime ? true : 'loopback');
+app.set('trust proxy', isVercelRuntime ? 1 : 'loopback');
 
 async function ensureServerlessInitialization(): Promise<boolean> {
   if (mongoose.connection.readyState === 1 && serverlessInitialized) return true;
