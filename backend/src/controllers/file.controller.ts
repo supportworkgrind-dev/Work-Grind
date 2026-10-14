@@ -280,6 +280,7 @@ export const downloadFile = async (req: AuthRequest, res: Response): Promise<voi
       _id:       req.params.id,
       companyId: req.user!.companyId, // workspace isolation — never bypass
       isDeleted: false,
+      ...getAcademicFileAccessScope(req),
     });
 
     if (!file) {
@@ -361,12 +362,12 @@ export const updateFile = async (req: AuthRequest, res: Response): Promise<void>
 // ═══════════════════════════════════════════════════════════════════════════════
 export const deleteFile = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
+    const accessScope = getAcademicFileAccessScope(req, 'edit');
     const file = await File.findOne({
       _id:       req.params.id,
       companyId: req.user!.companyId,
       isDeleted: false,
-      ...getAcademicFileAccessScope(req, 'edit'),
-      ...getAcademicFileAccessScope(req),
+      ...(accessScope.$or ? { $and: [accessScope] } : {}),
     });
 
     if (!file) {

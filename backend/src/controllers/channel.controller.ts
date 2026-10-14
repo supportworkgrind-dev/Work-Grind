@@ -93,7 +93,12 @@ export const createChannel = async (req: AuthRequest, res: Response): Promise<vo
 
 export const getChannel = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const channel = await Channel.findOne({ _id: req.params.id, companyId: req.user!.companyId })
+    const channel = await Channel.findOne({
+      _id: req.params.id,
+      companyId: req.user!.companyId,
+      isArchived: false,
+      $or: [{ type: 'public' }, { members: req.user!.userId }],
+    })
       .populate('members', 'fullName avatar status jobTitle')
       .populate({
         path: 'projectId',
@@ -156,7 +161,21 @@ export const getMessages = async (req: AuthRequest, res: Response): Promise<void
   try {
     const { channelId, page = 1, limit = 50, parentId } = req.query;
     const filter: any = { companyId: req.user!.companyId, deletedAt: null };
-    if (channelId) filter.channelId = channelId;
+    if (typeof channelId !== 'string' || !mongoose.Types.ObjectId.isValid(channelId)) {
+      res.status(400).json({ success: false, message: 'A valid channelId is required.' });
+      return;
+    }
+    const channel = await Channel.findOne({
+      _id: channelId,
+      companyId: req.user!.companyId,
+      isArchived: false,
+      $or: [{ type: 'public' }, { members: req.user!.userId }],
+    }).select('_id').lean();
+    if (!channel) {
+      res.status(404).json({ success: false, message: 'Channel not found.' });
+      return;
+    }
+    filter.channelId = channel._id;
     if (parentId) filter.parentId = parentId;
 
     const [total, messages] = await Promise.all([
