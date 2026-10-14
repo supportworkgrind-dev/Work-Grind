@@ -131,7 +131,7 @@ Remaining items are deployment-dependent or require broader validation:
 
 ## Validation performed
 
-- `Set-Location backend; npm run test:auth-refresh` — passed; 114 tests passed, 0 failed; includes TypeScript build.
+- `Set-Location backend; npm run test:auth-refresh` — passed; 115 tests passed, 0 failed; includes TypeScript build.
 - Frontend `npm run build` — passed with a temporary, non-secret, valid-format `NEXT_PUBLIC_LIVEKIT_URL`; generated all 103 pages. No deployment configuration was changed.
 - Frontend `npm run lint` — failed with 349 errors and 214 warnings across the tree; lint cleanup was outside this security scope.
 - `npm audit --omit=dev --json` — backend: 0 advisories; frontend: 16 advisories (6 High, 8 Moderate, 2 Low).
