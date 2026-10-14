@@ -116,6 +116,7 @@ import { logPolarConfig } from './config/subscription';
 import { logR2Config }   from './services/r2Storage';
 import { logGeminiConfig } from './services/geminiService';
 import { checkRedisHealth } from './config/redis';
+import { capturePolarWebhookRawBody } from './middleware/capturePolarWebhookBody';
 import { runTaskDueReminderSweep } from './services/taskDueReminders';
 import { cleanupExpiredVerificationCodes, migrateRefreshTokensAtRest } from './services/refreshTokenMigration';
 import mongoose from 'mongoose';
@@ -303,7 +304,7 @@ if (process.env.NODE_ENV !== 'production') {
   app.use(morgan('combined', { skip: skipOAuthCallbackLogs }));
 }
 
-app.use(express.json({ limit: '20mb' }));
+app.use(express.json({ limit: '20mb', verify: capturePolarWebhookRawBody }));
 app.use(
   express.urlencoded({
     extended: true,

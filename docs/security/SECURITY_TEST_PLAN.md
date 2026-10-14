@@ -4,7 +4,7 @@ This plan prioritizes repeatable authorization and boundary checks. Test only ag
 
 ## Automated checks currently present
 
-The full backend test command `npm run test:auth-refresh` ran after the compatible dependency updates and passed 110 tests. It builds TypeScript before running `tests/*.test.cjs`.
+The full backend test command `npm run test:auth-refresh` passed 114 tests after the security fixes. It builds TypeScript before running `tests/*.test.cjs`.
 
 ### Added for this audit
 
@@ -23,6 +23,9 @@ The regression file uses model mocks and covers:
 - Message history requires a valid channel ID.
 - Academic file downloads require uploader/shared-view scope.
 - Academic file deletion requires uploader/shared-edit scope, not view-only scope.
+- Inbound webhooks reject missing and invalid HMAC signatures.
+- Uploads reject spoofed or mismatched file signatures.
+- Redis rate-limit counters use an atomic expiry operation and shared key prefix.
 
 ### Existing focused coverage
 

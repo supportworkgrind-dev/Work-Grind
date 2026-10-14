@@ -819,7 +819,11 @@ export const handleWebhook = async (
   }
 
   try {
-    const rawBody       = (req as any).rawBody as Buffer;
+    const rawBody = (req as Request & { rawBody?: Buffer }).rawBody;
+    if (!Buffer.isBuffer(rawBody)) {
+      res.status(400).json({ success: false, message: 'Invalid webhook body' });
+      return;
+    }
     const signedContent = `${webhookId}.${timestamp}.${rawBody.toString('utf8')}`;
     const signatures    = signature.split(' ');
 

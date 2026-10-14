@@ -24,11 +24,11 @@ Use this before each production release and after material changes to authentica
 
 ## Network, headers, and rate limiting
 
-- [ ] Restrict backend ingress to the intended edge/proxy where feasible; configure `trust proxy` only for the actual trusted chain and ensure the edge overwrites untrusted forwarding headers.
-- [ ] Decide whether rate limits must be global across serverless instances; if so, configure a shared store and test limits through the production proxy.
+- [ ] Vercel code trusts exactly one proxy hop; verify the deployed edge overwrites client-supplied forwarding headers and that the request reaches the function through that hop.
+- [ ] Configure `REDIS_URL` in every Vercel environment when rate limits must be global across instances; without it, the code logs a warning and uses per-instance memory. Test limits through the production proxy.
 - [ ] Verify frontend production CSP nonce behavior and all required API/LiveKit connection origins; investigate browser CSP violations before relaxing directives.
 - [ ] Confirm HSTS, `X-Content-Type-Options`, frame protections, Referrer Policy, and Permissions Policy on public frontend responses.
-- [ ] Apply request/body/upload limits appropriate to memory and concurrency budgets; alert on repeated authentication/upload failures.
+- [ ] Apply request/body/upload limits appropriate to memory and concurrency budgets; upload routes also validate file signatures. No malware scanning is configured or claimed.
 
 ## Database, realtime, and storage
 

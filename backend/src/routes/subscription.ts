@@ -1,5 +1,4 @@
-import { Router } from 'express';
-import express from 'express';
+import { Request, Router } from 'express';
 import { authenticate, requireRole } from '../middleware/auth';
 import {
   getPlans,
@@ -20,10 +19,11 @@ router.get('/plans', getPlans);
 // ── Webhook — raw body required for HMAC signature verification ───────────────
 router.post(
   '/webhook',
-  express.raw({ type: 'application/json' }),
-  (req, _res, next) => {
-    (req as any).rawBody = req.body;
-    try { req.body = JSON.parse((req as any).rawBody.toString('utf8')); } catch { /* keep raw */ }
+  (req, res, next) => {
+    if (!Buffer.isBuffer((req as Request & { rawBody?: Buffer }).rawBody)) {
+      res.status(400).json({ success: false, message: 'Invalid webhook body' });
+      return;
+    }
     next();
   },
   handleWebhook,

@@ -25,14 +25,16 @@ Two high-impact authorization defects were confirmed and fixed:
 1. Workspace users could retrieve private-channel details and message history without being channel members. `getChannel` only constrained the tenant; `getMessages` constrained messages to the tenant but did not require a channel ID or authorize the requested channel. Both now require an active, same-tenant public channel or a channel that includes the requester. History requires a valid channel ID.
 2. Academic file downloads did not apply the academic uploader/share visibility filter, and file deletion accidentally replaced the edit-permission filter with the broader view-permission filter. Download now applies view scope; deletion composes the edit scope without overwriting it.
 
-No claim is made that no other vulnerabilities exist. These changes address only the verified findings below and are covered by focused controller regression tests.
+Additional fixes make inbound integration HMAC mandatory, validate file signatures after multipart parsing, limit Vercel proxy trust to one hop, and use Redis-backed rate-limit counters when `REDIS_URL` is configured. The vulnerable legacy local Transformers.js dependency was replaced, and audited high backend production dependencies were updated.
+
+No claim is made that no other vulnerabilities exist. Deployment-dependent controls and the complete application-wide authorization matrix remain unverified.
 
 ## Verified findings and remediation
 
 ### WG-SEC-00 — Critical — Vulnerable backend proxy address parser (fixed)
 
 - **Evidence:** The production dependency tree contained `proxy-addr` 2.0.7, affected by GHSA-jqcg-44mw-7w3h. The Express application trusts the Vercel proxy chain in `backend/src/index.ts`; a forged forwarded address can undermine IP-based controls when the affected IPv4-mapped IPv6 trust-subnet condition is met.
-- **Fix:** Applied the lockfile-compatible patch with `npm audit fix`; `proxy-addr` is now 2.0.8. No force upgrade or application API change was used.
+- **Fix:** Applied the lockfile-compatible patch with `npm audit fix`; `proxy-addr` is now 2.0.8. Vercel now trusts exactly one proxy hop instead of the full forwarded chain. No force install was used.
 - **Validation:** Re-ran the backend build and full `tests/*.test.cjs` suite after the update. The production-dependency audit no longer reports this critical advisory.
 
 ### WG-SEC-01 — High — Private-channel content disclosure (fixed)
@@ -54,7 +56,7 @@ No claim is made that no other vulnerabilities exist. These changes address only
 - **Authentication / authorization:** `backend/src/middleware/auth.ts` verifies access JWTs, rejects MFA-pending tokens, reloads active/verified/deleted state and the current workspace/role from MongoDB, and compares the token workspace. `requireSuperAdmin` separately checks persisted super-admin status and MFA completion when enabled. JWT helpers fail closed when secrets are absent. Password, reset, refresh, and OAuth edge cases were not exhaustively penetration-tested.
 - **Tenant access:** Route groups generally use `authenticate` and organization/entitlement guards; inspected file, task, project, approval, academic, client portal, and billing queries commonly scope by tenant ID. This is not a proof that every query is isolated; the private-channel and file issues above show why object-level access also needs focused tests.
 - **OAuth:** `backend/src/services/oauth.ts` implements fixed provider endpoints, state/nonce/PKCE, redirect-origin/path validation, HTTPS requirements in production, timed provider fetches, and OIDC validation. `backend/src/controllers/oauth.controller.ts` uses one-time exchanges and separate client-audience handling. Live provider behavior and real-account linking were not tested.
-- **Uploads / R2:** `backend/src/middleware/upload.ts` applies size/file-count limits plus extension and client MIME allowlists. `backend/src/controllers/file.controller.ts` and `backend/src/services/r2Storage.ts` store company-scoped object keys, check tenant scope before download, and issue short-lived signed downloads. No live R2 account, malware scanner, or byte-signature validation was tested.
+- **Uploads / R2:** `backend/src/middleware/upload.ts` applies size/file-count limits, MIME/extension allowlists, and content-signature checks for accepted image, document, archive, media, and text types after multipart parsing. File, avatar, and whiteboard upload routes use this check. No live R2 account or malware scanner was tested or claimed.
 - **Socket.IO:** `backend/src/utils/socket.ts` verifies JWTs and persisted user/workspace/subscription context at connection, refreshes authorization, checks channel membership and DM participation for joins, and validates meeting grants before sensitive events. Realtime behavior was source-reviewed; this task did not run a live multi-user Socket.IO attack test.
 - **Tavro AI:** `backend/src/controllers/aiAgent.controller.ts` derives user/company context server-side and looks up conversations by both owner and tenant. `backend/src/ai/tools.ts` scopes workspace data queries and includes role/feature checks for sensitive tools. Prompt injection and external-provider data handling were not red-teamed.
 - **Billing:** `backend/src/controllers/subscription.controller.ts` checks Polar HMAC signatures using constant-time comparison, enforces a five-minute timestamp window, validates product/workspace plan mapping, and claims delivery IDs for idempotency. No live Polar event was sent.
@@ -67,48 +69,48 @@ The source review used the **OWASP ASVS 5.0.0** verification domains and the **O
 - **API1: Broken Object Level Authorization / ASVS access control:** verified channel membership and academic file access gaps and added regression tests for these specific cases. Other object types still require systematic two-tenant tests.
 - **API2: Broken Authentication:** inspected JWT reload, OAuth state/nonce/PKCE, and refresh paths; no end-to-end provider or production session test was run.
 - **API3/API5: Broken Object Property / Function Level Authorization:** selected role and update allowlists were inspected; complete endpoint and mass-assignment coverage remains unverified.
-- **API4: Unrestricted Resource Consumption:** existing request/upload limits and rate limiting were inspected; multi-instance enforcement and adversarial load were not tested.
+- **API4: Unrestricted Resource Consumption:** request/upload limits remain. Rate limiting uses Redis-backed counters when `REDIS_URL` is present; without it the compatibility fallback is process-local and warns on Vercel. Distributed production enforcement depends on deployment configuration.
 - **API7/API10: SSRF / Unsafe Consumption of APIs:** outbound integrations and external provider boundaries need further destination and response validation review; no live upstream exercise was performed.
 - **API8/API9: Security Misconfiguration / Improper Inventory Management:** Vercel and environment-dependent controls were documented for operator verification; no live deployment configuration was accessed.
 - **API6: Sensitive Business Flows:** OAuth and Polar protections were inspected, but no live provider or race/replay test was conducted.
 
 ## Dependency audit results
 
-Dependency audits were run with `npm audit --omit=dev --audit-level=high` after compatible updates:
+Dependency audits were run after the dependency changes:
 
-- **Backend:** 5 production-tree advisories remain (4 High, 1 Moderate); the `proxy-addr` Critical advisory and compatible `qs`/`morgan` advisories were patched. Remaining High findings include the `agents`/MCP SDK dependency path and Nodemailer. npm indicates the available fixes require breaking-version changes; test compatibility before upgrading.
-- **Frontend:** 21 production-tree advisories remain (10 High, 1 Critical, 8 Moderate, 2 Low). Compatible updates moved Next.js to 16.4.0, `sharp` to 0.35.5, and `source-map-js` to 1.2.2. The Critical `protobufjs` advisory remains transitively reachable through `@xenova/transformers` → `onnxruntime-web` → `onnx-proto`; npm's suggested remediation downgrades `@xenova/transformers` to a breaking release. Other remaining advisories include Excalidraw/Mermaid dependency paths and nested `sharp`/`uuid` packages.
-- `npm audit fix` was run without `--force`; no automatic breaking-version remediation was applied. Review each dependency path and upgrade or replace it with compatibility tests.
+- **Backend production tree:** 0 advisories after updating `agents`, Nodemailer, UUID, and compatible lockfile dependencies. The full tree including development dependencies still reports 3 High advisories (`ts-node-dev`, `braces`, and `chokidar`); npm reports no compatible automatic fixes.
+- **Frontend production tree:** 16 advisories remain (6 High, 8 Moderate, 2 Low; 0 Critical). The Critical `protobufjs` and associated legacy ONNX dependency path were removed by migrating local AI imports from `@xenova/transformers` to the already-installed `@huggingface/transformers`; the production build passed. The remaining High findings include Excalidraw's dependency tree. npm's suggested Excalidraw fix downgrades to 0.17.6, whose peer range excludes this app's React 19, so that downgrade was not applied. Moderate/Low findings also remain in ExcelJS/Mermaid dependencies.
+- **Full frontend tree:** 23 advisories remain (11 High, 10 Moderate, 2 Low), including production dependencies and lint/build tools. Forced major updates/downgrades were not applied without compatibility evidence.
+- `npm audit fix` was run without `--force`; audited production fixes were made with normal compatible dependency updates and a maintained local AI runtime migration.
 
 OWASP references: [ASVS 5.0.0](https://owasp.org/www-project-application-security-verification-standard/) and [API Security Top 10 (2023)](https://owasp.org/API-Security/editions/2023/en/0x11-t10/).
 
 ## Unresolved findings and validation gaps
 
-These were not changed because they require compatibility/deployment decisions or broader validation:
+Remaining items are deployment-dependent or require broader validation:
 
-1. **Medium — Generic inbound integration webhook accepts requests without HMAC.** `backend/src/routes/integrations.ts` exposes `/webhook/:token` without user auth; `backend/src/controllers/integration.controller.ts` verifies HMAC only when a signature header is supplied. The URL token is generated with high entropy and acts as a bearer credential, but an exposed token permits forged realtime webhook events. Require signatures after confirming all existing webhook senders can be migrated; test rotation and legacy integrations.
-2. **Medium — Proxy/rate-limit configuration is deployment-sensitive.** `backend/src/index.ts` trusts the proxy chain in Vercel (`trust proxy: true`) and local loopback otherwise; `backend/src/middleware/rateLimiter.ts` uses the default in-memory store. Confirm the deployed edge overwrites forwarded client-IP headers, and use a shared store if limits must apply globally across serverless instances.
-3. **Low/Medium — Upload allowlists trust client-declared MIME and extension.** `backend/src/middleware/upload.ts` does not inspect file signatures. Download defenses (`attachment` for R2 and `nosniff` for local files) reduce browser execution risk, but do not establish that uploaded content matches its declared type. Consider magic-byte validation and malware scanning based on supported business requirements.
+1. **Unverified billing reliability concern — Polar raw-body capture ordering.** `backend/src/index.ts` installs `express.json()` before mounting `subscriptionRoutes`; `backend/src/routes/subscription.ts` then installs `express.raw()` for the webhook and expects a Buffer. Validate a real signed Polar sandbox event through the deployed middleware path. This is an integration gap, not a confirmed signature bypass.
+2. **Deployment-dependent rate limiting.** Shared counters are used only when `REDIS_URL` is configured. Vercel without that setting falls back to per-instance memory and therefore does not enforce a global quota. Verify the intended production Redis configuration and one-hop edge forwarding behavior.
+3. **Remaining frontend advisories.** Production audit reports 6 High, 8 Moderate, and 2 Low advisories. The suggested npm remediation for Excalidraw downgrades to a release incompatible with the React 19 peer range; ExcelJS/Mermaid and development-tool advisories also remain.
 4. **Unverified billing reliability concern — Raw-body capture ordering.** `backend/src/index.ts` installs `express.json()` before mounting `subscriptionRoutes`; `backend/src/routes/subscription.ts` then installs `express.raw()` for the webhook and expects a Buffer. Validate an actual signed Polar test event in an isolated sandbox to ensure the raw bytes survive this middleware order. This is recorded as an integration test gap, not a confirmed signature bypass.
-5. **High/Critical dependency findings remain:** see the dependency audit results above; notably the frontend transitive `protobufjs` Critical advisory and the backend MCP SDK/Nodemailer High advisories. The available fixes identified by npm require breaking dependency changes and were not forced.
-6. **Coverage gap:** This audit did not use production credentials, inspect or print `.env` values, access live customer data, exercise live OAuth/payment providers, run a full browser authentication flow, or conduct fuzzing/load/penetration tests. There is no claim of exhaustive testing.
+5. **Secret-handling follow-up.** A prior session reported local environment values appeared in tool output. No values are reproduced here and no rotation was performed; privately identify any affected credentials and rotate through their issuing providers/deployment control plane.
+6. **Tooling gap.** `gitleaks`, `trufflehog`, and `semgrep` were unavailable. No source secret scan or SAST run is claimed.
+7. **Coverage gap.** The added tests use mocked model queries and synthetic two-workspace object IDs; they do not provide disposable-database coverage across all resource families or prove Socket.IO multi-tenant isolation. No live OAuth/payment provider, R2, browser login, fuzzing, load, or penetration test was run.
 
 ## Prioritized follow-up plan
 
-1. **P0 — Critical dependency remediation:** replace or safely upgrade the frontend `@xenova/transformers` / ONNX dependency path so the vulnerable `protobufjs` is no longer installed; test local AI functionality and the production build. Do not force the suggested downgrade.
-2. **P1 — Remaining High dependencies:** plan a compatible `agents`/MCP SDK upgrade and Nodemailer upgrade; add Tavro and mail-flow compatibility tests before changing their major versions.
-3. **P1 — Inbound integration authentication:** inventory active webhook consumers, define a signed-request migration/version policy, then require HMAC and add invalid-signature/replay tests without silently breaking existing integrations.
+1. **P0 — Frontend dependencies:** resolve remaining Excalidraw High advisories with a React 19-compatible upstream release or a feature-tested replacement; assess ExcelJS/Mermaid paths without forced downgrades.
+2. **P1 — Distributed limits:** configure and verify shared `REDIS_URL` in each Vercel environment; confirm the edge supplies an unspoofable one-hop client IP.
 4. **P1 — Tenant coverage:** add disposable-database tests with two organizations and multiple roles across files, tasks/projects, CRM, academic records, channels, API routes, and socket events.
-5. **P2 — Upload and platform controls:** validate file signatures with a supported library; verify proxy-header handling and distributed rate-limit requirements against deployment configuration.
-6. **P2 — Provider integration checks:** verify Polar raw-body/signature behavior with a sandbox event and exercise OAuth, R2, and realtime flows using test accounts.
-7. **P2 — Completion evidence:** run the full ASVS 5.0.0/API Security Top 10 control matrix, static security analysis and secret scanning in CI, recording exceptions rather than treating them as passed.
+4. **P2 — Provider integration checks:** verify Polar raw-body/signature behavior with a sandbox event and exercise OAuth, R2, and realtime flows using test accounts.
+5. **P2 — Completion evidence:** run the full ASVS 5.0.0/API Security Top 10 control matrix and add secret scanning/SAST to CI, recording exceptions rather than treating them as passed.
 
 ## Validation performed
 
-- `Set-Location backend; npm run test:auth-refresh` — passed after dependency updates and the added cross-workspace cases; 110 tests passed, 0 failed (the script also builds TypeScript).
-- Focused backend boundary rerun — 23 passed, 0 failed.
-- Frontend `npm run build` — passed after compatible lockfile updates (Next.js 16.4.0), generating 103 pages.
-- Frontend `npm run lint` — failed with 358 errors and 214 warnings across the frontend tree; this security change did not alter frontend source files.
-- Production dependency audits — backend 5 and frontend 21 advisories remain at the severities listed above; audit commands return nonzero because unresolved advisories remain.
+- `Set-Location backend; npm run test:auth-refresh` — passed; 114 tests passed, 0 failed; includes TypeScript build.
+- Frontend `npm run build` — passed with a temporary, non-secret, valid-format `NEXT_PUBLIC_LIVEKIT_URL`; generated all 103 pages. No deployment configuration was changed.
+- Frontend `npm run lint` — failed with 349 errors and 214 warnings across the tree; lint cleanup was outside this security scope.
+- `npm audit --omit=dev --json` — backend: 0 advisories; frontend: 16 advisories (6 High, 8 Moderate, 2 Low).
+- `npm audit --json` — backend: 3 High development-tree advisories; frontend: 23 advisories (11 High, 10 Moderate, 2 Low).
 - `gitleaks`, `trufflehog`, and `semgrep` were not installed in the environment; no source secret scan or SAST run is claimed.
 - Tests use mocked model queries and do not connect to a database or external service.

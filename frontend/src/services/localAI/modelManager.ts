@@ -18,11 +18,10 @@ export function initEnv(): void {
         env.allowLocalModels = false;
         env.allowRemoteModels = true;
         env.useBrowserCache = true;
-        env.backends = env.backends ?? {} as any;
-        env.backends.onnx = env.backends.onnx ?? {} as any;
-        env.backends.onnx.wasm = env.backends.onnx.wasm ?? {} as any;
-        env.backends.onnx.wasm.numThreads = 1;
-        env.backends.onnx.wasm.simd = true;
+        if (env.backends.onnx.wasm) {
+          env.backends.onnx.wasm.numThreads = 1;
+          env.backends.onnx.wasm.simd = true;
+        }
       } catch {
       } finally {
         envInitialized = true;
@@ -64,11 +63,10 @@ export async function loadModel(
     env.allowLocalModels = false;
     env.allowRemoteModels = true;
     env.useBrowserCache = true;
-    env.backends = env.backends ?? ({} as any);
-    env.backends.onnx = env.backends.onnx ?? ({} as any);
-    env.backends.onnx.wasm = env.backends.onnx.wasm ?? ({} as any);
-    env.backends.onnx.wasm.numThreads = 1;
-    env.backends.onnx.wasm.simd = true;
+    if (env.backends.onnx.wasm) {
+      env.backends.onnx.wasm.numThreads = 1;
+      env.backends.onnx.wasm.simd = true;
+    }
 
     const timeout = new Promise<{ error: string }>((resolve) => {
       setTimeout(() => resolve({ error: `Model load timed out after 60s: ${modelName}` }), 60000);

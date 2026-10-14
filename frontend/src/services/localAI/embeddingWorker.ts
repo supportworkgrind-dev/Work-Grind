@@ -66,11 +66,10 @@ async function getModel(): Promise<any> {
         env.allowLocalModels = false;
         env.allowRemoteModels = true;
         env.useBrowserCache = true;
-        env.backends = env.backends ?? {} as any;
-        env.backends.onnx = env.backends.onnx ?? {} as any;
-        env.backends.onnx.wasm = env.backends.onnx.wasm ?? {} as any;
-        env.backends.onnx.wasm.numThreads = 1;
-        env.backends.onnx.wasm.simd = true;
+        if (env.backends.onnx.wasm) {
+          env.backends.onnx.wasm.numThreads = 1;
+          env.backends.onnx.wasm.simd = true;
+        }
 
         const runtime = typeof navigator !== 'undefined' && 'gpu' in navigator ? 'webgpu' : 'wasm';
         pipeline = await createPipeline('feature-extraction', EMBEDDING_MODEL, {

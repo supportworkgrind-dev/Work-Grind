@@ -22,7 +22,7 @@ return { hits, ttl }
 let storeSequence = 0;
 let missingRedisWarningLogged = false;
 
-class RedisRateLimitStore implements Store {
+export class RedisRateLimitStore implements Store {
   readonly localKeys = false;
   readonly prefix: string;
 
