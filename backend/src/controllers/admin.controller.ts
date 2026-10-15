@@ -12,19 +12,30 @@ import { ClientUser } from '../models/ClientPortal';
 import { AuthRequest } from '../middleware/auth';
 import { getCompanySubscription } from '../services/companySubscription';
 import { isOrganizationRoleEligible, normalizeOrganizationRole, roleMatches } from '../config/organization';
+import { parsePagination } from '../utils/pagination';
 
 export const getAdminMembers = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { role, department } = req.query;
+    const pagination = parsePagination(req.query, { defaultLimit: 100, maxLimit: 200 });
+    if (!pagination) {
+      res.status(400).json({ success: false, message: 'Invalid pagination parameters.' });
+      return;
+    }
+
     const filter: any = { companyId: req.user!.companyId };
     if (role) filter.role = role;
     if (department) filter.department = department;
 
-    const members = await User.find(filter)
+    const pageMembers = await User.find(filter)
       .select('-password -phone -refreshTokens -verificationToken -resetPasswordToken')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .skip(pagination.skip)
+      .limit(pagination.limit + 1);
+    const hasMore = pageMembers.length > pagination.limit;
+    const members = hasMore ? pageMembers.slice(0, pagination.limit) : pageMembers;
 
-    res.json({ success: true, members });
+    res.json({ success: true, members, page: pagination.page, hasMore });
   } catch (err: any) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -148,16 +159,25 @@ export const updateMemberStatus = async (req: AuthRequest, res: Response): Promi
 
 export const getAuditLogs = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { page = 1, limit = 50 } = req.query;
-    const logs = await AuditLog.find({ companyId: req.user!.companyId })
-      .populate('userId', 'fullName avatar email')
-      .sort({ createdAt: -1 })
-      .skip((Number(page) - 1) * Number(limit))
-      .limit(Number(limit));
+    const pagination = parsePagination(req.query, { defaultLimit: 50, maxLimit: 100 });
+    if (!pagination) {
+      res.status(400).json({ success: false, message: 'Invalid pagination parameters.' });
+      return;
+    }
 
-    const total = await AuditLog.countDocuments({ companyId: req.user!.companyId });
+    const filter = { companyId: req.user!.companyId };
+    const [pageLogs, total] = await Promise.all([
+      AuditLog.find(filter)
+        .populate('userId', 'fullName avatar email')
+        .sort({ createdAt: -1 })
+        .skip(pagination.skip)
+        .limit(pagination.limit + 1),
+      AuditLog.countDocuments(filter),
+    ]);
+    const hasMore = pageLogs.length > pagination.limit;
+    const logs = hasMore ? pageLogs.slice(0, pagination.limit) : pageLogs;
 
-    res.json({ success: true, logs, total });
+    res.json({ success: true, logs, total, page: pagination.page, hasMore });
   } catch (err: any) {
     res.status(500).json({ success: false, message: err.message });
   }

@@ -57,6 +57,9 @@ export default function TasksPage() {
   const isOwnerAdmin = user?.role === 'owner' || user?.role === 'admin' || user?.role === 'manager';
 
   const [tasks,          setTasks]          = useState<Task[]>([]);
+  const [tasksPage,      setTasksPage]      = useState(1);
+  const [tasksHaveMore,  setTasksHaveMore]  = useState(false);
+  const [loadingMoreTasks, setLoadingMoreTasks] = useState(false);
   const [viewMode,       setViewMode]       = useState<'kanban' | 'list' | 'calendar'>('kanban');
   const [calendarDate,   setCalendarDate]   = useState(() => new Date());
   const [filterStatus,   setFilterStatus]   = useState('all');
@@ -86,10 +89,30 @@ export default function TasksPage() {
 
   /* ── Fetch & real-time ── */
   const fetchTasks = async () => {
-    try { setLoading(true);
-      const r = await api.get('/tasks');
-      if (r.data.success) setTasks(r.data.tasks);
-    } catch { /* silent */ } finally { setLoading(false); }
+    try {
+      const r = await api.get('/tasks', { params: { page: 1, limit: 200 } });
+      if (r.data.success) {
+        setTasks(r.data.tasks);
+        setTasksPage(1);
+        setTasksHaveMore(Boolean(r.data.hasMore));
+      }
+    } catch { /* silent */ } finally {
+      setLoading(false);
+    }
+  };
+  const fetchMoreTasks = async () => {
+    if (loadingMoreTasks || !tasksHaveMore) return;
+    const page = tasksPage + 1;
+    setLoadingMoreTasks(true);
+    try {
+      const response = await api.get('/tasks', { params: { page, limit: 200 } });
+      if (response.data.success) {
+        setTasks((existing) => [...existing, ...response.data.tasks]);
+        setTasksPage(page);
+        setTasksHaveMore(Boolean(response.data.hasMore));
+      }
+    } catch { /* silent */ }
+    finally { setLoadingMoreTasks(false); }
   };
 
   useEffect(() => { fetchTasks(); }, []);
@@ -655,6 +678,19 @@ export default function TasksPage() {
               </tbody>
             </table>
           </div>
+        </div>
+      )}
+
+      {tasksHaveMore && (
+        <div className="text-center">
+          <button
+            type="button"
+            onClick={() => void fetchMoreTasks()}
+            disabled={loadingMoreTasks}
+            className="btn-secondary h-9 px-4"
+          >
+            {loadingMoreTasks ? 'Loading…' : 'Load more tasks'}
+          </button>
         </div>
       )}
 

@@ -14,6 +14,7 @@ import Approval from '../models/Approval';
 import { AuthRequest } from '../middleware/auth';
 import { emitToCompany } from '../utils/socket';
 import { getEffectiveSubscription } from '../services/companySubscription';
+import { parsePagination } from '../utils/pagination';
 
 async function validateCrmCompanyId(value: unknown, companyId: string): Promise<{ id?: mongoose.Types.ObjectId; error?: string }> {
   if (value == null || value === '') return {};
@@ -71,7 +72,13 @@ const generateSafeUniqueChannelName = async (
 
 export const getProjects = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { status, limit } = req.query;
+    const { status } = req.query;
+    const pagination = parsePagination(req.query, { defaultLimit: 200, maxLimit: 200 });
+    if (!pagination) {
+      res.status(400).json({ success: false, message: 'Invalid pagination parameters.' });
+      return;
+    }
+
     const filter: any = {
       companyId: req.user!.companyId,
       isArchived: false,
@@ -89,21 +96,20 @@ export const getProjects = async (req: AuthRequest, res: Response): Promise<void
       ];
     }
 
-    let query = Project.find(filter)
+    const pageProjects = await Project.find(filter)
       .populate('managerId', 'fullName avatar email jobTitle')
       .populate('assigneeId', 'fullName avatar email jobTitle')
       .populate('members.userId', 'fullName avatar email jobTitle')
       .populate('crmCompanyId', 'name domain logoUrl')
       .populate('channelId', 'name type isArchived members')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .skip(pagination.skip)
+      .limit(pagination.limit + 1)
+      .lean();
+    const hasMore = pageProjects.length > pagination.limit;
+    const projects = hasMore ? pageProjects.slice(0, pagination.limit) : pageProjects;
 
-    if (limit) {
-      query = query.limit(Number(limit));
-    }
-
-    const projects = await query.lean();
-
-    res.json({ success: true, projects });
+    res.json({ success: true, projects, page: pagination.page, hasMore });
   } catch (err: any) {
     res.status(500).json({ success: false, message: err.message });
   }

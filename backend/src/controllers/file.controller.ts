@@ -422,15 +422,25 @@ export const deleteFile = async (req: AuthRequest, res: Response): Promise<void>
 export const getFolders = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { parentId, projectId } = req.query;
+    const pagination = parsePagination(req.query, { defaultLimit: 200, maxLimit: 500 });
+    if (!pagination) {
+      res.status(400).json({ success: false, message: 'Invalid pagination parameters.' });
+      return;
+    }
+
     const filter: any = { companyId: req.user!.companyId };
     if (parentId !== undefined) filter.parentId = parentId === 'root' ? null : parentId;
     if (projectId) filter.projectId = projectId;
 
-    const folders = await Folder.find(filter)
+    const pageFolders = await Folder.find(filter)
       .populate('creatorId', 'fullName avatar')
-      .sort({ name: 1 });
+      .sort({ name: 1 })
+      .skip(pagination.skip)
+      .limit(pagination.limit + 1);
+    const hasMore = pageFolders.length > pagination.limit;
+    const folders = hasMore ? pageFolders.slice(0, pagination.limit) : pageFolders;
 
-    res.json({ success: true, folders });
+    res.json({ success: true, folders, page: pagination.page, hasMore });
   } catch (err: any) {
     res.status(500).json({ success: false, message: err.message });
   }

@@ -36,7 +36,7 @@ export const getNotifications = async (req: AuthRequest, res: Response): Promise
 export const markAsRead = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const notification = await Notification.findOneAndUpdate(
-      { _id: req.params.id, userId: req.user!.userId },
+      { _id: req.params.id, userId: req.user!.userId, companyId: req.user!.companyId },
       { isRead: true },
       { new: true }
     );
@@ -70,6 +70,7 @@ export const deleteNotification = async (req: AuthRequest, res: Response): Promi
     await Notification.findOneAndDelete({
       _id: req.params.id,
       userId: req.user!.userId,
+      companyId: req.user!.companyId,
     });
 
     res.json({ success: true, message: 'Notification deleted' });

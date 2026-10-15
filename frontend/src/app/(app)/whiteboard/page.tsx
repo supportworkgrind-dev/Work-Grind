@@ -78,6 +78,17 @@ type TemplateId = 'blank' | 'brainstorm' | 'mindmap' | 'kanban' | 'flowchart' | 
 
 const EMPTY_SCENE: SceneContent = { elements: [], appState: { viewBackgroundColor: '#f8fafc' } };
 
+async function fetchAllBoards(): Promise<Board[]> {
+  const boards: Board[] = [];
+  for (let page = 1; page <= 501; page += 1) {
+    const response = await api.get('/boards', { params: { page, limit: 200 } });
+    if (!response.data.success) throw new Error('Unable to load whiteboards.');
+    boards.push(...response.data.boards);
+    if (!response.data.hasMore) break;
+  }
+  return boards;
+}
+
 function uniqueCollaborators(members: CollaboratorPresence[], currentUserId?: string): WorkspaceUser[] {
   const unique = new Map<string, WorkspaceUser>();
   for (const member of members) {
@@ -232,14 +243,13 @@ export default function WhiteboardPage() {
   useEffect(() => {
     let alive = true;
     Promise.all([
-      api.get('/boards'),
+      fetchAllBoards(),
       api.get('/users').catch(() => null),
       api.get('/projects').catch(() => null),
       api.get('/meetings').catch(() => null),
       api.get('/documents').catch(() => null),
-    ]).then(([boardResponse, usersResponse, projectsResponse, meetingsResponse, documentsResponse]) => {
+    ]).then(([loadedBoards, usersResponse, projectsResponse, meetingsResponse, documentsResponse]) => {
       if (!alive) return;
-      const loadedBoards = boardResponse.data.boards ?? [];
       setBoards(loadedBoards);
       setUsers(usersResponse?.data.users ?? usersResponse?.data.members ?? []);
       setProjects(projectsResponse?.data.projects ?? []);

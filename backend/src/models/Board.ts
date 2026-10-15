@@ -50,6 +50,7 @@ const S = new Schema<IBoard>(
 );
 
 S.index({ companyId: 1, archivedAt: 1, updatedAt: -1 });
+S.index({ companyId: 1, updatedAt: -1 });
 S.index({ companyId: 1, createdBy: 1, archivedAt: 1 });
 S.index({ companyId: 1, 'members.userId': 1, archivedAt: 1 });
 

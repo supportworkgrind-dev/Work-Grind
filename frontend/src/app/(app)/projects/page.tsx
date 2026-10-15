@@ -39,12 +39,35 @@ export default function ProjectsPage() {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [filter,   setFilter]   = useState('all');
   const [loading,  setLoading]  = useState(true);
+  const [projectsPage, setProjectsPage] = useState(1);
+  const [projectsHaveMore, setProjectsHaveMore] = useState(false);
+  const [loadingMoreProjects, setLoadingMoreProjects] = useState(false);
 
   const fetchProjects = async () => {
-    try { setLoading(true);
-      const r = await api.get('/projects');
-      if (r.data.success) setProjects(r.data.projects);
-    } catch { /* silent */ } finally { setLoading(false); }
+    try {
+      const r = await api.get('/projects', { params: { page: 1, limit: 100 } });
+      if (r.data.success) {
+        setProjects(r.data.projects);
+        setProjectsPage(1);
+        setProjectsHaveMore(Boolean(r.data.hasMore));
+      }
+    } catch { /* silent */ } finally {
+      setLoading(false);
+    }
+  };
+  const fetchMoreProjects = async () => {
+    if (loadingMoreProjects || !projectsHaveMore) return;
+    const page = projectsPage + 1;
+    setLoadingMoreProjects(true);
+    try {
+      const response = await api.get('/projects', { params: { page, limit: 100 } });
+      if (response.data.success) {
+        setProjects((existing) => [...existing, ...response.data.projects]);
+        setProjectsPage(page);
+        setProjectsHaveMore(Boolean(response.data.hasMore));
+      }
+    } catch { /* silent */ }
+    finally { setLoadingMoreProjects(false); }
   };
 
   useEffect(() => { fetchProjects(); }, []);
@@ -219,6 +242,19 @@ export default function ProjectsPage() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {projectsHaveMore && !loading && (
+        <div className="text-center">
+          <button
+            type="button"
+            onClick={() => void fetchMoreProjects()}
+            disabled={loadingMoreProjects}
+            className="btn-secondary h-9 px-4"
+          >
+            {loadingMoreProjects ? 'Loading…' : 'Load more projects'}
+          </button>
         </div>
       )}
 

@@ -9,6 +9,7 @@ import { shouldDeliverNotification } from '../utils/notificationPreferences';
 import { createNotification } from './channel.controller';
 import { refreshAvatarUrls } from '../services/avatarUrls';
 import { isValidCallingId, normalizeCallingId } from '../services/callingId';
+import { parsePagination } from '../utils/pagination';
 
 // ── Helper: verify requester is a participant ─────────────────────────────────
 const assertParticipant = async (
@@ -31,8 +32,13 @@ export const getConversations = async (req: AuthRequest, res: Response): Promise
   try {
     const uid = new mongoose.Types.ObjectId(req.user!.userId);
     const companyId = new mongoose.Types.ObjectId(req.user!.companyId);
+    const pagination = parsePagination(req.query, { defaultLimit: 200, maxLimit: 500 });
+    if (!pagination) {
+      res.status(400).json({ success: false, message: 'Invalid pagination parameters.' });
+      return;
+    }
 
-    const conversations = await Conversation.find({
+    const pageConversations = await Conversation.find({
       participants: uid,
       $or: [
         { isGroup: false },
@@ -46,7 +52,11 @@ export const getConversations = async (req: AuthRequest, res: Response): Promise
         populate: { path: 'senderId', select: 'callingId fullName avatar avatarStorageKey' },
       })
       .sort({ updatedAt: -1 })
+      .skip(pagination.skip)
+      .limit(pagination.limit + 1)
       .lean();
+    const hasMore = pageConversations.length > pagination.limit;
+    const conversations = hasMore ? pageConversations.slice(0, pagination.limit) : pageConversations;
 
     // Attach unread count for the requesting user
     const enriched = await Promise.all(conversations.map(async (c) => {
@@ -54,7 +64,7 @@ export const getConversations = async (req: AuthRequest, res: Response): Promise
       return refreshAvatarUrls({ ...c, myUnreadCount: unread?.count ?? 0 });
     }));
 
-    res.json({ success: true, conversations: enriched });
+    res.json({ success: true, conversations: enriched, page: pagination.page, hasMore });
   } catch (err: any) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -154,7 +164,11 @@ export const startConversation = async (req: AuthRequest, res: Response): Promis
 export const getDMMessages = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { conversationId } = req.params;
-    const { page = 1, limit = 60 } = req.query;
+    const pagination = parsePagination(req.query, { defaultLimit: 60, maxLimit: 100 });
+    if (!pagination) {
+      res.status(400).json({ success: false, message: 'Invalid pagination parameters.' });
+      return;
+    }
 
     // ── Security: verify requester is a participant ──
     const conv = await assertParticipant(conversationId, req.user!.userId, req.user!.companyId);
@@ -169,23 +183,28 @@ export const getDMMessages = async (req: AuthRequest, res: Response): Promise<vo
       deletedAt: null,
     };
 
-    const total = await Message.countDocuments(filter);
-    const messages = await Message.find(filter)
-      .populate('senderId', 'callingId fullName avatar avatarStorageKey status')
-      .populate({
-        path: 'parentId',
-        select: 'content senderId createdAt attachments type',
-        populate: { path: 'senderId', select: 'callingId fullName avatar avatarStorageKey' },
-      })
-      .sort({ createdAt: -1 })
-      .skip((Number(page) - 1) * Number(limit))
-      .limit(Number(limit));
+    const [total, messages] = await Promise.all([
+      Message.countDocuments(filter),
+      Message.find(filter)
+        .populate('senderId', 'callingId fullName avatar avatarStorageKey status')
+        .populate({
+          path: 'parentId',
+          select: 'content senderId createdAt attachments type',
+          populate: { path: 'senderId', select: 'callingId fullName avatar avatarStorageKey' },
+        })
+        .sort({ createdAt: -1 })
+        .skip(pagination.skip)
+        .limit(pagination.limit + 1),
+    ]);
+    const hasMore = messages.length > pagination.limit;
+    const pageMessages = hasMore ? messages.slice(0, pagination.limit) : messages;
 
     res.json({
       success: true,
-      messages: await refreshAvatarUrls(messages.reverse().map((message) => message.toObject())),
+      messages: await refreshAvatarUrls(pageMessages.reverse().map((message) => message.toObject())),
       total,
-      hasMore: Number(page) * Number(limit) < total,
+      page: pagination.page,
+      hasMore,
     });
   } catch (err: any) {
     res.status(500).json({ success: false, message: err.message });

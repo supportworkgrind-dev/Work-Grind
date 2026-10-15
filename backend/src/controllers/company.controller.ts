@@ -11,6 +11,7 @@ import {
   isOrganizationType,
   roleMatches,
 } from '../config/organization';
+import { parsePagination } from '../utils/pagination';
 
 export const getCompany = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -158,22 +159,30 @@ export const updateCompany = async (req: AuthRequest, res: Response): Promise<vo
 
 export const getCompanyMembers = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    // Pagination support: default 100 members per page to avoid fetching entire collection at once
-    const page = Math.max(1, Number(req.query.page) || 1);
-    const limit = Math.min(200, Math.max(1, Number(req.query.limit) || 100));
-    const skip = (page - 1) * limit;
+    const pagination = parsePagination(req.query, { defaultLimit: 100, maxLimit: 200 });
+    if (!pagination) {
+      res.status(400).json({ success: false, message: 'Invalid pagination parameters.' });
+      return;
+    }
 
     const [members, total] = await Promise.all([
       User.find({ companyId: req.user!.companyId, isActive: true })
         .select('fullName email avatar jobTitle department role status lastSeen skills country timeZone bio')
         .sort({ fullName: 1 })
-        .skip(skip)
-        .limit(limit)
+        .skip(pagination.skip)
+        .limit(pagination.limit)
         .lean(),
       User.countDocuments({ companyId: req.user!.companyId, isActive: true }),
     ]);
 
-    res.json({ success: true, members, total, page, totalPages: Math.ceil(total / limit) });
+    res.json({
+      success: true,
+      members,
+      total,
+      page: pagination.page,
+      totalPages: Math.ceil(total / pagination.limit),
+      hasMore: pagination.skip + members.length < total,
+    });
   } catch (err: any) {
     res.status(500).json({ success: false, message: err.message });
   }

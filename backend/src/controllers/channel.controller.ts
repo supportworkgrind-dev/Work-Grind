@@ -41,7 +41,13 @@ export const getChannels = async (req: AuthRequest, res: Response): Promise<void
   try {
     const uid = req.user!.userId;
     const cid = req.user!.companyId;
-    const channels = await Channel.find({
+    const pagination = parsePagination(req.query, { defaultLimit: 200, maxLimit: 500 });
+    if (!pagination) {
+      res.status(400).json({ success: false, message: 'Invalid pagination parameters.' });
+      return;
+    }
+
+    const pageChannels = await Channel.find({
       companyId: cid,
       isArchived: false,
       $or: [{ type: 'public' }, { members: uid }],
@@ -53,9 +59,13 @@ export const getChannels = async (req: AuthRequest, res: Response): Promise<void
         populate: { path: 'assigneeId', select: 'fullName avatar' },
       })
       .sort({ isDefault: -1, name: 1 })
+      .skip(pagination.skip)
+      .limit(pagination.limit + 1)
       .lean();
+    const hasMore = pageChannels.length > pagination.limit;
+    const channels = hasMore ? pageChannels.slice(0, pagination.limit) : pageChannels;
 
-    res.json({ success: true, channels });
+    res.json({ success: true, channels, page: pagination.page, hasMore });
   } catch (e: any) {
     res.status(500).json({ success: false, message: e.message });
   }

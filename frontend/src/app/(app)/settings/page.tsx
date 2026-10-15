@@ -286,16 +286,23 @@ export default function SettingsPage() {
 
   const fetchMembers = async () => {
     setMembersLoading(true);
-    try {
-      const res = await api.get('/admin/members');
-      if (res.data.success) {
-        setMembers(res.data.members);
+    const fetchAllMembers = async (endpoint: string): Promise<User[]> => {
+      const allMembers: User[] = [];
+      for (let page = 1; page <= 501; page += 1) {
+        const response = await api.get(endpoint, { params: { page, limit: 200 } });
+        if (!response.data.success) throw new Error('Unable to load workspace members.');
+        allMembers.push(...response.data.members);
+        if (!response.data.hasMore) break;
       }
+      return allMembers;
+    };
+
+    try {
+      setMembers(await fetchAllMembers('/admin/members'));
     } catch (err) {
       // If non-admin, fallback to company members list
       try {
-        const fallbackRes = await api.get('/companies/members');
-        if (fallbackRes.data.success) setMembers(fallbackRes.data.members);
+        setMembers(await fetchAllMembers('/companies/members'));
       } catch (e) {
         console.error(e);
       }

@@ -122,16 +122,26 @@ interface ChatSidebarResponses {
 
 const pendingChatSidebarRequests = new Map<string, Promise<ChatSidebarResponses>>();
 
+async function fetchAllPages<T>(endpoint: string, collection: 'channels' | 'conversations'): Promise<T[]> {
+  const items: T[] = [];
+  for (let page = 1; ; page += 1) {
+    const response = await api.get(endpoint, { params: { page, limit: 500 } });
+    if (!response.data.success) throw new Error(`Unable to load ${collection}.`);
+    items.push(...(response.data[collection] as T[]));
+    if (!response.data.hasMore || page > 200) return items;
+  }
+}
+
 function requestChatSidebar(userId: string): Promise<ChatSidebarResponses> {
   const pending = pendingChatSidebarRequests.get(userId);
   if (pending) return pending;
 
   const request = Promise.all([
-    api.get<ChatSidebarResponses['channels']>('/channels'),
-    api.get<ChatSidebarResponses['conversations']>('/direct-messages/conversations'),
+    fetchAllPages<Channel>('/channels', 'channels'),
+    fetchAllPages<Conversation>('/direct-messages/conversations', 'conversations'),
   ]).then(([channels, conversations]) => ({
-    channels: channels.data,
-    conversations: conversations.data,
+    channels: { success: true, channels },
+    conversations: { success: true, conversations },
   })).finally(() => {
     if (pendingChatSidebarRequests.get(userId) === request) pendingChatSidebarRequests.delete(userId);
   });

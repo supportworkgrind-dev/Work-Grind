@@ -2,6 +2,7 @@ import { Response } from 'express';
 import mongoose from 'mongoose';
 import Board, { WhiteboardElementType } from '../models/Board';
 import { AuthRequest } from '../middleware/auth';
+import { parsePagination } from '../utils/pagination';
 
 type BoardElementInput = {
   id?: string;
@@ -70,8 +71,20 @@ export const getBoards = async (req: AuthRequest, res: Response): Promise<void> 
     return;
   }
 
-  const boards = await Board.find({ companyId: req.user.companyId }).sort({ updatedAt: -1 }).lean();
-  res.json({ success: true, boards });
+  const pagination = parsePagination(req.query, { defaultLimit: 100, maxLimit: 200 });
+  if (!pagination) {
+    res.status(400).json({ success: false, message: 'Invalid pagination parameters.' });
+    return;
+  }
+
+  const pageBoards = await Board.find({ companyId: req.user.companyId })
+    .sort({ updatedAt: -1 })
+    .skip(pagination.skip)
+    .limit(pagination.limit + 1)
+    .lean();
+  const hasMore = pageBoards.length > pagination.limit;
+  const boards = hasMore ? pageBoards.slice(0, pagination.limit) : pageBoards;
+  res.json({ success: true, boards, page: pagination.page, hasMore });
 };
 
 export const createBoard = async (req: AuthRequest, res: Response): Promise<void> => {

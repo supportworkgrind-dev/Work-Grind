@@ -1,5 +1,5 @@
 import rateLimit, { Store } from 'express-rate-limit';
-import { Request } from 'express';
+import { Request, Response } from 'express';
 import Redis from 'ioredis';
 import { getRedisClient, withRedisTimeout } from '../config/redis';
 
@@ -78,7 +78,7 @@ export const rateLimiter = (windowMin: number, max: number, options: RateLimiter
       console.error('[Rate limit] REDIS_URL is required on Vercel; rate-limited requests will fail closed until configured.');
       missingRedisWarningLogged = true;
     }
-    return (_req, res) => res.status(503).json({
+    return (_req: Request, res: Response) => res.status(503).json({
       success: false,
       code: 'RATE_LIMIT_UNAVAILABLE',
       message: 'Request protection is temporarily unavailable. Please retry later.',

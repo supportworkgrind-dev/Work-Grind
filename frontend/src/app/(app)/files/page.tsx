@@ -18,6 +18,12 @@ import Link from 'next/link';
 export default function FilesPage() {
   const { company, subscription, refreshSubscription } = useAuthStore();
   const [files,          setFiles]          = useState<FileItem[]>([]);
+  const [filesPage,      setFilesPage]      = useState(1);
+  const [filesHaveMore,  setFilesHaveMore]  = useState(false);
+  const [loadingMoreFiles, setLoadingMoreFiles] = useState(false);
+  const [foldersPage, setFoldersPage] = useState(1);
+  const [foldersHaveMore, setFoldersHaveMore] = useState(false);
+  const [loadingMoreFolders, setLoadingMoreFolders] = useState(false);
   const [storageSnapshot, setStorageSnapshot] = useState<{ used: number; limit: number } | null>(null);
   const [projects,       setProjects]       = useState<Project[]>([]);
   const [uploadProjectId, setUploadProjectId] = useState('');
@@ -30,18 +36,79 @@ export default function FilesPage() {
   const [newFolderName,  setNewFolderName]  = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
+  const navigateFolder = (folderId: string | null) => {
+    setFilesPage(1);
+    setFilesHaveMore(false);
+    setFoldersPage(1);
+    setFoldersHaveMore(false);
+    setCurrentFolder(folderId);
+  };
+
   const fetchData = async () => {
     try {
-      const param = currentFolder ? `?folderId=${currentFolder}` : '?folderId=root';
-      const [fRes, dirRes] = await Promise.all([api.get(`/files${param}`), api.get(`/files/folders/list${param}`)]);
+      const params = new URLSearchParams({
+        folderId: currentFolder ?? 'root',
+        page: '1',
+        limit: '100',
+      });
+      const [fRes, dirRes] = await Promise.all([
+        api.get(`/files?${params.toString()}`),
+        api.get('/files/folders/list', {
+        params: { folderId: currentFolder ?? 'root', page: 1, limit: 200 },
+        }),
+      ]);
       if (fRes.data.success) {
         setFiles(fRes.data.files);
+        setFilesPage(1);
+        setFilesHaveMore(Boolean(fRes.data.hasMore));
         if (fRes.data.storage) setStorageSnapshot(fRes.data.storage);
       }
-      if (dirRes.data.success) setFolders(dirRes.data.folders);
+      if (dirRes.data.success) {
+        setFolders(dirRes.data.folders);
+        setFoldersPage(1);
+        setFoldersHaveMore(Boolean(dirRes.data.hasMore));
+      }
     } catch { /* silent */ }
   };
-  useEffect(() => { fetchData(); }, [currentFolder]);
+  const fetchMoreFiles = async () => {
+    if (loadingMoreFiles || !filesHaveMore) return;
+    const page = filesPage + 1;
+    setLoadingMoreFiles(true);
+    try {
+      const params = new URLSearchParams({
+        folderId: currentFolder ?? 'root',
+        page: String(page),
+        limit: '100',
+      });
+      const response = await api.get(`/files?${params.toString()}`);
+      if (response.data.success) {
+        setFiles((existing) => [...existing, ...response.data.files]);
+        setFilesPage(page);
+        setFilesHaveMore(Boolean(response.data.hasMore));
+        if (response.data.storage) setStorageSnapshot(response.data.storage);
+      }
+    } catch { /* silent */ }
+    finally { setLoadingMoreFiles(false); }
+  };
+  const fetchMoreFolders = async () => {
+    if (loadingMoreFolders || !foldersHaveMore) return;
+    const page = foldersPage + 1;
+    setLoadingMoreFolders(true);
+    try {
+      const response = await api.get('/files/folders/list', {
+        params: { folderId: currentFolder ?? 'root', page, limit: 200 },
+      });
+      if (response.data.success) {
+        setFolders((existing) => [...existing, ...response.data.folders]);
+        setFoldersPage(page);
+        setFoldersHaveMore(Boolean(response.data.hasMore));
+      }
+    } catch { /* silent */ }
+    finally { setLoadingMoreFolders(false); }
+  };
+  useEffect(() => {
+    void fetchData();
+  }, [currentFolder]);
 
   useEffect(() => {
     let active = true;
@@ -73,7 +140,7 @@ export default function FilesPage() {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       if (r.data.success) {
-        setFiles((p) => [r.data.file, ...p]);
+        setFiles((p) => [r.data.file, ...p].slice(0, 100));
         if (r.data.storage) setStorageSnapshot(r.data.storage);
         void refreshSubscription();
       } else {
@@ -206,7 +273,7 @@ export default function FilesPage() {
       {/* Breadcrumb */}
       {currentFolder && (
         <div className="flex items-center gap-1.5 text-xs">
-          <button onClick={() => setCurrentFolder(null)} className="font-semibold text-indigo-600 hover:text-indigo-700">All Files</button>
+          <button onClick={() => navigateFolder(null)} className="font-semibold text-indigo-600 hover:text-indigo-700">All Files</button>
           <ChevronRight className="h-3.5 w-3.5 theme-text-muted" />
           <span className="theme-text-secondary">Current folder</span>
         </div>
@@ -218,13 +285,20 @@ export default function FilesPage() {
           <p className="section-label mb-3">Folders</p>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
             {folders.map((f) => (
-              <button key={f._id} onClick={() => setCurrentFolder(f._id)}
+              <button key={f._id} onClick={() => navigateFolder(f._id)}
                 className="surface rounded-xl p-3 flex items-center gap-2.5 text-left hover:border-indigo-300 transition-all card-hover">
                 <FolderClosed className="h-4.5 w-4.5 text-amber-500 shrink-0" style={{ height: '1.125rem', width: '1.125rem' }} />
                 <span className="truncate text-xs font-semibold theme-text-primary">{f.name}</span>
               </button>
             ))}
           </div>
+          {foldersHaveMore && (
+            <div className="mt-3 text-center">
+              <button type="button" onClick={fetchMoreFolders} disabled={loadingMoreFolders} className="btn-secondary h-9 px-4">
+                {loadingMoreFolders ? 'Loading…' : 'Load more folders'}
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -268,6 +342,18 @@ export default function FilesPage() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+        {filesHaveMore && (
+          <div className="mt-4 text-center">
+            <button
+              type="button"
+              onClick={() => void fetchMoreFiles()}
+              disabled={loadingMoreFiles}
+              className="btn-secondary h-9 px-4"
+            >
+              {loadingMoreFiles ? 'Loading…' : 'Load more files'}
+            </button>
           </div>
         )}
       </div>
