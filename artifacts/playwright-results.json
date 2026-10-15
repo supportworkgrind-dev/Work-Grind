@@ -5,7 +5,7 @@
       "C:\\workgrind\\frontend\\node_modules\\@playwright\\test\\cli.js",
       "test",
       "--config=playwright.config.ts",
-      "tests/socket-connection-policy.spec.ts"
+      "tests/signup-flow.spec.ts"
     ],
     "configFile": "C:\\workgrind\\frontend\\playwright.config.ts",
     "rootDir": "C:/workgrind/frontend/tests",
@@ -19,7 +19,7 @@
     "grepInvert": null,
     "maxFailures": 0,
     "metadata": {
-      "actualWorkers": 1
+      "actualWorkers": 4
     },
     "preserveOutput": "always",
     "projects": [
@@ -28,7 +28,7 @@
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
-          "actualWorkers": 1
+          "actualWorkers": 4
         },
         "id": "chromium",
         "name": "chromium",
@@ -48,7 +48,7 @@
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
-          "actualWorkers": 1
+          "actualWorkers": 4
         },
         "name": "chromium",
         "testDir": "C:\\workgrind\\frontend\\tests",
@@ -57,7 +57,7 @@
         "testMatch": "**/*.@(spec|test).?(c|m)[jt]s?(x)",
         "timeout": 60000,
         "use": {
-          "baseURL": "https://workgrind.vercel.app",
+          "baseURL": "http://127.0.0.1:3101",
           "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.8078.4 Safari/537.36",
           "viewport": {
             "width": 1280,
@@ -110,14 +110,14 @@
   },
   "suites": [
     {
-      "title": "socket-connection-policy.spec.ts",
-      "file": "socket-connection-policy.spec.ts",
+      "title": "signup-flow.spec.ts",
+      "file": "signup-flow.spec.ts",
       "column": 0,
       "line": 0,
       "specs": [
         {
-          "title": "Socket.IO retries use finite attempts and capped exponential backoff",
-          "ok": true,
+          "title": "Solo / Individual signup keeps its selection and gates account details",
+          "ok": false,
           "tags": [],
           "tests": [
             {
@@ -130,13 +130,318 @@
                 {
                   "workerIndex": 0,
                   "parallelIndex": 0,
+                  "status": "timedOut",
+                  "duration": 61197,
+                  "error": {
+                    "message": "\u001b[31mTest timeout of 60000ms exceeded.\u001b[39m",
+                    "stack": "\u001b[31mTest timeout of 60000ms exceeded.\u001b[39m"
+                  },
+                  "errors": [
+                    {
+                      "message": "\u001b[31mTest timeout of 60000ms exceeded.\u001b[39m"
+                    },
+                    {
+                      "location": {
+                        "file": "C:\\workgrind\\frontend\\tests\\signup-flow.spec.ts",
+                        "column": 17,
+                        "line": 21
+                      },
+                      "message": "Error: locator.check: Test timeout of 60000ms exceeded.\nBrowser logs:\n\n<launching> C:\\Users\\MUBASHAR\\AppData\\Local\\ms-playwright\\chromium_headless_shell-1248\\chrome-headless-shell-win64\\chrome-headless-shell.exe --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back-forward-cache --disable-breakpad --disable-client-side-phishing-detection --disable-component-extensions-with-background-pages --disable-component-update --no-default-browser-check --disable-default-apps --disable-dev-shm-usage --disable-edgeupdater --disable-extensions --disable-features=AvoidUnnecessaryBeforeUnloadCheckSync,DestroyProfileOnBrowserClose,DialMediaRouteProvider,GlobalMediaControls,HttpsUpgrades,LensOverlay,MediaRouter,PaintHolding,ThirdPartyStoragePartitioning,BlockOriginHeaderModificationOnRedirect,Translate,AutoDeElevate,OptimizationHints,NetworkTimeServiceQuerying,AimEnabled,msForceBrowserSignIn,msEdgeUpdateLaunchServicesPreferredVersion --enable-features=CDPScreenshotNewSurface --allow-pre-commit-input --disable-hang-monitor --disable-ipc-flooding-protection --disable-popup-blocking --disable-prompt-on-repost --disable-renderer-backgrounding --disable-updater-scheduler --force-color-profile=srgb --metrics-recording-only --no-first-run --password-store=basic --use-mock-keychain --no-service-autorun --export-tagged-pdf --disable-search-engine-choice-screen --unsafely-disable-devtools-self-xss-warnings --edge-skip-compat-layer-relaunch --disable-infobars --disable-search-engine-choice-screen --disable-sync --enable-unsafe-swiftshader --headless --hide-scrollbars --mute-audio --blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4 --no-sandbox --user-data-dir=C:\\Users\\MUBASHAR\\AppData\\Local\\Temp\\playwright_chromiumdev_profile-aDVObv --remote-debugging-pipe --no-startup-window\n<launched> pid=23112\n[pid=23112][err] [1015/183106.447:INFO:CONSOLE:720] \"%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold\", source: http://127.0.0.1:3101/_next/static/chunks/node_modules_next_dist_05y3oi5z9mc_3._.js (720)\n[pid=23112][err] [1015/183106.682:INFO:CONSOLE:720] \"[HMR] connected\", source: http://127.0.0.1:3101/_next/static/chunks/node_modules_next_dist_05y3oi5z9mc_3._.js (720)\n[pid=23112][err] [1015/183106.956:INFO:CONSOLE:720] \"[Fast Refresh] rebuilding\", source: http://127.0.0.1:3101/_next/static/chunks/node_modules_next_dist_05y3oi5z9mc_3._.js (720)\n[pid=23112][err] [1015/183107.022:INFO:CONSOLE:720] \"[Fast Refresh] done in 173ms\", source: http://127.0.0.1:3101/_next/static/chunks/node_modules_next_dist_05y3oi5z9mc_3._.js (720)\n[pid=23112][err] [1015/183107.117:INFO:CONSOLE:720] \"[Auth diagnostics] Starting a token refresh. [object Object]\", source: http://127.0.0.1:3101/_next/static/chunks/node_modules_next_dist_05y3oi5z9mc_3._.js (720)\n[pid=23112][err] [1015/183107.251:INFO:CONSOLE:720] \"[Fast Refresh] rebuilding\", source: http://127.0.0.1:3101/_next/static/chunks/node_modules_next_dist_05y3oi5z9mc_3._.js (720)\n[pid=23112][err] [1015/183108.382:INFO:CONSOLE:720] \"[Fast Refresh] done in 1234ms\", source: http://127.0.0.1:3101/_next/static/chunks/node_modules_next_dist_05y3oi5z9mc_3._.js (720)\n[pid=23112][err] [1015/183111.018:INFO:CONSOLE:0] \"The resource http://127.0.0.1:3101/_next/static/media/fba5a26ea33df6a3-s.p.18rizl4rsrl42.woff2 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.\", source: http://127.0.0.1:3101/signup (0)\n[pid=23112][err] [1015/183125.305:INFO:CONSOLE:0] \"The resource http://127.0.0.1:3101/_next/static/media/fba5a26ea33df6a3-s.p.18rizl4rsrl42.woff2 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.\", source: http://127.0.0.1:3101/signup (0)\n[pid=23112] <gracefully close start>\nCall log:\n\u001b[2m  - waiting for getByRole('radio', { name: /Solo \\/ Individual/ })\u001b[22m\n\u001b[2m    - locator resolved to <input type=\"radio\" value=\"solo\" name=\"signup-workspace\" id=\"signup-workspace-solo\" class=\"signup-option-radio\"/>\u001b[22m\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    2 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is visible, enabled and stable\u001b[22m\n\u001b[2m      - scrolling into view if needed\u001b[22m\n\u001b[2m      - done scrolling\u001b[22m\n\u001b[2m      - <label class=\"signup-option \" for=\"signup-workspace-solo\">…</label> intercepts pointer events\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m    - waiting 20ms\u001b[22m\n\u001b[2m    2 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is visible, enabled and stable\u001b[22m\n\u001b[2m      - scrolling into view if needed\u001b[22m\n\u001b[2m      - done scrolling\u001b[22m\n\u001b[2m      - <label class=\"signup-option \" for=\"signup-workspace-solo\">…</label> intercepts pointer events\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m      - waiting 100ms\u001b[22m\n\u001b[2m    54 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m       - element is visible, enabled and stable\u001b[22m\n\u001b[2m       - scrolling into view if needed\u001b[22m\n\u001b[2m       - done scrolling\u001b[22m\n\u001b[2m       - <label class=\"signup-option \" for=\"signup-workspace-solo\">…</label> intercepts pointer events\u001b[22m\n\u001b[2m     - retrying click action\u001b[22m\n\u001b[2m       - waiting 500ms\u001b[22m\n\u001b[2m    - waiting for element to be visible, enabled and stable\u001b[22m\n\n\n  19 |\n  20 |     const radio = page.getByRole('radio', { name: new RegExp(option.label) });\n> 21 |     await radio.check();\n     |                 ^\n  22 |     await expect(radio).toBeChecked();\n  23 |     await page.getByRole('button', { name: 'Continue', exact: true }).click();\n  24 |     await expect(page.getByRole('heading', { name: 'Create your account.' })).toBeVisible();\n    at C:\\workgrind\\frontend\\tests\\signup-flow.spec.ts:21:17"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-15T13:30:39.952Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "C:\\workgrind\\artifacts\\test-results\\signup-flow-Solo-Individua-4ce42-n-and-gates-account-details-chromium\\test-failed-1.png"
+                    },
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "C:\\workgrind\\artifacts\\test-results\\signup-flow-Solo-Individua-4ce42-n-and-gates-account-details-chromium\\error-context.md"
+                    }
+                  ]
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "14024500565cc74d50c8-2c9a49cf8baacc61f3d6",
+          "file": "signup-flow.spec.ts",
+          "line": 13,
+          "column": 7
+        },
+        {
+          "title": "Company / Business signup keeps its selection and gates account details",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "timedOut",
+                  "duration": 60988,
+                  "error": {
+                    "message": "\u001b[31mTest timeout of 60000ms exceeded.\u001b[39m",
+                    "stack": "\u001b[31mTest timeout of 60000ms exceeded.\u001b[39m"
+                  },
+                  "errors": [
+                    {
+                      "message": "\u001b[31mTest timeout of 60000ms exceeded.\u001b[39m"
+                    },
+                    {
+                      "location": {
+                        "file": "C:\\workgrind\\frontend\\tests\\signup-flow.spec.ts",
+                        "column": 17,
+                        "line": 21
+                      },
+                      "message": "Error: locator.check: Test timeout of 60000ms exceeded.\nBrowser logs:\n\n<launching> C:\\Users\\MUBASHAR\\AppData\\Local\\ms-playwright\\chromium_headless_shell-1248\\chrome-headless-shell-win64\\chrome-headless-shell.exe --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back-forward-cache --disable-breakpad --disable-client-side-phishing-detection --disable-component-extensions-with-background-pages --disable-component-update --no-default-browser-check --disable-default-apps --disable-dev-shm-usage --disable-edgeupdater --disable-extensions --disable-features=AvoidUnnecessaryBeforeUnloadCheckSync,DestroyProfileOnBrowserClose,DialMediaRouteProvider,GlobalMediaControls,HttpsUpgrades,LensOverlay,MediaRouter,PaintHolding,ThirdPartyStoragePartitioning,BlockOriginHeaderModificationOnRedirect,Translate,AutoDeElevate,OptimizationHints,NetworkTimeServiceQuerying,AimEnabled,msForceBrowserSignIn,msEdgeUpdateLaunchServicesPreferredVersion --enable-features=CDPScreenshotNewSurface --allow-pre-commit-input --disable-hang-monitor --disable-ipc-flooding-protection --disable-popup-blocking --disable-prompt-on-repost --disable-renderer-backgrounding --disable-updater-scheduler --force-color-profile=srgb --metrics-recording-only --no-first-run --password-store=basic --use-mock-keychain --no-service-autorun --export-tagged-pdf --disable-search-engine-choice-screen --unsafely-disable-devtools-self-xss-warnings --edge-skip-compat-layer-relaunch --disable-infobars --disable-search-engine-choice-screen --disable-sync --enable-unsafe-swiftshader --headless --hide-scrollbars --mute-audio --blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4 --no-sandbox --user-data-dir=C:\\Users\\MUBASHAR\\AppData\\Local\\Temp\\playwright_chromiumdev_profile-UtMNcU --remote-debugging-pipe --no-startup-window\n<launched> pid=20664\n[pid=20664][err] [1015/183106.430:INFO:CONSOLE:720] \"%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold\", source: http://127.0.0.1:3101/_next/static/chunks/node_modules_next_dist_05y3oi5z9mc_3._.js (720)\n[pid=20664][err] [1015/183106.683:INFO:CONSOLE:720] \"[HMR] connected\", source: http://127.0.0.1:3101/_next/static/chunks/node_modules_next_dist_05y3oi5z9mc_3._.js (720)\n[pid=20664][err] [1015/183106.997:INFO:CONSOLE:720] \"[Fast Refresh] rebuilding\", source: http://127.0.0.1:3101/_next/static/chunks/node_modules_next_dist_05y3oi5z9mc_3._.js (720)\n[pid=20664][err] [1015/183107.035:INFO:CONSOLE:720] \"[Fast Refresh] done in 178ms\", source: http://127.0.0.1:3101/_next/static/chunks/node_modules_next_dist_05y3oi5z9mc_3._.js (720)\n[pid=20664][err] [1015/183107.216:INFO:CONSOLE:720] \"[Auth diagnostics] Starting a token refresh. [object Object]\", source: http://127.0.0.1:3101/_next/static/chunks/node_modules_next_dist_05y3oi5z9mc_3._.js (720)\n[pid=20664][err] [1015/183107.579:INFO:CONSOLE:720] \"[Fast Refresh] rebuilding\", source: http://127.0.0.1:3101/_next/static/chunks/node_modules_next_dist_05y3oi5z9mc_3._.js (720)\n[pid=20664][err] [1015/183108.387:INFO:CONSOLE:720] \"[Fast Refresh] done in 1241ms\", source: http://127.0.0.1:3101/_next/static/chunks/node_modules_next_dist_05y3oi5z9mc_3._.js (720)\n[pid=20664][err] [1015/183111.232:INFO:CONSOLE:0] \"The resource http://127.0.0.1:3101/_next/static/media/fba5a26ea33df6a3-s.p.18rizl4rsrl42.woff2 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.\", source: http://127.0.0.1:3101/signup (0)\n[pid=20664][err] [1015/183125.467:INFO:CONSOLE:0] \"The resource http://127.0.0.1:3101/_next/static/media/fba5a26ea33df6a3-s.p.18rizl4rsrl42.woff2 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.\", source: http://127.0.0.1:3101/signup (0)\n[pid=20664] <gracefully close start>\nCall log:\n\u001b[2m  - waiting for getByRole('radio', { name: /Company \\/ Business/ })\u001b[22m\n\u001b[2m    - locator resolved to <input type=\"radio\" value=\"business\" name=\"signup-workspace\" class=\"signup-option-radio\" id=\"signup-workspace-business\"/>\u001b[22m\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    2 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is visible, enabled and stable\u001b[22m\n\u001b[2m      - scrolling into view if needed\u001b[22m\n\u001b[2m      - done scrolling\u001b[22m\n\u001b[2m      - <label class=\"signup-option \" for=\"signup-workspace-business\">…</label> intercepts pointer events\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m    - waiting 20ms\u001b[22m\n\u001b[2m    2 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is visible, enabled and stable\u001b[22m\n\u001b[2m      - scrolling into view if needed\u001b[22m\n\u001b[2m      - done scrolling\u001b[22m\n\u001b[2m      - <label class=\"signup-option \" for=\"signup-workspace-business\">…</label> intercepts pointer events\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m      - waiting 100ms\u001b[22m\n\u001b[2m    65 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m       - element is visible, enabled and stable\u001b[22m\n\u001b[2m       - scrolling into view if needed\u001b[22m\n\u001b[2m       - done scrolling\u001b[22m\n\u001b[2m       - <label class=\"signup-option \" for=\"signup-workspace-business\">…</label> intercepts pointer events\u001b[22m\n\u001b[2m     - retrying click action\u001b[22m\n\u001b[2m       - waiting 500ms\u001b[22m\n\u001b[2m    - waiting for element to be visible, enabled and stable\u001b[22m\n\n\n  19 |\n  20 |     const radio = page.getByRole('radio', { name: new RegExp(option.label) });\n> 21 |     await radio.check();\n     |                 ^\n  22 |     await expect(radio).toBeChecked();\n  23 |     await page.getByRole('button', { name: 'Continue', exact: true }).click();\n  24 |     await expect(page.getByRole('heading', { name: 'Create your account.' })).toBeVisible();\n    at C:\\workgrind\\frontend\\tests\\signup-flow.spec.ts:21:17"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-15T13:30:44.459Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "C:\\workgrind\\artifacts\\test-results\\signup-flow-Company-Busine-415fb-n-and-gates-account-details-chromium\\test-failed-1.png"
+                    },
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "C:\\workgrind\\artifacts\\test-results\\signup-flow-Company-Busine-415fb-n-and-gates-account-details-chromium\\error-context.md"
+                    }
+                  ]
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "14024500565cc74d50c8-2e53424c5f7715c330bb",
+          "file": "signup-flow.spec.ts",
+          "line": 13,
+          "column": 7
+        },
+        {
+          "title": "School / Academy signup keeps its selection and gates account details",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 2,
+                  "status": "timedOut",
+                  "duration": 61031,
+                  "error": {
+                    "message": "\u001b[31mTest timeout of 60000ms exceeded.\u001b[39m",
+                    "stack": "\u001b[31mTest timeout of 60000ms exceeded.\u001b[39m"
+                  },
+                  "errors": [
+                    {
+                      "message": "\u001b[31mTest timeout of 60000ms exceeded.\u001b[39m"
+                    },
+                    {
+                      "location": {
+                        "file": "C:\\workgrind\\frontend\\tests\\signup-flow.spec.ts",
+                        "column": 17,
+                        "line": 21
+                      },
+                      "message": "Error: locator.check: Test timeout of 60000ms exceeded.\nBrowser logs:\n\n<launching> C:\\Users\\MUBASHAR\\AppData\\Local\\ms-playwright\\chromium_headless_shell-1248\\chrome-headless-shell-win64\\chrome-headless-shell.exe --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back-forward-cache --disable-breakpad --disable-client-side-phishing-detection --disable-component-extensions-with-background-pages --disable-component-update --no-default-browser-check --disable-default-apps --disable-dev-shm-usage --disable-edgeupdater --disable-extensions --disable-features=AvoidUnnecessaryBeforeUnloadCheckSync,DestroyProfileOnBrowserClose,DialMediaRouteProvider,GlobalMediaControls,HttpsUpgrades,LensOverlay,MediaRouter,PaintHolding,ThirdPartyStoragePartitioning,BlockOriginHeaderModificationOnRedirect,Translate,AutoDeElevate,OptimizationHints,NetworkTimeServiceQuerying,AimEnabled,msForceBrowserSignIn,msEdgeUpdateLaunchServicesPreferredVersion --enable-features=CDPScreenshotNewSurface --allow-pre-commit-input --disable-hang-monitor --disable-ipc-flooding-protection --disable-popup-blocking --disable-prompt-on-repost --disable-renderer-backgrounding --disable-updater-scheduler --force-color-profile=srgb --metrics-recording-only --no-first-run --password-store=basic --use-mock-keychain --no-service-autorun --export-tagged-pdf --disable-search-engine-choice-screen --unsafely-disable-devtools-self-xss-warnings --edge-skip-compat-layer-relaunch --disable-infobars --disable-search-engine-choice-screen --disable-sync --enable-unsafe-swiftshader --headless --hide-scrollbars --mute-audio --blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4 --no-sandbox --user-data-dir=C:\\Users\\MUBASHAR\\AppData\\Local\\Temp\\playwright_chromiumdev_profile-vaTcNZ --remote-debugging-pipe --no-startup-window\n<launched> pid=18188\n[pid=18188][err] [1015/183106.497:INFO:CONSOLE:720] \"%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold\", source: http://127.0.0.1:3101/_next/static/chunks/node_modules_next_dist_05y3oi5z9mc_3._.js (720)\n[pid=18188][err] [1015/183106.768:INFO:CONSOLE:720] \"[HMR] connected\", source: http://127.0.0.1:3101/_next/static/chunks/node_modules_next_dist_05y3oi5z9mc_3._.js (720)\n[pid=18188][err] [1015/183107.096:INFO:CONSOLE:720] \"[Auth diagnostics] Starting a token refresh. [object Object]\", source: http://127.0.0.1:3101/_next/static/chunks/node_modules_next_dist_05y3oi5z9mc_3._.js (720)\n[pid=18188][err] [1015/183107.302:INFO:CONSOLE:720] \"[Fast Refresh] rebuilding\", source: http://127.0.0.1:3101/_next/static/chunks/node_modules_next_dist_05y3oi5z9mc_3._.js (720)\n[pid=18188][err] [1015/183108.368:INFO:CONSOLE:720] \"[Fast Refresh] done in 1204ms\", source: http://127.0.0.1:3101/_next/static/chunks/node_modules_next_dist_05y3oi5z9mc_3._.js (720)\n[pid=18188][err] [1015/183111.046:INFO:CONSOLE:0] \"The resource http://127.0.0.1:3101/_next/static/media/fba5a26ea33df6a3-s.p.18rizl4rsrl42.woff2 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.\", source: http://127.0.0.1:3101/signup (0)\n[pid=18188][err] [1015/183124.359:INFO:CONSOLE:0] \"The resource http://127.0.0.1:3101/_next/static/media/fba5a26ea33df6a3-s.p.18rizl4rsrl42.woff2 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.\", source: http://127.0.0.1:3101/signup (0)\n[pid=18188] <gracefully close start>\nCall log:\n\u001b[2m  - waiting for getByRole('radio', { name: /School \\/ Academy/ })\u001b[22m\n\u001b[2m    - locator resolved to <input type=\"radio\" value=\"school\" name=\"signup-workspace\" class=\"signup-option-radio\" id=\"signup-workspace-school\"/>\u001b[22m\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    2 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is visible, enabled and stable\u001b[22m\n\u001b[2m      - scrolling into view if needed\u001b[22m\n\u001b[2m      - done scrolling\u001b[22m\n\u001b[2m      - <label class=\"signup-option \" for=\"signup-workspace-school\">…</label> intercepts pointer events\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m    - waiting 20ms\u001b[22m\n\u001b[2m    2 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is visible, enabled and stable\u001b[22m\n\u001b[2m      - scrolling into view if needed\u001b[22m\n\u001b[2m      - done scrolling\u001b[22m\n\u001b[2m      - <label class=\"signup-option \" for=\"signup-workspace-school\">…</label> intercepts pointer events\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m      - waiting 100ms\u001b[22m\n\u001b[2m    54 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m       - element is visible, enabled and stable\u001b[22m\n\u001b[2m       - scrolling into view if needed\u001b[22m\n\u001b[2m       - done scrolling\u001b[22m\n\u001b[2m       - <label class=\"signup-option \" for=\"signup-workspace-school\">…</label> intercepts pointer events\u001b[22m\n\u001b[2m     - retrying click action\u001b[22m\n\u001b[2m       - waiting 500ms\u001b[22m\n\u001b[2m    - waiting for element to be visible, enabled and stable\u001b[22m\n\n\n  19 |\n  20 |     const radio = page.getByRole('radio', { name: new RegExp(option.label) });\n> 21 |     await radio.check();\n     |                 ^\n  22 |     await expect(radio).toBeChecked();\n  23 |     await page.getByRole('button', { name: 'Continue', exact: true }).click();\n  24 |     await expect(page.getByRole('heading', { name: 'Create your account.' })).toBeVisible();\n    at C:\\workgrind\\frontend\\tests\\signup-flow.spec.ts:21:17"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-15T13:30:44.528Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "C:\\workgrind\\artifacts\\test-results\\signup-flow-School-Academy-e43f3-n-and-gates-account-details-chromium\\test-failed-1.png"
+                    },
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "C:\\workgrind\\artifacts\\test-results\\signup-flow-School-Academy-e43f3-n-and-gates-account-details-chromium\\error-context.md"
+                    }
+                  ]
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "14024500565cc74d50c8-12bdf8bdcc0efb4491ba",
+          "file": "signup-flow.spec.ts",
+          "line": 13,
+          "column": 7
+        },
+        {
+          "title": "College signup keeps its selection and gates account details",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 3,
+                  "parallelIndex": 3,
+                  "status": "timedOut",
+                  "duration": 61076,
+                  "error": {
+                    "message": "\u001b[31mTest timeout of 60000ms exceeded.\u001b[39m",
+                    "stack": "\u001b[31mTest timeout of 60000ms exceeded.\u001b[39m"
+                  },
+                  "errors": [
+                    {
+                      "message": "\u001b[31mTest timeout of 60000ms exceeded.\u001b[39m"
+                    },
+                    {
+                      "location": {
+                        "file": "C:\\workgrind\\frontend\\tests\\signup-flow.spec.ts",
+                        "column": 17,
+                        "line": 21
+                      },
+                      "message": "Error: locator.check: Test timeout of 60000ms exceeded.\nBrowser logs:\n\n<launching> C:\\Users\\MUBASHAR\\AppData\\Local\\ms-playwright\\chromium_headless_shell-1248\\chrome-headless-shell-win64\\chrome-headless-shell.exe --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back-forward-cache --disable-breakpad --disable-client-side-phishing-detection --disable-component-extensions-with-background-pages --disable-component-update --no-default-browser-check --disable-default-apps --disable-dev-shm-usage --disable-edgeupdater --disable-extensions --disable-features=AvoidUnnecessaryBeforeUnloadCheckSync,DestroyProfileOnBrowserClose,DialMediaRouteProvider,GlobalMediaControls,HttpsUpgrades,LensOverlay,MediaRouter,PaintHolding,ThirdPartyStoragePartitioning,BlockOriginHeaderModificationOnRedirect,Translate,AutoDeElevate,OptimizationHints,NetworkTimeServiceQuerying,AimEnabled,msForceBrowserSignIn,msEdgeUpdateLaunchServicesPreferredVersion --enable-features=CDPScreenshotNewSurface --allow-pre-commit-input --disable-hang-monitor --disable-ipc-flooding-protection --disable-popup-blocking --disable-prompt-on-repost --disable-renderer-backgrounding --disable-updater-scheduler --force-color-profile=srgb --metrics-recording-only --no-first-run --password-store=basic --use-mock-keychain --no-service-autorun --export-tagged-pdf --disable-search-engine-choice-screen --unsafely-disable-devtools-self-xss-warnings --edge-skip-compat-layer-relaunch --disable-infobars --disable-search-engine-choice-screen --disable-sync --enable-unsafe-swiftshader --headless --hide-scrollbars --mute-audio --blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4 --no-sandbox --user-data-dir=C:\\Users\\MUBASHAR\\AppData\\Local\\Temp\\playwright_chromiumdev_profile-mxJFAC --remote-debugging-pipe --no-startup-window\n<launched> pid=9152\n[pid=9152][err] [1015/183106.364:INFO:CONSOLE:720] \"%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold\", source: http://127.0.0.1:3101/_next/static/chunks/node_modules_next_dist_05y3oi5z9mc_3._.js (720)\n[pid=9152][err] [1015/183106.695:INFO:CONSOLE:720] \"[HMR] connected\", source: http://127.0.0.1:3101/_next/static/chunks/node_modules_next_dist_05y3oi5z9mc_3._.js (720)\n[pid=9152][err] [1015/183106.965:INFO:CONSOLE:720] \"[Fast Refresh] rebuilding\", source: http://127.0.0.1:3101/_next/static/chunks/node_modules_next_dist_05y3oi5z9mc_3._.js (720)\n[pid=9152][err] [1015/183107.031:INFO:CONSOLE:720] \"[Fast Refresh] done in 171ms\", source: http://127.0.0.1:3101/_next/static/chunks/node_modules_next_dist_05y3oi5z9mc_3._.js (720)\n[pid=9152][err] [1015/183107.058:INFO:CONSOLE:720] \"[Auth diagnostics] Starting a token refresh. [object Object]\", source: http://127.0.0.1:3101/_next/static/chunks/node_modules_next_dist_05y3oi5z9mc_3._.js (720)\n[pid=9152][err] [1015/183107.246:INFO:CONSOLE:720] \"[Fast Refresh] rebuilding\", source: http://127.0.0.1:3101/_next/static/chunks/node_modules_next_dist_05y3oi5z9mc_3._.js (720)\n[pid=9152][err] [1015/183108.354:INFO:CONSOLE:720] \"[Fast Refresh] done in 1211ms\", source: http://127.0.0.1:3101/_next/static/chunks/node_modules_next_dist_05y3oi5z9mc_3._.js (720)\n[pid=9152][err] [1015/183111.006:INFO:CONSOLE:0] \"The resource http://127.0.0.1:3101/_next/static/media/fba5a26ea33df6a3-s.p.18rizl4rsrl42.woff2 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.\", source: http://127.0.0.1:3101/signup (0)\n[pid=9152][err] [1015/183125.194:INFO:CONSOLE:0] \"The resource http://127.0.0.1:3101/_next/static/media/fba5a26ea33df6a3-s.p.18rizl4rsrl42.woff2 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.\", source: http://127.0.0.1:3101/signup (0)\n[pid=9152] <gracefully close start>\nCall log:\n\u001b[2m  - waiting for getByRole('radio', { name: /College/ })\u001b[22m\n\u001b[2m    - locator resolved to <input type=\"radio\" value=\"college\" name=\"signup-workspace\" class=\"signup-option-radio\" id=\"signup-workspace-college\"/>\u001b[22m\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    2 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is visible, enabled and stable\u001b[22m\n\u001b[2m      - scrolling into view if needed\u001b[22m\n\u001b[2m      - done scrolling\u001b[22m\n\u001b[2m      - <label class=\"signup-option \" for=\"signup-workspace-college\">…</label> intercepts pointer events\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m    - waiting 20ms\u001b[22m\n\u001b[2m    2 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is visible, enabled and stable\u001b[22m\n\u001b[2m      - scrolling into view if needed\u001b[22m\n\u001b[2m      - done scrolling\u001b[22m\n\u001b[2m      - <label class=\"signup-option \" for=\"signup-workspace-college\">…</label> intercepts pointer events\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m      - waiting 100ms\u001b[22m\n\u001b[2m    54 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m       - element is visible, enabled and stable\u001b[22m\n\u001b[2m       - scrolling into view if needed\u001b[22m\n\u001b[2m       - done scrolling\u001b[22m\n\u001b[2m       - <label class=\"signup-option \" for=\"signup-workspace-college\">…</label> intercepts pointer events\u001b[22m\n\u001b[2m     - retrying click action\u001b[22m\n\u001b[2m       - waiting 500ms\u001b[22m\n\u001b[2m    - waiting for element to be visible, enabled and stable\u001b[22m\n\n\n  19 |\n  20 |     const radio = page.getByRole('radio', { name: new RegExp(option.label) });\n> 21 |     await radio.check();\n     |                 ^\n  22 |     await expect(radio).toBeChecked();\n  23 |     await page.getByRole('button', { name: 'Continue', exact: true }).click();\n  24 |     await expect(page.getByRole('heading', { name: 'Create your account.' })).toBeVisible();\n    at C:\\workgrind\\frontend\\tests\\signup-flow.spec.ts:21:17"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-15T13:30:44.501Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "C:\\workgrind\\artifacts\\test-results\\signup-flow-College-signup-781f8-n-and-gates-account-details-chromium\\test-failed-1.png"
+                    },
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "C:\\workgrind\\artifacts\\test-results\\signup-flow-College-signup-781f8-n-and-gates-account-details-chromium\\error-context.md"
+                    }
+                  ]
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "14024500565cc74d50c8-1a785b6b05ea6302ae9d",
+          "file": "signup-flow.spec.ts",
+          "line": 13,
+          "column": 7
+        },
+        {
+          "title": "University signup keeps its selection and gates account details",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 4,
+                  "parallelIndex": 1,
+                  "status": "timedOut",
+                  "duration": 62952,
+                  "error": {
+                    "message": "\u001b[31mTest timeout of 60000ms exceeded.\u001b[39m",
+                    "stack": "\u001b[31mTest timeout of 60000ms exceeded.\u001b[39m"
+                  },
+                  "errors": [
+                    {
+                      "message": "\u001b[31mTest timeout of 60000ms exceeded.\u001b[39m"
+                    },
+                    {
+                      "location": {
+                        "file": "C:\\workgrind\\frontend\\tests\\signup-flow.spec.ts",
+                        "column": 17,
+                        "line": 21
+                      },
+                      "message": "Error: locator.check: Test timeout of 60000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('radio', { name: /University/ })\u001b[22m\n\u001b[2m    - locator resolved to <input type=\"radio\" value=\"university\" name=\"signup-workspace\" class=\"signup-option-radio\" id=\"signup-workspace-university\"/>\u001b[22m\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    2 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is visible, enabled and stable\u001b[22m\n\u001b[2m      - scrolling into view if needed\u001b[22m\n\u001b[2m      - done scrolling\u001b[22m\n\u001b[2m      - <label class=\"signup-option \" for=\"signup-workspace-university\">…</label> intercepts pointer events\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m    - waiting 20ms\u001b[22m\n\u001b[2m    2 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is visible, enabled and stable\u001b[22m\n\u001b[2m      - scrolling into view if needed\u001b[22m\n\u001b[2m      - done scrolling\u001b[22m\n\u001b[2m      - <label class=\"signup-option \" for=\"signup-workspace-university\">…</label> intercepts pointer events\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m      - waiting 100ms\u001b[22m\n\u001b[2m    88 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m       - element is visible, enabled and stable\u001b[22m\n\u001b[2m       - scrolling into view if needed\u001b[22m\n\u001b[2m       - done scrolling\u001b[22m\n\u001b[2m       - <label class=\"signup-option \" for=\"signup-workspace-university\">…</label> intercepts pointer events\u001b[22m\n\u001b[2m     - retrying click action\u001b[22m\n\u001b[2m       - waiting 500ms\u001b[22m\n\u001b[2m    - waiting for element to be visible, enabled and stable\u001b[22m\n\n\n  19 |\n  20 |     const radio = page.getByRole('radio', { name: new RegExp(option.label) });\n> 21 |     await radio.check();\n     |                 ^\n  22 |     await expect(radio).toBeChecked();\n  23 |     await page.getByRole('button', { name: 'Continue', exact: true }).click();\n  24 |     await expect(page.getByRole('heading', { name: 'Create your account.' })).toBeVisible();\n    at C:\\workgrind\\frontend\\tests\\signup-flow.spec.ts:21:17"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-15T13:32:08.689Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "C:\\workgrind\\artifacts\\test-results\\signup-flow-University-sig-cc5f7-n-and-gates-account-details-chromium\\test-failed-1.png"
+                    },
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "C:\\workgrind\\artifacts\\test-results\\signup-flow-University-sig-cc5f7-n-and-gates-account-details-chromium\\error-context.md"
+                    }
+                  ]
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "14024500565cc74d50c8-63f868b991e57821ca9c",
+          "file": "signup-flow.spec.ts",
+          "line": 13,
+          "column": 7
+        },
+        {
+          "title": "signup account choices support keyboard selection and fit desktop and mobile widths",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 5,
+                  "parallelIndex": 3,
                   "status": "passed",
-                  "duration": 17,
+                  "duration": 7105,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-15T13:09:15.858Z",
+                  "startTime": "2026-10-15T13:32:08.256Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -144,9 +449,9 @@
               "status": "expected"
             }
           ],
-          "id": "f3f9a0a8684642f47ff4-1f24d384502842a22d69",
-          "file": "socket-connection-policy.spec.ts",
-          "line": 4,
+          "id": "14024500565cc74d50c8-fccee3fd5b8a7d2c63db",
+          "file": "signup-flow.spec.ts",
+          "line": 39,
           "column": 5
         }
       ]
@@ -154,11 +459,11 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-10-15T13:09:10.614Z",
-    "duration": 5381.717000000001,
+    "startTime": "2026-10-15T13:30:37.093Z",
+    "duration": 156594.25400000002,
     "expected": 1,
     "skipped": 0,
-    "unexpected": 0,
+    "unexpected": 5,
     "flaky": 0
   }
 }

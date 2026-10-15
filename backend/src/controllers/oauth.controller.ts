@@ -147,14 +147,15 @@ function errorRedirect(
   returnTo?: string,
   link = false,
   audience: 'user' | 'client' = 'user',
+  signup = false,
 ) {
   const fallback = audience === 'client' ? '/client-portal/oauth/callback' : '/auth/callback';
-  const destination = getClientRedirect(link && returnTo ? returnTo : fallback);
+  const destination = getClientRedirect((link || signup) && returnTo ? returnTo : fallback);
   if (!destination) {
     res.status(503).json({ success: false, code: 'OAUTH_UNAVAILABLE', message: 'Sign-in is temporarily unavailable.' });
     return;
   }
-  destination.searchParams.set(link ? 'oauth_error' : 'error', safeError(code));
+  destination.searchParams.set(link || signup ? 'oauth_error' : 'error', safeError(code));
   res.redirect(303, destination.toString());
 }
 
@@ -565,9 +566,10 @@ export const completeOAuthCallback = async (req: Request, res: Response): Promis
     errorRedirect(
       res,
       providerError === 'access_denied' ? 'cancelled' : 'authorization_failed',
-      transaction.returnTo,
+      signupErrorReturnTo(transaction) ?? transaction.returnTo,
       transaction.intent === 'link' || transaction.intent === 'publishing',
       transaction.audience,
+      transaction.intent === 'signup',
     );
     return;
   }
@@ -579,9 +581,10 @@ export const completeOAuthCallback = async (req: Request, res: Response): Promis
     errorRedirect(
       res,
       'provider_unavailable',
-      transaction.returnTo,
+      signupErrorReturnTo(transaction) ?? transaction.returnTo,
       transaction.intent === 'link' || transaction.intent === 'publishing',
       transaction.audience,
+      transaction.intent === 'signup',
     );
     return;
   }
@@ -590,9 +593,10 @@ export const completeOAuthCallback = async (req: Request, res: Response): Promis
     errorRedirect(
       res,
       'attempt_expired',
-      transaction.returnTo,
+      signupErrorReturnTo(transaction) ?? transaction.returnTo,
       transaction.intent === 'link' || transaction.intent === 'publishing',
       transaction.audience,
+      transaction.intent === 'signup',
     );
     return;
   }
@@ -708,12 +712,22 @@ export const completeOAuthCallback = async (req: Request, res: Response): Promis
     errorRedirect(
       res,
       errorCode,
-      destination,
+      signupErrorReturnTo(transaction) ?? destination,
       transaction.intent === 'link' || transaction.intent === 'publishing',
       transaction.audience,
+      transaction.intent === 'signup',
     );
   }
 };
+
+function signupErrorReturnTo(transaction: IOAuthTransaction): string | undefined {
+  if (transaction.intent !== 'signup' || transaction.audience !== 'user') return undefined;
+  const workspace = transaction.accountType === 'individual'
+    ? 'solo'
+    : transaction.organizationType;
+  if (!workspace) return undefined;
+  return `/signup?workspace=${encodeURIComponent(workspace)}&step=details`;
+}
 
 export const exchangeOAuthSession = async (req: Request, res: Response): Promise<void> => {
   res.setHeader('Cache-Control', 'no-store');

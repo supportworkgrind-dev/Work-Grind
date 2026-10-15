@@ -16,6 +16,15 @@ function VerifyEmailContent() {
   const email = (searchParams.get('email') || '').trim();
   const legacyToken = searchParams.get('token');
   const invite = searchParams.get('invite');
+  const workspaceId = searchParams.get('workspace');
+  const workspaceLabel = {
+    solo: 'Solo / Individual',
+    business: 'Company / Business',
+    school: 'School / Academy',
+    college: 'College',
+    university: 'University',
+  }[workspaceId || ''];
+  const isWorkspaceSignup = Boolean(workspaceLabel) && !invite;
   const { login, setCompany } = useAuthStore();
   const [code, setCode] = useState('');
   const [status, setStatus] = useState<'entry' | 'checking' | 'success' | 'legacy' | 'error'>(legacyToken ? 'checking' : 'entry');
@@ -128,10 +137,19 @@ function VerifyEmailContent() {
         </div>
       ) : (
         <>
+          {isWorkspaceSignup && (
+            <ol className="auth-step signup-steps" aria-label="Signup progress">
+              <li>01&nbsp; ACCOUNT TYPE</li><i aria-hidden="true" />
+              <li>02&nbsp; DETAILS</li><i aria-hidden="true" />
+              <li aria-current="step">03&nbsp; VERIFY EMAIL</li><i aria-hidden="true" />
+              <li>04&nbsp; WORKSPACE</li>
+            </ol>
+          )}
           <p className="auth-kicker !mb-3 !text-[9px]">ONE LAST STEP</p>
           <h1 className="auth-form-title">Check your inbox.</h1>
           <p className="auth-form-subtitle">
             If your signup is eligible, a six-digit code will be sent to <strong className="font-semibold text-stone-800">{email}</strong>. It expires in 10 minutes. If no code arrives, request another after the cooldown.
+            {isWorkspaceSignup && <> You’re setting up a <strong className="font-semibold text-stone-800">{workspaceLabel}</strong> workspace.</>}
           </p>
           {error && <div className="auth-error" role="alert"><AlertCircle size={15} className="mr-2 inline align-[-2px]" />{error}</div>}
           {notice && <p className="mb-4 text-sm text-stone-600" role="status">{notice}</p>}
@@ -156,7 +174,8 @@ function VerifyEmailContent() {
             <MailCheck size={15} className="mr-2 inline text-[#71836a]" />
             The code is single-use and stays valid for 10 minutes.
           </p>
-          <Link className="mt-5 inline-flex items-center gap-1.5 text-xs text-stone-500 hover:text-stone-800" href="/signup">
+          <Link className="mt-5 inline-flex items-center gap-1.5 text-xs text-stone-500 hover:text-stone-800"
+            href={workspaceLabel ? `/signup?workspace=${encodeURIComponent(workspaceId || '')}` : '/signup'}>
             <ArrowLeft size={13} /> Back to signup
           </Link>
           <p className="mt-5 text-xs text-stone-500">

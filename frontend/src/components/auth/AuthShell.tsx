@@ -2,9 +2,17 @@ import { ReactNode } from 'react';
 import { ArrowUpRight, Check, Circle, Clock3 } from 'lucide-react';
 import { ThemeAwareLogo } from '@/components/common/ThemeAwareLogo';
 
-export function AuthShell({ children }: { children: ReactNode }) {
+export function AuthShell({
+  children,
+  className = '',
+  contentClassName = '',
+}: {
+  children: ReactNode;
+  className?: string;
+  contentClassName?: string;
+}) {
   return (
-    <main className="auth-shell">
+    <main className={`auth-shell ${className}`.trim()}>
       <aside className="auth-editorial" aria-label="WorkGrind workspace preview">
         <div className="auth-brand">
           <ThemeAwareLogo size="md" showWordmark surface="dark" />
@@ -55,7 +63,7 @@ export function AuthShell({ children }: { children: ReactNode }) {
         <div className="auth-mobile-brand">
           <ThemeAwareLogo size="md" showWordmark />
         </div>
-        <div className="auth-content">{children}</div>
+        <div className={`auth-content ${contentClassName}`.trim()}>{children}</div>
         <footer className="auth-main-footer">
           <span>© {new Date().getFullYear()} WorkGrind</span>
           <span>For individuals, businesses, and education teams.</span>

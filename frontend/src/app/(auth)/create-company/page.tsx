@@ -137,7 +137,7 @@ export default function CreateCompanyPage() {
           <div className="flex items-center justify-between pb-6 border-b border-slate-100 mb-6">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700">
               <Sparkles className="h-3.5 w-3.5 text-indigo-600" />
-              <span>Step {step} of 2</span>
+              <span>{hasPersistedSignupContext && step === 2 ? '04 WORKSPACE SETUP' : `Step ${step} of 2`}</span>
             </span>
 
             <span className="text-xs text-slate-400 font-medium">
