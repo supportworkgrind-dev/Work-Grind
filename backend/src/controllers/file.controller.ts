@@ -23,6 +23,7 @@ import { AuthRequest } from '../middleware/auth';
 import { isAcademicOrganizationType } from '../config/organization';
 import { releaseStorage, reserveStorage } from '../utils/planLimits';
 import { getEffectiveSubscription } from '../services/companySubscription';
+import { parsePagination } from '../utils/pagination';
 import {
   isR2Configured,
   uploadFile   as r2Upload,
@@ -70,6 +71,12 @@ function isLocalPathSafe(p: string): boolean {
 // ═══════════════════════════════════════════════════════════════════════════════
 export const getFiles = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
+    const pagination = parsePagination(req.query, { defaultLimit: 100, maxLimit: 100 });
+    if (!pagination) {
+      res.status(400).json({ success: false, message: 'Invalid pagination parameters.' });
+      return;
+    }
+
     const { folderId, projectId, isStarred, search } = req.query;
     const filter: any = { companyId: req.user!.companyId, isDeleted: false };
     const accessScope = getAcademicFileAccessScope(req);
@@ -82,7 +89,7 @@ export const getFiles = async (req: AuthRequest, res: Response): Promise<void> =
     if (isStarred === 'true')  filter.isStarred = true;
     if (search)                filter.name      = { $regex: search, $options: 'i' };
 
-    const [files, subscription, company] = await Promise.all([
+    const [pageFiles, subscription, company] = await Promise.all([
       File.find(filter)
         .populate('uploaderId', 'fullName avatar')
         .populate('sharedWith.userId', 'fullName avatar')
@@ -92,16 +99,22 @@ export const getFiles = async (req: AuthRequest, res: Response): Promise<void> =
           select: 'name color crmCompanyId',
           populate: { path: 'crmCompanyId', match: { companyId: req.user!.companyId }, select: 'name' },
         })
-        .sort({ createdAt: -1 }),
+        .sort({ createdAt: -1 })
+        .skip(pagination.skip)
+        .limit(pagination.limit + 1),
       getEffectiveSubscription(req.user!.userId),
       req.user!.companyId
         ? Company.findById(req.user!.companyId).select('storage.used')
         : Promise.resolve(null),
     ]);
+    const hasMore = pageFiles.length > pagination.limit;
+    const files = hasMore ? pageFiles.slice(0, pagination.limit) : pageFiles;
 
     res.json({
       success: true,
       files,
+      page: pagination.page,
+      hasMore,
       storage: {
         used: company?.storage?.used ?? 0,
         limit: subscription.planConfig.limits.storage,

@@ -7,6 +7,7 @@ import Notification from '../models/Notification';
 import { AuthRequest } from '../middleware/auth';
 import { emitToChannel, emitToUser, emitToCompany, emitToDM } from '../utils/socket';
 import { shouldDeliverNotification } from '../utils/notificationPreferences';
+import { parsePagination } from '../utils/pagination';
 import { refreshAvatarUrls } from '../services/avatarUrls';
 
 const findAccessibleMessage = async (req: AuthRequest, messageId: string) => {
@@ -159,7 +160,13 @@ export const leaveChannel = async (req: AuthRequest, res: Response): Promise<voi
 
 export const getMessages = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { channelId, page = 1, limit = 50, parentId } = req.query;
+    const { channelId, parentId } = req.query;
+    const pagination = parsePagination(req.query, { defaultLimit: 50, maxLimit: 100 });
+    if (!pagination) {
+      res.status(400).json({ success: false, message: 'Invalid pagination parameters.' });
+      return;
+    }
+
     const filter: any = { companyId: req.user!.companyId, deletedAt: null };
     if (typeof channelId !== 'string' || !mongoose.Types.ObjectId.isValid(channelId)) {
       res.status(400).json({ success: false, message: 'A valid channelId is required.' });
@@ -189,16 +196,19 @@ export const getMessages = async (req: AuthRequest, res: Response): Promise<void
           populate: { path: 'senderId', select: 'fullName avatar avatarStorageKey' },
         })
         .sort({ createdAt: -1 })
-        .skip((Number(page) - 1) * Number(limit))
-        .limit(Number(limit))
+        .skip(pagination.skip)
+        .limit(pagination.limit + 1)
         .lean(),
     ]);
+    const hasMore = messages.length > pagination.limit;
+    const pageMessages = hasMore ? messages.slice(0, pagination.limit) : messages;
 
     res.json({
       success: true,
-      messages: await refreshAvatarUrls(messages.reverse()),
+      messages: await refreshAvatarUrls(pageMessages.reverse()),
       total,
-      hasMore: Number(page) * Number(limit) < total,
+      page: pagination.page,
+      hasMore,
     });
   } catch (e: any) { res.status(500).json({ success: false, message: e.message }); }
 };

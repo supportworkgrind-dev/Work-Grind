@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { checkRedisHealth, getRedisClient } from '../config/redis';
+import { checkRedisHealth, closeRedisClient, getRedisClient } from '../config/redis';
 
 async function run(): Promise<void> {
   const client = getRedisClient();
@@ -10,7 +10,7 @@ async function run(): Promise<void> {
       process.exitCode = 1;
     }
   } finally {
-    client?.disconnect();
+    await closeRedisClient();
   }
 }
 

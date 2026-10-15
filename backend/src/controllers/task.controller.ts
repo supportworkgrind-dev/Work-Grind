@@ -6,6 +6,7 @@ import type { TaskRecurrence } from '../models/Task';
 import { AuthRequest } from '../middleware/auth';
 import { createNotification } from './channel.controller';
 import { emitToCompany } from '../utils/socket';
+import { parsePagination } from '../utils/pagination';
 
 const TASK_RECURRENCES = new Set<TaskRecurrence>(['none', 'daily', 'weekly', 'monthly']);
 const MAX_TASK_DEPENDENCIES = 25;
@@ -99,7 +100,12 @@ const updateProjectProgress = async (projectId: string, companyId: string) => {
 
 export const getTasks = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { assigneeId, projectId, status, priority, dueDate, search } = req.query;
+    const { assigneeId, projectId, status, priority, search } = req.query;
+    const pagination = parsePagination(req.query, { defaultLimit: 200, maxLimit: 500 });
+    if (!pagination) {
+      res.status(400).json({ success: false, message: 'Invalid pagination parameters.' });
+      return;
+    }
     const filter: any = { companyId: req.user!.companyId, isArchived: false };
 
     if (req.user!.role === 'employee') {
@@ -130,26 +136,18 @@ export const getTasks = async (req: AuthRequest, res: Response): Promise<void> =
     if (priority) filter.priority = priority;
     if (search) filter.title = { $regex: search, $options: 'i' };
 
-    // Default limit of 200 tasks — prevents full-collection fetch on large workspaces.
-    // Pass ?limit=all to bypass when genuinely needed (e.g. exports).
-    const requestedLimit = req.query.limit;
-    const limit = requestedLimit === 'all'
-      ? undefined
-      : Math.min(500, Math.max(1, Number(requestedLimit) || 200));
-
-    let query = Task.find(filter)
+    const pageTasks = await Task.find(filter)
       .populate('assigneeId', 'fullName avatar email jobTitle')
       .populate('creatorId', 'fullName avatar')
       .populate('projectId', 'name color')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .skip(pagination.skip)
+      .limit(pagination.limit + 1)
+      .lean();
+    const hasMore = pageTasks.length > pagination.limit;
+    const tasks = hasMore ? pageTasks.slice(0, pagination.limit) : pageTasks;
 
-    if (limit) {
-      query = query.limit(limit);
-    }
-
-    const tasks = await query.lean();
-
-    res.json({ success: true, tasks });
+    res.json({ success: true, tasks, page: pagination.page, hasMore });
   } catch (err: any) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -157,10 +155,13 @@ export const getTasks = async (req: AuthRequest, res: Response): Promise<void> =
 
 export const getMyTasks = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    // Default to 50 tasks for dashboard/widget calls; pass ?limit=200 for full list
-    const limit = Math.min(500, Math.max(1, Number(req.query.limit) || 50));
+    const pagination = parsePagination(req.query, { defaultLimit: 50, maxLimit: 500 });
+    if (!pagination) {
+      res.status(400).json({ success: false, message: 'Invalid pagination parameters.' });
+      return;
+    }
 
-    const tasks = await Task.find({
+    const pageTasks = await Task.find({
       companyId: req.user!.companyId,
       assigneeId: req.user!.userId,
       isArchived: false,
@@ -169,10 +170,13 @@ export const getMyTasks = async (req: AuthRequest, res: Response): Promise<void>
       .populate('creatorId', 'fullName avatar')
       .populate('projectId', 'name color')
       .sort({ dueDate: 1, createdAt: -1 })
-      .limit(limit)
+      .skip(pagination.skip)
+      .limit(pagination.limit + 1)
       .lean();
 
-    res.json({ success: true, tasks });
+    const hasMore = pageTasks.length > pagination.limit;
+    const tasks = hasMore ? pageTasks.slice(0, pagination.limit) : pageTasks;
+    res.json({ success: true, tasks, page: pagination.page, hasMore });
   } catch (err: any) {
     res.status(500).json({ success: false, message: err.message });
   }

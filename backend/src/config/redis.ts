@@ -33,7 +33,7 @@ export function getRedisClient(): Redis | null {
       enableOfflineQueue: false,
       maxRetriesPerRequest: 1,
       connectTimeout: connectTimeoutMs,
-      retryStrategy: (attempt) => attempt <= 2 ? Math.min(attempt * 100, 300) : null,
+      retryStrategy: (attempt) => Math.min(attempt * 250, 5_000),
       autoResendUnfulfilledCommands: false,
     });
     client.on('error', (error: NodeJS.ErrnoException) => {
@@ -53,6 +53,18 @@ export function getRedisClient(): Redis | null {
 }
 
 export const REDIS_OPERATION_TIMEOUT_MS = operationTimeoutMs;
+
+export async function closeRedisClient(): Promise<void> {
+  const current = client;
+  client = null;
+  if (!current || current.status === 'end') return;
+
+  try {
+    await withRedisTimeout(current.quit(), 1_500);
+  } catch {
+    current.disconnect();
+  }
+}
 
 export function withRedisTimeout<T>(operation: Promise<T>, timeoutMs = operationTimeoutMs): Promise<T> {
   return new Promise<T>((resolve, reject) => {

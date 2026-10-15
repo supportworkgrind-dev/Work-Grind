@@ -14,4 +14,5 @@ const S = new Schema<INotification>({
 }, { timestamps: true });
 S.index({ userId: 1, isRead: 1, createdAt: -1 });
 S.index({ companyId: 1, userId: 1, isRead: 1, createdAt: -1 });
+S.index({ companyId: 1, userId: 1, createdAt: -1 });
 export default mongoose.model<INotification>('Notification', S);

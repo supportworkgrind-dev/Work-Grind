@@ -65,5 +65,6 @@ const S = new Schema<IFile>(
 S.index({ companyId: 1, folderId: 1 });
 S.index({ companyId: 1, uploaderId: 1 });
 S.index({ companyId: 1, isDeleted: 1 });
+S.index({ companyId: 1, isDeleted: 1, folderId: 1, createdAt: -1 });
 
 export default mongoose.model<IFile>('File', S);

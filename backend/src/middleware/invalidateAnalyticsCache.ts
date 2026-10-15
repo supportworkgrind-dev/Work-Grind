@@ -17,5 +17,6 @@ export const invalidateAnalyticsOverviewCache: RequestHandler = (req, res, next)
     }
   });
 
-  void deleteCacheKey(cacheKey).then(next);
+  void deleteCacheKey(cacheKey);
+  next();
 };

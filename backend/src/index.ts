@@ -115,7 +115,7 @@ import { rateLimiter } from './middleware/rateLimiter';
 import { logPolarConfig } from './config/subscription';
 import { logR2Config }   from './services/r2Storage';
 import { logGeminiConfig } from './services/geminiService';
-import { checkRedisHealth } from './config/redis';
+import { checkRedisHealth, closeRedisClient } from './config/redis';
 import { capturePolarWebhookRawBody } from './middleware/capturePolarWebhookBody';
 import { runTaskDueReminderSweep } from './services/taskDueReminders';
 import { cleanupExpiredVerificationCodes, migrateRefreshTokensAtRest } from './services/refreshTokenMigration';
@@ -242,8 +242,8 @@ const sendRedisHealthStatus: express.RequestHandler = async (_req, res) => {
     timestamp: new Date().toISOString(),
   });
 };
-app.get('/health/redis', rateLimiter(1, 10), sendRedisHealthStatus);
-app.get('/api/health/redis', rateLimiter(1, 10), sendRedisHealthStatus);
+app.get('/health/redis', rateLimiter(1, 10, { allowInMemoryOnVercel: true }), sendRedisHealthStatus);
+app.get('/api/health/redis', rateLimiter(1, 10, { allowInMemoryOnVercel: true }), sendRedisHealthStatus);
 
 // Global Middlewares
 
@@ -484,6 +484,16 @@ async function startServer(): Promise<void> {
 }
 
 if (!isVercelRuntime) void startServer();
+
+if (!isVercelRuntime) {
+  const shutdown = () => {
+    server.close(() => {
+      void closeRedisClient().finally(() => mongoose.disconnect());
+    });
+  };
+  process.once('SIGINT', shutdown);
+  process.once('SIGTERM', shutdown);
+}
 
 export default app;
 export { server };

@@ -7,6 +7,7 @@ type RateLimiterOptions = {
   message?: Record<string, unknown>;
   skip?: (req: Request) => boolean;
   keyGenerator?: (req: Request) => string;
+  allowInMemoryOnVercel?: boolean;
 };
 
 const incrementScript = `
@@ -68,22 +69,37 @@ export class RedisRateLimitStore implements Store {
 export const rateLimiter = (windowMin: number, max: number, options: RateLimiterOptions = {}) => {
   const windowMs = windowMin * 60 * 1000;
   const redis = getRedisClient();
+  const { allowInMemoryOnVercel = false, ...rateLimitOptions } = options;
   let store: Store | undefined;
   if (redis) {
     store = new RedisRateLimitStore(redis, windowMs, `workgrind:rate-limit:${++storeSequence}`);
-  } else if (process.env.VERCEL === '1' && !missingRedisWarningLogged) {
-    console.warn('[Rate limit] REDIS_URL is not configured; serverless limits are instance-local.');
+  } else if (process.env.VERCEL === '1' && !allowInMemoryOnVercel) {
+    if (!missingRedisWarningLogged) {
+      console.error('[Rate limit] REDIS_URL is required on Vercel; rate-limited requests will fail closed until configured.');
+      missingRedisWarningLogged = true;
+    }
+    return (_req, res) => res.status(503).json({
+      success: false,
+      code: 'RATE_LIMIT_UNAVAILABLE',
+      message: 'Request protection is temporarily unavailable. Please retry later.',
+    });
+  } else if (!redis && !missingRedisWarningLogged) {
+    const message = process.env.VERCEL === '1'
+      ? '[Rate limit] In-memory rate limiting is enabled only for explicitly exempted health checks.'
+      : '[Rate limit] REDIS_URL is not configured; local development uses process-local rate limits.';
+    console.warn(message);
     missingRedisWarningLogged = true;
   }
 
   return rateLimit({
     windowMs,
     max,
+    passOnStoreError: false,
     standardHeaders: true,
     legacyHeaders: false,
-    message: options.message || { success: false, message: 'Too many requests, please try again later.' },
-    skip: options.skip,
-    keyGenerator: options.keyGenerator,
+    message: rateLimitOptions.message || { success: false, message: 'Too many requests, please try again later.' },
+    skip: rateLimitOptions.skip,
+    keyGenerator: rateLimitOptions.keyGenerator,
     store,
   });
 };
