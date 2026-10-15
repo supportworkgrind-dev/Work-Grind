@@ -20,6 +20,7 @@ interface AuthState {
   setCompany: (company: Company | null) => void;
   login: (userData: User, accessToken: string) => void;
   logout: () => Promise<void>;
+  expireSession: () => void;
   fetchCurrentUser: () => Promise<void>;
   restoreSession: () => Promise<void>;
   refreshSubscription: () => Promise<void>;
@@ -164,21 +165,28 @@ export const useAuthStore = create<AuthState>((set, get) => {
     },
 
     logout: async () => {
-      authGeneration += 1;
-      const token = getAuthValue('workgrind_access_token');
+      const logoutGeneration = ++authGeneration;
       try {
         await api.post('/auth/logout', {});
       } catch (err) {
         console.error('Logout error:', err);
       } finally {
-        if (token && getAuthValue('workgrind_access_token') !== token) return;
+        if (authGeneration !== logoutGeneration) return;
         clearAuthValues();
         disconnectSocket();
         useCallingStore.getState().setActiveCall(null);
         useCallingStore.getState().setIncomingCall(null);
         set({ user: null, company: null, subscription: null, subscriptionLoading: false, subscriptionError: null, isAuthenticated: false, isLoading: false, authError: null });
-        window.location.href = '/login';
       }
+    },
+
+    expireSession: () => {
+      authGeneration += 1;
+      clearAuthValues();
+      disconnectSocket();
+      useCallingStore.getState().setActiveCall(null);
+      useCallingStore.getState().setIncomingCall(null);
+      set({ user: null, company: null, subscription: null, subscriptionLoading: false, subscriptionError: null, isAuthenticated: false, isLoading: false, authError: null });
     },
 
     restoreSession: () => {

@@ -1,27 +1,44 @@
 import axios from 'axios';
-import { getAuthValue, removeAuthValue, setAuthValue, updateAuthTokens } from './authSession';
+import { getAuthSessionVersion, getAuthValue, removeAuthValue, setAuthValue, updateAuthTokens } from './authSession';
 import { getApiBaseUrl } from './apiConfig';
 
 export interface RefreshedAuthTokens {
   accessToken: string;
 }
 
-let refreshInFlight: { expectedAccessToken: string | null; promise: Promise<RefreshedAuthTokens> } | null = null;
+let refreshInFlight: {
+  expectedAccessToken: string | null;
+  sessionVersion: number;
+  promise: Promise<RefreshedAuthTokens>;
+} | null = null;
 
 export function refreshAuthTokens(expectedAccessToken: string | null): Promise<RefreshedAuthTokens> {
+  const sessionVersion = getAuthSessionVersion();
   if (expectedAccessToken && getAuthValue('workgrind_access_token') !== expectedAccessToken) {
     return Promise.reject(new Error('Authentication session changed.'));
   }
 
   if (refreshInFlight) {
-    if (refreshInFlight.expectedAccessToken === expectedAccessToken || expectedAccessToken === null) {
+    if (
+      refreshInFlight.sessionVersion === sessionVersion &&
+      (refreshInFlight.expectedAccessToken === expectedAccessToken || expectedAccessToken === null)
+    ) {
       return refreshInFlight.promise;
     }
-    return refreshInFlight.promise.then(() => {
-      if (getAuthValue('workgrind_access_token') !== expectedAccessToken) {
+    return refreshInFlight.promise.catch(() => undefined).then(() => {
+      if (
+        getAuthSessionVersion() !== sessionVersion ||
+        (expectedAccessToken && getAuthValue('workgrind_access_token') !== expectedAccessToken)
+      ) {
         throw new Error('Authentication session changed.');
       }
       return refreshAuthTokens(expectedAccessToken);
+    });
+  }
+
+  if (process.env.NODE_ENV !== 'production') {
+    console.debug('[Auth diagnostics] Starting a token refresh.', {
+      reason: expectedAccessToken ? 'rejected-access-token' : 'session-restore',
     });
   }
 
@@ -34,7 +51,10 @@ export function refreshAuthTokens(expectedAccessToken: string | null): Promise<R
       if (typeof accessToken !== 'string' || !accessToken) {
         throw new Error('Authentication refresh returned invalid tokens.');
       }
-      if (expectedAccessToken && getAuthValue('workgrind_access_token') !== expectedAccessToken) {
+      if (
+        getAuthSessionVersion() !== sessionVersion ||
+        (expectedAccessToken && getAuthValue('workgrind_access_token') !== expectedAccessToken)
+      ) {
         throw new Error('Authentication session changed during refresh.');
       }
       if (expectedAccessToken) updateAuthTokens(accessToken, expectedAccessToken);
@@ -44,7 +64,10 @@ export function refreshAuthTokens(expectedAccessToken: string | null): Promise<R
     });
 
   const request = (async () => {
-    if (expectedAccessToken && getAuthValue('workgrind_access_token') !== expectedAccessToken) {
+    if (
+      getAuthSessionVersion() !== sessionVersion ||
+      (expectedAccessToken && getAuthValue('workgrind_access_token') !== expectedAccessToken)
+    ) {
       throw new Error('Authentication session changed.');
     }
     if (typeof navigator !== 'undefined' && navigator.locks) {
@@ -55,6 +78,6 @@ export function refreshAuthTokens(expectedAccessToken: string | null): Promise<R
     if (refreshInFlight?.promise === request) refreshInFlight = null;
   });
 
-  refreshInFlight = { expectedAccessToken, promise: request };
+  refreshInFlight = { expectedAccessToken, sessionVersion, promise: request };
   return request;
 }

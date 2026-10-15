@@ -9,6 +9,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuthStore } from '@/store/useAuthStore';
 import { ArrowUpRight, X } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 function PlanUpgradePrompt() {
   const [message, setMessage] = useState('');
@@ -70,8 +71,10 @@ function PlanUpgradePrompt() {
 }
 
 export function RootClientProviders({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
   const pathname = usePathname();
   const redirectingForSubscription = useRef(false);
+  const restoreAttempted = useRef(false);
 
   useEffect(() => {
     if (pathname === '/billing' || pathname === '/tasks') {
@@ -85,21 +88,37 @@ export function RootClientProviders({ children }: { children: React.ReactNode })
 
   useEffect(() => {
     if (pathname === '/auth/callback' || pathname === '/client-portal/oauth/callback') return;
+    if (restoreAttempted.current) return;
+    restoreAttempted.current = true;
     void useAuthStore.getState().restoreSession();
   }, [pathname]);
 
   useEffect(() => {
+    const handleExpiredSession = () => useAuthStore.getState().expireSession();
+    window.addEventListener('workgrind:auth-session-expired', handleExpiredSession);
+    return () => window.removeEventListener('workgrind:auth-session-expired', handleExpiredSession);
+  }, []);
+
+  useEffect(() => {
     const handleSubscriptionRequired = () => {
-      if (window.location.pathname === '/billing' || window.location.pathname === '/subscription-expired') return;
+      if (pathname === '/billing' || pathname === '/subscription-expired') return;
       if (redirectingForSubscription.current) return;
       redirectingForSubscription.current = true;
       void useAuthStore.getState().refreshSubscription().finally(() => {
-        window.location.assign('/subscription-expired');
+        if (pathname !== '/subscription-expired') {
+          if (process.env.NODE_ENV !== 'production') {
+            console.debug('[Navigation diagnostics] Redirecting after subscription rejection.', {
+              from: pathname,
+              to: '/subscription-expired',
+            });
+          }
+          router.replace('/subscription-expired');
+        }
       });
     };
     window.addEventListener('workgrind:subscription-required', handleSubscriptionRequired);
     return () => window.removeEventListener('workgrind:subscription-required', handleSubscriptionRequired);
-  }, [pathname]);
+  }, [pathname, router]);
 
   return (
     <I18nProvider>

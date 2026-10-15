@@ -6,13 +6,11 @@ import { refreshAuthTokens } from './tokenRefresh';
 
 const API_BASE_URL = getApiBaseUrl();
 
-export const clearAuthSession = ({ redirect = true } = {}) => {
+export const clearAuthSession = () => {
   if (typeof window === 'undefined') return;
   clearAuthValues();
   disconnectSocket();
-  if (redirect && window.location.pathname !== '/login' && window.location.pathname !== '/signup') {
-    window.location.href = '/login';
-  }
+  window.dispatchEvent(new Event('workgrind:auth-session-expired'));
 };
 
 export const api = axios.create({
@@ -23,8 +21,36 @@ export const api = axios.create({
   },
 });
 
+const duplicateRequestCounts = new Map<string, number>();
+const requestKeys = new WeakMap<object, string>();
+
+function trackRequest(config: object & { method?: string; url?: string }): void {
+  if (process.env.NODE_ENV === 'production') return;
+  const key = `${(config.method || 'GET').toUpperCase()} ${config.url || ''}`;
+  const active = duplicateRequestCounts.get(key) ?? 0;
+  duplicateRequestCounts.set(key, active + 1);
+  requestKeys.set(config, key);
+  if (active > 0) {
+    console.debug('[Request diagnostics] Concurrent duplicate API request.', {
+      method: (config.method || 'GET').toUpperCase(),
+      activeRequests: active + 1,
+    });
+  }
+}
+
+function finishRequest(config?: object): void {
+  if (process.env.NODE_ENV === 'production' || !config) return;
+  const key = requestKeys.get(config);
+  if (!key) return;
+  requestKeys.delete(config);
+  const active = duplicateRequestCounts.get(key) ?? 0;
+  if (active <= 1) duplicateRequestCounts.delete(key);
+  else duplicateRequestCounts.set(key, active - 1);
+}
+
 api.interceptors.request.use(
   (config) => {
+    trackRequest(config);
     if (typeof window !== 'undefined') {
       if (!config.headers.Authorization) {
         const token = getAuthValue('workgrind_access_token');
@@ -39,9 +65,13 @@ api.interceptors.request.use(
 );
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    finishRequest(response.config);
+    return response;
+  },
   async (error) => {
     const originalRequest = error.config;
+    finishRequest(originalRequest);
     const responseData = error.response?.data;
     const failedPath = typeof originalRequest?.url === 'string'
       ? new URL(originalRequest.url, typeof window === 'undefined' ? 'http://localhost' : window.location.origin).pathname
@@ -64,7 +94,26 @@ api.interceptors.response.use(
         detail: responseData,
       }));
     }
-    if (error.response?.status === 401 && !originalRequest._retry && typeof window !== 'undefined') {
+    const authEndpointDoesNotRefresh = [
+      '/auth/login',
+      '/auth/logout',
+      '/auth/refresh',
+      '/auth/signup',
+      '/auth/register',
+      '/auth/google',
+      '/auth/google/callback',
+      '/auth/verify-email',
+      '/auth/forgot-password',
+      '/auth/reset-password',
+      '/auth/resend-verification',
+    ].some((path) => failedPath.endsWith(path));
+    if (
+      originalRequest &&
+      error.response?.status === 401 &&
+      !authEndpointDoesNotRefresh &&
+      !originalRequest._retry &&
+      typeof window !== 'undefined'
+    ) {
       const requestToken = originalRequest.headers?.Authorization;
       const currentToken = getAuthValue('workgrind_access_token');
       if (!currentToken || requestToken !== `Bearer ${currentToken}`) {

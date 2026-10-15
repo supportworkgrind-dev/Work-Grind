@@ -1,5 +1,6 @@
 import { expect, test, type Route } from '@playwright/test';
 import { getTrustedConnectionSources } from '../src/lib/cspSources';
+import { shouldReloadForServiceWorkerControllerChange } from '../src/lib/serviceWorkerUpdate';
 import { resolveSocketUrl, SOCKET_IO_PATH } from '../src/lib/socket';
 
 const conversationId = 'regression-conversation-001';
@@ -66,8 +67,10 @@ async function mockApi(
     noSubscriptionRecord?: boolean;
     expireCurrentUserOnce?: { value: boolean };
     refreshStatus?: number;
+    refreshDelayMs?: number;
     refreshRequests?: number[];
     currentUserTokens?: string[];
+    unauthorizedPaths?: Map<string, number>;
   }
 ) {
   const request = route.request();
@@ -83,6 +86,21 @@ async function mockApi(
 
   if (request.method() === 'OPTIONS') {
     await route.fulfill({ status: 204, headers });
+    return;
+  }
+  const unauthorizedPath = [...(options.unauthorizedPaths?.keys() ?? [])]
+    .find((path) => pathname.endsWith(path));
+  const remainingUnauthorizedResponses = unauthorizedPath
+    ? options.unauthorizedPaths?.get(unauthorizedPath) ?? 0
+    : 0;
+  if (unauthorizedPath && remainingUnauthorizedResponses > 0) {
+    options.unauthorizedPaths?.set(unauthorizedPath, remainingUnauthorizedResponses - 1);
+    await route.fulfill({
+      status: 401,
+      headers,
+      contentType: 'application/json',
+      body: JSON.stringify({ success: false, message: 'Invalid or expired token' }),
+    });
     return;
   }
   if (pathname.endsWith('/auth/me')) {
@@ -118,6 +136,9 @@ async function mockApi(
   }
   if (pathname.endsWith('/auth/refresh')) {
     options.refreshRequests?.push(Date.now());
+    if (options.refreshDelayMs) {
+      await new Promise((resolve) => setTimeout(resolve, options.refreshDelayMs));
+    }
     await route.fulfill({
       status: options.refreshStatus ?? 200,
       headers,
@@ -361,6 +382,10 @@ test('Tavro remains on the same route when /auth/me recovers through refresh', a
 
 test('an expired or revoked refresh credential leaves a logged-out visitor on the public landing page', async ({ page }) => {
   const refreshRequests: number[] = [];
+  const mainFrameNavigations: number[] = [];
+  page.on('framenavigated', (frame) => {
+    if (frame === page.mainFrame()) mainFrameNavigations.push(Date.now());
+  });
   await page.route('**/api/**', (route) => mockApi(route, {
     ...makeApiState(),
     failSubscriptionRequestAt: undefined,
@@ -372,7 +397,112 @@ test('an expired or revoked refresh credential leaves a logged-out visitor on th
   await page.goto('/');
   await expect(page).toHaveURL(/\/$/);
   await expect(page.getByRole('link', { name: /sign in|log in/i }).first()).toBeVisible();
+  await page.waitForTimeout(500);
   expect(refreshRequests).toHaveLength(1);
+  expect(mainFrameNavigations).toHaveLength(1);
+});
+
+test('concurrent expired API requests share one refresh and preserve the current route', async ({ page }) => {
+  const state = makeApiState();
+  state.messages.push({
+    role: 'assistant',
+    content: 'Restored conversation',
+    createdAt: new Date().toISOString(),
+  });
+  const refreshRequests: number[] = [];
+  const unauthorizedPaths = new Map([
+    ['/subscription/status', 1],
+    [`/ai/agent/conversations/${conversationId}`, 1],
+  ]);
+  await page.addInitScript((id) => {
+    sessionStorage.setItem('workgrind_access_token', 'playwright-expired-access');
+    sessionStorage.setItem('workgrind:ai:active-conversation:playwright-user', id);
+  }, conversationId);
+  await page.route('**/api/**', (route) => mockApi(route, {
+    ...state,
+    failSubscriptionRequestAt: undefined,
+    failFirstAgentRequest: false,
+    refreshDelayMs: 150,
+    refreshRequests,
+    unauthorizedPaths,
+  }));
+  await page.goto('/ai');
+
+  await expect(page.getByPlaceholder(/Ask me to find tasks/)).toBeVisible();
+  await expect(page.getByText('Restored conversation')).toBeVisible();
+  expect(refreshRequests).toHaveLength(1);
+  await expect(page).toHaveURL(/\/ai$/);
+});
+
+test('login 401 is not retried with a stale access token', async ({ page }) => {
+  await setSessionAuth(page);
+  const refreshRequests: number[] = [];
+  let loginRequests = 0;
+  await page.route('**/api/**', async (route) => {
+    const pathname = new URL(route.request().url()).pathname;
+    if (pathname.endsWith('/auth/login')) {
+      loginRequests += 1;
+      await route.fulfill({
+        status: 401,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: false, message: 'Invalid credentials.' }),
+      });
+      return;
+    }
+    await mockApi(route, {
+      ...makeApiState(),
+      failSubscriptionRequestAt: undefined,
+      failFirstAgentRequest: false,
+      refreshRequests,
+    });
+  });
+  await page.goto('/login');
+  await page.getByLabel('Work email').fill('invalid@example.invalid');
+  await page.locator('#login-password').fill('not-a-real-secret');
+  await page.getByRole('button', { name: /Sign in to WorkGrind/ }).click();
+
+  await expect(page.getByRole('alert')).toContainText('Invalid credentials.');
+  expect(loginRequests).toBe(1);
+  expect(refreshRequests).toHaveLength(0);
+  await expect(page).toHaveURL(/\/login$/);
+});
+
+test('logout does not refresh a session after its logout request is rejected', async ({ page }) => {
+  await setSessionAuth(page);
+  const refreshRequests: number[] = [];
+  let logoutRequests = 0;
+  await page.route('**/api/**', async (route) => {
+    const pathname = new URL(route.request().url()).pathname;
+    if (pathname.endsWith('/auth/logout')) {
+      logoutRequests += 1;
+      await route.fulfill({
+        status: 401,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: false, message: 'Session already expired.' }),
+      });
+      return;
+    }
+    await mockApi(route, {
+      ...makeApiState(),
+      failSubscriptionRequestAt: undefined,
+      failFirstAgentRequest: false,
+      refreshRequests,
+    });
+  });
+  await page.goto('/ai');
+  await expect(page.getByPlaceholder(/Ask me to find tasks/)).toBeVisible();
+  await page.locator('button[aria-haspopup="menu"]').click();
+  await page.getByRole('menuitem', { name: 'Sign out' }).click();
+
+  await expect(page).toHaveURL(/\/login\?redirect=/);
+  expect(logoutRequests).toBe(1);
+  expect(refreshRequests).toHaveLength(0);
+});
+
+test('the initial service-worker takeover does not trigger a full-page reload', () => {
+  expect(shouldReloadForServiceWorkerControllerChange(false, false)).toBe(false);
+  expect(shouldReloadForServiceWorkerControllerChange(true, true)).toBe(false);
+  expect(shouldReloadForServiceWorkerControllerChange(true, false)).toBe(true);
 });
 
 test('refresh requests from two tabs are serialized while refresh-token cookies rotate', async ({ browser }) => {

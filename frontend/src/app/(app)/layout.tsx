@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, memo, useState } from 'react';
+import { useCallback, useEffect, useRef, memo, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useAppStore } from '@/store/useAppStore';
@@ -83,6 +83,24 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const isSidebarOpen    = useAppStore((s) => s.isSidebarOpen);
   const organization = company ?? (user?.companyId && typeof user.companyId === 'object' ? user.companyId : null);
   const routeAllowed = canAccessRoute(organization, user?.role, pathname, academicSection);
+  const pendingRedirect = useRef<string | null>(null);
+
+  const redirectOnce = useCallback((destination: string, reason: string) => {
+    const pendingPath = pendingRedirect.current?.split('?')[0];
+    if (pendingPath === pathname) pendingRedirect.current = null;
+    const currentLocation = `${pathname}${window.location.search}`;
+    if (destination === currentLocation || pendingRedirect.current === destination) return;
+    pendingRedirect.current = destination;
+    if (process.env.NODE_ENV !== 'production') {
+      console.debug('[Navigation diagnostics] Route guard redirect.', {
+        reason,
+        from: pathname,
+        to: destination.split('?')[0],
+      });
+    }
+    router.replace(destination);
+  }, [pathname, router]);
+
   useEffect(() => {
     if (!user) return;
     setTheme(normalizeTheme(user.theme));
@@ -109,15 +127,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!isLoading && !user) {
       const returnTo = `${pathname}${window.location.search}`;
-      router.replace(`/login?redirect=${encodeURIComponent(returnTo)}`);
+      redirectOnce(`/login?redirect=${encodeURIComponent(returnTo)}`, 'authentication-required');
     }
-  }, [isLoading, pathname, user, router]);
+  }, [isLoading, pathname, redirectOnce, user]);
 
   useEffect(() => {
     if (user && !routeAllowed) {
-      router.replace(getWorkspaceHome(organization));
+      redirectOnce(getWorkspaceHome(organization), 'organization-route-guard');
     }
-  }, [academicSection, organization, routeAllowed, router, user]);
+  }, [academicSection, organization, redirectOnce, routeAllowed, user]);
 
   useEffect(() => {
     if (user && !subscription && !subscriptionLoading && !subscriptionError) {
@@ -140,9 +158,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (user && !subscriptionLoading && !subscriptionError && subscription && !subscription.hasActiveAccess && pathname !== '/billing') {
-      router.replace('/subscription-expired');
+      redirectOnce('/subscription-expired', 'subscription-expired');
     }
-  }, [user, subscription, subscriptionLoading, subscriptionError, pathname, router]);
+  }, [user, subscription, subscriptionLoading, subscriptionError, pathname, redirectOnce]);
 
   // ── Key behaviour change ───────────────────────────────────────────────────
   // Previously: !mounted || isLoading → full-screen spinner, blocking ALL renders

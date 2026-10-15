@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { syncPendingActionsToServer } from '@/lib/offlineSync';
+import { shouldReloadForServiceWorkerControllerChange } from '@/lib/serviceWorkerUpdate';
 
 const DEV_BUILD_ID_KEY = 'workgrind:dev-build-id';
 const DEV_BUILD_RELOAD_KEY = 'workgrind:dev-build-reloaded:';
@@ -68,9 +69,38 @@ export function ServiceWorkerRegister() {
 
     if (isDev) return cleanupBuildListener;
 
+    const hadController = Boolean(navigator.serviceWorker.controller);
+    let refreshing = false;
+    const handleControllerChange = () => {
+      if (refreshing) return;
+      refreshing = true;
+      const controllerUrl = navigator.serviceWorker.controller?.scriptURL || buildId || 'active';
+      const reloadKey = `workgrind-sw-reloaded:${controllerUrl}`;
+      let alreadyReloaded = false;
+      try {
+        alreadyReloaded = sessionStorage.getItem(reloadKey) === '1';
+        if (shouldReloadForServiceWorkerControllerChange(hadController, alreadyReloaded)) {
+          sessionStorage.setItem(reloadKey, '1');
+        }
+      } catch {
+        alreadyReloaded = false;
+      }
+      if (!shouldReloadForServiceWorkerControllerChange(hadController, alreadyReloaded)) return;
+      if (process.env.NODE_ENV !== 'production') {
+        console.debug('[PWA diagnostics] Reloading after an updated service worker took control.');
+      }
+      window.location.reload();
+    };
+    const handleServiceWorkerMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'TRIGGER_BACKGROUND_SYNC') {
+        syncPendingActionsToServer();
+      }
+    };
+    navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange);
+    navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);
+
     const registerSW = async () => {
       try {
-        const buildId = process.env.NEXT_PUBLIC_BUILD_ID;
         const scriptUrl = buildId ? `/sw.js?build=${encodeURIComponent(buildId)}` : '/sw.js';
         const registration = await navigator.serviceWorker.register(scriptUrl, {
           // updateViaCache: 'none' tells the browser to always network-fetch
@@ -100,15 +130,6 @@ export function ServiceWorkerRegister() {
           });
         });
 
-        // Reload once when the SW controller changes (after SKIP_WAITING)
-        let refreshing = false;
-        navigator.serviceWorker.addEventListener('controllerchange', () => {
-          if (!refreshing) {
-            refreshing = true;
-            window.location.reload();
-          }
-        });
-
         // Register for Background Sync if supported
         if ('sync' in registration) {
           (registration as any).sync
@@ -120,14 +141,11 @@ export function ServiceWorkerRegister() {
       }
     };
 
-    registerSW();
-
-    // Listen for messages from Service Worker
-    navigator.serviceWorker.addEventListener('message', (event) => {
-      if (event.data?.type === 'TRIGGER_BACKGROUND_SYNC') {
-        syncPendingActionsToServer();
-      }
-    });
+    void registerSW();
+    return () => {
+      navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
+      navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage);
+    };
   }, []);
 
   return null;

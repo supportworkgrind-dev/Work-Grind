@@ -1,22 +1,30 @@
 'use client';
 
-import { useEffect, type ReactNode } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useRef, type ReactNode } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/useAuthStore';
 import styles from '@/app/landing.module.css';
 import { FloatingNavbar } from './FloatingNavbar';
 
 export function LandingPageClient({ children }: { children: ReactNode }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const pendingRedirect = useRef<string | null>(null);
   const { user, isAuthenticated, isLoading, authError, restoreSession } = useAuthStore();
 
   useEffect(() => {
     if (isLoading || !isAuthenticated || !user) return;
     const company = typeof user.companyId === 'object' ? user.companyId : undefined;
-    router.replace(company?.organizationType && company.organizationType !== 'business'
+    const destination = company?.organizationType && company.organizationType !== 'business'
       ? '/academic'
-      : user.companyId ? '/dashboard' : '/create-company');
-  }, [isAuthenticated, isLoading, router, user]);
+      : user.companyId ? '/dashboard' : '/create-company';
+    if (destination === pathname || pendingRedirect.current === destination) return;
+    pendingRedirect.current = destination;
+    if (process.env.NODE_ENV !== 'production') {
+      console.debug('[Navigation diagnostics] Landing redirect.', { from: pathname, to: destination });
+    }
+    router.replace(destination);
+  }, [isAuthenticated, isLoading, pathname, router, user]);
 
   return (
     <div className={`${styles.landing} landing-theme theme-scope min-h-screen overflow-x-hidden`}>

@@ -11,6 +11,12 @@ const AUTH_STORAGE_KEYS: AuthStorageKey[] = [
   'workgrind_subscription',
 ];
 
+let authSessionVersion = 0;
+
+export function getAuthSessionVersion(): number {
+  return authSessionVersion;
+}
+
 function removeLegacyAuthValues(): void {
   if (typeof window === 'undefined') return;
   for (const key of AUTH_STORAGE_KEYS) {
@@ -33,6 +39,7 @@ export function setAuthValue(key: AuthStorageKey, value: string): void {
 
 export function setAuthSession(accessToken: string, user: string): void {
   if (typeof window === 'undefined') return;
+  authSessionVersion += 1;
   removeLegacyAuthValues();
   setAuthValue('workgrind_access_token', accessToken);
   sessionStorage.removeItem('workgrind_refresh_token');
@@ -55,6 +62,7 @@ export function removeAuthValue(key: AuthStorageKey): void {
 
 export function clearAuthValues(): void {
   if (typeof window === 'undefined') return;
+  authSessionVersion += 1;
   removeLegacyAuthValues();
   for (const key of AUTH_STORAGE_KEYS) {
     sessionStorage.removeItem(key);
