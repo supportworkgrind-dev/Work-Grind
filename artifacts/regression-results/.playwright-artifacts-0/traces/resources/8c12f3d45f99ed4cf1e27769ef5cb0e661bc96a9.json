@@ -1,1 +1,0 @@
-{"success":true,"subscription":{"status":"trialing","hasActiveAccess":true,"organizationType":"business","entitlements":{"tasksProjects":true},"limits":{"members":5,"storage":1000000,"aiRequests":50},"usage":{"members":1,"storageBytes":0,"aiRequests":0}}}

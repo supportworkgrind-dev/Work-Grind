@@ -91,9 +91,7 @@ const invalidateSocketSession = (target: Socket, failedToken: string) => {
   if (socket !== target || getAuthValue('workgrind_access_token') !== failedToken) return;
   clearAuthValues();
   destroySocket(target);
-  if (window.location.pathname !== '/login' && window.location.pathname !== '/signup') {
-    window.location.assign('/login');
-  }
+  window.dispatchEvent(new Event('workgrind:auth-session-expired'));
 };
 
 function flushPendingRooms(s: Socket) {

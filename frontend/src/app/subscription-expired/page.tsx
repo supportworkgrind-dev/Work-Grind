@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { ArrowRight, ShieldCheck } from 'lucide-react';
 import { ThemeAwareLogo } from '@/components/common/ThemeAwareLogo';
 import { ExpiredSubscriptionExperience } from '@/components/subscription/ExpiredSubscriptionExperience';
@@ -10,6 +10,8 @@ import { useAuthStore } from '@/store/useAuthStore';
 
 export default function SubscriptionExpiredPage() {
   const router = useRouter();
+  const pathname = usePathname();
+  const pendingRedirect = useRef<string | null>(null);
   const user = useAuthStore((state) => state.user);
   const isLoading = useAuthStore((state) => state.isLoading);
   const subscription = useAuthStore((state) => state.subscription);
@@ -17,22 +19,27 @@ export default function SubscriptionExpiredPage() {
   const subscriptionError = useAuthStore((state) => state.subscriptionError);
   const fetchCurrentUser = useAuthStore((state) => state.fetchCurrentUser);
   const refreshSubscription = useAuthStore((state) => state.refreshSubscription);
+  const redirectOnce = useCallback((destination: string) => {
+    if (pathname === destination || pendingRedirect.current === destination) return;
+    pendingRedirect.current = destination;
+    router.replace(destination);
+  }, [pathname, router]);
 
   useEffect(() => {
     if (!user && isLoading) void fetchCurrentUser();
   }, [user, isLoading, fetchCurrentUser]);
 
   useEffect(() => {
-    if (!isLoading && !user) router.replace('/login');
-  }, [isLoading, user, router]);
+    if (!isLoading && !user) redirectOnce('/login');
+  }, [isLoading, user, redirectOnce]);
 
   useEffect(() => {
     if (user && !subscription) void refreshSubscription();
   }, [user, subscription, refreshSubscription]);
 
   useEffect(() => {
-    if (subscription?.hasActiveAccess) router.replace('/tasks');
-  }, [subscription, router]);
+    if (subscription?.hasActiveAccess) redirectOnce('/tasks');
+  }, [subscription, redirectOnce]);
 
   if (isLoading || !user || subscriptionLoading || (!subscription && !subscriptionError)) {
     return (

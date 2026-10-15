@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useAdminAuthStore } from '@/store/useAdminAuthStore';
@@ -41,6 +41,8 @@ export default function AdminPortalLayout({ children }: { children: React.ReactN
   const { adminUser, isAuthenticated, isLoading, fetchAdminMe, logout } = useAdminAuthStore();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [unreadInboxCount, setUnreadInboxCount] = useState(0);
+  const adminValidationAttempted = useRef(false);
+  const redirectingToLogin = useRef(false);
 
   // If on login page, render children directly without dashboard shell
   const isLoginPage = pathname === '/admin-portal/login';
@@ -58,16 +60,43 @@ export default function AdminPortalLayout({ children }: { children: React.ReactN
   }, []);
 
   useEffect(() => {
-    if (!isLoginPage) {
+    if (isLoginPage) {
+      adminValidationAttempted.current = false;
+      redirectingToLogin.current = false;
+      return;
+    }
+    if (!adminValidationAttempted.current) {
+      adminValidationAttempted.current = true;
       fetchAdminMe().then((authorized) => {
         if (!authorized) {
-          router.replace('/admin-portal/login');
+          if (pathname !== '/admin-portal/login' && !redirectingToLogin.current) {
+            redirectingToLogin.current = true;
+            if (process.env.NODE_ENV !== 'production') {
+              console.debug('[Navigation diagnostics] Admin session redirect.', {
+                from: pathname,
+                to: '/admin-portal/login',
+              });
+            }
+            router.replace('/admin-portal/login');
+          }
         } else {
           fetchUnreadCount();
         }
       });
     }
-  }, [isLoginPage, fetchAdminMe, router, fetchUnreadCount]);
+  }, [isLoginPage, fetchAdminMe, pathname, router, fetchUnreadCount]);
+
+  useEffect(() => {
+    const handleAdminSessionExpired = () => {
+      logout();
+      if (pathname !== '/admin-portal/login' && !redirectingToLogin.current) {
+        redirectingToLogin.current = true;
+        router.replace('/admin-portal/login');
+      }
+    };
+    window.addEventListener('workgrind:admin-session-expired', handleAdminSessionExpired);
+    return () => window.removeEventListener('workgrind:admin-session-expired', handleAdminSessionExpired);
+  }, [logout, pathname, router]);
 
   // Periodically refresh unread count every 30 seconds
   useEffect(() => {

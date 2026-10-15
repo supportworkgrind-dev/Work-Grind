@@ -25,7 +25,7 @@ adminApi.interceptors.response.use(
       if (typeof window !== 'undefined' && !window.location.pathname.includes('/admin-portal/login')) {
         localStorage.removeItem('workgrind_super_admin_token');
         localStorage.removeItem('workgrind_super_admin_user');
-        window.location.href = '/admin-portal/login';
+        window.dispatchEvent(new Event('workgrind:admin-session-expired'));
       }
     }
     return Promise.reject(error);
