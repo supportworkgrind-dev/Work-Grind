@@ -152,7 +152,7 @@ export function DailyFocusCard({ className = '', onRefresh }: DailyFocusCardProp
               </span>
               {data?.generatedBy === 'ai' && (
                 <span className="hidden sm:inline-block text-[10px] font-medium text-slate-400">
-                  GPT-4o Ranked
+                  Tavro AI ranked
                 </span>
               )}
             </div>
