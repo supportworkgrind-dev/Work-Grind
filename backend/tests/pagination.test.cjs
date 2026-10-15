@@ -1,6 +1,7 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 const mongoose = require('mongoose');
+const Board = require('../dist/models/Board').default;
 const Conversation = require('../dist/models/Conversation').default;
 const Message = require('../dist/models/Message').default;
 const Notification = require('../dist/models/Notification').default;
@@ -8,8 +9,10 @@ const Project = require('../dist/models/Project').default;
 const { getDMMessages } = require('../dist/controllers/directMessage.controller');
 const { deleteNotification, markAsRead } = require('../dist/controllers/notification.controller');
 const { getProjects } = require('../dist/controllers/project.controller');
+const { getBoards } = require('../dist/controllers/whiteboard.controller');
 const { parsePagination } = require('../dist/utils/pagination');
 
+const originalBoardFind = Board.find;
 const originalProjectFind = Project.find;
 const originalConversationFindOne = Conversation.findOne;
 const originalMessageCountDocuments = Message.countDocuments;
@@ -27,6 +30,7 @@ function response() {
 }
 
 test.afterEach(() => {
+  Board.find = originalBoardFind;
   Project.find = originalProjectFind;
   Conversation.findOne = originalConversationFindOne;
   Message.countDocuments = originalMessageCountDocuments;
@@ -61,6 +65,7 @@ test('pagination applies defaults and caps oversized limits', () => {
 test('project listing remains tenant and role scoped and reports a bounded next page', async () => {
   const companyId = 'tenant-a';
   let queryFilter;
+  let querySort;
   let querySkip;
   let queryLimit;
   const rows = [{ id: 1 }, { id: 2 }, { id: 3 }];
@@ -69,7 +74,7 @@ test('project listing remains tenant and role scoped and reports a bounded next 
     queryFilter = filter;
     const query = {
       populate() { return this; },
-      sort() { return this; },
+      sort(value) { querySort = value; return this; },
       skip(value) { querySkip = value; return this; },
       limit(value) { queryLimit = value; return this; },
       lean: async () => rows,
@@ -84,6 +89,7 @@ test('project listing remains tenant and role scoped and reports a bounded next 
   }, res);
 
   assert.equal(queryFilter.companyId, companyId);
+  assert.deepEqual(querySort, { createdAt: -1, _id: -1 });
   assert.equal(queryFilter.isArchived, false);
   assert.deepEqual(queryFilter.$or, [
     { 'members.userId': 'member-a' },
@@ -94,6 +100,72 @@ test('project listing remains tenant and role scoped and reports a bounded next 
   assert.equal(queryLimit, 3);
   assert.equal(res.statusCode, 200);
   assert.deepEqual(res.body, { success: true, projects: rows.slice(0, 2), page: 2, hasMore: true });
+});
+
+test('project listing returns an empty page without claiming more results', async () => {
+  Project.find = () => ({
+    populate() { return this; },
+    sort() { return this; },
+    skip() { return this; },
+    limit() { return this; },
+    lean: async () => [],
+  });
+
+  const res = response();
+  await getProjects({
+    query: { page: '4', limit: '20' },
+    user: { companyId: 'tenant-a', userId: 'member-a', role: 'owner' },
+  }, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(res.body, { success: true, projects: [], page: 4, hasMore: false });
+});
+
+test('active whiteboard listing paginates within the requesting workspace', async () => {
+  const companyId = new mongoose.Types.ObjectId().toString();
+  const userId = new mongoose.Types.ObjectId().toString();
+  let queryFilter;
+  let querySort;
+  let querySkip;
+  let queryLimit;
+  Board.find = (filter) => {
+    queryFilter = filter;
+    const query = {
+      select() { return this; },
+      populate() { return this; },
+      sort(value) { querySort = value; return this; },
+      skip(value) { querySkip = value; return this; },
+      limit(value) { queryLimit = value; return this; },
+      lean: async () => [{ _id: 'a' }, { _id: 'b' }, { _id: 'lookahead' }],
+    };
+    return query;
+  };
+
+  const res = response();
+  await new Promise((resolve, reject) => {
+    const next = (error) => error ? reject(error) : resolve();
+    getBoards({
+      query: { page: '2', limit: '2' },
+      user: { companyId, userId, role: 'owner' },
+    }, res, next);
+    setImmediate(resolve);
+  });
+
+  assert.equal(queryFilter.companyId, companyId);
+  assert.deepEqual(queryFilter.$or, [
+    { visibility: 'workspace' },
+    { createdBy: userId },
+    { 'members.userId': userId },
+  ]);
+  assert.deepEqual(querySort, { updatedAt: -1, _id: -1 });
+  assert.equal(querySkip, 2);
+  assert.equal(queryLimit, 3);
+  assert.deepEqual(res.body, {
+    success: true,
+    boards: [{ _id: 'a' }, { _id: 'b' }],
+    page: 2,
+    hasMore: true,
+  });
 });
 
 test('project listing rejects limit=all instead of allowing an unbounded query', async () => {

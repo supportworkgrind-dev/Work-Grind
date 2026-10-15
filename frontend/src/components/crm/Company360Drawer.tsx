@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
+import { fetchAllProjects } from '@/lib/projects';
 import { useAuthStore } from '@/store/useAuthStore';
 import type { CrmCompany, CrmContact, CrmDeal, DocumentItem, FileItem, Meeting, Project, Task } from '@/types';
 import { formatDate } from '@/lib/utils';
@@ -113,10 +114,8 @@ export function Company360Drawer({ company, onClose }: { company: CrmCompany; on
         setAccess(connected.access as ConnectedAccess);
         if (canManage && connected.access.projects) {
           try {
-            const response = await api.get('/projects?limit=200');
-            if (active && response.data.success) {
-              setAvailableProjects((response.data.projects as Project[]).filter((project) => !linkedCompanyId(project.crmCompanyId)));
-            }
+            const projects = await fetchAllProjects();
+            if (active) setAvailableProjects(projects.filter((project) => !linkedCompanyId(project.crmCompanyId)));
           } catch {
             if (active) setAvailableProjects([]);
           }

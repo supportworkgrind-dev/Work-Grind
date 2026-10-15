@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { api } from '@/lib/api';
+import { fetchAllProjects } from '@/lib/projects';
 import { DocumentItem, Project } from '@/types';
 import {
   FileText,
@@ -38,7 +39,7 @@ export default function DocsPage() {
     try {
       const [res, projectResponse] = await Promise.allSettled([
         api.get('/documents'),
-        api.get('/projects?limit=200'),
+        fetchAllProjects(),
       ]);
       if (res.status === 'fulfilled' && res.value.data.success) {
         setDocuments(res.value.data.documents);
@@ -46,8 +47,8 @@ export default function DocsPage() {
           selectDocument(res.value.data.documents[0]);
         }
       }
-      if (projectResponse.status === 'fulfilled' && projectResponse.value.data.success) {
-        setProjects(projectResponse.value.data.projects);
+      if (projectResponse.status === 'fulfilled') {
+        setProjects(projectResponse.value);
       }
     } catch (err) {
       console.error(err);

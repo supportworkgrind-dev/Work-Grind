@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useAppStore } from '@/store/useAppStore';
 import { api } from '@/lib/api';
+import { fetchAllProjects } from '@/lib/projects';
 import { User, Project, Task, TaskRecurrence, TaskCustomField } from '@/types';
 import { X, CheckSquare, Calendar, User as UserIcon, Flag, Briefcase, Clock3, Repeat2 } from 'lucide-react';
 
@@ -37,11 +38,11 @@ export function CreateTaskModal({ onCreated }: { onCreated?: () => void }) {
         try {
           const [uRes, pRes, taskRes] = await Promise.all([
             api.get('/users'),
-            api.get('/projects'),
+            fetchAllProjects(),
             api.get('/tasks?limit=200'),
           ]);
           if (uRes.data.success) setUsers(uRes.data.users);
-          if (pRes.data.success) setProjects(pRes.data.projects);
+          setProjects(pRes);
           if (taskRes.data.success) setAvailableTasks(taskRes.data.tasks ?? []);
         } catch (err) {
           console.error(err);

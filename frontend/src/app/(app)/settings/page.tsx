@@ -292,9 +292,9 @@ export default function SettingsPage() {
         const response = await api.get(endpoint, { params: { page, limit: 200 } });
         if (!response.data.success) throw new Error('Unable to load workspace members.');
         allMembers.push(...response.data.members);
-        if (!response.data.hasMore) break;
+        if (!response.data.hasMore) return allMembers;
       }
-      return allMembers;
+      throw new Error('The workspace has more members than can be loaded at once.');
     };
 
     try {

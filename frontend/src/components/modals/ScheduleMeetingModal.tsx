@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useAppStore } from '@/store/useAppStore';
 import { api } from '@/lib/api';
+import { fetchAllProjects } from '@/lib/projects';
 import type { CrmCompany, CrmContact, Project } from '@/types';
 import { X, Video, UserPlus } from 'lucide-react';
 
@@ -38,12 +39,12 @@ export function ScheduleMeetingModal({ onCreated }: { onCreated?: () => void }) 
       const [companyResult, contactResult, projectResult] = await Promise.allSettled([
         api.get('/crm/companies?limit=200'),
         api.get('/crm/contacts?limit=200'),
-        api.get('/projects?limit=200'),
+        fetchAllProjects(),
       ]);
       if (!active) return;
       setCrmCompanies(companyResult.status === 'fulfilled' ? companyResult.value.data.companies : []);
       setCrmContacts(contactResult.status === 'fulfilled' ? contactResult.value.data.contacts : []);
-      setProjects(projectResult.status === 'fulfilled' ? projectResult.value.data.projects : []);
+      setProjects(projectResult.status === 'fulfilled' ? projectResult.value : []);
     };
     void loadOptions();
     return () => { active = false; };

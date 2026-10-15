@@ -124,12 +124,13 @@ const pendingChatSidebarRequests = new Map<string, Promise<ChatSidebarResponses>
 
 async function fetchAllPages<T>(endpoint: string, collection: 'channels' | 'conversations'): Promise<T[]> {
   const items: T[] = [];
-  for (let page = 1; ; page += 1) {
+  for (let page = 1; page <= 201; page += 1) {
     const response = await api.get(endpoint, { params: { page, limit: 500 } });
     if (!response.data.success) throw new Error(`Unable to load ${collection}.`);
     items.push(...(response.data[collection] as T[]));
-    if (!response.data.hasMore || page > 200) return items;
+    if (!response.data.hasMore) return items;
   }
+  throw new Error(`Too many ${collection} to load safely.`);
 }
 
 function requestChatSidebar(userId: string): Promise<ChatSidebarResponses> {

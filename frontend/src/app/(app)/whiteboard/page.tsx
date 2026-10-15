@@ -37,6 +37,7 @@ import {
   X,
 } from 'lucide-react';
 import { api } from '@/lib/api';
+import { fetchAllProjects } from '@/lib/projects';
 import { getSocket } from '@/lib/socket';
 import { getWorkspaceProfile } from '@/lib/workspaceProfiles';
 import { getThemeBase, isDarkTheme, useThemeStore } from '@/lib/themeStore';
@@ -84,9 +85,9 @@ async function fetchAllBoards(): Promise<Board[]> {
     const response = await api.get('/boards', { params: { page, limit: 200 } });
     if (!response.data.success) throw new Error('Unable to load whiteboards.');
     boards.push(...response.data.boards);
-    if (!response.data.hasMore) break;
+    if (!response.data.hasMore) return boards;
   }
-  return boards;
+  throw new Error('The workspace has more whiteboards than can be loaded at once.');
 }
 
 function uniqueCollaborators(members: CollaboratorPresence[], currentUserId?: string): WorkspaceUser[] {
@@ -245,14 +246,14 @@ export default function WhiteboardPage() {
     Promise.all([
       fetchAllBoards(),
       api.get('/users').catch(() => null),
-      api.get('/projects').catch(() => null),
+      fetchAllProjects(),
       api.get('/meetings').catch(() => null),
       api.get('/documents').catch(() => null),
-    ]).then(([loadedBoards, usersResponse, projectsResponse, meetingsResponse, documentsResponse]) => {
+    ]).then(([loadedBoards, usersResponse, loadedProjects, meetingsResponse, documentsResponse]) => {
       if (!alive) return;
       setBoards(loadedBoards);
       setUsers(usersResponse?.data.users ?? usersResponse?.data.members ?? []);
-      setProjects(projectsResponse?.data.projects ?? []);
+      setProjects(loadedProjects);
       setMeetings(meetingsResponse?.data.meetings ?? []);
       setDocuments(documentsResponse?.data.documents ?? []);
       if (!loadedBoards.length) setIsTemplateOpen(true);

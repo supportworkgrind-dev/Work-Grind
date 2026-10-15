@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useCallback, useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { api } from '@/lib/api';
 import { FileItem, FolderItem, Project } from '@/types';
@@ -14,6 +14,7 @@ import { formatBytes, formatDate } from '@/lib/utils';
 import { getApiErrorMessage } from '@/lib/getApiErrorMessage';
 import { BackButton } from '@/components/common/BackButton';
 import Link from 'next/link';
+import { fetchAllProjects } from '@/lib/projects';
 
 export default function FilesPage() {
   const { company, subscription, refreshSubscription } = useAuthStore();
@@ -45,7 +46,7 @@ export default function FilesPage() {
     setCurrentFolder(folderId);
   };
 
-  const fetchData = async (folderId = currentFolder, query = searchQuery) => {
+  const fetchData = useCallback(async (folderId: string | null, query: string) => {
     const requestSequence = ++fileRequestSequence.current;
     try {
       const params = new URLSearchParams({
@@ -63,8 +64,8 @@ export default function FilesPage() {
         if (fRes.data.storage) setStorageSnapshot(fRes.data.storage);
       }
     } catch { /* silent */ }
-  };
-  const fetchFolders = async (folderId = currentFolder) => {
+  }, []);
+  const fetchFolders = useCallback(async (folderId: string | null) => {
     try {
       const response = await api.get('/files/folders/list', {
         params: { folderId: folderId ?? 'root', page: 1, limit: 200 },
@@ -75,7 +76,7 @@ export default function FilesPage() {
         setFoldersHaveMore(Boolean(response.data.hasMore));
       }
     } catch { /* silent */ }
-  };
+  }, []);
   const fetchMoreFiles = async () => {
     if (loadingMoreFiles || !filesHaveMore) return;
     const page = filesPage + 1;
@@ -118,12 +119,12 @@ export default function FilesPage() {
   useEffect(() => {
     void fetchData(currentFolder, searchQuery);
     void fetchFolders(currentFolder);
-  }, [currentFolder]);
+  }, [currentFolder, searchQuery, fetchData, fetchFolders]);
 
   useEffect(() => {
     let active = true;
-    api.get('/projects?limit=200').then((response) => {
-      if (active && response.data.success) setProjects(response.data.projects);
+    fetchAllProjects().then((items) => {
+      if (active) setProjects(items);
     }).catch(() => { if (active) setProjects([]); });
     return () => { active = false; };
   }, []);
@@ -199,7 +200,7 @@ export default function FilesPage() {
       try {
         await api.delete(`/files/${id}`);
         setFiles((p) => p.filter((f) => f._id !== id));
-        await fetchData();
+        await fetchData(currentFolder, searchQuery);
         void refreshSubscription();
       } catch { /* silent */ }
   };
@@ -216,7 +217,6 @@ export default function FilesPage() {
     setFilesPage(1);
     setFilesHaveMore(false);
     setSearchQuery(query);
-    void fetchData(currentFolder, query);
   };
   const storageUsed    = storageSnapshot?.used ?? subscription?.usage.storageBytes ?? company?.storage?.used ?? 0;
   const storageLimit   = storageSnapshot?.limit ?? subscription?.limits.storage ?? 1_073_741_824;
