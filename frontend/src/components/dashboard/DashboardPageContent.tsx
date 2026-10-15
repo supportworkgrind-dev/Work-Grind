@@ -278,7 +278,9 @@ export default function DashboardPage() {
             </h1>
             <p className="text-xs font-bold uppercase tracking-widest mt-0.5 mb-0.5" style={{ color: 'var(--accent)' }}>Overview</p>
             <p className="mt-1 text-sm" style={{ color: 'var(--text-secondary)' }}>
-              Here's what's happening in{' '}
+              {company?.accountType === 'individual'
+                ? 'Your personal workspace for tasks and projects: '
+                : 'Your workspace for team collaboration and business operations: '}
               <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>
                 {company?.name ?? 'your workspace'}
               </span>
@@ -313,7 +315,7 @@ export default function DashboardPage() {
         <StatCard label="Total Tasks"    value={stats.totalTasks}       sub="Across workspace"  icon={CheckSquare}  iconBg="bg-indigo-50"  iconColor="text-indigo-600"  accentColor="#6366f1" />
         <StatCard label="Completed"      value={stats.completedTasks}   sub="Delivered"          icon={CheckCircle2} iconBg="bg-emerald-50" iconColor="text-emerald-600" accentColor="#10b981" />
         <StatCard label="In Progress"    value={stats.pendingTasks}     sub="Active tasks"       icon={Clock}        iconBg="bg-amber-50"   iconColor="text-amber-600"   accentColor="#f59e0b" />
-        <StatCard label="Live Projects"  value={stats.activeProjects}   sub="Active roadmaps"   icon={Briefcase}    iconBg="bg-violet-50"  iconColor="text-violet-600"  accentColor="#8b5cf6" />
+        <StatCard label="Active Projects" value={stats.activeProjects}  sub="Projects in progress" icon={Briefcase} iconBg="bg-violet-50" iconColor="text-violet-600" accentColor="#8b5cf6" />
         <StatCard label="Meetings"       value={stats.upcomingMeetings} sub="Upcoming / active" icon={Video}        iconBg="bg-blue-50"    iconColor="text-blue-600"    accentColor="#3b82f6" className="col-span-2 sm:col-span-1" />
       </div>
 
@@ -382,7 +384,14 @@ export default function DashboardPage() {
 
             {myTasks.length === 0 ? (
               <div className="p-6">
-                <EmptyState icon={CheckSquare} title="No tasks assigned" description="Create a task or ask your manager to assign one." compact />
+                <EmptyState
+                  icon={CheckSquare}
+                  title="No tasks assigned"
+                  description={company?.accountType === 'individual'
+                    ? 'Create a task to organize your work and priorities.'
+                    : 'Create a task or ask a workspace admin to assign one.'}
+                  compact
+                />
               </div>
             ) : (
               <div className="divide-y" style={{ borderColor: 'var(--border-subtle)' }}>
@@ -427,7 +436,7 @@ export default function DashboardPage() {
 
             {projects.length === 0 ? (
               <div className="p-6">
-                <EmptyState icon={Briefcase} title="No active projects" description="Start a project to track milestones and team progress." compact />
+                <EmptyState icon={Briefcase} title="No active projects" description="Create a project to organize related work and deadlines." compact />
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4">
@@ -484,7 +493,7 @@ export default function DashboardPage() {
 
             {meetings.length === 0 ? (
               <div className="p-5">
-                <EmptyState icon={Video} title="No meetings scheduled" description="Schedule a meeting with your team." compact />
+                <EmptyState icon={Video} title="No meetings scheduled" description="Schedule a meeting when you need to meet with others." compact />
               </div>
             ) : (
               <div className="divide-y" style={{ borderColor: 'var(--border-subtle)' }}>

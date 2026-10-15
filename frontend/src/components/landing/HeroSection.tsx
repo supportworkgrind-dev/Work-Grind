@@ -90,8 +90,8 @@ const D = {
   ],
 
   ai: {
-    q: 'What needs attention today?',
-    a: '3 overdue tasks · 1 customer follow-up due · Acme demo at 2:00 PM',
+    q: 'What should I focus on in my workspace?',
+    a: 'Tavro AI can help with supported work and learning information available to this account.',
   },
 } as const;
 
@@ -487,7 +487,7 @@ function SceneAI({ reduced }: { reduced: boolean }) {
             <Sparkles className="h-3 w-3 text-violet-400" />
             <span className="text-[10px] font-semibold text-violet-300">Tavro AI</span>
           </div>
-          <p className="text-[10px] text-slate-400">Connected to your workspace context — tasks, CRM, calendar and team activity.</p>
+          <p className="text-[10px] text-slate-400">Uses supported work and learning information available to your account.</p>
         </div>
       </div>
 
@@ -759,7 +759,7 @@ export function HeroSection() {
             {/* Eyebrow */}
             <motion.div variants={lineVariant} className="mb-5">
               <span className={`${styles.heroEyebrow} inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-xs font-bold tracking-wide`}>
-                One platform. Five ways to work and learn.
+                For individuals, business teams, and education.
               </span>
             </motion.div>
 
@@ -768,8 +768,8 @@ export function HeroSection() {
               variants={lineVariant}
               className={`${styles.heroTitle} font-black text-white mb-5`}
             >
-              Connect work,<br />
-              business, and<br />
+              One workspace for<br />
+              work, business, and<br />
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-blue-400 to-cyan-400">
                 education.
               </span>
@@ -780,8 +780,9 @@ export function HeroSection() {
               variants={lineVariant}
               className={`${styles.heroDescription} text-slate-400 max-w-[65ch] mx-auto lg:mx-0 mb-7`}
             >
-              Choose a personal workspace, tools for running a business, or academic
-              capabilities for your school, college, or university.
+              Bring personal planning and freelancer work together with business team tools and
+              academic administration for schools, colleges, and universities. Tavro AI supports
+              both work and learning, with access based on your workspace, role, and plan.
             </motion.p>
 
             {/* CTAs */}

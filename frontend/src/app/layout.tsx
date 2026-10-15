@@ -20,7 +20,7 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_BASE_URL || 'https://workgrind.app'),
   title: 'WorkGrind | Connected Workspaces for Work and Learning',
-  description: 'WorkGrind offers separate workspaces for personal productivity, businesses, schools, colleges, and universities, with capabilities suited to each.',
+  description: 'WorkGrind is a connected workspace for individuals and freelancers, business and office teams, and schools, colleges, and universities. Features vary by workspace, role, and plan.',
   manifest: '/manifest.json',
   robots: {
     index: true,
@@ -33,7 +33,7 @@ export const metadata: Metadata = {
   },
   openGraph: {
     title:       'WorkGrind | Connected Workspaces for Work and Learning',
-    description: 'Choose a workspace for personal productivity, business collaboration, or academic administration.',
+    description: 'Bring personal work, team collaboration, business tools, and education administration together. Tavro AI supports work and learning where available.',
     url:         'https://workgrind.app',
     siteName:    'WorkGrind',
     images: [
@@ -49,7 +49,7 @@ export const metadata: Metadata = {
   twitter: {
     card:        'summary_large_image',
     title:        'WorkGrind | Connected Workspaces for Work and Learning',
-    description: 'Personal productivity, business collaboration, and academic administration in purpose-specific workspaces.',
+    description: 'A connected workspace for individuals, businesses, offices, schools, colleges, and universities—with Tavro AI for work and learning.',
     images:      ['/workgrind-og.png'],
   },
 };

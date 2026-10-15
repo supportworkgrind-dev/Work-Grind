@@ -79,7 +79,7 @@ const collaborationModules: FeatureTile[] = [
 const operatingSystems: FeatureTile[] = [
   { name: 'Analytics', href: '/analytics', icon: BarChart3, color: '#4c91c5', summary: 'Review task, project, CRM, and workspace activity to understand what is moving and what needs attention.', tag: 'Insights' },
   { name: 'Automation', href: '/workflows', icon: Workflow, color: '#38a887', summary: 'Use supported triggers and configured actions for task creation, alerts, and channel updates.', tag: 'Automation' },
-  { name: 'Tavro AI', href: '/ai', icon: Sparkles, color: '#8e91ee', summary: 'Ask permission-aware questions about supported workspace data and create or update approved records through available tools.', tag: 'AI' },
+  { name: 'Tavro AI', href: '/ai', icon: Sparkles, color: '#8e91ee', summary: 'Get assistance with supported work and learning information in your workspace. Available data and actions depend on workspace, role, and plan.', tag: 'AI' },
   { name: 'Client Portal', href: '/client-portal', icon: ShieldCheck, color: '#3e9c83', summary: 'Give clients a separate, permission-scoped place for shared project updates, messages, and approvals.', tag: 'External access' },
   { name: 'Team', href: '/team', icon: Users, color: '#5d78d8', summary: 'Manage people, roles, and the shared operational context behind the workspace.', tag: 'Access' },
   { name: 'Settings', href: '/settings', icon: CircleHelp, color: '#7b78ea', summary: 'Adjust personal and workspace preferences so the system matches how your team works.', tag: 'Admin' },
@@ -99,11 +99,11 @@ const governanceModules: FeatureTile[] = [
 ];
 
 const workspaceChoices = [
-  { name: 'Solo', workspace: 'solo', summary: 'Personal productivity, daily planning, tasks, documents, and AI assistance.' },
-  { name: 'Company', workspace: 'business', summary: 'Team collaboration, projects, CRM, client collaboration, meetings, and business workflows.' },
-  { name: 'School / Academy', workspace: 'school', summary: 'Students, teachers, classes, timetables, attendance, assignments, exams, results, and fees.' },
-  { name: 'College', workspace: 'college', summary: 'Students, faculty, departments, courses, schedules, and academic administration.' },
-  { name: 'University', workspace: 'university', summary: 'Students, faculty, departments, courses, academic administration, and authorized Dean / HOD workflows.' },
+  { name: 'Solo', workspace: 'solo', summary: 'Personal productivity, daily planning, tasks, projects, documents, and Tavro AI assistance where available.' },
+  { name: 'Company', workspace: 'business', summary: 'Office and business teams can use chat, meetings, tasks, projects, CRM, client portal, documents, files, workflows, and analytics where available.' },
+  { name: 'School / Academy', workspace: 'school', summary: 'Support administrators, teachers, and students with classes, courses, timetables, attendance, assignments, online class meetings where enabled, exams, results, fee records, and communication.' },
+  { name: 'College', workspace: 'college', summary: 'Coordinate students, faculty, departments, courses, schedules, attendance, assignments, online meetings where enabled, assessments, results, fee records, and communication.' },
+  { name: 'University', workspace: 'university', summary: 'Support students, faculty, administrators, departments, courses, timetables, attendance, online meetings where enabled, assessments, results, fee records, and communication.' },
 ];
 
 function ModuleGrid({ modules }: { modules: FeatureTile[] }) {
@@ -171,9 +171,9 @@ export default function FeaturesPage() {
         <section className="py-14 sm:py-16">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <SectionHeading
-              eyebrow="Personal and Company capabilities"
-              title="Core work, customer context, and daily execution"
-              description="Daily Focus, tasks, calendar, and projects support eligible workspaces. CRM is a Company capability; access depends on role and plan."
+              eyebrow="Solo, Company, and office capabilities"
+              title="Personal work, team collaboration, and business operations"
+              description="WorkGrind brings chat, meetings, tasks, projects, CRM, client portal, documents, files, workflows, and analytics into a connected workspace where enabled. Access depends on workspace, role, and plan."
             />
             <div className="mt-8"><ModuleGrid modules={operatingModules} /></div>
           </div>

@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: 'About WorkGrind | Work and Learning in One Platform',
-  description: 'Learn about WorkGrind workspaces for personal productivity, company collaboration, and academic administration.',
+  description: 'WorkGrind brings personal productivity, business and office collaboration, and school, college, and university administration into connected workspaces.',
   openGraph: {
     title: 'About WorkGrind',
     description: 'Separate Solo, Company, School / Academy, College, and University workspaces.',

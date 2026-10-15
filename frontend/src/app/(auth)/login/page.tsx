@@ -89,7 +89,7 @@ export default function LoginPage() {
 
       <form onSubmit={handleSubmit}>
         <div className="auth-field">
-          <label className="auth-label" htmlFor="login-email">Work email</label>
+          <label className="auth-label" htmlFor="login-email">Email address</label>
           <div className="auth-input-wrap">
             <Mail size={16} className="auth-icon" />
             <input id="login-email" className="auth-input" type="email" required autoComplete="email"

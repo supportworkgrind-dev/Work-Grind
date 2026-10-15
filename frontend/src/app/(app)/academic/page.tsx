@@ -358,7 +358,9 @@ export default function AcademicPage() {
     <div className="space-y-6 pb-10">
       <PageHeader
         title={sectionTitle}
-        subtitle={company?.name ? `${company.name} · ${company.organizationType}` : 'Education workspace'}
+        subtitle={company?.name
+          ? `${company.name} · Education workspace. Academic tools depend on your role.`
+          : 'Education workspace. Academic tools depend on your role.'}
         icon={GraduationCap}
       />
       {error && <div role="alert" className="rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-800">{error}</div>}

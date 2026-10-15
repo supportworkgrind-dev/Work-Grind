@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: 'Contact WorkGrind',
-  description: 'Contact WorkGrind with questions about Solo, Company, School / Academy, College, or University workspaces.',
+  description: 'Contact WorkGrind with questions about Solo, Company, School / Academy, College, or University workspaces, plans, and support.',
   openGraph: {
     title: 'Contact WorkGrind',
     description: 'Send a question about WorkGrind workspaces, plans, or support.',

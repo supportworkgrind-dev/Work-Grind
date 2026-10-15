@@ -18,11 +18,11 @@ export default function AboutPage() {
   ] as const;
 
   const audiences = [
-    { name: 'Solo', description: 'Personal planning, tasks, documents, and AI assistance.', workspace: 'solo' },
-    { name: 'Company', description: 'Team collaboration, projects, customer tools, and business workflows.', workspace: 'business' },
-    { name: 'School / Academy', description: 'Students, teachers, classes, attendance, assignments, and academic administration.', workspace: 'school' },
-    { name: 'College', description: 'Students, faculty, departments, courses, and academic administration.', workspace: 'college' },
-    { name: 'University', description: 'University academic operations and authorized department-level workflows.', workspace: 'university' },
+    { name: 'Solo', description: 'Personal planning, tasks, projects, documents, and Tavro AI assistance where available.', workspace: 'solo' },
+    { name: 'Company', description: 'Office and business teams can bring chat, meetings, tasks, projects, CRM, client portal, documents, files, workflows, and analytics together where available.', workspace: 'business' },
+    { name: 'School / Academy', description: 'Support administrators, teachers, and students with classes, courses, timetables, attendance, assignments, online class meetings where enabled, exams, results, fee records, and communication.', workspace: 'school' },
+    { name: 'College', description: 'Coordinate students, faculty, departments, courses, schedules, attendance, assignments, online meetings where enabled, assessments, results, fee records, and communication.', workspace: 'college' },
+    { name: 'University', description: 'Support students, faculty, administrators, departments, courses, timetables, attendance, online meetings where enabled, assessments, results, fee records, and communication.', workspace: 'university' },
   ];
 
   return (

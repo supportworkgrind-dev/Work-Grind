@@ -86,7 +86,7 @@ export function ProductPreview3D() {
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
                 </span>
-                <span>Live Sync &amp; WebRTC Active</span>
+                <span>Illustrative Preview</span>
               </span>
             </div>
           </div>
@@ -124,7 +124,7 @@ export function ProductPreview3D() {
                       <span className="text-[9px] text-slate-400">10:42 AM</span>
                     </div>
                     <p className="text-slate-600 text-[11px] mt-1 leading-relaxed">
-                      Instant WebRTC meeting is live! Ready for team sprint review. 🚀
+                      Project update is ready for the team to review.
                     </p>
                   </div>
                   <div className="bg-blue-50/70 p-3 rounded-xl border border-blue-100/80 text-blue-950">
@@ -133,14 +133,14 @@ export function ProductPreview3D() {
                       <span className="text-[9px] text-blue-500">Just now</span>
                     </div>
                     <p className="text-blue-800 text-[11px] mt-1 leading-relaxed">
-                      Joined with HD audio &amp; video. All real-time signals synced!
+                      The scheduled meeting is ready to join.
                     </p>
                   </div>
                 </div>
               </div>
 
               <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
-                <span className="font-medium">18 team members active</span>
+                <span className="font-medium">Illustrative team activity</span>
                 <span className="text-blue-600 font-semibold cursor-pointer hover:underline">View Chat →</span>
               </div>
             </div>
@@ -160,8 +160,8 @@ export function ProductPreview3D() {
                       <CheckSquare className="h-4 w-4" />
                     </div>
                     <div>
-                      <h4 className="text-xs font-bold text-slate-900 leading-none">Sprint Roadmap</h4>
-                      <span className="text-[10px] text-slate-400">Q3 Milestone</span>
+                      <h4 className="text-xs font-bold text-slate-900 leading-none">Project Tasks</h4>
+                      <span className="text-[10px] text-slate-400">Assigned work</span>
                     </div>
                   </div>
                   <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100">
@@ -172,27 +172,27 @@ export function ProductPreview3D() {
                 <div className="space-y-2.5 text-xs">
                   <div className="p-3 rounded-xl border border-slate-200/80 bg-slate-50/50 shadow-2xs">
                     <div className="flex items-center justify-between">
-                      <span className="font-semibold text-slate-900 text-[11px]">WebRTC Live Mesh</span>
+                      <span className="font-semibold text-slate-900 text-[11px]">Project Planning</span>
                       <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100">
-                        Delivered
+                        In progress
                       </span>
                     </div>
                     <div className="mt-2 flex items-center justify-between text-[10px] text-slate-400">
                       <span>Assigned: Alex R.</span>
-                      <span className="text-emerald-600 font-medium">✓ Passed E2E</span>
+                      <span className="text-emerald-600 font-medium">Due date set</span>
                     </div>
                   </div>
 
                   <div className="p-3 rounded-xl border border-slate-200/80 bg-slate-50/50 shadow-2xs">
                     <div className="flex items-center justify-between">
-                      <span className="font-semibold text-slate-900 text-[11px]">MFA Authenticator</span>
+                      <span className="font-semibold text-slate-900 text-[11px]">Workspace Permissions</span>
                       <span className="text-[9px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-100">
                         Active
                       </span>
                     </div>
                     <div className="mt-2 flex items-center justify-between text-[10px] text-slate-400">
-                      <span>Assigned: Security</span>
-                      <span>100% Protected</span>
+                      <span>Access: by role</span>
+                      <span>Workspace-scoped</span>
                     </div>
                   </div>
                 </div>
@@ -205,7 +205,7 @@ export function ProductPreview3D() {
               </div>
             </div>
 
-            {/* Panel 3: Video & AI Copilot Insights */}
+            {/* Panel 3: Video & Tavro AI */}
             <div
               style={{
                 transform: isFlat ? 'none' : 'translateZ(26px)',
@@ -220,32 +220,32 @@ export function ProductPreview3D() {
                       <Bot className="h-4 w-4" />
                     </div>
                     <div>
-                      <h4 className="text-xs font-bold text-slate-900 leading-none">AI Copilot</h4>
-                      <span className="text-[10px] text-slate-400">Real-time Insights</span>
+                      <h4 className="text-xs font-bold text-slate-900 leading-none">Tavro AI</h4>
+                      <span className="text-[10px] text-slate-400">Workspace assistance</span>
                     </div>
                   </div>
                   <span className="text-[10px] font-bold text-sky-600 bg-sky-50 px-2 py-0.5 rounded-full border border-sky-100">
-                    GPT-4o
+                    AI assistant
                   </span>
                 </div>
 
                 <div className="bg-slate-50/80 p-3 rounded-xl border border-slate-100 text-xs space-y-2">
                   <p className="font-bold text-slate-800 text-[11px] flex items-center gap-1.5">
                     <Sparkles className="h-3 w-3 text-sky-500" />
-                    <span>Auto-Generated Summary</span>
+                    <span>Supported assistance</span>
                   </p>
                   <ul className="text-[10px] text-slate-600 space-y-1.5 list-none pl-0">
                     <li className="flex items-center gap-1.5">
                       <CheckCircle2 className="h-3 w-3 text-emerald-500 shrink-0" />
-                      <span>Unified video rooms and real-time chat</span>
+                      <span>Help with supported work and learning questions</span>
                     </li>
                     <li className="flex items-center gap-1.5">
                       <CheckCircle2 className="h-3 w-3 text-emerald-500 shrink-0" />
-                      <span>Automated 6-digit MFA portal protection</span>
+                      <span>Uses information available to your account</span>
                     </li>
                     <li className="flex items-center gap-1.5">
                       <CheckCircle2 className="h-3 w-3 text-emerald-500 shrink-0" />
-                      <span>Single-click Book a Demo routing</span>
+                      <span>Actions depend on your role and plan</span>
                     </li>
                   </ul>
                 </div>
@@ -254,9 +254,9 @@ export function ProductPreview3D() {
               <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px]">
                 <span className="inline-flex items-center gap-1 text-slate-500">
                   <Video className="h-3 w-3 text-slate-400" />
-                  <span>3 Active Rooms</span>
+                  <span>Meetings where available</span>
                 </span>
-                <span className="text-sky-600 font-semibold cursor-pointer hover:underline">Ask Copilot →</span>
+                <span className="text-sky-600 font-semibold cursor-pointer hover:underline">Ask Tavro AI →</span>
               </div>
             </div>
           </div>

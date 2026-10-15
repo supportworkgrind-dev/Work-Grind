@@ -12,17 +12,17 @@ export function AuthShell({ children }: { children: ReactNode }) {
         </div>
 
         <div className="auth-editorial-copy">
-          <p className="auth-kicker">THE WORKSPACE THAT MOVES WITH YOU</p>
-          <h2>Make room<br />for your best work.</h2>
+          <p className="auth-kicker">FOR WORK, BUSINESS, AND LEARNING</p>
+          <h2>One workspace<br />for work and learning.</h2>
           <p className="auth-editorial-description">
-            Projects, people and progress — brought into one considered place.
+            Personal planning, team collaboration, and academic administration, with Tavro AI for work and learning where available.
           </p>
         </div>
 
         <div className="auth-workspace-preview" aria-label="Illustration of a WorkGrind workspace">
           <div className="auth-preview-topline">
             <span>MONDAY / OVERVIEW</span>
-            <span className="auth-preview-live"><i /> LIVE</span>
+            <span className="auth-preview-live"><i /> SAMPLE</span>
           </div>
           <div className="auth-preview-heading">Good morning, team<span>.</span></div>
           <div className="auth-preview-rule" />
@@ -48,7 +48,7 @@ export function AuthShell({ children }: { children: ReactNode }) {
           </div>
         </div>
 
-        <p className="auth-editorial-foot">A clearer way to work together.</p>
+        <p className="auth-editorial-foot">For individuals, organizations, and education teams.</p>
       </aside>
 
       <section className="auth-main">
@@ -58,7 +58,7 @@ export function AuthShell({ children }: { children: ReactNode }) {
         <div className="auth-content">{children}</div>
         <footer className="auth-main-footer">
           <span>© {new Date().getFullYear()} WorkGrind</span>
-          <span>Thoughtful work starts here.</span>
+          <span>For individuals, businesses, and education teams.</span>
         </footer>
       </section>
     </main>

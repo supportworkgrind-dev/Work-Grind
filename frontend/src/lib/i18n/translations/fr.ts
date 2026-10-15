@@ -8,7 +8,7 @@ export const fr: Translations = {
   about: {
     badge: 'À propos de WorkGrind', headline1: 'Un espace connecté pour', headline2: 'travailler et apprendre', headline3: '',
     subheadline: 'WorkGrind propose des expériences distinctes pour la productivité personnelle, la collaboration en entreprise et l’administration académique.',
-    stats: { workspaces: 'Espaces créés', messages: 'Messages envoyés', tasks: 'Tâches accomplies', uptime: 'SLA de disponibilité' },
+    stats: { workspaces: 'Solo', messages: 'Company', tasks: 'École / Académie', uptime: 'Collège / Université' },
     story: { heading: 'Un espace adapté à votre activité', p1: 'Organiser sa journée, coordonner les projets d’une entreprise et gérer un établissement scolaire nécessitent des outils et des autorisations différents.', p2: 'WorkGrind propose des espaces Solo, Company, École / Académie, Collège et Université. Les fonctionnalités dépendent du type d’espace, du rôle et du forfait.' },
     pillars: {
       sync:     { title: 'Travail connecté', desc: 'Les tâches, projets, calendriers et conversations pris en charge restent associés dans votre espace.' },
@@ -22,24 +22,24 @@ export const fr: Translations = {
     badge: 'Espaces et fonctionnalités', headline: 'Les outils adaptés à votre activité', subheadline: 'WorkGrind distingue la productivité personnelle, les opérations d’entreprise et l’administration académique.',
     cta: { heading: 'Choisissez votre espace WorkGrind', sub: 'Sélectionnez Solo, Company, École / Académie, Collège ou Université lors de l’inscription.' },
     items: {
-      chat:          { title: 'Communication en temps réel',   tag: 'Chat et DMs',    desc: 'Organisez les discussions en canaux publics ou privés, envoyez des messages directs, utilisez Markdown et des réactions emoji.' },
-      tasks:         { title: 'Gestion des tâches',            tag: 'Kanban et listes', desc: 'Suivez les livrables via des tableaux Kanban flexibles ou des listes structurées. Assignez des responsables et définissez des priorités.' },
-      projects:      { title: 'Feuilles de route des projets', tag: 'Gestion',         desc: 'Regroupez les tâches en projets. Surveillez les barres de progression en temps réel.' },
-      files:         { title: 'Documents et lecteur cloud',    tag: 'Lecteur de travail', desc: 'Stockez tous les fichiers dans une arborescence. Créez des documents collaboratifs avec historique des versions.' },
-      meetings:      { title: 'Vidéoconférences et calendrier', tag: 'Vidéo et événements', desc: 'Organisez des appels vidéo WebRTC avec partage d\'écran. Planifiez des réunions directement dans le calendrier.' },
-      ai:            { title: 'Copilote IA de l\'espace',      tag: 'Assistance IA',  desc: 'Résumez les transcriptions de réunions, rédigez des briefs de projet et générez des listes de tâches en quelques secondes.' },
-      search:        { title: '⌘K Recherche globale unifiée', tag: 'Recherche rapide', desc: 'Trouvez instantanément n\'importe quel membre, tâche, message ou fichier avec un raccourci clavier.' },
-      notifications: { title: 'Notifications centralisées',    tag: 'Alertes',         desc: 'Restez informé sans surcharge. Recevez des alertes immédiates quand vous êtes mentionné ou assigné.' },
+      chat:          { title: 'Communication de l’espace de travail', tag: 'Chat et messages', desc: 'Utilisez les canaux et messages directs disponibles pour relier les échanges au travail partagé.' },
+      tasks:         { title: 'Tâches et planification', tag: 'Travail individuel ou en équipe', desc: 'Créez et organisez des tâches, définissez des priorités et des échéances, puis suivez leur avancement lorsque ces outils sont disponibles.' },
+      projects:      { title: 'Projets', tag: 'Organisation du travail', desc: 'Regroupez les travaux associés et suivez les responsabilités, l’état et les échéances dans les espaces compatibles.' },
+      files:         { title: 'Fichiers et documents', tag: 'Fonction partagée', desc: 'Organisez les fichiers et documents avec des accès selon l’espace et le rôle. La disponibilité dépend du compte et de l’offre.' },
+      meetings:      { title: 'Réunions et calendrier', tag: 'Fonction partagée', desc: 'Planifiez des réunions et consultez les éléments du calendrier lorsqu’ils sont activés pour l’espace et l’offre.' },
+      ai:            { title: 'Tavro AI', tag: 'Assistance IA', desc: 'Obtenez de l’aide pour les questions prises en charge sur le travail et l’apprentissage. Les informations et actions disponibles dépendent de votre rôle et de votre offre.' },
+      search:        { title: 'Recherche dans l’espace', tag: 'Trouver des informations', desc: 'Recherchez les personnes, tâches, messages, documents et fichiers pris en charge dans votre espace autorisé.' },
+      notifications: { title: 'Notifications', tag: 'Mises à jour', desc: 'Consultez les alertes et mises à jour sur l’activité accessible à votre compte.' },
     },
   },
   demo: {
-    badge: 'Découvrir WorkGrind', headline: 'Explorer WorkGrind', subheadline: 'Indiquez-nous l’espace WorkGrind qui vous intéresse et ce que vous souhaitez découvrir.',
+    badge: 'Découvrir WorkGrind', headline: 'Demander une présentation de WorkGrind', subheadline: 'Indiquez-nous l’espace WorkGrind qui vous intéresse et ce que vous souhaitez découvrir.',
     form: { name: 'Nom complet', email: 'Adresse e-mail', company: 'Entreprise ou établissement (facultatif)', message: 'Que souhaitez-vous explorer ?', namePH: 'ex. Alex Martin', emailPH: 'alex@example.com', companyPH: 'Nom de l’organisation', messagePH: 'Indiquez le type d’espace et vos questions…', submit: 'Demander une présentation', submitting: 'Envoi en cours…' },
     success: { heading: 'Merci ! Nous vous contacterons bientôt.', sub: 'Nous avons reçu votre demande pour {{email}}. Notre équipe vous contactera bientôt.', home: 'Retour à l\'accueil', another: 'Soumettre une autre demande' },
   },
   contact: {
     badge: 'Contact', headline: 'Contacter WorkGrind', sub: 'Une question sur Solo, Company, École / Académie, Collège, Université, les forfaits ou l’assistance ? Écrivez-nous.',
     form: { heading: 'Envoyez-nous un message', name: 'Votre nom', email: 'Adresse e-mail', company: 'Entreprise ou établissement (facultatif)', subject: 'Sujet', message: 'Message', namePH: 'Votre nom', emailPH: 'vous@example.com', companyPH: 'Nom de l’organisation', messagePH: 'Indiquez le type d’espace et comment nous pouvons vous aider…', submit: 'Envoyer la demande', submitting: 'Envoi…', subjects: { sales: 'Forfaits et questions sur le produit', support: 'Support technique', partner: 'Opportunités de partenariat', general: 'Question générale' } },
-    success: { heading: 'Message reçu !', sub: 'Merci de contacter WorkGrind. Notre équipe vous répondra dans les 2 heures ouvrables.', another: 'Envoyer un autre message' },
+    success: { heading: 'Message reçu !', sub: 'Votre message a été enregistré. Pour un suivi, consultez le centre d’aide ou contactez-nous à nouveau.', another: 'Envoyer un autre message' },
   },
 };

@@ -112,7 +112,7 @@ function VerifyEmailContent() {
           <p className="auth-form-subtitle">
             {status === 'legacy'
               ? 'Your email is confirmed. Sign in to continue to your workspace.'
-              : invite ? 'Your account is ready. Joining the invited workspace…' : 'Your email is confirmed. Sign in to continue to your workspace.'}
+              : invite ? 'Your account is ready. Joining the invited workspace…' : 'Your email is confirmed. Continuing to workspace setup…'}
           </p>
           {status === 'legacy' && <Link href="/login" className="auth-primary no-underline">Continue to sign in <ArrowRight size={16} /></Link>}
         </div>

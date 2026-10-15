@@ -28,7 +28,7 @@ export default function ContactPage() {
     try {
       const res = await api.post('/contact', form);
       if (res.data?.success) {
-        setSubmittedMessage(res.data.message || 'Your message was recorded.');
+        setSubmittedMessage(res.data.message || t('contact.success.sub'));
         setSubmitted(true);
       }
       else { setError(res.data?.message || t('common.errorGeneric')); }

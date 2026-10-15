@@ -134,7 +134,7 @@ export const en: TranslationShape = {
       projects:      { title: 'Projects', tag: 'Company and Solo', desc: 'Group related work, coordinate project members, and follow progress and deadlines in eligible workspaces.' },
       files:         { title: 'Files and documents', tag: 'Shared capability', desc: 'Organize files and documents with workspace and role-based access. Availability depends on account type and plan.' },
       meetings:      { title: 'Meetings and calendar', tag: 'Shared capability', desc: 'Schedule meetings and review calendar items when enabled for the workspace and subscription.' },
-      ai:            { title: 'Tavro AI', tag: 'AI assistance', desc: 'Ask questions about supported workspace information and use available actions, subject to your role and plan.' },
+      ai:            { title: 'Tavro AI', tag: 'AI assistance', desc: 'Get help with supported work and learning questions using available workspace information; actions depend on your role and plan.' },
       search:        { title: 'Workspace search', tag: 'Find information', desc: 'Search supported people, tasks, messages, documents, and files within your authorized workspace.' },
       notifications: { title: 'Notifications', tag: 'Updates', desc: 'Review updates and alerts for activity available to your account.' },
     },
@@ -143,11 +143,11 @@ export const en: TranslationShape = {
   // ── Demo page ─────────────────────────────────────────────────────────────
   demo: {
     badge:       'Personalized Walkthrough',
-    headline:    'Book a WorkGrind Demo',
+    headline:    'Request a WorkGrind Walkthrough',
     subheadline: "Tell us whether you’re exploring Solo, Company, School / Academy, College, or University use, and what you’d like to understand.",
     form: {
       name:        'Full Name',
-      email:       'Work Email',
+      email:       'Email Address',
       company:     'Company or institution (optional)',
       message:     'What would you like to explore?',
       namePH:      'e.g. Alex Rivera',
@@ -173,7 +173,7 @@ export const en: TranslationShape = {
     form: {
       heading:    'Send us a message',
       name:       'Your Name',
-      email:      'Work Email',
+      email:      'Email Address',
       company:    'Company or institution (optional)',
       subject:    'Subject',
       message:    'Message',

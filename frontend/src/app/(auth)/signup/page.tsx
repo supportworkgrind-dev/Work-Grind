@@ -32,11 +32,11 @@ type SignupSelection = {
 };
 
 const signupOptions: SignupSelection[] = [
-  { id: 'solo', label: 'Solo / Individual', description: 'A personal workspace for your projects, focus, and goals.', accountType: 'individual', organizationType: 'business', Icon: UserRound },
-  { id: 'business', label: 'Company / Business', description: 'Coordinate a team, projects, operations, and collaboration.', accountType: 'company', organizationType: 'business', Icon: Building2 },
-  { id: 'school', label: 'School', description: 'Organize students, teachers, classes, attendance, and fees.', accountType: 'company', organizationType: 'school', Icon: School },
-  { id: 'college', label: 'College', description: 'Manage academic departments, courses, schedules, and results.', accountType: 'company', organizationType: 'college', Icon: GraduationCap },
-  { id: 'university', label: 'University', description: 'Bring academic programs, faculty, and campus operations together.', accountType: 'company', organizationType: 'university', Icon: Landmark },
+  { id: 'solo', label: 'Solo / Individual', description: 'Personal planning, tasks, projects, and documents for individuals and freelancers, with Tavro AI assistance where available.', accountType: 'individual', organizationType: 'business', Icon: UserRound },
+  { id: 'business', label: 'Company / Business', description: 'Bring office teams together with chat, meetings, tasks, projects, CRM, client portal, documents, files, workflows, and analytics where available.', accountType: 'company', organizationType: 'business', Icon: Building2 },
+  { id: 'school', label: 'School', description: 'Support administrators, teachers, and students with classes, courses, timetables, attendance, assignments, online class meetings where enabled, exams, results, fee records, and communication.', accountType: 'company', organizationType: 'school', Icon: School },
+  { id: 'college', label: 'College', description: 'Coordinate students, faculty, departments, courses, schedules, attendance, assignments, online meetings where enabled, assessments, results, fee records, and communication.', accountType: 'company', organizationType: 'college', Icon: GraduationCap },
+  { id: 'university', label: 'University', description: 'Support students, faculty, administrators, departments, courses, timetables, attendance, online meetings where enabled, assessments, results, fee records, and communication.', accountType: 'company', organizationType: 'university', Icon: Landmark },
 ];
 
 export default function SignUpPage() {
@@ -107,7 +107,7 @@ export default function SignUpPage() {
     <AuthShell>
       <div className="auth-step"><b>01&nbsp; DETAILS</b><i /><span>02&nbsp; VERIFY EMAIL</span><i /><span>03&nbsp; WORKSPACE</span></div>
       <h1 className="auth-form-title">Choose how you’ll use WorkGrind.</h1>
-      <p className="auth-form-subtitle">Create your account and choose a Solo, Company, School / Academy, College, or University workspace. We’ll email a verification code before activation.</p>
+      <p className="auth-form-subtitle">Create your account and choose a Solo, Company, School / Academy, College, or University workspace. Available tools depend on workspace, role, and plan. We’ll email a verification code before activation.</p>
 
       <fieldset className="mt-6">
         <legend className="mb-2 text-xs font-semibold text-stone-800">What are you setting up?</legend>
@@ -170,11 +170,11 @@ export default function SignUpPage() {
           </div>
         </div>
         <div className="auth-field">
-          <label className="auth-label" htmlFor="signup-email">Work email</label>
+          <label className="auth-label" htmlFor="signup-email">Email address</label>
           <div className="auth-input-wrap">
             <Mail size={16} className="auth-icon" />
             <input id="signup-email" className="auth-input" type="email" required autoComplete="email"
-              placeholder="you@company.com" value={email} onChange={(event) => setEmail(event.target.value)} />
+              placeholder="you@example.com" value={email} onChange={(event) => setEmail(event.target.value)} />
           </div>
         </div>
         <div className="auth-field">

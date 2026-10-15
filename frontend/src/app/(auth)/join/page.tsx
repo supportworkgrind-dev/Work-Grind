@@ -170,10 +170,10 @@ function JoinWorkspaceContent() {
                 <span>Workspace Invitation</span>
               </div>
               <h1 className="text-2xl font-extrabold tracking-tight">
-                Join Your Team on WorkGrind
+                Join Your WorkGrind Workspace
               </h1>
               <p className="mt-1.5 text-xs text-indigo-100 max-w-sm mx-auto">
-                Connect with your colleagues, manage tasks, coordinate projects, and chat in real-time.
+                Join a WorkGrind workspace to access the shared tools and information available to your role.
               </p>
             </div>
 
@@ -373,7 +373,7 @@ function JoinWorkspaceContent() {
 
         {/* Footer */}
         <div className="mt-8 text-center text-xs text-slate-400">
-          <p>© {new Date().getFullYear()} WorkGrind. All-in-one team productivity platform.</p>
+          <p>© {new Date().getFullYear()} WorkGrind. A connected workspace for work and learning.</p>
         </div>
       </div>
     </div>

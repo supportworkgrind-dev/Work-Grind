@@ -51,7 +51,7 @@ export const WORKSPACE_PROFILES = [
     id: 'professional', label: 'Other / Professional', shortLabel: 'Professional',
     description: 'The balanced WorkGrind default with a warm neutral palette.',
     baseTheme: 'light', swatches: ['#f5f3ed', '#fffefa', '#294a38'], projectColor: '#4f46e5',
-    starterProject: 'Product Roadmap', starterDescription: 'Organize priorities, milestones, and cross-functional work.',
+    starterProject: 'Work Plan', starterDescription: 'Organize priorities, milestones, and shared work.',
   },
 ] as const;
 

@@ -51,6 +51,9 @@ export default function OnboardingPage() {
   const { user, company, isLoading, fetchCurrentUser, setUser } = useAuthStore();
   const setTheme = useThemeStore((state) => state.setTheme);
   const isIndividual = company?.accountType === 'individual' || user?.accountType === 'individual';
+  const isEducationWorkspace = ['school', 'college', 'university'].includes(
+    company?.organizationType ?? user?.signupOrganizationType ?? '',
+  );
   const totalSteps = isIndividual ? 2 : 3;
   const [hasHydratedAuth, setHasHydratedAuth] = useState(false);
   const [step, setStep] = useState<1 | 2 | 3>(1);
@@ -171,19 +174,19 @@ export default function OnboardingPage() {
     {
       title: 'Welcome to WorkGrind',
       badge: 'Recommended',
-      desc: 'Interactive starter project with 4 pre-made onboarding tasks.',
+      desc: 'A starter project with four setup tasks to help organize your workspace.',
       icon: Sparkles,
     },
     {
-      title: 'Product Roadmap',
-      badge: 'Tech & SaaS',
-      desc: 'Quarterly feature goals, sprint milestones, and bug triage.',
+      title: 'Project Plan',
+      badge: 'Planning',
+      desc: 'Organize shared goals, owners, milestones, and deadlines.',
       icon: Layers,
     },
     {
-      title: 'Marketing Campaign',
-      badge: 'Growth',
-      desc: 'Content calendar, brand rollout, launch checklist, and asset reviews.',
+      title: 'Operations & Events Plan',
+      badge: 'Coordination',
+      desc: 'Coordinate schedules, resources, and follow-up tasks across a team.',
       icon: Rocket,
     },
   ];
@@ -234,7 +237,7 @@ export default function OnboardingPage() {
           <ThemeAwareLogo size="lg" showWordmark />
         </div>
         <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--accent-text)' }}>
-          {isIndividual ? 'Personal Workspace Setup' : 'Guided Workspace Setup'}
+          {isIndividual ? 'Personal Workspace Setup' : isEducationWorkspace ? 'Education Workspace Setup' : 'Business Workspace Setup'}
         </p>
       </div>
 
@@ -248,8 +251,8 @@ export default function OnboardingPage() {
                 Step {currentDisplayStep} of {totalSteps}:{' '}
                 <span className="theme-text-muted font-normal">
                   {step === 1 && (isIndividual ? 'Personal Workspace & Theme' : 'Workspace Name & Theme')}
-                  {step === 2 && 'Invite Team Members'}
-                  {step === 3 && (isIndividual ? 'Select Starter Template' : 'Starter Project Roadmap')}
+                  {step === 2 && (isEducationWorkspace ? 'Invite Workspace Members' : 'Invite Team Members')}
+                  {step === 3 && (isIndividual ? 'Select Starter Template' : isEducationWorkspace ? 'Choose a Starter Project' : 'Choose a Starter Project')}
                 </span>
               </span>
               <span className="text-xs font-bold" style={{ color: 'var(--accent-text)' }}>
@@ -273,7 +276,9 @@ export default function OnboardingPage() {
                 <p className="mt-1 text-xs theme-text-secondary">
                   {isIndividual
                     ? "Let's personalize your private workspace and color palette."
-                    : "Let's configure your team's workspace name and visual branding."}
+                    : isEducationWorkspace
+                      ? "Set your institution's workspace name and choose how it is presented."
+                      : "Set your organization's workspace name and choose how it is presented."}
                 </p>
               </div>
 
@@ -302,9 +307,9 @@ export default function OnboardingPage() {
 
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider theme-text-secondary mb-1">
-                  What best describes your work?
+                  What best describes your role or work?
                 </label>
-                <p className="mb-3 text-xs theme-text-muted">WorkGrind will tune the workspace style and starter project. You can change the theme any time.</p>
+                <p className="mb-3 text-xs theme-text-muted">Choose a workspace profile to set its starting style and suggested project. You can change the theme any time.</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
                   {WORKSPACE_PROFILES.map((profile) => {
                     const Icon = PROFILE_ICONS[profile.id];
@@ -358,9 +363,9 @@ export default function OnboardingPage() {
           {step === 2 && !isIndividual && (
             <div className="space-y-6 animate-in fade-in-50 duration-200">
               <div>
-                <h2 className="text-xl font-bold theme-text-primary">Invite Your Teammates</h2>
+                <h2 className="text-xl font-bold theme-text-primary">{isEducationWorkspace ? 'Invite Workspace Members' : 'Invite Your Teammates'}</h2>
                 <p className="mt-1 text-xs theme-text-secondary">
-                  WorkGrind is designed for collaboration. Invite colleagues now or skip this step.
+                  Invite colleagues, staff, or other workspace members now, or skip this step and invite people later.
                 </p>
               </div>
 
@@ -371,7 +376,7 @@ export default function OnboardingPage() {
                       type="email"
                       value={email}
                       onChange={(e) => handleEmailChange(idx, e.target.value)}
-                      placeholder="colleague@company.com"
+                      placeholder="name@example.com"
                       className="block w-full rounded-xl border py-2 px-3 text-xs focus:outline-none focus:ring-2"
                       style={{ background: 'var(--bg-input)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
                     />
@@ -437,12 +442,14 @@ export default function OnboardingPage() {
             <div className="space-y-6 animate-in fade-in-50 duration-200">
               <div>
                 <h2 className="text-xl font-bold theme-text-primary">
-                  {isIndividual ? 'Pick Your Starter Project' : 'Create Your First Project'}
+                  {isIndividual ? 'Pick Your Starter Project' : 'Choose a Starter Project'}
                 </h2>
                 <p className="mt-1 text-xs theme-text-secondary">
                   {isIndividual
                     ? 'Start with a structured template to organize your tasks, goals, and freelance work.'
-                    : 'Projects keep your team organized with Kanban boards, deadlines, and milestones.'}
+                    : isEducationWorkspace
+                      ? 'Use a project to coordinate an academic program, term, event, or shared initiative. Available tools depend on workspace access.'
+                      : 'Use a project to organize shared work, owners, goals, and deadlines.'}
                 </p>
               </div>
 
@@ -505,7 +512,7 @@ export default function OnboardingPage() {
                   className="inline-flex items-center gap-2 rounded-xl px-6 py-2.5 text-xs font-bold shadow-md transition-all disabled:opacity-50"
                   style={{ background: 'var(--accent)', color: 'var(--text-on-accent)', boxShadow: 'var(--shadow-md)' }}
                 >
-                  <span>{isCompleting ? 'Launching...' : 'Complete & Open Dashboard'}</span>
+                  <span>{isCompleting ? 'Opening workspace...' : 'Complete & Open Workspace'}</span>
                   <ArrowRight className="h-4 w-4" />
                 </button>
               </div>

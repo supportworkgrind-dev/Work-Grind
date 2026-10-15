@@ -159,10 +159,10 @@ export default function CreateCompanyPage() {
             <div className="space-y-6">
               <div className="text-center sm:text-left">
                 <h2 className="text-2xl font-bold tracking-tight text-slate-900">
-                  WorkGrind ko kis tarah use karna chahte hain?
+                  How do you plan to use WorkGrind?
                 </h2>
                 <p className="mt-1.5 text-xs sm:text-sm text-slate-500">
-                  Choose the workspace experience tailored to your exact workflow.
+                  Choose an individual or organization workspace. Organizations can set up a business, school, college, or university workspace.
                 </p>
               </div>
 
@@ -202,13 +202,13 @@ export default function CreateCompanyPage() {
 
                     <div className="mt-4">
                       <span className="inline-block rounded-md bg-indigo-100/80 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-indigo-700">
-                        Multi-User Collaboration
+                        Business & Education
                       </span>
                       <h3 className="mt-1.5 text-base font-bold text-slate-900">
-                        Company / Team
+                        Company / Institution
                       </h3>
                       <p className="mt-1 text-xs text-slate-600 leading-relaxed">
-                        Apni team ke sath collaborate karein — projects, tasks, aur communication ek jagah manage karein.
+                        Set up an office or business team, school, college, or university. Available tools depend on workspace type, role, and plan.
                       </p>
                     </div>
                   </div>
@@ -216,15 +216,15 @@ export default function CreateCompanyPage() {
                   <ul className="mt-4 pt-3 border-t border-slate-100 space-y-1.5 text-[11px] text-slate-500">
                     <li className="flex items-center gap-1.5">
                       <Check className="h-3 w-3 text-indigo-600" />
-                      <span>Team channels & direct messaging</span>
+                      <span>Chat, meetings, and shared communication</span>
                     </li>
                     <li className="flex items-center gap-1.5">
                       <Check className="h-3 w-3 text-indigo-600" />
-                      <span>Role permissions & team invites</span>
+                      <span>Tasks, projects, and team coordination</span>
                     </li>
                     <li className="flex items-center gap-1.5">
                       <Check className="h-3 w-3 text-indigo-600" />
-                      <span>Shared project roadmaps & drive</span>
+                      <span>CRM, client portal, documents, and files where available</span>
                     </li>
                   </ul>
                 </div>
@@ -266,10 +266,10 @@ export default function CreateCompanyPage() {
                         Solo & Freelance
                       </span>
                       <h3 className="mt-1.5 text-base font-bold text-slate-900">
-                        Individual / Personal Use
+                        Solo / Individual
                       </h3>
                       <p className="mt-1 text-xs text-slate-600 leading-relaxed">
-                        Apna kaam akele organize karein — tasks aur projects track karein without any team complexity.
+                        Organize personal or freelance work with planning, tasks, projects, and documents. Tavro AI assistance is available where supported.
                       </p>
                     </div>
                   </div>
@@ -277,15 +277,15 @@ export default function CreateCompanyPage() {
                   <ul className="mt-4 pt-3 border-t border-slate-100 space-y-1.5 text-[11px] text-slate-500">
                     <li className="flex items-center gap-1.5">
                       <Check className="h-3 w-3 text-emerald-600" />
-                      <span>Streamlined personal Kanban board</span>
+                      <span>Personal tasks, projects, and priorities</span>
                     </li>
                     <li className="flex items-center gap-1.5">
                       <Check className="h-3 w-3 text-emerald-600" />
-                      <span>Solo deadline tracking & calendar</span>
+                      <span>Calendar and deadline planning</span>
                     </li>
                     <li className="flex items-center gap-1.5">
                       <Check className="h-3 w-3 text-emerald-600" />
-                      <span>Switch to team workspace anytime in Settings</span>
+                      <span>Tools and access suited to individual work</span>
                     </li>
                   </ul>
                 </div>
@@ -380,7 +380,7 @@ export default function CreateCompanyPage() {
                 )}
                 <div>
                   <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700">
-                    {accountType === 'individual' ? 'Primary Focus' : 'Industry'}
+                    {accountType === 'individual' ? 'Primary Focus' : 'Industry or focus'}
                   </label>
                   <select
                     value={industry}
@@ -399,6 +399,7 @@ export default function CreateCompanyPage() {
                       </>
                     ) : (
                       <>
+                        <option value="Education">Education</option>
                         <option value="Technology">Technology / SaaS</option>
                         <option value="Design & Creative">Design & Creative</option>
                         <option value="Marketing & Media">Marketing & Media</option>
@@ -414,18 +415,18 @@ export default function CreateCompanyPage() {
                 {accountType === 'company' ? (
                   <div>
                     <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700">
-                      Team Size
+                      Organization Size
                     </label>
                     <select
                       value={size}
                       onChange={(e) => setSize(e.target.value)}
                       className="mt-1.5 block w-full rounded-xl border border-slate-200 py-2.5 px-3 text-slate-900 focus:ring-2 focus:ring-indigo-600 text-xs transition-all"
                     >
-                      <option value="1-10">1 - 10 employees</option>
-                      <option value="11-50">11 - 50 employees</option>
-                      <option value="51-200">51 - 200 employees</option>
-                      <option value="201-500">201 - 500 employees</option>
-                      <option value="500+">500+ employees</option>
+                      <option value="1-10">1 - 10 people</option>
+                      <option value="11-50">11 - 50 people</option>
+                      <option value="51-200">51 - 200 people</option>
+                      <option value="201-500">201 - 500 people</option>
+                      <option value="500+">500+ people</option>
                     </select>
                   </div>
                 ) : (
@@ -435,7 +436,7 @@ export default function CreateCompanyPage() {
                     </label>
                     <div className="mt-1.5 flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600">
                       <ShieldCheck className="h-4 w-4 text-emerald-600" />
-                      <span>Solo Mode (Can add team later)</span>
+                      <span>Personal workspace for individual work</span>
                     </div>
                   </div>
                 )}

@@ -115,7 +115,7 @@ function TeamSection() {
               See who is working on what, across every department. Workload visibility, roles, status and active projects — all in one place.
             </p>
             <ul className="space-y-3">
-              {['Departments, roles & permissions', 'Live workload & status', 'Member profiles & skills', 'Cross-team project visibility'].map((f) => (
+              {['Departments, roles & permissions', 'Member status & activity', 'Member profiles & skills', 'Cross-team project visibility'].map((f) => (
                 <li key={f} className="flex items-center gap-2.5 text-[13px] text-slate-300">
                   <span className="h-1.5 w-1.5 rounded-full bg-violet-400 shrink-0" />
                   {f}
@@ -183,7 +183,7 @@ function WorkflowSection() {
           <div className="flex items-center gap-2 mb-2">
             <div className="flex items-center gap-1 bg-rose-500/20 border border-rose-500/30 rounded-md px-1.5 py-0.5">
               <span className="h-1.5 w-1.5 rounded-full bg-rose-500 animate-pulse" />
-              <span className="text-[9px] font-bold text-rose-400">LIVE</span>
+              <span className="text-[9px] font-bold text-rose-400">SAMPLE</span>
             </div>
             <span className="text-[11px] font-bold text-white">Design Review</span>
           </div>
@@ -234,7 +234,7 @@ function WorkflowSection() {
             From conversation to completion.
           </h2>
           <p className="text-base text-slate-400">
-            One idea becomes a chat, a task, a meeting and an outcome — all tracked in the same workspace.
+            Bring chats, tasks, projects, meetings, and follow-up together in a shared workspace.
           </p>
         </motion.div>
 
@@ -363,10 +363,10 @@ function TasksSection() {
               Know what needs to happen next.
             </h2>
             <p className="text-base text-slate-400 leading-relaxed max-w-md">
-              Kanban boards, project milestones, priorities and assignments — with real-time updates so every team member sees the same picture.
+              Organize tasks, priorities, assignments, and due dates, then follow project status and progress. Milestone and Gantt timeline planning is coming soon.
             </p>
             <ul className="space-y-3">
-              {['Kanban and list views', 'Project milestones and progress', 'Priority, assignee and due dates', 'Linked to CRM and meetings'].map((f) => (
+              {['Task board and list views', 'Project status and progress', 'Priority, assignee and due dates', 'Related work with CRM and meetings'].map((f) => (
                 <li key={f} className="flex items-center gap-2.5 text-[13px] text-slate-300">
                   <CheckSquare className="h-4 w-4 text-emerald-400 shrink-0" />
                   {f}

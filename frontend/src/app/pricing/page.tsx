@@ -116,6 +116,14 @@ function PricingCard({
 
 const FAQS = [
   {
+    q: 'Which workspace should I choose?',
+    a: 'Choose Solo for individual and freelance work, Company for business and office teams, and School / Academy, College, or University for education administration. Available features depend on workspace type, member role, and plan.',
+  },
+  {
+    q: 'Can Tavro AI help with business and education work?',
+    a: 'Tavro AI supports both work and learning assistance with information and actions available to your account. Access depends on workspace type, role, enabled features, and plan.',
+  },
+  {
     q: 'Does the free trial require a credit card?',
     a: 'Trial availability and terms are shown with the applicable plan. Payment details are requested through checkout when you select a paid plan.',
   },

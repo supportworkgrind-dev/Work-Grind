@@ -52,7 +52,7 @@ export default function ForgotPasswordPage() {
               <div className="auth-input-wrap">
                 <Mail size={16} className="auth-icon" />
                 <input id="recovery-email" className="auth-input" type="email" required autoComplete="email"
-                  placeholder="you@company.com" value={email} onChange={(event) => setEmail(event.target.value)} />
+                  placeholder="you@example.com" value={email} onChange={(event) => setEmail(event.target.value)} />
               </div>
             </div>
             <button className="auth-primary" type="submit" disabled={loading}>

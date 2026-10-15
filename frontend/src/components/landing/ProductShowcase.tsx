@@ -12,8 +12,8 @@ const PILLARS = [
     bg: 'bg-blue-500/10',
     border: 'border-blue-500/20',
     icon: UserRound,
-    headline: 'Personal Productivity',
-    items: ['Daily focus & priorities', 'Personal tasks & projects', 'Calendar & planning', 'Documents & AI assistance'],
+    headline: 'Personal Work & Freelance',
+    items: ['Daily focus & priorities', 'Tasks, projects & planning', 'Calendar & documents', 'Tavro AI assistance where available'],
   },
   {
     id: 'company',
@@ -22,8 +22,8 @@ const PILLARS = [
     bg: 'bg-violet-500/10',
     border: 'border-violet-500/20',
     icon: Users,
-    headline: 'Business Collaboration',
-    items: ['Team communication', 'Projects & shared work', 'CRM & client collaboration', 'Meetings & workflows'],
+    headline: 'Business & Office',
+    items: ['Team chat & meetings', 'Tasks, projects & shared work', 'CRM & client portal', 'Documents, files, workflows & analytics'],
   },
   {
     id: 'education',
@@ -32,8 +32,8 @@ const PILLARS = [
     bg: 'bg-emerald-500/10',
     border: 'border-emerald-500/20',
     icon: GraduationCap,
-    headline: 'Academic Administration',
-    items: ['Students, teachers & faculty', 'Classes, courses & departments', 'Attendance, assignments & exams', 'Results & fees'],
+    headline: 'Education Administration',
+    items: ['Students, teachers & administrators', 'Classes, courses & timetables', 'Attendance, assignments & online class meetings where enabled', 'Exams, results & fee records'],
   },
   {
     id: 'ai',
@@ -74,11 +74,11 @@ export function ProductShowcase() {
           className="max-w-2xl mb-16"
         >
           <h2 id="product-heading" className="text-3xl sm:text-4xl lg:text-[2.6rem] font-black text-white tracking-tight leading-tight mb-4">
-            Work and learning,{' '}
-            <span className="text-slate-400">connected.</span>
+            One workspace for{' '}
+            <span className="text-slate-400">work and learning.</span>
           </h2>
           <p className="text-base text-slate-400 leading-relaxed">
-            Choose a workspace for personal productivity, business collaboration, or academic administration.
+            WorkGrind brings personal work, business and office teams, and education administration together. Choose Solo, Company, School / Academy, College, or University; available features depend on workspace, role, and plan.
           </p>
         </motion.div>
 
@@ -148,7 +148,7 @@ export function ProductShowcase() {
         >
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">One connected workspace</p>
-            <p className="text-sm text-slate-400">All connected. No switching tabs.</p>
+              <p className="text-sm text-slate-400">Tools for personal work, teams, and learning—with access shaped by your workspace.</p>
           </div>
           <ol aria-label="Personal, Company, Education, and Tavro AI workspaces" className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {WORKFLOW.map(({ label, detail, icon: Icon, color }, index) => (

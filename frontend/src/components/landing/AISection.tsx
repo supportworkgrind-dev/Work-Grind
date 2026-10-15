@@ -110,18 +110,18 @@ export function AISection() {
           >
             <div className="inline-flex items-center gap-2 rounded-full border border-indigo-500/25 bg-indigo-500/8 px-4 py-1.5">
               <Sparkles className="h-3.5 w-3.5 text-indigo-400" />
-              <span className="text-xs font-semibold tracking-wider text-indigo-400 uppercase">AI Intelligence</span>
+              <span className="text-xs font-semibold tracking-wider text-indigo-400 uppercase">Tavro AI for work and learning</span>
             </div>
 
             <h2 id="ai-heading" className="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight leading-tight">
-              Work doesn't just happen.{' '}
+              Support for work and learning.{' '}
               <span className="block bg-gradient-to-r from-indigo-400 via-violet-400 to-cyan-400 bg-clip-text text-transparent">
-                It gets smarter.
+                Meet Tavro AI.
               </span>
             </h2>
 
             <p className="text-base sm:text-lg text-slate-400 leading-relaxed">
-              Tavro AI can assist with supported workspace information and actions. What it can access depends on your workspace, role, and plan.
+              Tavro AI can help with supported business, personal, and academic workspace information—from organizing work to learning support. Available information and actions depend on your workspace, role, and plan.
             </p>
 
             <Link

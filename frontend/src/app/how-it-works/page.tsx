@@ -257,7 +257,7 @@ export default function HowItWorksPage() {
                 <span className="inline-flex h-11 w-11 items-center justify-center rounded-lg bg-emerald-300/10 text-emerald-300"><Sparkles className="h-5 w-5" aria-hidden="true" /></span>
                 <p className="mt-5 text-xs font-bold uppercase tracking-wider text-emerald-300">Intelligence</p>
                 <h2 className="mt-2 text-3xl font-extrabold">Meet Tavro AI</h2>
-                <p className="mt-4 max-w-xl text-sm leading-relaxed text-slate-300">Tavro AI is WorkGrind’s built-in assistant. It can search supported workspace records, help create or update tasks, and summarize workspace information through available tools.</p>
+                <p className="mt-4 max-w-xl text-sm leading-relaxed text-slate-300">Tavro AI can assist with supported work and learning questions, search workspace records, help create or update tasks, and summarize available information through enabled tools.</p>
                 <p className="mt-4 flex items-start gap-2 text-xs leading-relaxed text-slate-400"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300" aria-hidden="true" />Tavro uses authenticated, workspace-scoped tools and respects the caller’s permissions and plan access.</p>
                 <Link href="/ai" className="mt-6 inline-flex items-center gap-2 text-sm font-bold text-emerald-300 transition-colors hover:text-white">Explore Tavro AI <ArrowRight className="h-4 w-4" aria-hidden="true" /></Link>
               </div>
