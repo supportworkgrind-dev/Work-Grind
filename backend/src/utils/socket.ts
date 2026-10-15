@@ -28,6 +28,7 @@ let adapterReady: Promise<void> | null = null;
 const ADAPTER_COLLECTION = 'socket.io-adapter-events';
 const PRESENCE_LEASE_MS = 90_000;
 const PRESENCE_HEARTBEAT_MS = 30_000;
+export const SOCKET_IO_PATH = '/api/socket-io/socket.io';
 
 export interface MeetingParticipant {
   socketId: string;
@@ -393,9 +394,9 @@ const authorizeMeetingSocket = async (socket: Pick<Socket, 'data'>, meetingLink:
 export const initSocket = (server: HTTPServer) => {
   if (io) return io;
   io = new SocketServer(server, {
-    path: process.env.VERCEL === '1' ? '/socket.io' : '/api/socket-io/socket.io',
+    path: SOCKET_IO_PATH,
     cors: { origin: getAllowedClientOrigins(), credentials: true },
-    transports: ['websocket'],
+    transports: process.env.VERCEL === '1' ? ['websocket'] : ['polling', 'websocket'],
   });
 
   io.use(async (socket: Socket, next) => {

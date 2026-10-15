@@ -5,8 +5,7 @@
       "C:\\workgrind\\frontend\\node_modules\\@playwright\\test\\cli.js",
       "test",
       "--config=playwright.config.ts",
-      "--grep",
-      "public page"
+      "tests/socket-connection-policy.spec.ts"
     ],
     "configFile": "C:\\workgrind\\frontend\\playwright.config.ts",
     "rootDir": "C:/workgrind/frontend/tests",
@@ -20,7 +19,7 @@
     "grepInvert": null,
     "maxFailures": 0,
     "metadata": {
-      "actualWorkers": 4
+      "actualWorkers": 1
     },
     "preserveOutput": "always",
     "projects": [
@@ -29,7 +28,7 @@
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
-          "actualWorkers": 4
+          "actualWorkers": 1
         },
         "id": "chromium",
         "name": "chromium",
@@ -49,7 +48,7 @@
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
-          "actualWorkers": 4
+          "actualWorkers": 1
         },
         "name": "chromium",
         "testDir": "C:\\workgrind\\frontend\\tests",
@@ -58,7 +57,7 @@
         "testMatch": "**/*.@(spec|test).?(c|m)[jt]s?(x)",
         "timeout": 60000,
         "use": {
-          "baseURL": "http://localhost:3000",
+          "baseURL": "https://workgrind.vercel.app",
           "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.8078.4 Safari/537.36",
           "viewport": {
             "width": 1280,
@@ -111,13 +110,13 @@
   },
   "suites": [
     {
-      "title": "workgrind-audit.spec.ts",
-      "file": "workgrind-audit.spec.ts",
+      "title": "socket-connection-policy.spec.ts",
+      "file": "socket-connection-policy.spec.ts",
       "column": 0,
       "line": 0,
       "specs": [
         {
-          "title": "responsive layouts on key public pages",
+          "title": "Socket.IO retries use finite attempts and capped exponential backoff",
           "ok": true,
           "tags": [],
           "tests": [
@@ -129,793 +128,37 @@
               "projectName": "chromium",
               "results": [
                 {
-                  "workerIndex": 10,
-                  "parallelIndex": 1,
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 24210,
+                  "duration": 17,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-15T12:34:16.859Z",
+                  "startTime": "2026-10-15T13:09:15.858Z",
                   "annotations": [],
-                  "attachments": [
-                    {
-                      "name": "responsive-audit.json",
-                      "contentType": "application/json",
-                      "body": "ewogICJpc3N1ZXMiOiBbXQp9"
-                    }
-                  ]
+                  "attachments": []
                 }
               ],
               "status": "expected"
             }
           ],
-          "id": "2aae5247a7454980396a-e7bd1d6a51e69aeedfa4",
-          "file": "workgrind-audit.spec.ts",
-          "line": 265,
+          "id": "f3f9a0a8684642f47ff4-1f24d384502842a22d69",
+          "file": "socket-connection-policy.spec.ts",
+          "line": 4,
           "column": 5
-        }
-      ],
-      "suites": [
-        {
-          "title": "WorkGrind public-site audit",
-          "file": "workgrind-audit.spec.ts",
-          "line": 216,
-          "column": 6,
-          "specs": [
-            {
-              "title": "public page /",
-              "ok": false,
-              "tags": [],
-              "tests": [
-                {
-                  "timeout": 60000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
-                  "projectId": "chromium",
-                  "projectName": "chromium",
-                  "results": [
-                    {
-                      "workerIndex": 0,
-                      "parallelIndex": 0,
-                      "status": "failed",
-                      "duration": 29780,
-                      "error": {
-                        "message": "Error: / audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 6\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"Button without accessible name: <button class=\\\"h-7 w-7 rounded-lg bg-indigo-600 flex items-center justify-center hover:bg-indigo-500 transition-colors\\\"><svg xmlns=\\\"http://www.w3.org/2000/svg\\\" width=\\\"24\\\" height=\\\"24\\\" viewBox=\\\"0 0 24 24\\\" fill=\\\"none\\\" stroke=\\\"currentColor\\\" str\",\u001b[39m\n\u001b[31m+   \"Button without accessible name: <button class=\\\"text-slate-600 hover:text-slate-400 transition-colors\\\"><svg xmlns=\\\"http://www.w3.org/2000/svg\\\" width=\\\"24\\\" height=\\\"24\\\" viewBox=\\\"0 0 24 24\\\" fill=\\\"none\\\" stroke=\\\"currentColor\\\" stroke-width=\\\"2\\\" stroke-linecap=\\\"round\\\" stroke-linejo\",\u001b[39m\n\u001b[31m+   \"401 POST http://localhost:3000/api/auth/refresh\",\u001b[39m\n\u001b[31m+   \"Console error: Failed to load resource: the server responded with a status of 401 (Unauthorized)\",\u001b[39m\n\u001b[31m+ ]\u001b[39m",
-                        "stack": "Error: / audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 6\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"Button without accessible name: <button class=\\\"h-7 w-7 rounded-lg bg-indigo-600 flex items-center justify-center hover:bg-indigo-500 transition-colors\\\"><svg xmlns=\\\"http://www.w3.org/2000/svg\\\" width=\\\"24\\\" height=\\\"24\\\" viewBox=\\\"0 0 24 24\\\" fill=\\\"none\\\" stroke=\\\"currentColor\\\" str\",\u001b[39m\n\u001b[31m+   \"Button without accessible name: <button class=\\\"text-slate-600 hover:text-slate-400 transition-colors\\\"><svg xmlns=\\\"http://www.w3.org/2000/svg\\\" width=\\\"24\\\" height=\\\"24\\\" viewBox=\\\"0 0 24 24\\\" fill=\\\"none\\\" stroke=\\\"currentColor\\\" stroke-width=\\\"2\\\" stroke-linecap=\\\"round\\\" stroke-linejo\",\u001b[39m\n\u001b[31m+   \"401 POST http://localhost:3000/api/auth/refresh\",\u001b[39m\n\u001b[31m+   \"Console error: Failed to load resource: the server responded with a status of 401 (Unauthorized)\",\u001b[39m\n\u001b[31m+ ]\u001b[39m\n    at C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts:258:46",
-                        "location": {
-                          "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
-                          "column": 46,
-                          "line": 258
-                        },
-                        "snippet": "\u001b[0m \u001b[90m 256 |\u001b[39m         contentType\u001b[33m:\u001b[39m \u001b[32m'application/json'\u001b[39m\u001b[33m,\u001b[39m\n \u001b[90m 257 |\u001b[39m       })\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 258 |\u001b[39m       expect(issues\u001b[33m,\u001b[39m \u001b[32m`${path} audit issues`\u001b[39m)\u001b[33m.\u001b[39mtoEqual([])\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m                                              \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 259 |\u001b[39m       test\u001b[33m.\u001b[39minfo()\u001b[33m.\u001b[39mannotations\u001b[33m.\u001b[39mpush({ type\u001b[33m:\u001b[39m \u001b[32m'navigation-ms'\u001b[39m\u001b[33m,\u001b[39m description\u001b[33m:\u001b[39m \u001b[33mString\u001b[39m(audit\u001b[33m.\u001b[39melapsedMs) })\u001b[33m;\u001b[39m\n \u001b[90m 260 |\u001b[39m       audit\u001b[33m.\u001b[39mstopTracking()\u001b[33m;\u001b[39m\n \u001b[90m 261 |\u001b[39m     })\u001b[33m;\u001b[39m\u001b[0m"
-                      },
-                      "errors": [
-                        {
-                          "location": {
-                            "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
-                            "column": 46,
-                            "line": 258
-                          },
-                          "message": "Error: / audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 6\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"Button without accessible name: <button class=\\\"h-7 w-7 rounded-lg bg-indigo-600 flex items-center justify-center hover:bg-indigo-500 transition-colors\\\"><svg xmlns=\\\"http://www.w3.org/2000/svg\\\" width=\\\"24\\\" height=\\\"24\\\" viewBox=\\\"0 0 24 24\\\" fill=\\\"none\\\" stroke=\\\"currentColor\\\" str\",\u001b[39m\n\u001b[31m+   \"Button without accessible name: <button class=\\\"text-slate-600 hover:text-slate-400 transition-colors\\\"><svg xmlns=\\\"http://www.w3.org/2000/svg\\\" width=\\\"24\\\" height=\\\"24\\\" viewBox=\\\"0 0 24 24\\\" fill=\\\"none\\\" stroke=\\\"currentColor\\\" stroke-width=\\\"2\\\" stroke-linecap=\\\"round\\\" stroke-linejo\",\u001b[39m\n\u001b[31m+   \"401 POST http://localhost:3000/api/auth/refresh\",\u001b[39m\n\u001b[31m+   \"Console error: Failed to load resource: the server responded with a status of 401 (Unauthorized)\",\u001b[39m\n\u001b[31m+ ]\u001b[39m\n\n  256 |         contentType: 'application/json',\n  257 |       });\n> 258 |       expect(issues, `${path} audit issues`).toEqual([]);\n      |                                              ^\n  259 |       test.info().annotations.push({ type: 'navigation-ms', description: String(audit.elapsedMs) });\n  260 |       audit.stopTracking();\n  261 |     });\n    at C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts:258:46"
-                        }
-                      ],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-10-15T12:33:12.521Z",
-                      "annotations": [],
-                      "attachments": [
-                        {
-                          "name": "page-audit.json",
-                          "contentType": "application/json",
-                          "body": "ewogICJ1cmwiOiAiaHR0cDovL2xvY2FsaG9zdDozMDAwLyIsCiAgInBhdGgiOiAiLyIsCiAgInN0YXR1cyI6IDIwMCwKICAiY29udGVudFNlY3VyaXR5UG9saWN5IjogdHJ1ZSwKICAic3RyaWN0VHJhbnNwb3J0U2VjdXJpdHkiOiB0cnVlLAogICJzZXRDb29raWVBdHRyaWJ1dGVzIjogW10sCiAgInRpdGxlIjogIldvcmtHcmluZCB8IENvbm5lY3RlZCBXb3Jrc3BhY2VzIGZvciBXb3JrIGFuZCBMZWFybmluZyIsCiAgImVsYXBzZWRNcyI6IDEyMDc4LAogICJpc3N1ZXMiOiBbCiAgICAiQnV0dG9uIHdpdGhvdXQgYWNjZXNzaWJsZSBuYW1lOiA8YnV0dG9uIGNsYXNzPVwiaC03IHctNyByb3VuZGVkLWxnIGJnLWluZGlnby02MDAgZmxleCBpdGVtcy1jZW50ZXIganVzdGlmeS1jZW50ZXIgaG92ZXI6YmctaW5kaWdvLTUwMCB0cmFuc2l0aW9uLWNvbG9yc1wiPjxzdmcgeG1sbnM9XCJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2Z1wiIHdpZHRoPVwiMjRcIiBoZWlnaHQ9XCIyNFwiIHZpZXdCb3g9XCIwIDAgMjQgMjRcIiBmaWxsPVwibm9uZVwiIHN0cm9rZT1cImN1cnJlbnRDb2xvclwiIHN0ciIsCiAgICAiQnV0dG9uIHdpdGhvdXQgYWNjZXNzaWJsZSBuYW1lOiA8YnV0dG9uIGNsYXNzPVwidGV4dC1zbGF0ZS02MDAgaG92ZXI6dGV4dC1zbGF0ZS00MDAgdHJhbnNpdGlvbi1jb2xvcnNcIj48c3ZnIHhtbG5zPVwiaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmdcIiB3aWR0aD1cIjI0XCIgaGVpZ2h0PVwiMjRcIiB2aWV3Qm94PVwiMCAwIDI0IDI0XCIgZmlsbD1cIm5vbmVcIiBzdHJva2U9XCJjdXJyZW50Q29sb3JcIiBzdHJva2Utd2lkdGg9XCIyXCIgc3Ryb2tlLWxpbmVjYXA9XCJyb3VuZFwiIHN0cm9rZS1saW5lam8iLAogICAgIjQwMSBQT1NUIGh0dHA6Ly9sb2NhbGhvc3Q6MzAwMC9hcGkvYXV0aC9yZWZyZXNoIiwKICAgICJDb25zb2xlIGVycm9yOiBGYWlsZWQgdG8gbG9hZCByZXNvdXJjZTogdGhlIHNlcnZlciByZXNwb25kZWQgd2l0aCBhIHN0YXR1cyBvZiA0MDEgKFVuYXV0aG9yaXplZCkiCiAgXSwKICAib2xkQnJhbmRNYXRjaGVzIjogW10KfQ=="
-                        },
-                        {
-                          "name": "screenshot",
-                          "contentType": "image/png",
-                          "path": "C:\\workgrind\\artifacts\\test-results\\workgrind-audit-WorkGrind-public-site-audit-public-page--chromium\\test-failed-1.png"
-                        },
-                        {
-                          "name": "error-context",
-                          "contentType": "text/markdown",
-                          "path": "C:\\workgrind\\artifacts\\test-results\\workgrind-audit-WorkGrind-public-site-audit-public-page--chromium\\error-context.md"
-                        }
-                      ],
-                      "errorLocation": {
-                        "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
-                        "column": 46,
-                        "line": 258
-                      }
-                    }
-                  ],
-                  "status": "unexpected"
-                }
-              ],
-              "id": "2aae5247a7454980396a-376ff0e51771ab9d5ac0",
-              "file": "workgrind-audit.spec.ts",
-              "line": 218,
-              "column": 9
-            },
-            {
-              "title": "public page /about",
-              "ok": false,
-              "tags": [],
-              "tests": [
-                {
-                  "timeout": 60000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
-                  "projectId": "chromium",
-                  "projectName": "chromium",
-                  "results": [
-                    {
-                      "workerIndex": 1,
-                      "parallelIndex": 1,
-                      "status": "failed",
-                      "duration": 29526,
-                      "error": {
-                        "message": "Error: /about audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 5\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"Slow request (13726ms): http://localhost:3000/api/auth/refresh\",\u001b[39m\n\u001b[31m+   \"401 POST http://localhost:3000/api/auth/refresh\",\u001b[39m\n\u001b[31m+   \"Console error: Failed to load resource: the server responded with a status of 401 (Unauthorized)\",\u001b[39m\n\u001b[31m+ ]\u001b[39m",
-                        "stack": "Error: /about audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 5\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"Slow request (13726ms): http://localhost:3000/api/auth/refresh\",\u001b[39m\n\u001b[31m+   \"401 POST http://localhost:3000/api/auth/refresh\",\u001b[39m\n\u001b[31m+   \"Console error: Failed to load resource: the server responded with a status of 401 (Unauthorized)\",\u001b[39m\n\u001b[31m+ ]\u001b[39m\n    at C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts:258:46",
-                        "location": {
-                          "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
-                          "column": 46,
-                          "line": 258
-                        },
-                        "snippet": "\u001b[0m \u001b[90m 256 |\u001b[39m         contentType\u001b[33m:\u001b[39m \u001b[32m'application/json'\u001b[39m\u001b[33m,\u001b[39m\n \u001b[90m 257 |\u001b[39m       })\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 258 |\u001b[39m       expect(issues\u001b[33m,\u001b[39m \u001b[32m`${path} audit issues`\u001b[39m)\u001b[33m.\u001b[39mtoEqual([])\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m                                              \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 259 |\u001b[39m       test\u001b[33m.\u001b[39minfo()\u001b[33m.\u001b[39mannotations\u001b[33m.\u001b[39mpush({ type\u001b[33m:\u001b[39m \u001b[32m'navigation-ms'\u001b[39m\u001b[33m,\u001b[39m description\u001b[33m:\u001b[39m \u001b[33mString\u001b[39m(audit\u001b[33m.\u001b[39melapsedMs) })\u001b[33m;\u001b[39m\n \u001b[90m 260 |\u001b[39m       audit\u001b[33m.\u001b[39mstopTracking()\u001b[33m;\u001b[39m\n \u001b[90m 261 |\u001b[39m     })\u001b[33m;\u001b[39m\u001b[0m"
-                      },
-                      "errors": [
-                        {
-                          "location": {
-                            "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
-                            "column": 46,
-                            "line": 258
-                          },
-                          "message": "Error: /about audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 5\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"Slow request (13726ms): http://localhost:3000/api/auth/refresh\",\u001b[39m\n\u001b[31m+   \"401 POST http://localhost:3000/api/auth/refresh\",\u001b[39m\n\u001b[31m+   \"Console error: Failed to load resource: the server responded with a status of 401 (Unauthorized)\",\u001b[39m\n\u001b[31m+ ]\u001b[39m\n\n  256 |         contentType: 'application/json',\n  257 |       });\n> 258 |       expect(issues, `${path} audit issues`).toEqual([]);\n      |                                              ^\n  259 |       test.info().annotations.push({ type: 'navigation-ms', description: String(audit.elapsedMs) });\n  260 |       audit.stopTracking();\n  261 |     });\n    at C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts:258:46"
-                        }
-                      ],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-10-15T12:33:12.416Z",
-                      "annotations": [],
-                      "attachments": [
-                        {
-                          "name": "page-audit.json",
-                          "contentType": "application/json",
-                          "body": "ewogICJ1cmwiOiAiaHR0cDovL2xvY2FsaG9zdDozMDAwL2Fib3V0IiwKICAicGF0aCI6ICIvYWJvdXQiLAogICJzdGF0dXMiOiAyMDAsCiAgImNvbnRlbnRTZWN1cml0eVBvbGljeSI6IHRydWUsCiAgInN0cmljdFRyYW5zcG9ydFNlY3VyaXR5IjogdHJ1ZSwKICAic2V0Q29va2llQXR0cmlidXRlcyI6IFtdLAogICJ0aXRsZSI6ICJBYm91dCBXb3JrR3JpbmQgfCBXb3JrIGFuZCBMZWFybmluZyBpbiBPbmUgUGxhdGZvcm0iLAogICJlbGFwc2VkTXMiOiAxNjk5NSwKICAiaXNzdWVzIjogWwogICAgIlNsb3cgcmVxdWVzdCAoMTM3MjZtcyk6IGh0dHA6Ly9sb2NhbGhvc3Q6MzAwMC9hcGkvYXV0aC9yZWZyZXNoIiwKICAgICI0MDEgUE9TVCBodHRwOi8vbG9jYWxob3N0OjMwMDAvYXBpL2F1dGgvcmVmcmVzaCIsCiAgICAiQ29uc29sZSBlcnJvcjogRmFpbGVkIHRvIGxvYWQgcmVzb3VyY2U6IHRoZSBzZXJ2ZXIgcmVzcG9uZGVkIHdpdGggYSBzdGF0dXMgb2YgNDAxIChVbmF1dGhvcml6ZWQpIgogIF0sCiAgIm9sZEJyYW5kTWF0Y2hlcyI6IFtdCn0="
-                        },
-                        {
-                          "name": "screenshot",
-                          "contentType": "image/png",
-                          "path": "C:\\workgrind\\artifacts\\test-results\\workgrind-audit-WorkGrind--33d41-ite-audit-public-page-about-chromium\\test-failed-1.png"
-                        },
-                        {
-                          "name": "error-context",
-                          "contentType": "text/markdown",
-                          "path": "C:\\workgrind\\artifacts\\test-results\\workgrind-audit-WorkGrind--33d41-ite-audit-public-page-about-chromium\\error-context.md"
-                        }
-                      ],
-                      "errorLocation": {
-                        "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
-                        "column": 46,
-                        "line": 258
-                      }
-                    }
-                  ],
-                  "status": "unexpected"
-                }
-              ],
-              "id": "2aae5247a7454980396a-84ddd1c4469e897651f5",
-              "file": "workgrind-audit.spec.ts",
-              "line": 218,
-              "column": 9
-            },
-            {
-              "title": "public page /features",
-              "ok": false,
-              "tags": [],
-              "tests": [
-                {
-                  "timeout": 60000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
-                  "projectId": "chromium",
-                  "projectName": "chromium",
-                  "results": [
-                    {
-                      "workerIndex": 2,
-                      "parallelIndex": 2,
-                      "status": "failed",
-                      "duration": 29167,
-                      "error": {
-                        "message": "Error: /features audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 4\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"401 POST http://localhost:3000/api/auth/refresh\",\u001b[39m\n\u001b[31m+   \"Console error: Failed to load resource: the server responded with a status of 401 (Unauthorized)\",\u001b[39m\n\u001b[31m+ ]\u001b[39m",
-                        "stack": "Error: /features audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 4\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"401 POST http://localhost:3000/api/auth/refresh\",\u001b[39m\n\u001b[31m+   \"Console error: Failed to load resource: the server responded with a status of 401 (Unauthorized)\",\u001b[39m\n\u001b[31m+ ]\u001b[39m\n    at C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts:258:46",
-                        "location": {
-                          "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
-                          "column": 46,
-                          "line": 258
-                        },
-                        "snippet": "\u001b[0m \u001b[90m 256 |\u001b[39m         contentType\u001b[33m:\u001b[39m \u001b[32m'application/json'\u001b[39m\u001b[33m,\u001b[39m\n \u001b[90m 257 |\u001b[39m       })\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 258 |\u001b[39m       expect(issues\u001b[33m,\u001b[39m \u001b[32m`${path} audit issues`\u001b[39m)\u001b[33m.\u001b[39mtoEqual([])\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m                                              \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 259 |\u001b[39m       test\u001b[33m.\u001b[39minfo()\u001b[33m.\u001b[39mannotations\u001b[33m.\u001b[39mpush({ type\u001b[33m:\u001b[39m \u001b[32m'navigation-ms'\u001b[39m\u001b[33m,\u001b[39m description\u001b[33m:\u001b[39m \u001b[33mString\u001b[39m(audit\u001b[33m.\u001b[39melapsedMs) })\u001b[33m;\u001b[39m\n \u001b[90m 260 |\u001b[39m       audit\u001b[33m.\u001b[39mstopTracking()\u001b[33m;\u001b[39m\n \u001b[90m 261 |\u001b[39m     })\u001b[33m;\u001b[39m\u001b[0m"
-                      },
-                      "errors": [
-                        {
-                          "location": {
-                            "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
-                            "column": 46,
-                            "line": 258
-                          },
-                          "message": "Error: /features audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 4\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"401 POST http://localhost:3000/api/auth/refresh\",\u001b[39m\n\u001b[31m+   \"Console error: Failed to load resource: the server responded with a status of 401 (Unauthorized)\",\u001b[39m\n\u001b[31m+ ]\u001b[39m\n\n  256 |         contentType: 'application/json',\n  257 |       });\n> 258 |       expect(issues, `${path} audit issues`).toEqual([]);\n      |                                              ^\n  259 |       test.info().annotations.push({ type: 'navigation-ms', description: String(audit.elapsedMs) });\n  260 |       audit.stopTracking();\n  261 |     });\n    at C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts:258:46"
-                        }
-                      ],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-10-15T12:33:12.492Z",
-                      "annotations": [],
-                      "attachments": [
-                        {
-                          "name": "page-audit.json",
-                          "contentType": "application/json",
-                          "body": "ewogICJ1cmwiOiAiaHR0cDovL2xvY2FsaG9zdDozMDAwL2ZlYXR1cmVzIiwKICAicGF0aCI6ICIvZmVhdHVyZXMiLAogICJzdGF0dXMiOiAyMDAsCiAgImNvbnRlbnRTZWN1cml0eVBvbGljeSI6IHRydWUsCiAgInN0cmljdFRyYW5zcG9ydFNlY3VyaXR5IjogdHJ1ZSwKICAic2V0Q29va2llQXR0cmlidXRlcyI6IFtdLAogICJ0aXRsZSI6ICJXb3JrR3JpbmQgRmVhdHVyZXMgfCBQZXJzb25hbCwgQnVzaW5lc3MsIGFuZCBFZHVjYXRpb24gV29ya3NwYWNlcyIsCiAgImVsYXBzZWRNcyI6IDEyMDI3LAogICJpc3N1ZXMiOiBbCiAgICAiNDAxIFBPU1QgaHR0cDovL2xvY2FsaG9zdDozMDAwL2FwaS9hdXRoL3JlZnJlc2giLAogICAgIkNvbnNvbGUgZXJyb3I6IEZhaWxlZCB0byBsb2FkIHJlc291cmNlOiB0aGUgc2VydmVyIHJlc3BvbmRlZCB3aXRoIGEgc3RhdHVzIG9mIDQwMSAoVW5hdXRob3JpemVkKSIKICBdLAogICJvbGRCcmFuZE1hdGNoZXMiOiBbXQp9"
-                        },
-                        {
-                          "name": "screenshot",
-                          "contentType": "image/png",
-                          "path": "C:\\workgrind\\artifacts\\test-results\\workgrind-audit-WorkGrind--08b20--audit-public-page-features-chromium\\test-failed-1.png"
-                        },
-                        {
-                          "name": "error-context",
-                          "contentType": "text/markdown",
-                          "path": "C:\\workgrind\\artifacts\\test-results\\workgrind-audit-WorkGrind--08b20--audit-public-page-features-chromium\\error-context.md"
-                        }
-                      ],
-                      "errorLocation": {
-                        "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
-                        "column": 46,
-                        "line": 258
-                      }
-                    }
-                  ],
-                  "status": "unexpected"
-                }
-              ],
-              "id": "2aae5247a7454980396a-edb4efe8490e1513f0c9",
-              "file": "workgrind-audit.spec.ts",
-              "line": 218,
-              "column": 9
-            },
-            {
-              "title": "public page /demo",
-              "ok": false,
-              "tags": [],
-              "tests": [
-                {
-                  "timeout": 60000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
-                  "projectId": "chromium",
-                  "projectName": "chromium",
-                  "results": [
-                    {
-                      "workerIndex": 3,
-                      "parallelIndex": 3,
-                      "status": "failed",
-                      "duration": 14686,
-                      "error": {
-                        "message": "Error: /demo audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 4\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"401 POST http://localhost:3000/api/auth/refresh\",\u001b[39m\n\u001b[31m+   \"Console error: Failed to load resource: the server responded with a status of 401 (Unauthorized)\",\u001b[39m\n\u001b[31m+ ]\u001b[39m",
-                        "stack": "Error: /demo audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 4\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"401 POST http://localhost:3000/api/auth/refresh\",\u001b[39m\n\u001b[31m+   \"Console error: Failed to load resource: the server responded with a status of 401 (Unauthorized)\",\u001b[39m\n\u001b[31m+ ]\u001b[39m\n    at C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts:258:46",
-                        "location": {
-                          "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
-                          "column": 46,
-                          "line": 258
-                        },
-                        "snippet": "\u001b[0m \u001b[90m 256 |\u001b[39m         contentType\u001b[33m:\u001b[39m \u001b[32m'application/json'\u001b[39m\u001b[33m,\u001b[39m\n \u001b[90m 257 |\u001b[39m       })\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 258 |\u001b[39m       expect(issues\u001b[33m,\u001b[39m \u001b[32m`${path} audit issues`\u001b[39m)\u001b[33m.\u001b[39mtoEqual([])\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m                                              \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 259 |\u001b[39m       test\u001b[33m.\u001b[39minfo()\u001b[33m.\u001b[39mannotations\u001b[33m.\u001b[39mpush({ type\u001b[33m:\u001b[39m \u001b[32m'navigation-ms'\u001b[39m\u001b[33m,\u001b[39m description\u001b[33m:\u001b[39m \u001b[33mString\u001b[39m(audit\u001b[33m.\u001b[39melapsedMs) })\u001b[33m;\u001b[39m\n \u001b[90m 260 |\u001b[39m       audit\u001b[33m.\u001b[39mstopTracking()\u001b[33m;\u001b[39m\n \u001b[90m 261 |\u001b[39m     })\u001b[33m;\u001b[39m\u001b[0m"
-                      },
-                      "errors": [
-                        {
-                          "location": {
-                            "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
-                            "column": 46,
-                            "line": 258
-                          },
-                          "message": "Error: /demo audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 4\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"401 POST http://localhost:3000/api/auth/refresh\",\u001b[39m\n\u001b[31m+   \"Console error: Failed to load resource: the server responded with a status of 401 (Unauthorized)\",\u001b[39m\n\u001b[31m+ ]\u001b[39m\n\n  256 |         contentType: 'application/json',\n  257 |       });\n> 258 |       expect(issues, `${path} audit issues`).toEqual([]);\n      |                                              ^\n  259 |       test.info().annotations.push({ type: 'navigation-ms', description: String(audit.elapsedMs) });\n  260 |       audit.stopTracking();\n  261 |     });\n    at C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts:258:46"
-                        }
-                      ],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-10-15T12:33:12.322Z",
-                      "annotations": [],
-                      "attachments": [
-                        {
-                          "name": "page-audit.json",
-                          "contentType": "application/json",
-                          "body": "ewogICJ1cmwiOiAiaHR0cDovL2xvY2FsaG9zdDozMDAwL2RlbW8iLAogICJwYXRoIjogIi9kZW1vIiwKICAic3RhdHVzIjogMjAwLAogICJjb250ZW50U2VjdXJpdHlQb2xpY3kiOiB0cnVlLAogICJzdHJpY3RUcmFuc3BvcnRTZWN1cml0eSI6IHRydWUsCiAgInNldENvb2tpZUF0dHJpYnV0ZXMiOiBbXSwKICAidGl0bGUiOiAiUmVxdWVzdCBhIFdvcmtHcmluZCBXYWxrdGhyb3VnaCIsCiAgImVsYXBzZWRNcyI6IDkyMTIsCiAgImlzc3VlcyI6IFsKICAgICI0MDEgUE9TVCBodHRwOi8vbG9jYWxob3N0OjMwMDAvYXBpL2F1dGgvcmVmcmVzaCIsCiAgICAiQ29uc29sZSBlcnJvcjogRmFpbGVkIHRvIGxvYWQgcmVzb3VyY2U6IHRoZSBzZXJ2ZXIgcmVzcG9uZGVkIHdpdGggYSBzdGF0dXMgb2YgNDAxIChVbmF1dGhvcml6ZWQpIgogIF0sCiAgIm9sZEJyYW5kTWF0Y2hlcyI6IFtdCn0="
-                        },
-                        {
-                          "name": "screenshot",
-                          "contentType": "image/png",
-                          "path": "C:\\workgrind\\artifacts\\test-results\\workgrind-audit-WorkGrind-public-site-audit-public-page-demo-chromium\\test-failed-1.png"
-                        },
-                        {
-                          "name": "error-context",
-                          "contentType": "text/markdown",
-                          "path": "C:\\workgrind\\artifacts\\test-results\\workgrind-audit-WorkGrind-public-site-audit-public-page-demo-chromium\\error-context.md"
-                        }
-                      ],
-                      "errorLocation": {
-                        "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
-                        "column": 46,
-                        "line": 258
-                      }
-                    }
-                  ],
-                  "status": "unexpected"
-                }
-              ],
-              "id": "2aae5247a7454980396a-5db2e059ed12195a70c2",
-              "file": "workgrind-audit.spec.ts",
-              "line": 218,
-              "column": 9
-            },
-            {
-              "title": "public page /contact",
-              "ok": false,
-              "tags": [],
-              "tests": [
-                {
-                  "timeout": 60000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
-                  "projectId": "chromium",
-                  "projectName": "chromium",
-                  "results": [
-                    {
-                      "workerIndex": 4,
-                      "parallelIndex": 3,
-                      "status": "failed",
-                      "duration": 32121,
-                      "error": {
-                        "message": "Error: /contact audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  -  1\u001b[39m\n\u001b[31m+ Received  + 26\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/login\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/signup\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/about\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/features\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/demo\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/contact\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/privacy\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/terms\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/cookies\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/refunds\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/cancellation\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/disclaimer\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/security\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/responsible-disclosure\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/accessibility\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/dpa\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/acceptable-use\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/community-guidelines\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/help\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/support\",\u001b[39m\n\u001b[31m+   \"Slow request (11613ms): http://localhost:3000/api/auth/refresh\",\u001b[39m\n\u001b[31m+   \"401 POST http://localhost:3000/api/auth/refresh\",\u001b[39m\n\u001b[31m+   \"Console error: Failed to load resource: the server responded with a status of 401 (Unauthorized)\",\u001b[39m\n\u001b[31m+ ]\u001b[39m",
-                        "stack": "Error: /contact audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  -  1\u001b[39m\n\u001b[31m+ Received  + 26\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/login\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/signup\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/about\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/features\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/demo\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/contact\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/privacy\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/terms\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/cookies\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/refunds\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/cancellation\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/disclaimer\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/security\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/responsible-disclosure\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/accessibility\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/dpa\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/acceptable-use\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/community-guidelines\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/help\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/support\",\u001b[39m\n\u001b[31m+   \"Slow request (11613ms): http://localhost:3000/api/auth/refresh\",\u001b[39m\n\u001b[31m+   \"401 POST http://localhost:3000/api/auth/refresh\",\u001b[39m\n\u001b[31m+   \"Console error: Failed to load resource: the server responded with a status of 401 (Unauthorized)\",\u001b[39m\n\u001b[31m+ ]\u001b[39m\n    at C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts:258:46",
-                        "location": {
-                          "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
-                          "column": 46,
-                          "line": 258
-                        },
-                        "snippet": "\u001b[0m \u001b[90m 256 |\u001b[39m         contentType\u001b[33m:\u001b[39m \u001b[32m'application/json'\u001b[39m\u001b[33m,\u001b[39m\n \u001b[90m 257 |\u001b[39m       })\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 258 |\u001b[39m       expect(issues\u001b[33m,\u001b[39m \u001b[32m`${path} audit issues`\u001b[39m)\u001b[33m.\u001b[39mtoEqual([])\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m                                              \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 259 |\u001b[39m       test\u001b[33m.\u001b[39minfo()\u001b[33m.\u001b[39mannotations\u001b[33m.\u001b[39mpush({ type\u001b[33m:\u001b[39m \u001b[32m'navigation-ms'\u001b[39m\u001b[33m,\u001b[39m description\u001b[33m:\u001b[39m \u001b[33mString\u001b[39m(audit\u001b[33m.\u001b[39melapsedMs) })\u001b[33m;\u001b[39m\n \u001b[90m 260 |\u001b[39m       audit\u001b[33m.\u001b[39mstopTracking()\u001b[33m;\u001b[39m\n \u001b[90m 261 |\u001b[39m     })\u001b[33m;\u001b[39m\u001b[0m"
-                      },
-                      "errors": [
-                        {
-                          "location": {
-                            "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
-                            "column": 46,
-                            "line": 258
-                          },
-                          "message": "Error: /contact audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  -  1\u001b[39m\n\u001b[31m+ Received  + 26\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/login\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/signup\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/about\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/features\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/demo\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/contact\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/privacy\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/terms\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/cookies\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/refunds\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/cancellation\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/disclaimer\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/security\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/responsible-disclosure\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/accessibility\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/dpa\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/acceptable-use\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/community-guidelines\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/help\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/support\",\u001b[39m\n\u001b[31m+   \"Slow request (11613ms): http://localhost:3000/api/auth/refresh\",\u001b[39m\n\u001b[31m+   \"401 POST http://localhost:3000/api/auth/refresh\",\u001b[39m\n\u001b[31m+   \"Console error: Failed to load resource: the server responded with a status of 401 (Unauthorized)\",\u001b[39m\n\u001b[31m+ ]\u001b[39m\n\n  256 |         contentType: 'application/json',\n  257 |       });\n> 258 |       expect(issues, `${path} audit issues`).toEqual([]);\n      |                                              ^\n  259 |       test.info().annotations.push({ type: 'navigation-ms', description: String(audit.elapsedMs) });\n  260 |       audit.stopTracking();\n  261 |     });\n    at C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts:258:46"
-                        }
-                      ],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-10-15T12:33:36.473Z",
-                      "annotations": [],
-                      "attachments": [
-                        {
-                          "name": "page-audit.json",
-                          "contentType": "application/json",
-                          "body": "ewogICJ1cmwiOiAiaHR0cDovL2xvY2FsaG9zdDozMDAwL2NvbnRhY3QiLAogICJwYXRoIjogIi9jb250YWN0IiwKICAic3RhdHVzIjogMjAwLAogICJjb250ZW50U2VjdXJpdHlQb2xpY3kiOiB0cnVlLAogICJzdHJpY3RUcmFuc3BvcnRTZWN1cml0eSI6IHRydWUsCiAgInNldENvb2tpZUF0dHJpYnV0ZXMiOiBbXSwKICAidGl0bGUiOiAiQ29udGFjdCBXb3JrR3JpbmQiLAogICJlbGFwc2VkTXMiOiAxMjMxOSwKICAiaXNzdWVzIjogWwogICAgIkJyb2tlbiBpbnRlcm5hbCBsaW5rOiByZXF1ZXN0IGZhaWxlZCBodHRwOi8vbG9jYWxob3N0OjMwMDAvIiwKICAgICJCcm9rZW4gaW50ZXJuYWwgbGluazogcmVxdWVzdCBmYWlsZWQgaHR0cDovL2xvY2FsaG9zdDozMDAwL2xvZ2luIiwKICAgICJCcm9rZW4gaW50ZXJuYWwgbGluazogcmVxdWVzdCBmYWlsZWQgaHR0cDovL2xvY2FsaG9zdDozMDAwL3NpZ251cCIsCiAgICAiQnJva2VuIGludGVybmFsIGxpbms6IHJlcXVlc3QgZmFpbGVkIGh0dHA6Ly9sb2NhbGhvc3Q6MzAwMC9hYm91dCIsCiAgICAiQnJva2VuIGludGVybmFsIGxpbms6IHJlcXVlc3QgZmFpbGVkIGh0dHA6Ly9sb2NhbGhvc3Q6MzAwMC9mZWF0dXJlcyIsCiAgICAiQnJva2VuIGludGVybmFsIGxpbms6IHJlcXVlc3QgZmFpbGVkIGh0dHA6Ly9sb2NhbGhvc3Q6MzAwMC9kZW1vIiwKICAgICJCcm9rZW4gaW50ZXJuYWwgbGluazogcmVxdWVzdCBmYWlsZWQgaHR0cDovL2xvY2FsaG9zdDozMDAwL2NvbnRhY3QiLAogICAgIkJyb2tlbiBpbnRlcm5hbCBsaW5rOiByZXF1ZXN0IGZhaWxlZCBodHRwOi8vbG9jYWxob3N0OjMwMDAvcHJpdmFjeSIsCiAgICAiQnJva2VuIGludGVybmFsIGxpbms6IHJlcXVlc3QgZmFpbGVkIGh0dHA6Ly9sb2NhbGhvc3Q6MzAwMC90ZXJtcyIsCiAgICAiQnJva2VuIGludGVybmFsIGxpbms6IHJlcXVlc3QgZmFpbGVkIGh0dHA6Ly9sb2NhbGhvc3Q6MzAwMC9jb29raWVzIiwKICAgICJCcm9rZW4gaW50ZXJuYWwgbGluazogcmVxdWVzdCBmYWlsZWQgaHR0cDovL2xvY2FsaG9zdDozMDAwL3JlZnVuZHMiLAogICAgIkJyb2tlbiBpbnRlcm5hbCBsaW5rOiByZXF1ZXN0IGZhaWxlZCBodHRwOi8vbG9jYWxob3N0OjMwMDAvY2FuY2VsbGF0aW9uIiwKICAgICJCcm9rZW4gaW50ZXJuYWwgbGluazogcmVxdWVzdCBmYWlsZWQgaHR0cDovL2xvY2FsaG9zdDozMDAwL2Rpc2NsYWltZXIiLAogICAgIkJyb2tlbiBpbnRlcm5hbCBsaW5rOiByZXF1ZXN0IGZhaWxlZCBodHRwOi8vbG9jYWxob3N0OjMwMDAvc2VjdXJpdHkiLAogICAgIkJyb2tlbiBpbnRlcm5hbCBsaW5rOiByZXF1ZXN0IGZhaWxlZCBodHRwOi8vbG9jYWxob3N0OjMwMDAvcmVzcG9uc2libGUtZGlzY2xvc3VyZSIsCiAgICAiQnJva2VuIGludGVybmFsIGxpbms6IHJlcXVlc3QgZmFpbGVkIGh0dHA6Ly9sb2NhbGhvc3Q6MzAwMC9hY2Nlc3NpYmlsaXR5IiwKICAgICJCcm9rZW4gaW50ZXJuYWwgbGluazogcmVxdWVzdCBmYWlsZWQgaHR0cDovL2xvY2FsaG9zdDozMDAwL2RwYSIsCiAgICAiQnJva2VuIGludGVybmFsIGxpbms6IHJlcXVlc3QgZmFpbGVkIGh0dHA6Ly9sb2NhbGhvc3Q6MzAwMC9hY2NlcHRhYmxlLXVzZSIsCiAgICAiQnJva2VuIGludGVybmFsIGxpbms6IHJlcXVlc3QgZmFpbGVkIGh0dHA6Ly9sb2NhbGhvc3Q6MzAwMC9jb21tdW5pdHktZ3VpZGVsaW5lcyIsCiAgICAiQnJva2VuIGludGVybmFsIGxpbms6IHJlcXVlc3QgZmFpbGVkIGh0dHA6Ly9sb2NhbGhvc3Q6MzAwMC9oZWxwIiwKICAgICJCcm9rZW4gaW50ZXJuYWwgbGluazogcmVxdWVzdCBmYWlsZWQgaHR0cDovL2xvY2FsaG9zdDozMDAwL3N1cHBvcnQiLAogICAgIlNsb3cgcmVxdWVzdCAoMTE2MTNtcyk6IGh0dHA6Ly9sb2NhbGhvc3Q6MzAwMC9hcGkvYXV0aC9yZWZyZXNoIiwKICAgICI0MDEgUE9TVCBodHRwOi8vbG9jYWxob3N0OjMwMDAvYXBpL2F1dGgvcmVmcmVzaCIsCiAgICAiQ29uc29sZSBlcnJvcjogRmFpbGVkIHRvIGxvYWQgcmVzb3VyY2U6IHRoZSBzZXJ2ZXIgcmVzcG9uZGVkIHdpdGggYSBzdGF0dXMgb2YgNDAxIChVbmF1dGhvcml6ZWQpIgogIF0sCiAgIm9sZEJyYW5kTWF0Y2hlcyI6IFtdCn0="
-                        },
-                        {
-                          "name": "screenshot",
-                          "contentType": "image/png",
-                          "path": "C:\\workgrind\\artifacts\\test-results\\workgrind-audit-WorkGrind--a4f55-e-audit-public-page-contact-chromium\\test-failed-1.png"
-                        },
-                        {
-                          "name": "error-context",
-                          "contentType": "text/markdown",
-                          "path": "C:\\workgrind\\artifacts\\test-results\\workgrind-audit-WorkGrind--a4f55-e-audit-public-page-contact-chromium\\error-context.md"
-                        }
-                      ],
-                      "errorLocation": {
-                        "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
-                        "column": 46,
-                        "line": 258
-                      }
-                    }
-                  ],
-                  "status": "unexpected"
-                }
-              ],
-              "id": "2aae5247a7454980396a-313eedc694fe00b30ece",
-              "file": "workgrind-audit.spec.ts",
-              "line": 218,
-              "column": 9
-            },
-            {
-              "title": "public page /pricing",
-              "ok": false,
-              "tags": [],
-              "tests": [
-                {
-                  "timeout": 60000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
-                  "projectId": "chromium",
-                  "projectName": "chromium",
-                  "results": [
-                    {
-                      "workerIndex": 5,
-                      "parallelIndex": 2,
-                      "status": "failed",
-                      "duration": 23587,
-                      "error": {
-                        "message": "Error: /pricing audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 8\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/login\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/signup\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/contact\",\u001b[39m\n\u001b[31m+   \"401 POST http://localhost:3000/api/auth/refresh\",\u001b[39m\n\u001b[31m+   \"Console error: Failed to load resource: the server responded with a status of 401 (Unauthorized)\",\u001b[39m\n\u001b[31m+ ]\u001b[39m",
-                        "stack": "Error: /pricing audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 8\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/login\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/signup\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/contact\",\u001b[39m\n\u001b[31m+   \"401 POST http://localhost:3000/api/auth/refresh\",\u001b[39m\n\u001b[31m+   \"Console error: Failed to load resource: the server responded with a status of 401 (Unauthorized)\",\u001b[39m\n\u001b[31m+ ]\u001b[39m\n    at C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts:258:46",
-                        "location": {
-                          "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
-                          "column": 46,
-                          "line": 258
-                        },
-                        "snippet": "\u001b[0m \u001b[90m 256 |\u001b[39m         contentType\u001b[33m:\u001b[39m \u001b[32m'application/json'\u001b[39m\u001b[33m,\u001b[39m\n \u001b[90m 257 |\u001b[39m       })\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 258 |\u001b[39m       expect(issues\u001b[33m,\u001b[39m \u001b[32m`${path} audit issues`\u001b[39m)\u001b[33m.\u001b[39mtoEqual([])\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m                                              \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 259 |\u001b[39m       test\u001b[33m.\u001b[39minfo()\u001b[33m.\u001b[39mannotations\u001b[33m.\u001b[39mpush({ type\u001b[33m:\u001b[39m \u001b[32m'navigation-ms'\u001b[39m\u001b[33m,\u001b[39m description\u001b[33m:\u001b[39m \u001b[33mString\u001b[39m(audit\u001b[33m.\u001b[39melapsedMs) })\u001b[33m;\u001b[39m\n \u001b[90m 260 |\u001b[39m       audit\u001b[33m.\u001b[39mstopTracking()\u001b[33m;\u001b[39m\n \u001b[90m 261 |\u001b[39m     })\u001b[33m;\u001b[39m\u001b[0m"
-                      },
-                      "errors": [
-                        {
-                          "location": {
-                            "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
-                            "column": 46,
-                            "line": 258
-                          },
-                          "message": "Error: /pricing audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 8\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/login\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/signup\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/contact\",\u001b[39m\n\u001b[31m+   \"401 POST http://localhost:3000/api/auth/refresh\",\u001b[39m\n\u001b[31m+   \"Console error: Failed to load resource: the server responded with a status of 401 (Unauthorized)\",\u001b[39m\n\u001b[31m+ ]\u001b[39m\n\n  256 |         contentType: 'application/json',\n  257 |       });\n> 258 |       expect(issues, `${path} audit issues`).toEqual([]);\n      |                                              ^\n  259 |       test.info().annotations.push({ type: 'navigation-ms', description: String(audit.elapsedMs) });\n  260 |       audit.stopTracking();\n  261 |     });\n    at C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts:258:46"
-                        }
-                      ],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-10-15T12:33:47.988Z",
-                      "annotations": [],
-                      "attachments": [
-                        {
-                          "name": "page-audit.json",
-                          "contentType": "application/json",
-                          "body": "ewogICJ1cmwiOiAiaHR0cDovL2xvY2FsaG9zdDozMDAwL3ByaWNpbmciLAogICJwYXRoIjogIi9wcmljaW5nIiwKICAic3RhdHVzIjogMjAwLAogICJjb250ZW50U2VjdXJpdHlQb2xpY3kiOiB0cnVlLAogICJzdHJpY3RUcmFuc3BvcnRTZWN1cml0eSI6IHRydWUsCiAgInNldENvb2tpZUF0dHJpYnV0ZXMiOiBbXSwKICAidGl0bGUiOiAiV29ya0dyaW5kIFByaWNpbmcgfCBQbGFucyBmb3IgRWFjaCBXb3Jrc3BhY2UiLAogICJlbGFwc2VkTXMiOiA5MDM3LAogICJpc3N1ZXMiOiBbCiAgICAiQnJva2VuIGludGVybmFsIGxpbms6IHJlcXVlc3QgZmFpbGVkIGh0dHA6Ly9sb2NhbGhvc3Q6MzAwMC8iLAogICAgIkJyb2tlbiBpbnRlcm5hbCBsaW5rOiByZXF1ZXN0IGZhaWxlZCBodHRwOi8vbG9jYWxob3N0OjMwMDAvbG9naW4iLAogICAgIkJyb2tlbiBpbnRlcm5hbCBsaW5rOiByZXF1ZXN0IGZhaWxlZCBodHRwOi8vbG9jYWxob3N0OjMwMDAvc2lnbnVwIiwKICAgICJCcm9rZW4gaW50ZXJuYWwgbGluazogcmVxdWVzdCBmYWlsZWQgaHR0cDovL2xvY2FsaG9zdDozMDAwL2NvbnRhY3QiLAogICAgIjQwMSBQT1NUIGh0dHA6Ly9sb2NhbGhvc3Q6MzAwMC9hcGkvYXV0aC9yZWZyZXNoIiwKICAgICJDb25zb2xlIGVycm9yOiBGYWlsZWQgdG8gbG9hZCByZXNvdXJjZTogdGhlIHNlcnZlciByZXNwb25kZWQgd2l0aCBhIHN0YXR1cyBvZiA0MDEgKFVuYXV0aG9yaXplZCkiCiAgXSwKICAib2xkQnJhbmRNYXRjaGVzIjogW10KfQ=="
-                        },
-                        {
-                          "name": "screenshot",
-                          "contentType": "image/png",
-                          "path": "C:\\workgrind\\artifacts\\test-results\\workgrind-audit-WorkGrind--beb9d-e-audit-public-page-pricing-chromium\\test-failed-1.png"
-                        },
-                        {
-                          "name": "error-context",
-                          "contentType": "text/markdown",
-                          "path": "C:\\workgrind\\artifacts\\test-results\\workgrind-audit-WorkGrind--beb9d-e-audit-public-page-pricing-chromium\\error-context.md"
-                        }
-                      ],
-                      "errorLocation": {
-                        "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
-                        "column": 46,
-                        "line": 258
-                      }
-                    }
-                  ],
-                  "status": "unexpected"
-                }
-              ],
-              "id": "2aae5247a7454980396a-e944d0e49a7d12da7e1e",
-              "file": "workgrind-audit.spec.ts",
-              "line": 218,
-              "column": 9
-            },
-            {
-              "title": "public page /privacy",
-              "ok": false,
-              "tags": [],
-              "tests": [
-                {
-                  "timeout": 60000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
-                  "projectId": "chromium",
-                  "projectName": "chromium",
-                  "results": [
-                    {
-                      "workerIndex": 6,
-                      "parallelIndex": 0,
-                      "status": "failed",
-                      "duration": 23546,
-                      "error": {
-                        "message": "Error: /privacy audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  -  1\u001b[39m\n\u001b[31m+ Received  + 22\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/login\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/signup\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/contact\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/about\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/features\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/demo\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/privacy\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/terms\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/cookies\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/cancellation\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/refunds\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/disclaimer\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/security\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/responsible-disclosure\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/accessibility\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/dpa\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/acceptable-use\",\u001b[39m\n\u001b[31m+   \"401 POST http://localhost:3000/api/auth/refresh\",\u001b[39m\n\u001b[31m+   \"Console error: Failed to load resource: the server responded with a status of 401 (Unauthorized)\",\u001b[39m\n\u001b[31m+ ]\u001b[39m",
-                        "stack": "Error: /privacy audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  -  1\u001b[39m\n\u001b[31m+ Received  + 22\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/login\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/signup\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/contact\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/about\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/features\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/demo\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/privacy\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/terms\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/cookies\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/cancellation\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/refunds\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/disclaimer\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/security\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/responsible-disclosure\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/accessibility\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/dpa\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/acceptable-use\",\u001b[39m\n\u001b[31m+   \"401 POST http://localhost:3000/api/auth/refresh\",\u001b[39m\n\u001b[31m+   \"Console error: Failed to load resource: the server responded with a status of 401 (Unauthorized)\",\u001b[39m\n\u001b[31m+ ]\u001b[39m\n    at C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts:258:46",
-                        "location": {
-                          "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
-                          "column": 46,
-                          "line": 258
-                        },
-                        "snippet": "\u001b[0m \u001b[90m 256 |\u001b[39m         contentType\u001b[33m:\u001b[39m \u001b[32m'application/json'\u001b[39m\u001b[33m,\u001b[39m\n \u001b[90m 257 |\u001b[39m       })\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 258 |\u001b[39m       expect(issues\u001b[33m,\u001b[39m \u001b[32m`${path} audit issues`\u001b[39m)\u001b[33m.\u001b[39mtoEqual([])\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m                                              \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 259 |\u001b[39m       test\u001b[33m.\u001b[39minfo()\u001b[33m.\u001b[39mannotations\u001b[33m.\u001b[39mpush({ type\u001b[33m:\u001b[39m \u001b[32m'navigation-ms'\u001b[39m\u001b[33m,\u001b[39m description\u001b[33m:\u001b[39m \u001b[33mString\u001b[39m(audit\u001b[33m.\u001b[39melapsedMs) })\u001b[33m;\u001b[39m\n \u001b[90m 260 |\u001b[39m       audit\u001b[33m.\u001b[39mstopTracking()\u001b[33m;\u001b[39m\n \u001b[90m 261 |\u001b[39m     })\u001b[33m;\u001b[39m\u001b[0m"
-                      },
-                      "errors": [
-                        {
-                          "location": {
-                            "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
-                            "column": 46,
-                            "line": 258
-                          },
-                          "message": "Error: /privacy audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  -  1\u001b[39m\n\u001b[31m+ Received  + 22\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/login\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/signup\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/contact\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/about\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/features\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/demo\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/privacy\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/terms\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/cookies\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/cancellation\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/refunds\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/disclaimer\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/security\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/responsible-disclosure\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/accessibility\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/dpa\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/acceptable-use\",\u001b[39m\n\u001b[31m+   \"401 POST http://localhost:3000/api/auth/refresh\",\u001b[39m\n\u001b[31m+   \"Console error: Failed to load resource: the server responded with a status of 401 (Unauthorized)\",\u001b[39m\n\u001b[31m+ ]\u001b[39m\n\n  256 |         contentType: 'application/json',\n  257 |       });\n> 258 |       expect(issues, `${path} audit issues`).toEqual([]);\n      |                                              ^\n  259 |       test.info().annotations.push({ type: 'navigation-ms', description: String(audit.elapsedMs) });\n  260 |       audit.stopTracking();\n  261 |     });\n    at C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts:258:46"
-                        }
-                      ],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-10-15T12:33:48.004Z",
-                      "annotations": [],
-                      "attachments": [
-                        {
-                          "name": "page-audit.json",
-                          "contentType": "application/json",
-                          "body": "ewogICJ1cmwiOiAiaHR0cDovL2xvY2FsaG9zdDozMDAwL3ByaXZhY3kiLAogICJwYXRoIjogIi9wcml2YWN5IiwKICAic3RhdHVzIjogMjAwLAogICJjb250ZW50U2VjdXJpdHlQb2xpY3kiOiB0cnVlLAogICJzdHJpY3RUcmFuc3BvcnRTZWN1cml0eSI6IHRydWUsCiAgInNldENvb2tpZUF0dHJpYnV0ZXMiOiBbXSwKICAidGl0bGUiOiAiUHJpdmFjeSBQb2xpY3kgfCBXb3JrR3JpbmQiLAogICJlbGFwc2VkTXMiOiA4NjcxLAogICJpc3N1ZXMiOiBbCiAgICAiQnJva2VuIGludGVybmFsIGxpbms6IHJlcXVlc3QgZmFpbGVkIGh0dHA6Ly9sb2NhbGhvc3Q6MzAwMC8iLAogICAgIkJyb2tlbiBpbnRlcm5hbCBsaW5rOiByZXF1ZXN0IGZhaWxlZCBodHRwOi8vbG9jYWxob3N0OjMwMDAvbG9naW4iLAogICAgIkJyb2tlbiBpbnRlcm5hbCBsaW5rOiByZXF1ZXN0IGZhaWxlZCBodHRwOi8vbG9jYWxob3N0OjMwMDAvc2lnbnVwIiwKICAgICJCcm9rZW4gaW50ZXJuYWwgbGluazogcmVxdWVzdCBmYWlsZWQgaHR0cDovL2xvY2FsaG9zdDozMDAwL2NvbnRhY3QiLAogICAgIkJyb2tlbiBpbnRlcm5hbCBsaW5rOiByZXF1ZXN0IGZhaWxlZCBodHRwOi8vbG9jYWxob3N0OjMwMDAvYWJvdXQiLAogICAgIkJyb2tlbiBpbnRlcm5hbCBsaW5rOiByZXF1ZXN0IGZhaWxlZCBodHRwOi8vbG9jYWxob3N0OjMwMDAvZmVhdHVyZXMiLAogICAgIkJyb2tlbiBpbnRlcm5hbCBsaW5rOiByZXF1ZXN0IGZhaWxlZCBodHRwOi8vbG9jYWxob3N0OjMwMDAvZGVtbyIsCiAgICAiQnJva2VuIGludGVybmFsIGxpbms6IHJlcXVlc3QgZmFpbGVkIGh0dHA6Ly9sb2NhbGhvc3Q6MzAwMC9wcml2YWN5IiwKICAgICJCcm9rZW4gaW50ZXJuYWwgbGluazogcmVxdWVzdCBmYWlsZWQgaHR0cDovL2xvY2FsaG9zdDozMDAwL3Rlcm1zIiwKICAgICJCcm9rZW4gaW50ZXJuYWwgbGluazogcmVxdWVzdCBmYWlsZWQgaHR0cDovL2xvY2FsaG9zdDozMDAwL2Nvb2tpZXMiLAogICAgIkJyb2tlbiBpbnRlcm5hbCBsaW5rOiByZXF1ZXN0IGZhaWxlZCBodHRwOi8vbG9jYWxob3N0OjMwMDAvY2FuY2VsbGF0aW9uIiwKICAgICJCcm9rZW4gaW50ZXJuYWwgbGluazogcmVxdWVzdCBmYWlsZWQgaHR0cDovL2xvY2FsaG9zdDozMDAwL3JlZnVuZHMiLAogICAgIkJyb2tlbiBpbnRlcm5hbCBsaW5rOiByZXF1ZXN0IGZhaWxlZCBodHRwOi8vbG9jYWxob3N0OjMwMDAvZGlzY2xhaW1lciIsCiAgICAiQnJva2VuIGludGVybmFsIGxpbms6IHJlcXVlc3QgZmFpbGVkIGh0dHA6Ly9sb2NhbGhvc3Q6MzAwMC9zZWN1cml0eSIsCiAgICAiQnJva2VuIGludGVybmFsIGxpbms6IHJlcXVlc3QgZmFpbGVkIGh0dHA6Ly9sb2NhbGhvc3Q6MzAwMC9yZXNwb25zaWJsZS1kaXNjbG9zdXJlIiwKICAgICJCcm9rZW4gaW50ZXJuYWwgbGluazogcmVxdWVzdCBmYWlsZWQgaHR0cDovL2xvY2FsaG9zdDozMDAwL2FjY2Vzc2liaWxpdHkiLAogICAgIkJyb2tlbiBpbnRlcm5hbCBsaW5rOiByZXF1ZXN0IGZhaWxlZCBodHRwOi8vbG9jYWxob3N0OjMwMDAvZHBhIiwKICAgICJCcm9rZW4gaW50ZXJuYWwgbGluazogcmVxdWVzdCBmYWlsZWQgaHR0cDovL2xvY2FsaG9zdDozMDAwL2FjY2VwdGFibGUtdXNlIiwKICAgICI0MDEgUE9TVCBodHRwOi8vbG9jYWxob3N0OjMwMDAvYXBpL2F1dGgvcmVmcmVzaCIsCiAgICAiQ29uc29sZSBlcnJvcjogRmFpbGVkIHRvIGxvYWQgcmVzb3VyY2U6IHRoZSBzZXJ2ZXIgcmVzcG9uZGVkIHdpdGggYSBzdGF0dXMgb2YgNDAxIChVbmF1dGhvcml6ZWQpIgogIF0sCiAgIm9sZEJyYW5kTWF0Y2hlcyI6IFtdCn0="
-                        },
-                        {
-                          "name": "screenshot",
-                          "contentType": "image/png",
-                          "path": "C:\\workgrind\\artifacts\\test-results\\workgrind-audit-WorkGrind--242c7-e-audit-public-page-privacy-chromium\\test-failed-1.png"
-                        },
-                        {
-                          "name": "error-context",
-                          "contentType": "text/markdown",
-                          "path": "C:\\workgrind\\artifacts\\test-results\\workgrind-audit-WorkGrind--242c7-e-audit-public-page-privacy-chromium\\error-context.md"
-                        }
-                      ],
-                      "errorLocation": {
-                        "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
-                        "column": 46,
-                        "line": 258
-                      }
-                    }
-                  ],
-                  "status": "unexpected"
-                }
-              ],
-              "id": "2aae5247a7454980396a-b1d4f7f9614e5af496d1",
-              "file": "workgrind-audit.spec.ts",
-              "line": 218,
-              "column": 9
-            },
-            {
-              "title": "public page /terms",
-              "ok": false,
-              "tags": [],
-              "tests": [
-                {
-                  "timeout": 60000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
-                  "projectId": "chromium",
-                  "projectName": "chromium",
-                  "results": [
-                    {
-                      "workerIndex": 7,
-                      "parallelIndex": 1,
-                      "status": "failed",
-                      "duration": 23332,
-                      "error": {
-                        "message": "Error: /terms audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  -  1\u001b[39m\n\u001b[31m+ Received  + 25\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/login\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/signup\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/contact\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/about\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/features\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/demo\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/privacy\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/terms\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/cookies\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/refunds\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/cancellation\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/disclaimer\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/security\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/responsible-disclosure\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/accessibility\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/dpa\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/acceptable-use\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/community-guidelines\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/help\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/support\",\u001b[39m\n\u001b[31m+   \"401 POST http://localhost:3000/api/auth/refresh\",\u001b[39m\n\u001b[31m+   \"Console error: Failed to load resource: the server responded with a status of 401 (Unauthorized)\",\u001b[39m\n\u001b[31m+ ]\u001b[39m",
-                        "stack": "Error: /terms audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  -  1\u001b[39m\n\u001b[31m+ Received  + 25\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/login\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/signup\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/contact\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/about\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/features\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/demo\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/privacy\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/terms\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/cookies\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/refunds\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/cancellation\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/disclaimer\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/security\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/responsible-disclosure\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/accessibility\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/dpa\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/acceptable-use\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/community-guidelines\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/help\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/support\",\u001b[39m\n\u001b[31m+   \"401 POST http://localhost:3000/api/auth/refresh\",\u001b[39m\n\u001b[31m+   \"Console error: Failed to load resource: the server responded with a status of 401 (Unauthorized)\",\u001b[39m\n\u001b[31m+ ]\u001b[39m\n    at C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts:258:46",
-                        "location": {
-                          "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
-                          "column": 46,
-                          "line": 258
-                        },
-                        "snippet": "\u001b[0m \u001b[90m 256 |\u001b[39m         contentType\u001b[33m:\u001b[39m \u001b[32m'application/json'\u001b[39m\u001b[33m,\u001b[39m\n \u001b[90m 257 |\u001b[39m       })\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 258 |\u001b[39m       expect(issues\u001b[33m,\u001b[39m \u001b[32m`${path} audit issues`\u001b[39m)\u001b[33m.\u001b[39mtoEqual([])\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m                                              \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 259 |\u001b[39m       test\u001b[33m.\u001b[39minfo()\u001b[33m.\u001b[39mannotations\u001b[33m.\u001b[39mpush({ type\u001b[33m:\u001b[39m \u001b[32m'navigation-ms'\u001b[39m\u001b[33m,\u001b[39m description\u001b[33m:\u001b[39m \u001b[33mString\u001b[39m(audit\u001b[33m.\u001b[39melapsedMs) })\u001b[33m;\u001b[39m\n \u001b[90m 260 |\u001b[39m       audit\u001b[33m.\u001b[39mstopTracking()\u001b[33m;\u001b[39m\n \u001b[90m 261 |\u001b[39m     })\u001b[33m;\u001b[39m\u001b[0m"
-                      },
-                      "errors": [
-                        {
-                          "location": {
-                            "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
-                            "column": 46,
-                            "line": 258
-                          },
-                          "message": "Error: /terms audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  -  1\u001b[39m\n\u001b[31m+ Received  + 25\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/login\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/signup\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/contact\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/about\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/features\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/demo\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/privacy\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/terms\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/cookies\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/refunds\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/cancellation\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/disclaimer\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/security\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/responsible-disclosure\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/accessibility\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/dpa\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/acceptable-use\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/community-guidelines\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/help\",\u001b[39m\n\u001b[31m+   \"Broken internal link: request failed http://localhost:3000/support\",\u001b[39m\n\u001b[31m+   \"401 POST http://localhost:3000/api/auth/refresh\",\u001b[39m\n\u001b[31m+   \"Console error: Failed to load resource: the server responded with a status of 401 (Unauthorized)\",\u001b[39m\n\u001b[31m+ ]\u001b[39m\n\n  256 |         contentType: 'application/json',\n  257 |       });\n> 258 |       expect(issues, `${path} audit issues`).toEqual([]);\n      |                                              ^\n  259 |       test.info().annotations.push({ type: 'navigation-ms', description: String(audit.elapsedMs) });\n  260 |       audit.stopTracking();\n  261 |     });\n    at C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts:258:46"
-                        }
-                      ],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-10-15T12:33:48.003Z",
-                      "annotations": [],
-                      "attachments": [
-                        {
-                          "name": "page-audit.json",
-                          "contentType": "application/json",
-                          "body": "ewogICJ1cmwiOiAiaHR0cDovL2xvY2FsaG9zdDozMDAwL3Rlcm1zIiwKICAicGF0aCI6ICIvdGVybXMiLAogICJzdGF0dXMiOiAyMDAsCiAgImNvbnRlbnRTZWN1cml0eVBvbGljeSI6IHRydWUsCiAgInN0cmljdFRyYW5zcG9ydFNlY3VyaXR5IjogdHJ1ZSwKICAic2V0Q29va2llQXR0cmlidXRlcyI6IFtdLAogICJ0aXRsZSI6ICJUZXJtcyBvZiBTZXJ2aWNlIHwgV29ya0dyaW5kIiwKICAiZWxhcHNlZE1zIjogODc4MywKICAiaXNzdWVzIjogWwogICAgIkJyb2tlbiBpbnRlcm5hbCBsaW5rOiByZXF1ZXN0IGZhaWxlZCBodHRwOi8vbG9jYWxob3N0OjMwMDAvIiwKICAgICJCcm9rZW4gaW50ZXJuYWwgbGluazogcmVxdWVzdCBmYWlsZWQgaHR0cDovL2xvY2FsaG9zdDozMDAwL2xvZ2luIiwKICAgICJCcm9rZW4gaW50ZXJuYWwgbGluazogcmVxdWVzdCBmYWlsZWQgaHR0cDovL2xvY2FsaG9zdDozMDAwL3NpZ251cCIsCiAgICAiQnJva2VuIGludGVybmFsIGxpbms6IHJlcXVlc3QgZmFpbGVkIGh0dHA6Ly9sb2NhbGhvc3Q6MzAwMC9jb250YWN0IiwKICAgICJCcm9rZW4gaW50ZXJuYWwgbGluazogcmVxdWVzdCBmYWlsZWQgaHR0cDovL2xvY2FsaG9zdDozMDAwL2Fib3V0IiwKICAgICJCcm9rZW4gaW50ZXJuYWwgbGluazogcmVxdWVzdCBmYWlsZWQgaHR0cDovL2xvY2FsaG9zdDozMDAwL2ZlYXR1cmVzIiwKICAgICJCcm9rZW4gaW50ZXJuYWwgbGluazogcmVxdWVzdCBmYWlsZWQgaHR0cDovL2xvY2FsaG9zdDozMDAwL2RlbW8iLAogICAgIkJyb2tlbiBpbnRlcm5hbCBsaW5rOiByZXF1ZXN0IGZhaWxlZCBodHRwOi8vbG9jYWxob3N0OjMwMDAvcHJpdmFjeSIsCiAgICAiQnJva2VuIGludGVybmFsIGxpbms6IHJlcXVlc3QgZmFpbGVkIGh0dHA6Ly9sb2NhbGhvc3Q6MzAwMC90ZXJtcyIsCiAgICAiQnJva2VuIGludGVybmFsIGxpbms6IHJlcXVlc3QgZmFpbGVkIGh0dHA6Ly9sb2NhbGhvc3Q6MzAwMC9jb29raWVzIiwKICAgICJCcm9rZW4gaW50ZXJuYWwgbGluazogcmVxdWVzdCBmYWlsZWQgaHR0cDovL2xvY2FsaG9zdDozMDAwL3JlZnVuZHMiLAogICAgIkJyb2tlbiBpbnRlcm5hbCBsaW5rOiByZXF1ZXN0IGZhaWxlZCBodHRwOi8vbG9jYWxob3N0OjMwMDAvY2FuY2VsbGF0aW9uIiwKICAgICJCcm9rZW4gaW50ZXJuYWwgbGluazogcmVxdWVzdCBmYWlsZWQgaHR0cDovL2xvY2FsaG9zdDozMDAwL2Rpc2NsYWltZXIiLAogICAgIkJyb2tlbiBpbnRlcm5hbCBsaW5rOiByZXF1ZXN0IGZhaWxlZCBodHRwOi8vbG9jYWxob3N0OjMwMDAvc2VjdXJpdHkiLAogICAgIkJyb2tlbiBpbnRlcm5hbCBsaW5rOiByZXF1ZXN0IGZhaWxlZCBodHRwOi8vbG9jYWxob3N0OjMwMDAvcmVzcG9uc2libGUtZGlzY2xvc3VyZSIsCiAgICAiQnJva2VuIGludGVybmFsIGxpbms6IHJlcXVlc3QgZmFpbGVkIGh0dHA6Ly9sb2NhbGhvc3Q6MzAwMC9hY2Nlc3NpYmlsaXR5IiwKICAgICJCcm9rZW4gaW50ZXJuYWwgbGluazogcmVxdWVzdCBmYWlsZWQgaHR0cDovL2xvY2FsaG9zdDozMDAwL2RwYSIsCiAgICAiQnJva2VuIGludGVybmFsIGxpbms6IHJlcXVlc3QgZmFpbGVkIGh0dHA6Ly9sb2NhbGhvc3Q6MzAwMC9hY2NlcHRhYmxlLXVzZSIsCiAgICAiQnJva2VuIGludGVybmFsIGxpbms6IHJlcXVlc3QgZmFpbGVkIGh0dHA6Ly9sb2NhbGhvc3Q6MzAwMC9jb21tdW5pdHktZ3VpZGVsaW5lcyIsCiAgICAiQnJva2VuIGludGVybmFsIGxpbms6IHJlcXVlc3QgZmFpbGVkIGh0dHA6Ly9sb2NhbGhvc3Q6MzAwMC9oZWxwIiwKICAgICJCcm9rZW4gaW50ZXJuYWwgbGluazogcmVxdWVzdCBmYWlsZWQgaHR0cDovL2xvY2FsaG9zdDozMDAwL3N1cHBvcnQiLAogICAgIjQwMSBQT1NUIGh0dHA6Ly9sb2NhbGhvc3Q6MzAwMC9hcGkvYXV0aC9yZWZyZXNoIiwKICAgICJDb25zb2xlIGVycm9yOiBGYWlsZWQgdG8gbG9hZCByZXNvdXJjZTogdGhlIHNlcnZlciByZXNwb25kZWQgd2l0aCBhIHN0YXR1cyBvZiA0MDEgKFVuYXV0aG9yaXplZCkiCiAgXSwKICAib2xkQnJhbmRNYXRjaGVzIjogW10KfQ=="
-                        },
-                        {
-                          "name": "screenshot",
-                          "contentType": "image/png",
-                          "path": "C:\\workgrind\\artifacts\\test-results\\workgrind-audit-WorkGrind--d4887-ite-audit-public-page-terms-chromium\\test-failed-1.png"
-                        },
-                        {
-                          "name": "error-context",
-                          "contentType": "text/markdown",
-                          "path": "C:\\workgrind\\artifacts\\test-results\\workgrind-audit-WorkGrind--d4887-ite-audit-public-page-terms-chromium\\error-context.md"
-                        }
-                      ],
-                      "errorLocation": {
-                        "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
-                        "column": 46,
-                        "line": 258
-                      }
-                    }
-                  ],
-                  "status": "unexpected"
-                }
-              ],
-              "id": "2aae5247a7454980396a-9ca28fcca5fd1c3c141b",
-              "file": "workgrind-audit.spec.ts",
-              "line": 218,
-              "column": 9
-            },
-            {
-              "title": "public page /signup",
-              "ok": false,
-              "tags": [],
-              "tests": [
-                {
-                  "timeout": 60000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
-                  "projectId": "chromium",
-                  "projectName": "chromium",
-                  "results": [
-                    {
-                      "workerIndex": 9,
-                      "parallelIndex": 2,
-                      "status": "failed",
-                      "duration": 6389,
-                      "error": {
-                        "message": "Error: /signup audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 4\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"401 POST http://localhost:3000/api/auth/refresh\",\u001b[39m\n\u001b[31m+   \"Console error: Failed to load resource: the server responded with a status of 401 (Unauthorized)\",\u001b[39m\n\u001b[31m+ ]\u001b[39m",
-                        "stack": "Error: /signup audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 4\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"401 POST http://localhost:3000/api/auth/refresh\",\u001b[39m\n\u001b[31m+   \"Console error: Failed to load resource: the server responded with a status of 401 (Unauthorized)\",\u001b[39m\n\u001b[31m+ ]\u001b[39m\n    at C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts:258:46",
-                        "location": {
-                          "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
-                          "column": 46,
-                          "line": 258
-                        },
-                        "snippet": "\u001b[0m \u001b[90m 256 |\u001b[39m         contentType\u001b[33m:\u001b[39m \u001b[32m'application/json'\u001b[39m\u001b[33m,\u001b[39m\n \u001b[90m 257 |\u001b[39m       })\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 258 |\u001b[39m       expect(issues\u001b[33m,\u001b[39m \u001b[32m`${path} audit issues`\u001b[39m)\u001b[33m.\u001b[39mtoEqual([])\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m                                              \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 259 |\u001b[39m       test\u001b[33m.\u001b[39minfo()\u001b[33m.\u001b[39mannotations\u001b[33m.\u001b[39mpush({ type\u001b[33m:\u001b[39m \u001b[32m'navigation-ms'\u001b[39m\u001b[33m,\u001b[39m description\u001b[33m:\u001b[39m \u001b[33mString\u001b[39m(audit\u001b[33m.\u001b[39melapsedMs) })\u001b[33m;\u001b[39m\n \u001b[90m 260 |\u001b[39m       audit\u001b[33m.\u001b[39mstopTracking()\u001b[33m;\u001b[39m\n \u001b[90m 261 |\u001b[39m     })\u001b[33m;\u001b[39m\u001b[0m"
-                      },
-                      "errors": [
-                        {
-                          "location": {
-                            "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
-                            "column": 46,
-                            "line": 258
-                          },
-                          "message": "Error: /signup audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 4\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"401 POST http://localhost:3000/api/auth/refresh\",\u001b[39m\n\u001b[31m+   \"Console error: Failed to load resource: the server responded with a status of 401 (Unauthorized)\",\u001b[39m\n\u001b[31m+ ]\u001b[39m\n\n  256 |         contentType: 'application/json',\n  257 |       });\n> 258 |       expect(issues, `${path} audit issues`).toEqual([]);\n      |                                              ^\n  259 |       test.info().annotations.push({ type: 'navigation-ms', description: String(audit.elapsedMs) });\n  260 |       audit.stopTracking();\n  261 |     });\n    at C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts:258:46"
-                        }
-                      ],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-10-15T12:34:16.792Z",
-                      "annotations": [],
-                      "attachments": [
-                        {
-                          "name": "page-audit.json",
-                          "contentType": "application/json",
-                          "body": "ewogICJ1cmwiOiAiaHR0cDovL2xvY2FsaG9zdDozMDAwL3NpZ251cCIsCiAgInBhdGgiOiAiL3NpZ251cCIsCiAgInN0YXR1cyI6IDIwMCwKICAiY29udGVudFNlY3VyaXR5UG9saWN5IjogdHJ1ZSwKICAic3RyaWN0VHJhbnNwb3J0U2VjdXJpdHkiOiB0cnVlLAogICJzZXRDb29raWVBdHRyaWJ1dGVzIjogW10sCiAgInRpdGxlIjogIldvcmtHcmluZCBBY2NvdW50IiwKICAiZWxhcHNlZE1zIjogMzc4MywKICAiaXNzdWVzIjogWwogICAgIjQwMSBQT1NUIGh0dHA6Ly9sb2NhbGhvc3Q6MzAwMC9hcGkvYXV0aC9yZWZyZXNoIiwKICAgICJDb25zb2xlIGVycm9yOiBGYWlsZWQgdG8gbG9hZCByZXNvdXJjZTogdGhlIHNlcnZlciByZXNwb25kZWQgd2l0aCBhIHN0YXR1cyBvZiA0MDEgKFVuYXV0aG9yaXplZCkiCiAgXSwKICAib2xkQnJhbmRNYXRjaGVzIjogW10KfQ=="
-                        },
-                        {
-                          "name": "screenshot",
-                          "contentType": "image/png",
-                          "path": "C:\\workgrind\\artifacts\\test-results\\workgrind-audit-WorkGrind--963fd-te-audit-public-page-signup-chromium\\test-failed-1.png"
-                        },
-                        {
-                          "name": "error-context",
-                          "contentType": "text/markdown",
-                          "path": "C:\\workgrind\\artifacts\\test-results\\workgrind-audit-WorkGrind--963fd-te-audit-public-page-signup-chromium\\error-context.md"
-                        }
-                      ],
-                      "errorLocation": {
-                        "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
-                        "column": 46,
-                        "line": 258
-                      }
-                    }
-                  ],
-                  "status": "unexpected"
-                }
-              ],
-              "id": "2aae5247a7454980396a-f274e394f137bdf7ad29",
-              "file": "workgrind-audit.spec.ts",
-              "line": 218,
-              "column": 9
-            },
-            {
-              "title": "public page /login",
-              "ok": false,
-              "tags": [],
-              "tests": [
-                {
-                  "timeout": 60000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
-                  "projectId": "chromium",
-                  "projectName": "chromium",
-                  "results": [
-                    {
-                      "workerIndex": 8,
-                      "parallelIndex": 0,
-                      "status": "failed",
-                      "duration": 6242,
-                      "error": {
-                        "message": "Error: /login audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 4\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"401 POST http://localhost:3000/api/auth/refresh\",\u001b[39m\n\u001b[31m+   \"Console error: Failed to load resource: the server responded with a status of 401 (Unauthorized)\",\u001b[39m\n\u001b[31m+ ]\u001b[39m",
-                        "stack": "Error: /login audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 4\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"401 POST http://localhost:3000/api/auth/refresh\",\u001b[39m\n\u001b[31m+   \"Console error: Failed to load resource: the server responded with a status of 401 (Unauthorized)\",\u001b[39m\n\u001b[31m+ ]\u001b[39m\n    at C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts:258:46",
-                        "location": {
-                          "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
-                          "column": 46,
-                          "line": 258
-                        },
-                        "snippet": "\u001b[0m \u001b[90m 256 |\u001b[39m         contentType\u001b[33m:\u001b[39m \u001b[32m'application/json'\u001b[39m\u001b[33m,\u001b[39m\n \u001b[90m 257 |\u001b[39m       })\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 258 |\u001b[39m       expect(issues\u001b[33m,\u001b[39m \u001b[32m`${path} audit issues`\u001b[39m)\u001b[33m.\u001b[39mtoEqual([])\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m                                              \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 259 |\u001b[39m       test\u001b[33m.\u001b[39minfo()\u001b[33m.\u001b[39mannotations\u001b[33m.\u001b[39mpush({ type\u001b[33m:\u001b[39m \u001b[32m'navigation-ms'\u001b[39m\u001b[33m,\u001b[39m description\u001b[33m:\u001b[39m \u001b[33mString\u001b[39m(audit\u001b[33m.\u001b[39melapsedMs) })\u001b[33m;\u001b[39m\n \u001b[90m 260 |\u001b[39m       audit\u001b[33m.\u001b[39mstopTracking()\u001b[33m;\u001b[39m\n \u001b[90m 261 |\u001b[39m     })\u001b[33m;\u001b[39m\u001b[0m"
-                      },
-                      "errors": [
-                        {
-                          "location": {
-                            "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
-                            "column": 46,
-                            "line": 258
-                          },
-                          "message": "Error: /login audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 4\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"401 POST http://localhost:3000/api/auth/refresh\",\u001b[39m\n\u001b[31m+   \"Console error: Failed to load resource: the server responded with a status of 401 (Unauthorized)\",\u001b[39m\n\u001b[31m+ ]\u001b[39m\n\n  256 |         contentType: 'application/json',\n  257 |       });\n> 258 |       expect(issues, `${path} audit issues`).toEqual([]);\n      |                                              ^\n  259 |       test.info().annotations.push({ type: 'navigation-ms', description: String(audit.elapsedMs) });\n  260 |       audit.stopTracking();\n  261 |     });\n    at C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts:258:46"
-                        }
-                      ],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-10-15T12:34:16.902Z",
-                      "annotations": [],
-                      "attachments": [
-                        {
-                          "name": "page-audit.json",
-                          "contentType": "application/json",
-                          "body": "ewogICJ1cmwiOiAiaHR0cDovL2xvY2FsaG9zdDozMDAwL2xvZ2luIiwKICAicGF0aCI6ICIvbG9naW4iLAogICJzdGF0dXMiOiAyMDAsCiAgImNvbnRlbnRTZWN1cml0eVBvbGljeSI6IHRydWUsCiAgInN0cmljdFRyYW5zcG9ydFNlY3VyaXR5IjogdHJ1ZSwKICAic2V0Q29va2llQXR0cmlidXRlcyI6IFtdLAogICJ0aXRsZSI6ICJXb3JrR3JpbmQgQWNjb3VudCIsCiAgImVsYXBzZWRNcyI6IDMzNjksCiAgImlzc3VlcyI6IFsKICAgICI0MDEgUE9TVCBodHRwOi8vbG9jYWxob3N0OjMwMDAvYXBpL2F1dGgvcmVmcmVzaCIsCiAgICAiQ29uc29sZSBlcnJvcjogRmFpbGVkIHRvIGxvYWQgcmVzb3VyY2U6IHRoZSBzZXJ2ZXIgcmVzcG9uZGVkIHdpdGggYSBzdGF0dXMgb2YgNDAxIChVbmF1dGhvcml6ZWQpIgogIF0sCiAgIm9sZEJyYW5kTWF0Y2hlcyI6IFtdCn0="
-                        },
-                        {
-                          "name": "screenshot",
-                          "contentType": "image/png",
-                          "path": "C:\\workgrind\\artifacts\\test-results\\workgrind-audit-WorkGrind--73a6d-ite-audit-public-page-login-chromium\\test-failed-1.png"
-                        },
-                        {
-                          "name": "error-context",
-                          "contentType": "text/markdown",
-                          "path": "C:\\workgrind\\artifacts\\test-results\\workgrind-audit-WorkGrind--73a6d-ite-audit-public-page-login-chromium\\error-context.md"
-                        }
-                      ],
-                      "errorLocation": {
-                        "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
-                        "column": 46,
-                        "line": 258
-                      }
-                    }
-                  ],
-                  "status": "unexpected"
-                }
-              ],
-              "id": "2aae5247a7454980396a-ef429edf7af88c139840",
-              "file": "workgrind-audit.spec.ts",
-              "line": 218,
-              "column": 9
-            }
-          ]
         }
       ]
     }
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-10-15T12:32:51.574Z",
-    "duration": 111534.722,
+    "startTime": "2026-10-15T13:09:10.614Z",
+    "duration": 5381.717000000001,
     "expected": 1,
     "skipped": 0,
-    "unexpected": 10,
+    "unexpected": 0,
     "flaky": 0
   }
 }

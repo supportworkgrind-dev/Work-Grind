@@ -38,6 +38,14 @@ let currentSocketToken = state.token ?? null;
 let authRecoveryAttempted = false;
 const pendingRooms = state.pendingRooms;
 export const SOCKET_IO_PATH = '/api/socket-io/socket.io';
+export const SOCKET_RECONNECTION_OPTIONS = {
+  reconnection: true,
+  reconnectionAttempts: 8,
+  reconnectionDelay: 1000,
+  reconnectionDelayMax: 15_000,
+  randomizationFactor: 0.5,
+  timeout: 20_000,
+} as const;
 
 export function resolveSocketUrl(
   socketUrl: string | undefined,
@@ -156,11 +164,7 @@ export const getSocket = (): Socket | null => {
       // the same verifier used for Bearer tokens on authenticated API routes.
       auth: { token },
       transports: ['websocket'],
-      reconnection: true,
-      reconnectionAttempts: Infinity,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      timeout: 20000,
+      ...SOCKET_RECONNECTION_OPTIONS,
     });
 
     state.socket = socket;
