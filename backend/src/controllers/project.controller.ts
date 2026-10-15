@@ -102,7 +102,7 @@ export const getProjects = async (req: AuthRequest, res: Response): Promise<void
       .populate('members.userId', 'fullName avatar email jobTitle')
       .populate('crmCompanyId', 'name domain logoUrl')
       .populate('channelId', 'name type isArchived members')
-      .sort({ createdAt: -1 })
+      .sort({ createdAt: -1, _id: -1 })
       .skip(pagination.skip)
       .limit(pagination.limit + 1)
       .lean();

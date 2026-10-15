@@ -35,6 +35,7 @@ export default function FilesPage() {
   const [newFolderOpen,  setNewFolderOpen]  = useState(false);
   const [newFolderName,  setNewFolderName]  = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
+  const fileRequestSequence = useRef(0);
 
   const navigateFolder = (folderId: string | null) => {
     setFilesPage(1);
@@ -44,35 +45,41 @@ export default function FilesPage() {
     setCurrentFolder(folderId);
   };
 
-  const fetchData = async () => {
+  const fetchData = async (folderId = currentFolder, query = searchQuery) => {
+    const requestSequence = ++fileRequestSequence.current;
     try {
       const params = new URLSearchParams({
-        folderId: currentFolder ?? 'root',
+        folderId: folderId ?? 'root',
         page: '1',
         limit: '100',
       });
-      const [fRes, dirRes] = await Promise.all([
-        api.get(`/files?${params.toString()}`),
-        api.get('/files/folders/list', {
-        params: { folderId: currentFolder ?? 'root', page: 1, limit: 200 },
-        }),
-      ]);
+      if (query.trim()) params.set('search', query.trim());
+      const fRes = await api.get(`/files?${params.toString()}`);
+      if (requestSequence !== fileRequestSequence.current) return;
       if (fRes.data.success) {
         setFiles(fRes.data.files);
         setFilesPage(1);
         setFilesHaveMore(Boolean(fRes.data.hasMore));
         if (fRes.data.storage) setStorageSnapshot(fRes.data.storage);
       }
-      if (dirRes.data.success) {
-        setFolders(dirRes.data.folders);
+    } catch { /* silent */ }
+  };
+  const fetchFolders = async (folderId = currentFolder) => {
+    try {
+      const response = await api.get('/files/folders/list', {
+        params: { folderId: folderId ?? 'root', page: 1, limit: 200 },
+      });
+      if (response.data.success) {
+        setFolders(response.data.folders);
         setFoldersPage(1);
-        setFoldersHaveMore(Boolean(dirRes.data.hasMore));
+        setFoldersHaveMore(Boolean(response.data.hasMore));
       }
     } catch { /* silent */ }
   };
   const fetchMoreFiles = async () => {
     if (loadingMoreFiles || !filesHaveMore) return;
     const page = filesPage + 1;
+    const requestSequence = fileRequestSequence.current;
     setLoadingMoreFiles(true);
     try {
       const params = new URLSearchParams({
@@ -80,7 +87,9 @@ export default function FilesPage() {
         page: String(page),
         limit: '100',
       });
+      if (searchQuery.trim()) params.set('search', searchQuery.trim());
       const response = await api.get(`/files?${params.toString()}`);
+      if (requestSequence !== fileRequestSequence.current) return;
       if (response.data.success) {
         setFiles((existing) => [...existing, ...response.data.files]);
         setFilesPage(page);
@@ -107,7 +116,8 @@ export default function FilesPage() {
     finally { setLoadingMoreFolders(false); }
   };
   useEffect(() => {
-    void fetchData();
+    void fetchData(currentFolder, searchQuery);
+    void fetchFolders(currentFolder);
   }, [currentFolder]);
 
   useEffect(() => {
@@ -202,6 +212,12 @@ export default function FilesPage() {
   };
 
   const filtered = files.filter((f) => f.name.toLowerCase().includes(searchQuery.toLowerCase()));
+  const handleSearchChange = (query: string) => {
+    setFilesPage(1);
+    setFilesHaveMore(false);
+    setSearchQuery(query);
+    void fetchData(currentFolder, query);
+  };
   const storageUsed    = storageSnapshot?.used ?? subscription?.usage.storageBytes ?? company?.storage?.used ?? 0;
   const storageLimit   = storageSnapshot?.limit ?? subscription?.limits.storage ?? 1_073_741_824;
   const storagePercent = Math.min(100, Math.round((storageUsed / storageLimit) * 100));
@@ -258,7 +274,7 @@ export default function FilesPage() {
         <div className="surface rounded-2xl p-4 flex items-center gap-2.5 md:col-span-2">
           <Search className="h-4 w-4 theme-text-muted shrink-0" />
           <input
-            type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+            type="text" value={searchQuery} onChange={(e) => handleSearchChange(e.target.value)}
             placeholder="Search files by name…"
             className="flex-1 border-0 bg-transparent text-sm theme-text-primary placeholder:text-[var(--text-muted)] focus:outline-none"
           />

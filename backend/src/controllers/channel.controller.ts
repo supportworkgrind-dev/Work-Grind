@@ -58,7 +58,7 @@ export const getChannels = async (req: AuthRequest, res: Response): Promise<void
         select: 'name color status progress priority assigneeId',
         populate: { path: 'assigneeId', select: 'fullName avatar' },
       })
-      .sort({ isDefault: -1, name: 1 })
+      .sort({ isDefault: -1, name: 1, _id: 1 })
       .skip(pagination.skip)
       .limit(pagination.limit + 1)
       .lean();
@@ -205,7 +205,7 @@ export const getMessages = async (req: AuthRequest, res: Response): Promise<void
           select: 'content senderId createdAt attachments',
           populate: { path: 'senderId', select: 'fullName avatar avatarStorageKey' },
         })
-        .sort({ createdAt: -1 })
+        .sort({ createdAt: -1, _id: -1 })
         .skip(pagination.skip)
         .limit(pagination.limit + 1)
         .lean(),

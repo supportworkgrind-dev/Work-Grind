@@ -29,7 +29,7 @@ export const getAdminMembers = async (req: AuthRequest, res: Response): Promise<
 
     const pageMembers = await User.find(filter)
       .select('-password -phone -refreshTokens -verificationToken -resetPasswordToken')
-      .sort({ createdAt: -1 })
+      .sort({ createdAt: -1, _id: -1 })
       .skip(pagination.skip)
       .limit(pagination.limit + 1);
     const hasMore = pageMembers.length > pagination.limit;
@@ -169,7 +169,7 @@ export const getAuditLogs = async (req: AuthRequest, res: Response): Promise<voi
     const [pageLogs, total] = await Promise.all([
       AuditLog.find(filter)
         .populate('userId', 'fullName avatar email')
-        .sort({ createdAt: -1 })
+        .sort({ createdAt: -1, _id: -1 })
         .skip(pagination.skip)
         .limit(pagination.limit + 1),
       AuditLog.countDocuments(filter),

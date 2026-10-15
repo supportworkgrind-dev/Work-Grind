@@ -51,7 +51,7 @@ export const getConversations = async (req: AuthRequest, res: Response): Promise
         select: 'content senderId createdAt type attachments deletedAt',
         populate: { path: 'senderId', select: 'callingId fullName avatar avatarStorageKey' },
       })
-      .sort({ updatedAt: -1 })
+      .sort({ updatedAt: -1, _id: -1 })
       .skip(pagination.skip)
       .limit(pagination.limit + 1)
       .lean();
@@ -192,7 +192,7 @@ export const getDMMessages = async (req: AuthRequest, res: Response): Promise<vo
           select: 'content senderId createdAt attachments type',
           populate: { path: 'senderId', select: 'callingId fullName avatar avatarStorageKey' },
         })
-        .sort({ createdAt: -1 })
+        .sort({ createdAt: -1, _id: -1 })
         .skip(pagination.skip)
         .limit(pagination.limit + 1),
     ]);

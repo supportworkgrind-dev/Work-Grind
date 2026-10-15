@@ -78,6 +78,11 @@ export const getFiles = async (req: AuthRequest, res: Response): Promise<void> =
     }
 
     const { folderId, projectId, isStarred, search } = req.query;
+    if (search !== undefined && (typeof search !== 'string' || search.length > 100)) {
+      res.status(400).json({ success: false, message: 'Invalid search parameter.' });
+      return;
+    }
+
     const filter: any = { companyId: req.user!.companyId, isDeleted: false };
     const accessScope = getAcademicFileAccessScope(req);
     if (accessScope.$or) {
@@ -87,7 +92,10 @@ export const getFiles = async (req: AuthRequest, res: Response): Promise<void> =
     if (folderId)              filter.folderId  = folderId === 'root' ? null : folderId;
     if (projectId)             filter.projectId = projectId;
     if (isStarred === 'true')  filter.isStarred = true;
-    if (search)                filter.name      = { $regex: search, $options: 'i' };
+    if (search?.trim()) {
+      const escapedSearch = search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      filter.name = { $regex: escapedSearch, $options: 'i' };
+    }
 
     const [pageFiles, subscription, company] = await Promise.all([
       File.find(filter)
@@ -99,7 +107,7 @@ export const getFiles = async (req: AuthRequest, res: Response): Promise<void> =
           select: 'name color crmCompanyId',
           populate: { path: 'crmCompanyId', match: { companyId: req.user!.companyId }, select: 'name' },
         })
-        .sort({ createdAt: -1 })
+        .sort({ createdAt: -1, _id: -1 })
         .skip(pagination.skip)
         .limit(pagination.limit + 1),
       getEffectiveSubscription(req.user!.userId),
@@ -434,7 +442,7 @@ export const getFolders = async (req: AuthRequest, res: Response): Promise<void>
 
     const pageFolders = await Folder.find(filter)
       .populate('creatorId', 'fullName avatar')
-      .sort({ name: 1 })
+      .sort({ name: 1, _id: 1 })
       .skip(pagination.skip)
       .limit(pagination.limit + 1);
     const hasMore = pageFolders.length > pagination.limit;

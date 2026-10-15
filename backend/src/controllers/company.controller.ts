@@ -168,7 +168,7 @@ export const getCompanyMembers = async (req: AuthRequest, res: Response): Promis
     const [members, total] = await Promise.all([
       User.find({ companyId: req.user!.companyId, isActive: true })
         .select('fullName email avatar jobTitle department role status lastSeen skills country timeZone bio')
-        .sort({ fullName: 1 })
+        .sort({ fullName: 1, _id: 1 })
         .skip(pagination.skip)
         .limit(pagination.limit)
         .lean(),

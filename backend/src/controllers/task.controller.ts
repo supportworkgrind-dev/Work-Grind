@@ -140,7 +140,7 @@ export const getTasks = async (req: AuthRequest, res: Response): Promise<void> =
       .populate('assigneeId', 'fullName avatar email jobTitle')
       .populate('creatorId', 'fullName avatar')
       .populate('projectId', 'name color')
-      .sort({ createdAt: -1 })
+      .sort({ createdAt: -1, _id: -1 })
       .skip(pagination.skip)
       .limit(pagination.limit + 1)
       .lean();
@@ -169,7 +169,7 @@ export const getMyTasks = async (req: AuthRequest, res: Response): Promise<void>
       .populate('assigneeId', 'fullName avatar email jobTitle')
       .populate('creatorId', 'fullName avatar')
       .populate('projectId', 'name color')
-      .sort({ dueDate: 1, createdAt: -1 })
+      .sort({ dueDate: 1, createdAt: -1, _id: -1 })
       .skip(pagination.skip)
       .limit(pagination.limit + 1)
       .lean();

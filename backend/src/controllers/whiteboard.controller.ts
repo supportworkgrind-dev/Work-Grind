@@ -10,6 +10,7 @@ import { emitToCompany, getIO } from '../utils/socket';
 import { findAccessibleBoard, permissionForBoard, permitsPermission } from '../services/boardAccess';
 import { isR2Configured, uploadFile as r2Upload, deleteFile as r2Delete, readPrivateFile } from '../services/r2Storage';
 import { releaseStorage, reserveStorage } from '../utils/planLimits';
+import { parsePagination } from '../utils/pagination';
 
 const MAX_SCENE_BYTES = 6 * 1024 * 1024;
 const MAX_SCENE_ELEMENTS = 2500;
@@ -128,14 +129,23 @@ export const getBoards = asyncHandler(async (req, res) => {
   }
   if (req.query.favorite === 'true') filter.favorites = userId(req);
 
-  const boards = await Board.find(filter)
+  const pagination = parsePagination(req.query, { defaultLimit: 100, maxLimit: 200 });
+  if (!pagination) {
+    res.status(400).json({ success: false, message: 'Invalid pagination parameters.' });
+    return;
+  }
+
+  const pageBoards = await Board.find(filter)
     .select('name description visibility workspacePermission createdBy lastEditedBy favorites projectId meetingId documentId createdAt updatedAt')
     .populate('createdBy', 'fullName avatar')
     .populate('lastEditedBy', 'fullName avatar')
-    .sort({ updatedAt: -1 })
-    .limit(100)
+    .sort({ updatedAt: -1, _id: -1 })
+    .skip(pagination.skip)
+    .limit(pagination.limit + 1)
     .lean();
-  res.json({ success: true, boards });
+  const hasMore = pageBoards.length > pagination.limit;
+  const boards = hasMore ? pageBoards.slice(0, pagination.limit) : pageBoards;
+  res.json({ success: true, boards, page: pagination.page, hasMore });
 });
 
 export const createBoard = asyncHandler(async (req, res) => {
