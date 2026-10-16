@@ -27,6 +27,7 @@ import {
   hashOAuthValue,
   identityTokenHasVerifiedEmail,
   introspectLinkedInAccessToken,
+  isOAuthProductionEnvironment,
   OAuthServiceError,
   OidcClaims,
 } from '../services/oauth';
@@ -93,6 +94,8 @@ const knownOAuthFailures = new Set([
   'verified_email_required',
   'publishing_permission_denied',
   'provider_already_linked',
+  'missing_state',
+  'invalid_state_format',
   'Identity token nonce was invalid.',
   'Identity token claims were invalid.',
   'Identity token signing key was not recognized.',
@@ -169,7 +172,7 @@ function stateCookieName(provider: OAuthProvider, state: string) {
 }
 
 function clearStateCookie(res: Response, provider: OAuthProvider, state: string, legacy = false) {
-  const sameSite = provider === 'apple' || process.env.NODE_ENV === 'production' ? 'None' : 'Lax';
+  const sameSite = provider === 'apple' || isOAuthProductionEnvironment() ? 'None' : 'Lax';
   const secure = sameSite === 'None' ? '; Secure' : '';
   const cookieNames = [stateCookieName(provider, state)];
   if (legacy) cookieNames.push(`wg_oauth_${provider}_state`);
@@ -299,7 +302,7 @@ export const startOAuth = async (req: Request, res: Response): Promise<void> => 
       expiresAt: new Date(Date.now() + 10 * 60_000),
     });
     res.setHeader('Cache-Control', 'no-store');
-    const sameSite = provider === 'apple' || process.env.NODE_ENV === 'production' ? 'None' : 'Lax';
+    const sameSite = provider === 'apple' || isOAuthProductionEnvironment() ? 'None' : 'Lax';
     const secure = sameSite === 'None' ? '; Secure' : '';
     res.append(
       'Set-Cookie',
@@ -532,7 +535,12 @@ export const completeOAuthCallback = async (req: Request, res: Response): Promis
   const state = typeof req.query.state === 'string' ? req.query.state :
     typeof req.body?.state === 'string' ? req.body.state : '';
   if (!state || !/^[A-Za-z0-9_-]{32,128}$/.test(state)) {
-    logOAuthFailure(provider, 'state_validation', new Error('invalid_request'), correlationId);
+    logOAuthFailure(
+      provider,
+      'state_validation',
+      new Error(state ? 'invalid_state_format' : 'missing_state'),
+      correlationId,
+    );
     errorRedirect(res, 'invalid_request', undefined, false, 'user', false, correlationId);
     return;
   }

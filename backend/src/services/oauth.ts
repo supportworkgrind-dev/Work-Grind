@@ -41,6 +41,10 @@ export class OAuthServiceError extends Error {
   }
 }
 
+export function isOAuthProductionEnvironment(): boolean {
+  return process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production';
+}
+
 const safeProviderErrorCodes = new Set([
   'access_denied',
   'invalid_client',
@@ -115,10 +119,10 @@ export function getOAuthConfigurationIssue(provider: OAuthProvider): string | nu
     const base = new URL(backendUrl);
     const redirect = new URL(redirectUri);
     const expectedPath = `/api/auth/oauth/${provider}/callback`;
-    if (process.env.NODE_ENV === 'production' && (base.protocol !== 'https:' || redirect.protocol !== 'https:')) {
+    if (isOAuthProductionEnvironment() && (base.protocol !== 'https:' || redirect.protocol !== 'https:')) {
       return 'BACKEND_URL and the provider redirect URI must use HTTPS in production.';
     }
-    if (process.env.NODE_ENV === 'production' && redirect.origin !== base.origin) {
+    if (isOAuthProductionEnvironment() && redirect.origin !== base.origin) {
       return `${redirectKey} must use the configured BACKEND_URL origin in production.`;
     }
     if (redirect.pathname !== expectedPath) return `${redirectKey} path must be ${expectedPath}.`;
@@ -160,7 +164,7 @@ export function getClientRedirect(returnTo: string): URL | null {
   }
   try {
     const base = new URL(clientUrl);
-    if (process.env.NODE_ENV === 'production' && base.protocol !== 'https:') return null;
+    if (isOAuthProductionEnvironment() && base.protocol !== 'https:') return null;
     const target = new URL(returnTo, base);
     if (target.origin !== base.origin || target.username || target.password) return null;
     return target;

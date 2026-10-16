@@ -86,11 +86,17 @@ test('LinkedIn callback rejects a missing or mismatched browser state cookie bef
 
 test('OAuth callback rejects missing or malformed state before transaction lookup', async (context) => {
   let transactionLookups = 0;
+  const failureLogs = [];
+  const originalConsoleError = console.error;
+  console.error = (...args) => failureLogs.push(args);
   OAuthTransaction.findOneAndDelete = async () => {
     transactionLookups += 1;
     return null;
   };
-  context.after(() => { OAuthTransaction.findOneAndDelete = originalFindOneAndDelete; });
+  context.after(() => {
+    OAuthTransaction.findOneAndDelete = originalFindOneAndDelete;
+    console.error = originalConsoleError;
+  });
 
   for (const state of ['', 'not a valid state']) {
     const request = callbackRequest(state);
@@ -106,6 +112,11 @@ test('OAuth callback rejects missing or malformed state before transaction looku
     );
   }
   assert.equal(transactionLookups, 0);
+  assert.deepEqual(
+    failureLogs.map(([, details]) => details.reason),
+    ['missing_state', 'invalid_state_format'],
+  );
+  assert.equal(JSON.stringify(failureLogs).includes('not a valid state'), false);
 });
 
 test('OAuth signup cancellation returns to the selected workspace details step', async (context) => {
