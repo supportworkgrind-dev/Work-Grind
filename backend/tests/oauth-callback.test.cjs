@@ -84,6 +84,38 @@ test('LinkedIn callback rejects a missing or mismatched browser state cookie bef
   assert.equal(new URL(response.redirects[0].url).searchParams.get('error'), 'attempt_expired');
 });
 
+test('OAuth signup cancellation returns to the selected workspace details step', async (context) => {
+  process.env.CLIENT_URL = 'https://frontend.example.test';
+  const selections = [
+    { workspace: 'solo', accountType: 'individual', organizationType: 'business' },
+    { workspace: 'business', accountType: 'company', organizationType: 'business' },
+    { workspace: 'school', accountType: 'company', organizationType: 'school' },
+    { workspace: 'college', accountType: 'company', organizationType: 'college' },
+    { workspace: 'university', accountType: 'company', organizationType: 'university' },
+  ];
+  context.after(() => { OAuthTransaction.findOneAndDelete = originalFindOneAndDelete; });
+
+  for (const selection of selections) {
+    OAuthTransaction.findOneAndDelete = async () => ({
+      returnTo: '/create-company',
+      intent: 'signup',
+      audience: 'user',
+      accountType: selection.accountType,
+      organizationType: selection.organizationType,
+    });
+
+    const state = randomBytes(32).toString('base64url');
+    const response = responseMock();
+    await completeOAuthCallback(callbackRequest(state, state, { error: 'access_denied' }), response);
+
+    const destination = new URL(response.redirects[0].url);
+    assert.equal(destination.pathname, '/signup');
+    assert.equal(destination.searchParams.get('workspace'), selection.workspace);
+    assert.equal(destination.searchParams.get('step'), 'details');
+    assert.equal(destination.searchParams.get('oauth_error'), 'cancelled');
+  }
+});
+
 test('LinkedIn callback rejects expired or replayed OAuth transactions', async (context) => {
   let available = true;
   OAuthTransaction.findOneAndDelete = async () => {
