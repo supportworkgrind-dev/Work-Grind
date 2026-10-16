@@ -70,10 +70,32 @@ async function callRefresh(refreshToken) {
   return response;
 }
 
+async function callRefreshWithoutCookie() {
+  const response = makeResponse();
+  await refresh({
+    path: '/refresh',
+    headers: {},
+    body: {},
+  }, response);
+  return response;
+}
+
 test.afterEach(() => {
   User.findById = originalFindById;
   User.findOneAndUpdate = originalFindOneAndUpdate;
   process.env.NODE_ENV = 'test';
+});
+
+test('missing refresh cookie returns an unauthenticated response and clears stale cookie state', async () => {
+  let databaseLookups = 0;
+  User.findById = async () => { databaseLookups += 1; return null; };
+
+  const response = await callRefreshWithoutCookie();
+
+  assert.equal(response.statusCode, 401);
+  assert.deepEqual(response.body, { success: false, message: 'Refresh token required' });
+  assert.equal(response.clearedCookie.name, REFRESH_COOKIE_NAME);
+  assert.equal(databaseLookups, 0);
 });
 
 test('expired refresh credentials are rejected and the stale cookie is cleared', async () => {
