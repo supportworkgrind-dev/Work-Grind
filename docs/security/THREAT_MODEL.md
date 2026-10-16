@@ -9,7 +9,7 @@ WorkGrind is a multi-tenant workspace application with:
 - A Next.js frontend (`frontend`) that calls an Express/Mongoose API (`backend`).
 - JWT-authenticated workspace identities and organization/role-based features.
 - A separate client-portal identity and token path.
-- MongoDB-backed collaboration, billing, identity, and workspace records; optional Redis and Socket.IO coordination.
+- MongoDB-backed collaboration, billing, identity, and workspace records; Socket.IO coordination.
 - Private file storage through Cloudflare R2 (or a local fallback).
 - OAuth/OIDC providers, Polar billing, configurable inbound integration webhooks, and external AI providers for Tavro.
 - Socket.IO collaboration, chat, meetings, and calling.
@@ -29,7 +29,7 @@ WorkGrind is a multi-tenant workspace application with:
 2. **User to workspace:** an authenticated user may intentionally probe another member's private records, object IDs, features, or role restrictions.
 3. **WorkGrind user to client portal:** external clients have a separate account/token model and must not inherit workspace-user privileges.
 4. **Provider to callback/webhook:** OAuth and billing callbacks are untrusted until state/signature, timestamp, identity, audience, and event mapping checks succeed.
-5. **Application to data/storage:** MongoDB, Redis, R2, and Socket.IO adapters hold cross-tenant state and require server-derived tenant scope.
+5. **Application to data/storage:** MongoDB, R2, and Socket.IO adapters hold cross-tenant state and require server-derived tenant scope.
 6. **Application to AI/provider:** prompts and retrieved content may be adversarial; model output and tool arguments are untrusted input.
 7. **User-configured integrations:** webhook tokens/URLs are credentials and destinations that can be exposed through external configuration or logs.
 
@@ -59,7 +59,7 @@ WorkGrind is a multi-tenant workspace application with:
 
 - Tenant correctness still depends on every controller/query adding object-level scope; a source review cannot prove all endpoints or combinations are safe.
 - The generic inbound integration endpoint now requires a valid HMAC in addition to its high-entropy URL token; test that all current senders sign requests before rollout.
-- Vercel trusts one proxy hop. Valid `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` backend settings enable shared rate-limit counters. If Redis is missing or unavailable, `express-rate-limit` continues using per-process counters; serverless instances do not coordinate those fallback limits.
+- Vercel trusts one proxy hop. `express-rate-limit` uses process-local counters; separate serverless instances do not coordinate counters, so validate request limits and proxy behavior through the production edge.
 - Upload routes validate content signatures against allowed MIME/extension pairs, but do not scan for malware.
 - Production OAuth, billing, webhook, storage, proxy, and realtime settings were not exercised with real provider accounts. Polar signature interoperability still needs a sandbox test.
 - AI prompt injection, browser/client manipulation, concurrency races, and resource-exhaustion behaviors require adversarial integration testing.

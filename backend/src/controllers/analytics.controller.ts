@@ -16,7 +16,6 @@ import { CrmContact } from '../models/CrmContact';
 import { CrmCompany } from '../models/CrmCompany';
 import File from '../models/File';
 import Message from '../models/Message';
-import { getOrSetJsonCache, namespacedCacheKey } from '../utils/cache';
 
 // ── Helper ─────────────────────────────────────────────────────────────────
 
@@ -32,49 +31,43 @@ function cid(req: AuthRequest) {
 export const getOverview = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const companyId = cid(req);
-    const overview = await getOrSetJsonCache(
-      namespacedCacheKey('analytics:overview', companyId.toString()),
-      20,
-      async () => {
-        const [
-          totalTasks, completedTasks, overdueTasks,
-          activeProjects, completedProjects,
-          totalMembers,
-          totalMeetings, completedMeetings,
-          openDeals, wonDeals, totalDealValue,
-          totalContacts, totalCrmCompanies,
-        ] = await Promise.all([
-          Task.countDocuments({ companyId, isArchived: false }),
-          Task.countDocuments({ companyId, isArchived: false, status: 'completed' }),
-          Task.countDocuments({ companyId, isArchived: false, status: { $ne: 'completed' }, dueDate: { $lt: new Date() } }),
-          Project.countDocuments({ companyId, isArchived: false, status: 'active' }),
-          Project.countDocuments({ companyId, isArchived: false, status: 'completed' }),
-          User.countDocuments({ companyId, isActive: true }),
-          Meeting.countDocuments({ companyId }),
-          Meeting.countDocuments({ companyId, status: 'ended' }),
-          CrmDeal.countDocuments({ companyId, stage: { $nin: ['won','lost'] } }),
-          CrmDeal.countDocuments({ companyId, stage: 'won' }),
-          CrmDeal.aggregate([
-            { $match: { companyId, stage: 'won' } },
-            { $group: { _id: null, total: { $sum: '$value' } } },
-          ]).then(r => r[0]?.total ?? 0),
-          CrmContact.countDocuments({ companyId }),
-          CrmCompany.countDocuments({ companyId }),
-        ]);
+    const [
+      totalTasks, completedTasks, overdueTasks,
+      activeProjects, completedProjects,
+      totalMembers,
+      totalMeetings, completedMeetings,
+      openDeals, wonDeals, totalDealValue,
+      totalContacts, totalCrmCompanies,
+    ] = await Promise.all([
+      Task.countDocuments({ companyId, isArchived: false }),
+      Task.countDocuments({ companyId, isArchived: false, status: 'completed' }),
+      Task.countDocuments({ companyId, isArchived: false, status: { $ne: 'completed' }, dueDate: { $lt: new Date() } }),
+      Project.countDocuments({ companyId, isArchived: false, status: 'active' }),
+      Project.countDocuments({ companyId, isArchived: false, status: 'completed' }),
+      User.countDocuments({ companyId, isActive: true }),
+      Meeting.countDocuments({ companyId }),
+      Meeting.countDocuments({ companyId, status: 'ended' }),
+      CrmDeal.countDocuments({ companyId, stage: { $nin: ['won','lost'] } }),
+      CrmDeal.countDocuments({ companyId, stage: 'won' }),
+      CrmDeal.aggregate([
+        { $match: { companyId, stage: 'won' } },
+        { $group: { _id: null, total: { $sum: '$value' } } },
+      ]).then(r => r[0]?.total ?? 0),
+      CrmContact.countDocuments({ companyId }),
+      CrmCompany.countDocuments({ companyId }),
+    ]);
 
-        const taskCompletionRate = totalTasks > 0
-          ? Math.round((completedTasks / totalTasks) * 100)
-          : 0;
+    const taskCompletionRate = totalTasks > 0
+      ? Math.round((completedTasks / totalTasks) * 100)
+      : 0;
 
-        return {
-          tasks: { total: totalTasks, completed: completedTasks, overdue: overdueTasks, completionRate: taskCompletionRate },
-          projects: { active: activeProjects, completed: completedProjects },
-          team: { totalMembers },
-          meetings: { total: totalMeetings, completed: completedMeetings },
-          crm: { openDeals, wonDeals, totalDealValue, totalContacts, totalCrmCompanies },
-        };
-      },
-    );
+    const overview = {
+      tasks: { total: totalTasks, completed: completedTasks, overdue: overdueTasks, completionRate: taskCompletionRate },
+      projects: { active: activeProjects, completed: completedProjects },
+      team: { totalMembers },
+      meetings: { total: totalMeetings, completed: completedMeetings },
+      crm: { openDeals, wonDeals, totalDealValue, totalContacts, totalCrmCompanies },
+    };
 
     res.json({
       success: true,

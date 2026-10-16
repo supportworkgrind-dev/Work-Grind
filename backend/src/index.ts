@@ -1,7 +1,6 @@
 import dotenv from 'dotenv';
 import path from 'path';
 import { getAllowedClientOrigins } from './utils/clientOrigins';
-import { checkRedisHealth, closeRedisClient, getRedisConfigurationIssue } from './config/redis';
 
 // Load environment variables immediately before any other module evaluation
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
@@ -23,8 +22,6 @@ dotenv.config();
     { key: 'GEMINI_API_KEY',           service: 'Gemini AI',                 note: 'AI features disabled if unset' },
     { key: 'GEMINI_MODEL',             service: 'Gemini AI model selection',  note: 'Defaults to gemini-2.5-flash' },
     { key: 'AI_PROVIDER_RETRY_ATTEMPTS', service: 'Tavro AI transient retry limit', note: 'Defaults to 1; capped at 2' },
-    { key: 'UPSTASH_REDIS_REST_URL',   service: 'Shared Redis cache and rate limits', note: 'Optional; configure together with the REST token for shared cache/limits' },
-    { key: 'UPSTASH_REDIS_REST_TOKEN', service: 'Shared Redis cache and rate limits', note: 'Optional; configure together with the REST URL for shared cache/limits' },
     { key: 'POLAR_ACCESS_TOKEN',       service: 'Polar Payments',            note: 'Payments disabled if unset' },
     { key: 'POLAR_WEBHOOK_SECRET',     service: 'Polar Webhook verification', note: 'Webhooks disabled if unset' },
     { key: 'POLAR_STARTER_PRODUCT_ID', service: 'Polar Starter plan',        note: 'Starter checkout disabled if unset' },
@@ -68,11 +65,6 @@ dotenv.config();
     }
     console.warn('⚠️  Replace placeholders with real values in backend/.env');
     console.warn('');
-  }
-
-  const redisConfigurationIssue = getRedisConfigurationIssue();
-  if (redisConfigurationIssue) {
-    console.warn('[Redis] Shared Redis configuration issue.', { issue: redisConfigurationIssue });
   }
 
   const missingEmailSettings: string[] = [];
@@ -209,9 +201,7 @@ async function ensureServerlessInitialization(): Promise<boolean> {
 if (isVercelRuntime) {
   app.use(async (req, res, next) => {
     if (
-      req.path === '/api/whatsapp/webhook' ||
-      req.path === '/health/redis' ||
-      req.path === '/api/health/redis'
+      req.path === '/api/whatsapp/webhook'
     ) {
       next();
       return;
@@ -239,19 +229,6 @@ const sendHealthStatus = (_req: express.Request, res: express.Response) => {
 };
 
 app.get('/health', sendHealthStatus);
-const sendRedisHealthStatus: express.RequestHandler = async (_req, res) => {
-  const redis = await checkRedisHealth();
-  const healthy = redis.status === 'connected' && redis.ping === 'PONG';
-  res.status(healthy ? 200 : 503).json({
-    status: healthy ? 'connected' : 'disconnected',
-    configured: redis.configured,
-    ping: redis.ping,
-    latencyMs: redis.latencyMs,
-    timestamp: new Date().toISOString(),
-  });
-};
-app.get('/health/redis', rateLimiter(1, 10), sendRedisHealthStatus);
-app.get('/api/health/redis', rateLimiter(1, 10), sendRedisHealthStatus);
 
 // Global Middlewares
 
@@ -336,9 +313,7 @@ app.use(
 app.use((req, res, next) => {
   if (
     req.path === '/health' ||
-    req.path === '/health/redis' ||
     req.path === '/api/health' ||
-    req.path === '/api/health/redis' ||
     req.path === '/api/whatsapp/webhook'
   ) {
     return next(); // always allow health checks through
@@ -496,7 +471,7 @@ if (!isVercelRuntime) void startServer();
 if (!isVercelRuntime) {
   const shutdown = () => {
     server.close(() => {
-      void closeRedisClient().finally(() => mongoose.disconnect());
+      void mongoose.disconnect();
     });
   };
   process.once('SIGINT', shutdown);

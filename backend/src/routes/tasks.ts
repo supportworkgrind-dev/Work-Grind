@@ -7,7 +7,6 @@ import {
 import { authenticate, requireEntitlement, requireRole } from '../middleware/auth';
 import { requireAnyOrganizationFeature } from '../middleware/organizationAccess';
 import { validateObjectId } from '../middleware/validateObjectId';
-import { invalidateAnalyticsOverviewCache } from '../middleware/invalidateAnalyticsCache';
 
 const router = Router();
 
@@ -16,8 +15,6 @@ router.use(
   requireAnyOrganizationFeature('workspaceContent', 'soloWorkspace'),
   requireEntitlement('tasksProjects'),
 );
-router.use(invalidateAnalyticsOverviewCache);
-
 router.get('/',      getTasks);
 router.get('/my',    getMyTasks);
 router.post('/',     requireRole('owner', 'admin', 'manager'), createTask);

@@ -14,7 +14,6 @@ import { avatarUpload, validateUploadedContent } from '../middleware/upload';
 import { asyncHandler } from '../middleware/asyncHandler';
 import { rateLimiter } from '../middleware/rateLimiter';
 import { requireOrganizationFeature } from '../middleware/organizationAccess';
-import { invalidateAnalyticsOverviewCache } from '../middleware/invalidateAnalyticsCache';
 import {
   backfillWorkspaceCallingIds,
   checkCallingIdAvailability,
@@ -26,7 +25,6 @@ import {
 const router = Router();
 
 router.use(authenticate);
-router.use(invalidateAnalyticsOverviewCache);
 
 router.get('/', requireOrganizationFeature('memberDirectory'), getUsers);
 router.get('/me', (req, res, next) => {

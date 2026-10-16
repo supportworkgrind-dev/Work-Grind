@@ -14,12 +14,10 @@ import {
 import { authenticate, requireEntitlement } from '../middleware/auth';
 import { requireOrganizationFeature } from '../middleware/organizationAccess';
 import { rateLimiter } from '../middleware/rateLimiter';
-import { invalidateAnalyticsOverviewCache } from '../middleware/invalidateAnalyticsCache';
 
 const router = Router();
 
 router.use(authenticate, requireOrganizationFeature('educationMeetings'));
-router.use(invalidateAnalyticsOverviewCache);
 
 router.get('/', requireEntitlement('meetingsCalendar'), getMeetings);
 router.get('/active', requireEntitlement('meetingsCalendar'), getActiveMeetings);

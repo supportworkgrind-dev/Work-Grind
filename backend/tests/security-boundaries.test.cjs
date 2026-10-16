@@ -11,7 +11,6 @@ const { deleteFile, downloadFile } = require('../dist/controllers/file.controlle
 const { receiveWebhook } = require('../dist/controllers/integration.controller');
 const { encryptProviderToken } = require('../dist/utils/providerTokenEncryption');
 const { fileContentMatches } = require('../dist/middleware/upload');
-const { RedisRateLimitStore } = require('../dist/middleware/rateLimiter');
 const { capturePolarWebhookRawBody } = require('../dist/middleware/capturePolarWebhookBody');
 
 const companyId = new mongoose.Types.ObjectId().toString();
@@ -249,23 +248,6 @@ test('file upload content validation rejects mismatched or spoofed file types', 
   assert.equal(fileContentMatches(pngSignature, 'image/jpeg', '.jpg'), false);
   assert.equal(fileContentMatches(Buffer.from('not a PDF'), 'application/pdf', '.pdf'), false);
   assert.equal(fileContentMatches(Buffer.from('%PDF-1.7'), 'application/pdf', '.pdf'), true);
-});
-
-test('Redis rate-limit stores share prefixed counters with an atomic expiry', async () => {
-  const calls = [];
-  const redis = {
-    incrementRateLimitCounter: async (...args) => {
-      calls.push(args);
-      return { totalHits: 1, ttlMs: 60_000 };
-    },
-  };
-  const store = new RedisRateLimitStore(redis, 60_000, 'workgrind:rate-limit:test');
-
-  const result = await store.increment('client-key');
-
-  assert.equal(result.totalHits, 1);
-  assert.ok(result.resetTime.getTime() > Date.now());
-  assert.deepEqual(calls[0], ['workgrind:rate-limit:test:client-key', 60_000]);
 });
 
 test('Polar raw-body capture preserves exact webhook bytes only for its endpoint', () => {

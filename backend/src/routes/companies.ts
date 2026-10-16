@@ -13,12 +13,10 @@ import {
 import { inviteMember } from '../controllers/user.controller';
 import { authenticate, requireRole } from '../middleware/auth';
 import { requireOrganizationFeature } from '../middleware/organizationAccess';
-import { invalidateAnalyticsOverviewCache } from '../middleware/invalidateAnalyticsCache';
 
 const router = Router();
 
 router.use(authenticate);
-router.use(invalidateAnalyticsOverviewCache);
 
 router.get('/', getCompany);
 router.patch('/', requireRole('owner', 'admin', 'principal'), requireOrganizationFeature('workspaceSettings'), updateCompany);

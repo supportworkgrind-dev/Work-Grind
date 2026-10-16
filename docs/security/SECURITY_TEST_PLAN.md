@@ -25,7 +25,7 @@ The regression file uses model mocks and covers:
 - Academic file deletion requires uploader/shared-edit scope, not view-only scope.
 - Inbound webhooks reject missing and invalid HMAC signatures.
 - Uploads reject spoofed or mismatched file signatures.
-- Redis rate-limit counters use an atomic expiry operation and shared key prefix.
+- API rate limits enforce configured thresholds with the built-in process-local store.
 - Polar raw-body capture preserves exact bytes and is limited to the subscription webhook endpoint.
 
 ### Existing focused coverage
