@@ -57,6 +57,18 @@ test('Google configuration and authorization use the configured callback and PKC
   assert.equal(url.searchParams.has('client_secret'), false);
 });
 
+test('Google configuration requires both credentials and the production backend callback origin', () => {
+  configureGoogle();
+  delete process.env.GOOGLE_CLIENT_ID;
+  assert.match(getOAuthConfigurationIssue('google'), /GOOGLE_CLIENT_ID/);
+  assert.equal(getOAuthConfiguration('google'), null);
+
+  configureGoogle();
+  process.env.GOOGLE_REDIRECT_URI = 'https://frontend.example.test/api/auth/oauth/google/callback';
+  assert.match(getOAuthConfigurationIssue('google'), /GOOGLE_REDIRECT_URI must use the configured BACKEND_URL origin/);
+  assert.equal(getOAuthConfiguration('google'), null);
+});
+
 test('Google code exchange validates the signed identity token and nonce', async (context) => {
   configureGoogle();
   const configuration = getOAuthConfiguration('google');

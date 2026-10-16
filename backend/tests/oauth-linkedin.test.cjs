@@ -60,6 +60,14 @@ test('LinkedIn configuration requires credentials and the implemented callback r
   assert.equal(configuration.callbackUrl, process.env.LINKEDIN_CALLBACK_URL);
 });
 
+test('LinkedIn configuration requires the production backend callback origin', () => {
+  configureLinkedIn();
+  process.env.LINKEDIN_CALLBACK_URL = 'https://frontend.example.test/api/auth/oauth/linkedin/callback';
+
+  assert.match(getOAuthConfigurationIssue('linkedin'), /LINKEDIN_CALLBACK_URL must use the configured BACKEND_URL origin/);
+  assert.equal(getOAuthConfiguration('linkedin'), null);
+});
+
 test('LinkedIn authorization requests ask only for OIDC profile/email and use state, nonce, and PKCE', () => {
   configureLinkedIn();
   const configuration = getOAuthConfiguration('linkedin');
