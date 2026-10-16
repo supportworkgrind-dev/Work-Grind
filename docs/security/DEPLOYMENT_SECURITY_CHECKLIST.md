@@ -25,7 +25,7 @@ Use this before each production release and after material changes to authentica
 ## Network, headers, and rate limiting
 
 - [ ] Vercel code trusts exactly one proxy hop; verify the deployed edge overwrites client-supplied forwarding headers and that the request reaches the function through that hop.
-- [ ] Configure `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` as backend-only secrets in every Vercel environment requiring shared limits. The REST URL must be HTTPS; rate-limited requests fail closed on Vercel when either value is missing or invalid. Test limits through the production proxy.
+- [ ] Optionally configure `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` as backend-only settings in every Vercel environment requiring shared limits. The REST URL must be HTTPS and both settings must be present together. Without a working Redis store, process-local limits remain enforced but are not shared across serverless instances. Test limits through the production proxy.
 - [ ] Verify frontend production CSP nonce behavior and all required API/LiveKit connection origins; investigate browser CSP violations before relaxing directives.
 - [ ] Confirm HSTS, `X-Content-Type-Options`, frame protections, Referrer Policy, and Permissions Policy on public frontend responses.
 - [ ] Apply request/body/upload limits appropriate to memory and concurrency budgets; upload routes also validate file signatures. No malware scanning is configured or claimed.

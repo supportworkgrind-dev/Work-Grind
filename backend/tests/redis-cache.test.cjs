@@ -60,7 +60,7 @@ class MemoryRedis {
   async incrementRateLimitCounter(key, windowMs) {
     this.calls.incrementRateLimitCounter += 1;
     if (this.fail.has('incrementRateLimitCounter')) {
-      throw Object.assign(new Error('NOPERM eval'), { code: 'NOPERM' });
+      throw Object.assign(new Error('Redis rate-limit command denied'), { code: 'NOPERM' });
     }
     const now = Date.now();
     if ((this.expirations.get(key) ?? 0) <= now) {
@@ -69,7 +69,7 @@ class MemoryRedis {
     }
     const hits = (this.counters.get(key) ?? 0) + 1;
     this.counters.set(key, hits);
-    return [hits, 1, this.expirations.get(key) - now];
+    return { totalHits: hits, ttlMs: this.expirations.get(key) - now };
   }
 }
 
@@ -186,7 +186,7 @@ test('Upstash configuration requires both credentials and an HTTPS REST URL', ()
 
     process.env.UPSTASH_REDIS_REST_URL = 'https://example.upstash.io';
     assert.equal(isRedisConfigured(), false);
-    assert.match(getRedisConfigurationIssue(), /must both be configured/);
+    assert.match(getRedisConfigurationIssue(), /configure both URL and token/);
     process.env.UPSTASH_REDIS_REST_TOKEN = 'test-token';
     assert.equal(isRedisConfigured(), true);
     assert.equal(getRedisConfigurationIssue(), null);
@@ -220,21 +220,17 @@ test('valid Upstash REST settings initialize the HTTP client without Redis TCP c
   assert.ok(getRedisClient() instanceof UpstashRedisCommands);
 });
 
-test('Upstash adapter maps cache, expiry, and rate-limit operations', async () => {
+test('Upstash adapter maps cache and rate-limit commands without transactions', async () => {
   const calls = [];
-  const transaction = {
-    incr: (key) => { calls.push(['incr', key]); return transaction; },
-    pexpire: (...args) => { calls.push(['pexpire', ...args]); return transaction; },
-    pttl: (key) => { calls.push(['pttl', key]); return transaction; },
-    exec: async () => [1, 1, 60_000],
-  };
   const upstash = {
     get: async (key) => { calls.push(['get', key]); return 'cached'; },
     set: async (...args) => { calls.push(['set', ...args]); return 'OK'; },
     del: async (key) => { calls.push(['del', key]); return 1; },
     decr: async (key) => { calls.push(['decr', key]); return 0; },
     ping: async () => 'PONG',
-    multi: () => transaction,
+    incr: async (key) => { calls.push(['incr', key]); return 1; },
+    pexpire: async (...args) => { calls.push(['pexpire', ...args]); return 1; },
+    pttl: async (key) => { calls.push(['pttl', key]); return 60_000; },
   };
   const redis = new UpstashRedisCommands(upstash);
 
@@ -243,13 +239,30 @@ test('Upstash adapter maps cache, expiry, and rate-limit operations', async () =
   assert.equal(await redis.del('cache-key'), 1);
   assert.equal(await redis.decr('rate-key'), 0);
   assert.equal(await redis.ping(), 'PONG');
-  assert.deepEqual(await redis.incrementRateLimitCounter('rate-key', 60_000), [1, 1, 60_000]);
+  assert.deepEqual(await redis.incrementRateLimitCounter('rate-key', 60_000), { totalHits: 1, ttlMs: 60_000 });
   assert.deepEqual(calls[1], ['set', 'cache-key', 'value', { ex: 30 }]);
   assert.deepEqual(calls.slice(4), [
     ['incr', 'rate-key'],
     ['pexpire', 'rate-key', 60_000, 'NX'],
     ['pttl', 'rate-key'],
   ]);
+  assert.equal(calls.some(([command]) => command === 'multi' || command === 'exec'), false);
+});
+
+test('Upstash rate-limit adapter retries if the counter expires during the update', async () => {
+  const calls = [];
+  let increment = 0;
+  const redis = new UpstashRedisCommands({
+    incr: async (key) => { calls.push(['incr', key]); return ++increment; },
+    pexpire: async (...args) => { calls.push(['pexpire', ...args]); return 1; },
+    pttl: async (key) => {
+      calls.push(['pttl', key]);
+      return calls.filter(([command]) => command === 'pttl').length === 1 ? -2 : 60_000;
+    },
+  });
+
+  assert.deepEqual(await redis.incrementRateLimitCounter('rate-key', 60_000), { totalHits: 2, ttlMs: 60_000 });
+  assert.equal(calls.filter(([command]) => command === 'incr').length, 2);
 });
 
 test('rate limiting atomically counts requests and enforces the configured maximum', async (context) => {
@@ -267,7 +280,7 @@ test('rate limiting atomically counts requests and enforces the configured maxim
   assert.equal(limited.status, 429);
 });
 
-test('login reaches the authentication handler when Redis supports transactions but denies EVAL', async (context) => {
+test('login reaches the authentication handler when Upstash direct rate-limit commands work', async (context) => {
   const redis = new MemoryRedis();
   let loginHandlerCalls = 0;
   const app = express();
@@ -299,7 +312,7 @@ test('login reaches the authentication handler when Redis supports transactions 
   assert.equal(redis.calls.incrementRateLimitCounter, 3);
 });
 
-test('Redis rate-limit failures stop protected handlers instead of failing open', async (context) => {
+test('Redis rate-limit failures fall back to the local limiter and still enforce the limit', async (context) => {
   const redis = {
     incrementRateLimitCounter: async () => { throw new Error('Upstash unavailable'); },
     decr: async () => 0,
@@ -311,15 +324,14 @@ test('Redis rate-limit failures stop protected handlers instead of failing open'
     protectedHandlerCalls += 1;
     res.sendStatus(200);
   });
-  app.use((error, _req, res, _next) => res.status(503).json({ code: 'RATE_LIMIT_UNAVAILABLE' }));
   const server = http.createServer(app);
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   context.after(() => new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve())));
 
-  const response = await fetch(`http://127.0.0.1:${server.address().port}/protected`);
-  assert.equal(response.status, 503);
-  assert.equal((await response.json()).code, 'RATE_LIMIT_UNAVAILABLE');
-  assert.equal(protectedHandlerCalls, 0);
+  const url = `http://127.0.0.1:${server.address().port}/protected`;
+  assert.equal((await fetch(url)).status, 200);
+  assert.equal((await fetch(url)).status, 429);
+  assert.equal(protectedHandlerCalls, 1);
 });
 
 test('OAuth start succeeds behind a healthy Upstash-backed rate limiter', async (context) => {
@@ -347,31 +359,6 @@ test('OAuth start succeeds behind a healthy Upstash-backed rate limiter', async 
     }
   });
 
-  test('Redis permission failures keep login protected and never reach the login handler', async (context) => {
-    const redis = new MemoryRedis();
-    redis.fail.add('incrementRateLimitCounter');
-    let loginHandlerCalls = 0;
-    const app = express();
-    app.use(express.json());
-    app.post('/api/auth/login', rateLimiter(15, 10, {}, redis), (_req, res) => {
-      loginHandlerCalls += 1;
-      res.json({ success: true });
-    });
-    app.use((error, _req, res, _next) => res.status(500).json({ success: false, message: 'An unexpected error occurred.' }));
-    const server = http.createServer(app);
-    await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
-    context.after(() => new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve())));
-
-    const response = await fetch(`http://127.0.0.1:${server.address().port}/api/auth/login`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: 'member@example.test', password: 'test-only' }),
-    });
-
-    assert.equal(response.status, 500);
-    assert.equal(loginHandlerCalls, 0);
-  });
-
   const app = express();
   const redis = new MemoryRedis();
   app.get('/api/auth/oauth/:provider/start', rateLimiter(15, 10, {}, redis), (req, res, next) => {
@@ -391,20 +378,56 @@ test('OAuth start succeeds behind a healthy Upstash-backed rate limiter', async 
   assert.match(body.authUrl, /^https:\/\/www\.linkedin\.com\/oauth\/v2\/authorization/);
 });
 
-test('Vercel rate-limited requests fail closed without Upstash credentials', async (context) => {
-  const previous = process.env.VERCEL;
-  process.env.VERCEL = '1';
-  context.after(() => {
-    if (previous === undefined) delete process.env.VERCEL;
-    else process.env.VERCEL = previous;
+test('Redis permission failures keep login rate-limited without returning an infrastructure error', async (context) => {
+  const redis = new MemoryRedis();
+  redis.fail.add('incrementRateLimitCounter');
+  let loginHandlerCalls = 0;
+  const app = express();
+  app.use(express.json());
+  app.post('/api/auth/login', rateLimiter(15, 1, {}, redis), (_req, res) => {
+    loginHandlerCalls += 1;
+    res.json({ success: true });
   });
+  const server = http.createServer(app);
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  context.after(() => new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve())));
+
+  const url = `http://127.0.0.1:${server.address().port}/api/auth/login`;
+  const request = () => fetch(url, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ email: 'member@example.test', password: 'test-only' }),
+  });
+  assert.equal((await request()).status, 200);
+  assert.equal((await request()).status, 429);
+  assert.equal(loginHandlerCalls, 1);
+});
+
+test('Vercel uses its local rate limiter when optional Upstash credentials are absent', async (context) => {
+  const previous = {
+    VERCEL: process.env.VERCEL,
+    url: process.env.UPSTASH_REDIS_REST_URL,
+    token: process.env.UPSTASH_REDIS_REST_TOKEN,
+  };
+  process.env.VERCEL = '1';
+  delete process.env.UPSTASH_REDIS_REST_URL;
+  delete process.env.UPSTASH_REDIS_REST_TOKEN;
+  context.after(() => {
+    if (previous.VERCEL === undefined) delete process.env.VERCEL;
+    else process.env.VERCEL = previous.VERCEL;
+    if (previous.url === undefined) delete process.env.UPSTASH_REDIS_REST_URL;
+    else process.env.UPSTASH_REDIS_REST_URL = previous.url;
+    if (previous.token === undefined) delete process.env.UPSTASH_REDIS_REST_TOKEN;
+    else process.env.UPSTASH_REDIS_REST_TOKEN = previous.token;
+  });
+  assert.equal(getRedisConfigurationIssue(), null);
   const app = express();
   app.get('/protected', rateLimiter(1, 1, {}, null), (_req, res) => res.sendStatus(200));
   const server = http.createServer(app);
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   context.after(() => new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve())));
 
-  const response = await fetch(`http://127.0.0.1:${server.address().port}/protected`);
-  assert.equal(response.status, 503);
-  assert.equal((await response.json()).code, 'RATE_LIMIT_UNAVAILABLE');
+  const url = `http://127.0.0.1:${server.address().port}/protected`;
+  assert.equal((await fetch(url)).status, 200);
+  assert.equal((await fetch(url)).status, 429);
 });

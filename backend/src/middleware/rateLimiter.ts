@@ -1,16 +1,22 @@
 import rateLimit, { Store } from 'express-rate-limit';
-import { Request, Response } from 'express';
+import { Request, RequestHandler, Response } from 'express';
 import { getRedisClient, withRedisTimeout, type RedisCommands } from '../config/redis';
 
 type RateLimiterOptions = {
   message?: Record<string, unknown>;
   skip?: (req: Request) => boolean;
   keyGenerator?: (req: Request) => string;
-  allowInMemoryOnVercel?: boolean;
 };
 
 let storeSequence = 0;
-let missingRedisWarningLogged = false;
+let redisFallbackWarningLogged = false;
+
+class RedisRateLimitStoreUnavailable extends Error {
+  constructor() {
+    super('Redis rate-limit store unavailable.');
+    this.name = 'RedisRateLimitStoreUnavailable';
+  }
+}
 
 export class RedisRateLimitStore implements Store {
   readonly localKeys = false;
@@ -26,18 +32,23 @@ export class RedisRateLimitStore implements Store {
 
   async increment(key: string): Promise<{ totalHits: number; resetTime: Date }> {
     const redisKey = `${this.prefix}:${key}`;
-    const result = await withRedisTimeout(
-      this.redis.incrementRateLimitCounter(redisKey, this.windowMs),
-      1_500,
-    );
-    if (!Array.isArray(result) || result.length !== 3) {
-      throw new Error('Redis rate-limit increment returned an invalid response.');
+    try {
+      const result = await withRedisTimeout(
+        this.redis.incrementRateLimitCounter(redisKey, this.windowMs),
+        1_500,
+      );
+      if (!result || typeof result !== 'object') {
+        throw new Error('Redis rate-limit increment returned an invalid response.');
+      }
+      const totalHits = Number(result.totalHits);
+      const ttlMs = Number(result.ttlMs);
+      if (!Number.isFinite(totalHits) || !Number.isFinite(ttlMs) || ttlMs < 0) {
+        throw new Error('Redis rate-limit increment returned invalid counters.');
+      }
+      return { totalHits, resetTime: new Date(Date.now() + ttlMs) };
+    } catch {
+      throw new RedisRateLimitStoreUnavailable();
     }
-    const [totalHits, , ttl] = result.map(Number);
-    if (!Number.isFinite(totalHits) || !Number.isFinite(ttl) || ttl < 0) {
-      throw new Error('Redis rate-limit increment returned invalid counters.');
-    }
-    return { totalHits, resetTime: new Date(Date.now() + ttl) };
   }
 
   async decrement(key: string): Promise<void> {
@@ -60,37 +71,49 @@ export const rateLimiter = (
   redisClient: RedisCommands | null = getRedisClient(),
 ) => {
   const windowMs = windowMin * 60 * 1000;
-  const { allowInMemoryOnVercel = false, ...rateLimitOptions } = options;
-  let store: Store | undefined;
-  if (redisClient) {
-    store = new RedisRateLimitStore(redisClient, windowMs, `workgrind:rate-limit:${++storeSequence}`);
-  } else if (process.env.VERCEL === '1' && !allowInMemoryOnVercel) {
-    if (!missingRedisWarningLogged) {
-      console.error('[Rate limit] UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN are required on Vercel; rate-limited requests will fail closed until configured.');
-      missingRedisWarningLogged = true;
-    }
-    return (_req: Request, res: Response) => res.status(503).json({
-      success: false,
-      code: 'RATE_LIMIT_UNAVAILABLE',
-      message: 'Request protection is temporarily unavailable. Please retry later.',
-    });
-  } else if (!redisClient && !missingRedisWarningLogged) {
-    const message = process.env.VERCEL === '1'
-      ? '[Rate limit] In-memory rate limiting is enabled only for explicitly exempted health checks.'
-      : '[Rate limit] Upstash is not configured; local development uses process-local rate limits.';
-    console.warn(message);
-    missingRedisWarningLogged = true;
-  }
-
-  return rateLimit({
+  const rateLimitOptions = {
     windowMs,
     max,
-    passOnStoreError: false,
     standardHeaders: true,
     legacyHeaders: false,
-    message: rateLimitOptions.message || { success: false, message: 'Too many requests, please try again later.' },
-    skip: rateLimitOptions.skip,
-    keyGenerator: rateLimitOptions.keyGenerator,
-    store,
+    message: options.message || { success: false, message: 'Too many requests, please try again later.' },
+    skip: options.skip,
+    keyGenerator: options.keyGenerator,
+  };
+
+  // Keep a supported express-rate-limit MemoryStore active even when the shared
+  // store is healthy, so a Redis outage never removes the request limit.
+  const localLimiter = rateLimit(rateLimitOptions);
+  if (!redisClient) {
+    if (!redisFallbackWarningLogged) {
+      console.warn('[Rate limit] Upstash is unavailable; process-local rate limits are active.');
+      redisFallbackWarningLogged = true;
+    }
+    return localLimiter;
+  }
+
+  const redisLimiter = rateLimit({
+    ...rateLimitOptions,
+    passOnStoreError: false,
+    store: new RedisRateLimitStore(redisClient, windowMs, `workgrind:rate-limit:${++storeSequence}`),
   });
+  const redisFallback: RequestHandler = (req, res, next) => {
+    redisLimiter(req, res, (error?: unknown) => {
+      if (error instanceof RedisRateLimitStoreUnavailable) {
+        if (!redisFallbackWarningLogged) {
+          console.warn('[Rate limit] Redis is unavailable; process-local rate limits remain active.');
+          redisFallbackWarningLogged = true;
+        }
+        return next();
+      }
+      return next(error);
+    });
+  };
+
+  return (req: Request, res: Response, next: (error?: unknown) => void) => {
+    localLimiter(req, res, (error?: unknown) => {
+      if (error) return next(error);
+      return redisFallback(req, res, next);
+    });
+  };
 };

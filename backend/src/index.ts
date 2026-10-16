@@ -23,8 +23,8 @@ dotenv.config();
     { key: 'GEMINI_API_KEY',           service: 'Gemini AI',                 note: 'AI features disabled if unset' },
     { key: 'GEMINI_MODEL',             service: 'Gemini AI model selection',  note: 'Defaults to gemini-2.5-flash' },
     { key: 'AI_PROVIDER_RETRY_ATTEMPTS', service: 'Tavro AI transient retry limit', note: 'Defaults to 1; capped at 2' },
-    { key: 'UPSTASH_REDIS_REST_URL',   service: 'Shared Redis cache and rate limits', note: 'HTTPS REST URL; required with its token on Vercel' },
-    { key: 'UPSTASH_REDIS_REST_TOKEN', service: 'Shared Redis cache and rate limits', note: 'Required with the REST URL on Vercel' },
+    { key: 'UPSTASH_REDIS_REST_URL',   service: 'Shared Redis cache and rate limits', note: 'Optional; configure together with the REST token for shared cache/limits' },
+    { key: 'UPSTASH_REDIS_REST_TOKEN', service: 'Shared Redis cache and rate limits', note: 'Optional; configure together with the REST URL for shared cache/limits' },
     { key: 'POLAR_ACCESS_TOKEN',       service: 'Polar Payments',            note: 'Payments disabled if unset' },
     { key: 'POLAR_WEBHOOK_SECRET',     service: 'Polar Webhook verification', note: 'Webhooks disabled if unset' },
     { key: 'POLAR_STARTER_PRODUCT_ID', service: 'Polar Starter plan',        note: 'Starter checkout disabled if unset' },
@@ -250,8 +250,8 @@ const sendRedisHealthStatus: express.RequestHandler = async (_req, res) => {
     timestamp: new Date().toISOString(),
   });
 };
-app.get('/health/redis', rateLimiter(1, 10, { allowInMemoryOnVercel: true }), sendRedisHealthStatus);
-app.get('/api/health/redis', rateLimiter(1, 10, { allowInMemoryOnVercel: true }), sendRedisHealthStatus);
+app.get('/health/redis', rateLimiter(1, 10), sendRedisHealthStatus);
+app.get('/api/health/redis', rateLimiter(1, 10), sendRedisHealthStatus);
 
 // Global Middlewares
 

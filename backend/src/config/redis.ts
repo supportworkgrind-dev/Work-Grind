@@ -5,8 +5,13 @@ export interface RedisCommands {
   set(key: string, value: string, expiryMode: 'EX', ttlSeconds: number): Promise<unknown>;
   del(key: string): Promise<number>;
   decr(key: string): Promise<number>;
-  incrementRateLimitCounter(key: string, windowMs: number): Promise<unknown>;
+  incrementRateLimitCounter(key: string, windowMs: number): Promise<RateLimitCounterResult>;
   ping(): Promise<string>;
+}
+
+export interface RateLimitCounterResult {
+  totalHits: number;
+  ttlMs: number;
 }
 
 type RedisConfiguration = {
@@ -22,13 +27,9 @@ let missingConfigurationLogged = false;
 export function getRedisConfigurationIssue(): string | null {
   const url = process.env.UPSTASH_REDIS_REST_URL?.trim();
   const token = process.env.UPSTASH_REDIS_REST_TOKEN?.trim();
-  if (!url && !token) {
-    return process.env.VERCEL === '1'
-      ? 'UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN are required on Vercel.'
-      : null;
-  }
+  if (!url && !token) return null;
   if (!url || !token) {
-    return 'UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN must both be configured.';
+    return 'Optional Upstash Redis settings are incomplete; configure both URL and token or remove both.';
   }
 
   try {
@@ -72,14 +73,33 @@ export class UpstashRedisCommands implements RedisCommands {
     return this.redis.decr(key);
   }
 
-  incrementRateLimitCounter(key: string, windowMs: number): Promise<unknown> {
-    // MULTI keeps the increment, first-hit expiry, and TTL read atomic without EVAL.
-    return this.redis
-      .multi()
-      .incr(key)
-      .pexpire(key, windowMs, 'NX')
-      .pttl(key)
-      .exec();
+  async incrementRateLimitCounter(key: string, windowMs: number): Promise<RateLimitCounterResult> {
+    if (!Number.isSafeInteger(windowMs) || windowMs <= 0) {
+      throw new Error('Redis rate-limit window must be a positive integer.');
+    }
+
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const totalHits = Number(await this.redis.incr(key));
+      if (!Number.isSafeInteger(totalHits) || totalHits < 1) {
+        throw new Error('Redis rate-limit increment returned an invalid counter.');
+      }
+
+      await this.redis.pexpire(key, windowMs, 'NX');
+      let ttlMs = Number(await this.redis.pttl(key));
+
+      if (ttlMs === -2) continue;
+      if (ttlMs === -1) {
+        await this.redis.pexpire(key, windowMs, 'NX');
+        ttlMs = Number(await this.redis.pttl(key));
+      }
+
+      if (!Number.isFinite(ttlMs) || ttlMs < 0) {
+        throw new Error('Redis rate-limit increment returned an invalid expiry.');
+      }
+      return { totalHits, ttlMs };
+    }
+
+    throw new Error('Redis rate-limit counter expired while being updated.');
   }
 
   ping(): Promise<string> {
@@ -94,7 +114,7 @@ export function getRedisClient(): RedisCommands | null {
   const configuration = getRedisConfiguration();
   if (!configuration) {
     if (!missingConfigurationLogged) {
-      console.info('[Redis] A valid Upstash REST URL and token are required for Redis operations.');
+      console.info('[Redis] Upstash is not configured; cache bypass and process-local rate limiting are active.');
       missingConfigurationLogged = true;
     }
     return null;

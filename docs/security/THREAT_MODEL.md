@@ -59,7 +59,7 @@ WorkGrind is a multi-tenant workspace application with:
 
 - Tenant correctness still depends on every controller/query adding object-level scope; a source review cannot prove all endpoints or combinations are safe.
 - The generic inbound integration endpoint now requires a valid HMAC in addition to its high-entropy URL token; test that all current senders sign requests before rollout.
-- Vercel trusts one proxy hop. Shared rate limiting requires valid `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` backend settings; protected requests fail closed if the Upstash store is unavailable.
+- Vercel trusts one proxy hop. Valid `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` backend settings enable shared rate-limit counters. If Redis is missing or unavailable, `express-rate-limit` continues using per-process counters; serverless instances do not coordinate those fallback limits.
 - Upload routes validate content signatures against allowed MIME/extension pairs, but do not scan for malware.
 - Production OAuth, billing, webhook, storage, proxy, and realtime settings were not exercised with real provider accounts. Polar signature interoperability still needs a sandbox test.
 - AI prompt injection, browser/client manipulation, concurrency races, and resource-exhaustion behaviors require adversarial integration testing.

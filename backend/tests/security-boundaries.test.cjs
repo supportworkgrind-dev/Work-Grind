@@ -256,7 +256,7 @@ test('Redis rate-limit stores share prefixed counters with an atomic expiry', as
   const redis = {
     incrementRateLimitCounter: async (...args) => {
       calls.push(args);
-      return [1, 1, 60_000];
+      return { totalHits: 1, ttlMs: 60_000 };
     },
   };
   const store = new RedisRateLimitStore(redis, 60_000, 'workgrind:rate-limit:test');
