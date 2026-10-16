@@ -22,7 +22,9 @@ const { startOAuth } = require('../dist/controllers/oauth.controller');
 
 class MemoryRedis {
   values = new Map();
-  calls = { get: 0, set: 0, del: 0, ping: 0 };
+  counters = new Map();
+  expirations = new Map();
+  calls = { get: 0, set: 0, del: 0, ping: 0, incrementRateLimitCounter: 0 };
   fail = new Set();
   pingResult = 'PONG';
 
@@ -55,8 +57,19 @@ class MemoryRedis {
     return this.pingResult;
   }
 
-  async eval() {
-    return [1, 60_000];
+  async incrementRateLimitCounter(key, windowMs) {
+    this.calls.incrementRateLimitCounter += 1;
+    if (this.fail.has('incrementRateLimitCounter')) {
+      throw Object.assign(new Error('NOPERM eval'), { code: 'NOPERM' });
+    }
+    const now = Date.now();
+    if ((this.expirations.get(key) ?? 0) <= now) {
+      this.counters.set(key, 0);
+      this.expirations.set(key, now + windowMs);
+    }
+    const hits = (this.counters.get(key) ?? 0) + 1;
+    this.counters.set(key, hits);
+    return [hits, 1, this.expirations.get(key) - now];
   }
 }
 
@@ -209,13 +222,19 @@ test('valid Upstash REST settings initialize the HTTP client without Redis TCP c
 
 test('Upstash adapter maps cache, expiry, and rate-limit operations', async () => {
   const calls = [];
+  const transaction = {
+    incr: (key) => { calls.push(['incr', key]); return transaction; },
+    pexpire: (...args) => { calls.push(['pexpire', ...args]); return transaction; },
+    pttl: (key) => { calls.push(['pttl', key]); return transaction; },
+    exec: async () => [1, 1, 60_000],
+  };
   const upstash = {
     get: async (key) => { calls.push(['get', key]); return 'cached'; },
     set: async (...args) => { calls.push(['set', ...args]); return 'OK'; },
     del: async (key) => { calls.push(['del', key]); return 1; },
     decr: async (key) => { calls.push(['decr', key]); return 0; },
     ping: async () => 'PONG',
-    eval: async (...args) => { calls.push(['eval', ...args]); return [1, 60_000]; },
+    multi: () => transaction,
   };
   const redis = new UpstashRedisCommands(upstash);
 
@@ -224,25 +243,17 @@ test('Upstash adapter maps cache, expiry, and rate-limit operations', async () =
   assert.equal(await redis.del('cache-key'), 1);
   assert.equal(await redis.decr('rate-key'), 0);
   assert.equal(await redis.ping(), 'PONG');
-  assert.deepEqual(await redis.eval('return 1', ['rate-key'], ['60000']), [1, 60_000]);
+  assert.deepEqual(await redis.incrementRateLimitCounter('rate-key', 60_000), [1, 1, 60_000]);
   assert.deepEqual(calls[1], ['set', 'cache-key', 'value', { ex: 30 }]);
-  assert.deepEqual(calls[4], ['eval', 'return 1', ['rate-key'], ['60000']]);
+  assert.deepEqual(calls.slice(4), [
+    ['incr', 'rate-key'],
+    ['pexpire', 'rate-key', 60_000, 'NX'],
+    ['pttl', 'rate-key'],
+  ]);
 });
 
 test('rate limiting atomically counts requests and enforces the configured maximum', async (context) => {
-  const counts = new Map();
-  const redis = {
-    get: async () => null,
-    set: async () => 'OK',
-    del: async () => 1,
-    decr: async () => 0,
-    ping: async () => 'PONG',
-    eval: async (_script, [key], [windowMs]) => {
-      const hits = (counts.get(key) || 0) + 1;
-      counts.set(key, hits);
-      return [hits, Number(windowMs)];
-    },
-  };
+  const redis = new MemoryRedis();
   const app = express();
   app.get('/oauth/start', rateLimiter(1, 1, {}, redis), (_req, res) => res.status(302).set('Location', 'https://provider.example.test').end());
   const server = http.createServer(app);
@@ -256,9 +267,41 @@ test('rate limiting atomically counts requests and enforces the configured maxim
   assert.equal(limited.status, 429);
 });
 
+test('login reaches the authentication handler when Redis supports transactions but denies EVAL', async (context) => {
+  const redis = new MemoryRedis();
+  let loginHandlerCalls = 0;
+  const app = express();
+  app.use(express.json());
+  app.set('trust proxy', 1);
+  app.post(
+    '/api/auth/login',
+    rateLimiter(15, 10, {}, redis),
+    rateLimiter(15, 10, {}, redis),
+    rateLimiter(60, 10, { keyGenerator: (req) => String(req.body.email).toLowerCase() }, redis),
+    (_req, res) => {
+      loginHandlerCalls += 1;
+      res.json({ success: true });
+    },
+  );
+  const server = http.createServer(app);
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  context.after(() => new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve())));
+
+  const response = await fetch(`http://127.0.0.1:${server.address().port}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-forwarded-for': '198.51.100.10' },
+    body: JSON.stringify({ email: 'member@example.test', password: 'test-only' }),
+  });
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { success: true });
+  assert.equal(loginHandlerCalls, 1);
+  assert.equal(redis.calls.incrementRateLimitCounter, 3);
+});
+
 test('Redis rate-limit failures stop protected handlers instead of failing open', async (context) => {
   const redis = {
-    eval: async () => { throw new Error('Upstash unavailable'); },
+    incrementRateLimitCounter: async () => { throw new Error('Upstash unavailable'); },
     decr: async () => 0,
     del: async () => 0,
   };
@@ -302,6 +345,31 @@ test('OAuth start succeeds behind a healthy Upstash-backed rate limiter', async 
       if (value === undefined) delete process.env[key];
       else process.env[key] = value;
     }
+  });
+
+  test('Redis permission failures keep login protected and never reach the login handler', async (context) => {
+    const redis = new MemoryRedis();
+    redis.fail.add('incrementRateLimitCounter');
+    let loginHandlerCalls = 0;
+    const app = express();
+    app.use(express.json());
+    app.post('/api/auth/login', rateLimiter(15, 10, {}, redis), (_req, res) => {
+      loginHandlerCalls += 1;
+      res.json({ success: true });
+    });
+    app.use((error, _req, res, _next) => res.status(500).json({ success: false, message: 'An unexpected error occurred.' }));
+    const server = http.createServer(app);
+    await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+    context.after(() => new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve())));
+
+    const response = await fetch(`http://127.0.0.1:${server.address().port}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: 'member@example.test', password: 'test-only' }),
+    });
+
+    assert.equal(response.status, 500);
+    assert.equal(loginHandlerCalls, 0);
   });
 
   const app = express();

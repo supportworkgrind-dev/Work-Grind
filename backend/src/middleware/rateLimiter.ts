@@ -9,16 +9,6 @@ type RateLimiterOptions = {
   allowInMemoryOnVercel?: boolean;
 };
 
-const incrementScript = `
-local hits = redis.call('INCR', KEYS[1])
-local ttl = redis.call('PTTL', KEYS[1])
-if hits == 1 or ttl < 0 then
-  redis.call('PEXPIRE', KEYS[1], ARGV[1])
-  ttl = ARGV[1]
-end
-return { hits, ttl }
-`;
-
 let storeSequence = 0;
 let missingRedisWarningLogged = false;
 
@@ -37,13 +27,13 @@ export class RedisRateLimitStore implements Store {
   async increment(key: string): Promise<{ totalHits: number; resetTime: Date }> {
     const redisKey = `${this.prefix}:${key}`;
     const result = await withRedisTimeout(
-      this.redis.eval(incrementScript, [redisKey], [String(this.windowMs)]),
+      this.redis.incrementRateLimitCounter(redisKey, this.windowMs),
       1_500,
     );
-    if (!Array.isArray(result) || result.length !== 2) {
+    if (!Array.isArray(result) || result.length !== 3) {
       throw new Error('Redis rate-limit increment returned an invalid response.');
     }
-    const [totalHits, ttl] = result.map(Number);
+    const [totalHits, , ttl] = result.map(Number);
     if (!Number.isFinite(totalHits) || !Number.isFinite(ttl) || ttl < 0) {
       throw new Error('Redis rate-limit increment returned invalid counters.');
     }

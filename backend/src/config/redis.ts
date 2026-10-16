@@ -5,8 +5,8 @@ export interface RedisCommands {
   set(key: string, value: string, expiryMode: 'EX', ttlSeconds: number): Promise<unknown>;
   del(key: string): Promise<number>;
   decr(key: string): Promise<number>;
+  incrementRateLimitCounter(key: string, windowMs: number): Promise<unknown>;
   ping(): Promise<string>;
-  eval(script: string, keys: string[], args: string[]): Promise<unknown>;
 }
 
 type RedisConfiguration = {
@@ -72,12 +72,18 @@ export class UpstashRedisCommands implements RedisCommands {
     return this.redis.decr(key);
   }
 
-  ping(): Promise<string> {
-    return this.redis.ping();
+  incrementRateLimitCounter(key: string, windowMs: number): Promise<unknown> {
+    // MULTI keeps the increment, first-hit expiry, and TTL read atomic without EVAL.
+    return this.redis
+      .multi()
+      .incr(key)
+      .pexpire(key, windowMs, 'NX')
+      .pttl(key)
+      .exec();
   }
 
-  eval(script: string, keys: string[], args: string[]): Promise<unknown> {
-    return this.redis.eval(script, keys, args);
+  ping(): Promise<string> {
+    return this.redis.ping();
   }
 }
 
