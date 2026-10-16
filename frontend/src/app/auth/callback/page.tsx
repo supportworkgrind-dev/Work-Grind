@@ -30,18 +30,20 @@ function CallbackContent() {
   const { login } = useAuthStore();
   const started = useRef(false);
   const [error, setError] = useState('');
+  const [supportId, setSupportId] = useState('');
 
   useEffect(() => {
     const oauthError = searchParams.get('error');
     if (oauthError) return;
     const code = searchParams.get('code');
+    const attemptId = searchParams.get('attemptId') || '';
     if (!code || started.current) {
       if (!code && !started.current && !error) setError(errorMessages.invalid_request);
       return;
     }
     started.current = true;
     window.history.replaceState({}, '', '/auth/callback');
-    void api.post('/auth/oauth/exchange', { code })
+    void api.post('/auth/oauth/exchange', { code, ...(attemptId ? { attemptId } : {}) })
       .then((response) => {
         const data = response.data;
         if (!data?.success || !data.user?._id || !data.accessToken) {
@@ -58,9 +60,18 @@ function CallbackContent() {
       .catch((requestError: unknown) => {
         const message = (requestError as AxiosError<{ message?: string }>).response?.data?.message;
         setError(message || errorMessages.try_again);
+        if (/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(attemptId)) {
+          setSupportId(attemptId);
+        }
       });
   }, [searchParams, router, login, error]);
   const queryError = searchParams.get('error');
+  const querySupportId = searchParams.get('supportId');
+  const displayedSupportId = supportId || (
+    querySupportId && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(querySupportId)
+      ? querySupportId
+      : ''
+  );
   const displayedError = error || (queryError ? errorMessages[queryError] || errorMessages.try_again : '');
 
   return (
@@ -68,6 +79,9 @@ function CallbackContent() {
       {displayedError
         ? <>
           <div className="auth-error" role="alert"><AlertCircle size={16} className="mr-2 inline" />{displayedError}</div>
+          {displayedSupportId && (
+            <p className="mt-3 text-center text-xs text-stone-500">Reference ID: <code>{displayedSupportId}</code></p>
+          )}
           <p className="mt-5 text-center text-xs text-stone-500">
             <Link href="/login" className="auth-link">Return to sign in</Link>
             <span className="px-2">·</span>

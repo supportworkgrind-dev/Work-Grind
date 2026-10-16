@@ -35,8 +35,30 @@ export class OAuthServiceError extends Error {
   constructor(
     readonly diagnosticCode: 'token_endpoint_rejected' | 'token_response_invalid' | 'jwks_endpoint_rejected' | 'provider_keys_invalid',
     readonly httpStatus?: number,
+    readonly providerErrorCode?: string,
   ) {
     super(diagnosticCode);
+  }
+}
+
+const safeProviderErrorCodes = new Set([
+  'access_denied',
+  'invalid_client',
+  'invalid_grant',
+  'invalid_request',
+  'unauthorized_client',
+  'unsupported_grant_type',
+]);
+
+async function readSafeProviderErrorCode(response: Response): Promise<string | undefined> {
+  try {
+    const payload: unknown = await response.json();
+    if (!payload || typeof payload !== 'object' || !('error' in payload)) return undefined;
+    const value = payload.error;
+    if (typeof value !== 'string') return undefined;
+    return safeProviderErrorCodes.has(value) ? value : 'unrecognized_provider_error';
+  } catch {
+    return undefined;
   }
 }
 
@@ -250,7 +272,10 @@ export async function exchangeAuthorizationCode(
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: form.toString(),
   });
-  if (!response.ok) throw new OAuthServiceError('token_endpoint_rejected', response.status);
+  if (!response.ok) {
+    const providerErrorCode = await readSafeProviderErrorCode(response);
+    throw new OAuthServiceError('token_endpoint_rejected', response.status, providerErrorCode);
+  }
   let tokenResponse: {
     id_token?: string;
     access_token?: string;

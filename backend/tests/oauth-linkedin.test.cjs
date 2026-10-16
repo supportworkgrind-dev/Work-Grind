@@ -10,6 +10,7 @@ const {
   getOAuthConfiguration,
   getOAuthConfigurationIssue,
   introspectLinkedInAccessToken,
+  OAuthServiceError,
 } = require('../dist/services/oauth');
 
 function configureLinkedIn() {
@@ -181,5 +182,34 @@ test('LinkedIn code exchange validates the signed ID token and nonce and sends P
       'different-nonce',
     ),
     /nonce was invalid/,
+  );
+});
+
+test('LinkedIn token rejection exposes only a safe provider error code and HTTP status', async (context) => {
+  configureLinkedIn();
+  const configuration = getOAuthConfiguration('linkedin');
+  const originalFetch = global.fetch;
+  global.fetch = async () => new Response(JSON.stringify({
+    error: 'invalid_client',
+    error_description: 'Do not expose this provider response.',
+  }), { status: 401 });
+  context.after(() => { global.fetch = originalFetch; });
+
+  await assert.rejects(
+    exchangeAuthorizationCode(
+      'linkedin',
+      configuration,
+      'test-authorization-code',
+      'test-verifier',
+      'test-nonce',
+    ),
+    (error) => {
+      assert.ok(error instanceof OAuthServiceError);
+      assert.equal(error.diagnosticCode, 'token_endpoint_rejected');
+      assert.equal(error.httpStatus, 401);
+      assert.equal(error.providerErrorCode, 'invalid_client');
+      assert.equal(error.message.includes('Do not expose'), false);
+      return true;
+    },
   );
 });

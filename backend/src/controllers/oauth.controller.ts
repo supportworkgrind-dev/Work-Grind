@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { timingSafeEqual } from 'crypto';
+import { randomUUID, timingSafeEqual } from 'crypto';
 import User, { IUser } from '../models/User';
 import Company from '../models/Company';
 import OAuthTransaction, { IOAuthTransaction, OAuthProvider } from '../models/OAuthTransaction';
@@ -103,19 +103,21 @@ const knownOAuthFailures = new Set([
   'Unsupported identity token.',
 ]);
 
-function logOAuthFailure(provider: OAuthProvider | 'oauth', stage: string, error: unknown) {
+function logOAuthFailure(provider: OAuthProvider | 'oauth', stage: string, error: unknown, correlationId: string) {
   if (error instanceof OAuthServiceError) {
     console.error('[OAuth] Callback step failed.', {
       provider,
       stage,
       reason: error.diagnosticCode,
       ...(error.httpStatus ? { httpStatus: error.httpStatus } : {}),
+      ...(error.providerErrorCode ? { providerErrorCode: error.providerErrorCode } : {}),
+      correlationId,
     });
     return;
   }
 
   if (error && typeof error === 'object' && 'code' in error && error.code === 11000) {
-    console.error('[OAuth] Callback step failed.', { provider, stage, reason: 'duplicate_key' });
+    console.error('[OAuth] Callback step failed.', { provider, stage, reason: 'duplicate_key', correlationId });
     return;
   }
 
@@ -127,6 +129,7 @@ function logOAuthFailure(provider: OAuthProvider | 'oauth', stage: string, error
       provider,
       stage,
       reason: error.message.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 64),
+      correlationId,
     });
     return;
   }
@@ -138,7 +141,7 @@ function logOAuthFailure(provider: OAuthProvider | 'oauth', stage: string, error
       : error instanceof Error && ['MongoError', 'MongoServerError', 'MongoNetworkError', 'MongoServerSelectionError', 'MongooseError'].includes(error.name)
         ? 'database_error'
         : 'unexpected_error';
-  console.error('[OAuth] Callback step failed.', { provider, stage, reason });
+  console.error('[OAuth] Callback step failed.', { provider, stage, reason, correlationId });
 }
 
 function errorRedirect(
@@ -148,6 +151,7 @@ function errorRedirect(
   link = false,
   audience: 'user' | 'client' = 'user',
   signup = false,
+  correlationId?: string,
 ) {
   const fallback = audience === 'client' ? '/client-portal/oauth/callback' : '/auth/callback';
   const destination = getClientRedirect((link || signup) && returnTo ? returnTo : fallback);
@@ -156,6 +160,7 @@ function errorRedirect(
     return;
   }
   destination.searchParams.set(link || signup ? 'oauth_error' : 'error', safeError(code));
+  if (correlationId) destination.searchParams.set('supportId', correlationId);
   res.redirect(303, destination.toString());
 }
 
@@ -274,8 +279,10 @@ export const startOAuth = async (req: Request, res: Response): Promise<void> => 
   const state = createOAuthToken();
   const nonce = createOAuthToken();
   const codeVerifier = createOAuthToken();
+  const correlationId = randomUUID();
   try {
     await OAuthTransaction.create({
+      correlationId,
       stateHash: hashOAuthValue(state),
       provider,
       audience,
@@ -312,7 +319,7 @@ export const startOAuth = async (req: Request, res: Response): Promise<void> => 
     }
     res.json({ success: true, authUrl });
   } catch {
-    console.error('[OAuth] Sign-in setup failed.', { provider, stage: 'transaction_creation', reason: 'database_error' });
+    console.error('[OAuth] Sign-in setup failed.', { provider, stage: 'transaction_creation', reason: 'database_error', correlationId });
     res.status(503).json({ success: false, code: 'OAUTH_UNAVAILABLE', message: 'Sign-in could not be started. Please try again.' });
   }
 };
@@ -517,6 +524,7 @@ export const completeOAuthCallback = async (req: Request, res: Response): Promis
   res.setHeader('Cache-Control', 'no-store');
   res.setHeader('Referrer-Policy', 'no-referrer');
   const provider = req.params.provider as OAuthProvider;
+  let correlationId: string = randomUUID();
   if (!isOAuthProvider(provider)) {
     res.status(404).json({ success: false, message: 'Not found.' });
     return;
@@ -524,15 +532,15 @@ export const completeOAuthCallback = async (req: Request, res: Response): Promis
   const state = typeof req.query.state === 'string' ? req.query.state :
     typeof req.body?.state === 'string' ? req.body.state : '';
   if (!state || !/^[A-Za-z0-9_-]{32,128}$/.test(state)) {
-    logOAuthFailure(provider, 'state_validation', new Error('invalid_request'));
-    errorRedirect(res, 'invalid_request');
+    logOAuthFailure(provider, 'state_validation', new Error('invalid_request'), correlationId);
+    errorRedirect(res, 'invalid_request', undefined, false, 'user', false, correlationId);
     return;
   }
   const stateCookie = readStateCookie(req, provider, state);
   clearStateCookie(res, provider, state, stateCookie.legacy);
   if (!stateCookieMatches(stateCookie.value, state)) {
-    logOAuthFailure(provider, 'state_cookie_validation', new Error('invalid_request'));
-    errorRedirect(res, 'attempt_expired');
+    logOAuthFailure(provider, 'state_cookie_validation', new Error('invalid_request'), correlationId);
+    errorRedirect(res, 'attempt_expired', undefined, false, 'user', false, correlationId);
     return;
   }
   let transaction: IOAuthTransaction | null;
@@ -543,15 +551,16 @@ export const completeOAuthCallback = async (req: Request, res: Response): Promis
       expiresAt: { $gt: new Date() },
     });
   } catch (error) {
-    logOAuthFailure(provider, 'transaction_lookup', error);
-    errorRedirect(res, 'try_again');
+    logOAuthFailure(provider, 'transaction_lookup', error, correlationId);
+    errorRedirect(res, 'try_again', undefined, false, 'user', false, correlationId);
     return;
   }
   if (!transaction) {
-    logOAuthFailure(provider, 'transaction_lookup', new Error('attempt_expired'));
-    errorRedirect(res, 'attempt_expired');
+    logOAuthFailure(provider, 'transaction_lookup', new Error('attempt_expired'), correlationId);
+    errorRedirect(res, 'attempt_expired', undefined, false, 'user', false, correlationId);
     return;
   }
+  correlationId = transaction.correlationId || correlationId;
   const providerError = typeof req.query.error === 'string' ? req.query.error :
     typeof req.body?.error === 'string' ? req.body.error : '';
   if (providerError) {
@@ -562,6 +571,7 @@ export const completeOAuthCallback = async (req: Request, res: Response): Promis
       provider,
       'provider_callback',
       new Error(providerError === 'access_denied' ? 'cancelled' : `provider_error_${safeProviderError}`),
+      correlationId,
     );
     errorRedirect(
       res,
@@ -570,6 +580,7 @@ export const completeOAuthCallback = async (req: Request, res: Response): Promis
       transaction.intent === 'link' || transaction.intent === 'publishing',
       transaction.audience,
       transaction.intent === 'signup',
+      correlationId,
     );
     return;
   }
@@ -577,7 +588,7 @@ export const completeOAuthCallback = async (req: Request, res: Response): Promis
     typeof req.body?.code === 'string' ? req.body.code : '';
   const configuration = getOAuthConfiguration(provider);
   if (!configuration) {
-    logOAuthFailure(provider, 'callback_configuration', new Error('provider_unavailable'));
+    logOAuthFailure(provider, 'callback_configuration', new Error('provider_unavailable'), correlationId);
     errorRedirect(
       res,
       'provider_unavailable',
@@ -585,11 +596,12 @@ export const completeOAuthCallback = async (req: Request, res: Response): Promis
       transaction.intent === 'link' || transaction.intent === 'publishing',
       transaction.audience,
       transaction.intent === 'signup',
+      correlationId,
     );
     return;
   }
   if (!code || code.length > 4096) {
-    logOAuthFailure(provider, 'callback_authorization_code', new Error('attempt_expired'));
+    logOAuthFailure(provider, 'callback_authorization_code', new Error('attempt_expired'), correlationId);
     errorRedirect(
       res,
       'attempt_expired',
@@ -597,6 +609,7 @@ export const completeOAuthCallback = async (req: Request, res: Response): Promis
       transaction.intent === 'link' || transaction.intent === 'publishing',
       transaction.audience,
       transaction.intent === 'signup',
+      correlationId,
     );
     return;
   }
@@ -658,6 +671,7 @@ export const completeOAuthCallback = async (req: Request, res: Response): Promis
       const exchangeCode = createOAuthToken();
       stage = 'exchange_code_persistence';
       await OAuthExchange.create({
+        correlationId,
         codeHash: hashOAuthValue(exchangeCode),
         audience: 'client',
         clientUserId: client._id,
@@ -667,6 +681,7 @@ export const completeOAuthCallback = async (req: Request, res: Response): Promis
       const destination = getClientRedirect('/client-portal/oauth/callback');
       if (!destination) throw new Error('invalid_return_to');
       destination.searchParams.set('code', exchangeCode);
+      destination.searchParams.set('attemptId', correlationId);
       res.redirect(303, destination.toString());
       return;
     }
@@ -683,6 +698,7 @@ export const completeOAuthCallback = async (req: Request, res: Response): Promis
     const exchangeCode = createOAuthToken();
     stage = 'exchange_code_persistence';
     await OAuthExchange.create({
+      correlationId,
       codeHash: hashOAuthValue(exchangeCode),
       userId: user._id,
       returnTo: existingCompany?.organizationType && existingCompany.organizationType !== 'business'
@@ -693,9 +709,10 @@ export const completeOAuthCallback = async (req: Request, res: Response): Promis
     const destination = getClientRedirect('/auth/callback');
     if (!destination) throw new Error('invalid_return_to');
     destination.searchParams.set('code', exchangeCode);
+    destination.searchParams.set('attemptId', correlationId);
     res.redirect(303, destination.toString());
   } catch (error: any) {
-    logOAuthFailure(provider, stage, error);
+    logOAuthFailure(provider, stage, error, correlationId);
     const destination = transaction.intent === 'link' || transaction.intent === 'publishing'
       ? transaction.returnTo
       : transaction.audience === 'client' ? '/client-portal/oauth/callback' : undefined;
@@ -716,6 +733,7 @@ export const completeOAuthCallback = async (req: Request, res: Response): Promis
       transaction.intent === 'link' || transaction.intent === 'publishing',
       transaction.audience,
       transaction.intent === 'signup',
+      correlationId,
     );
   }
 };
@@ -731,9 +749,19 @@ function signupErrorReturnTo(transaction: IOAuthTransaction): string | undefined
 
 export const exchangeOAuthSession = async (req: Request, res: Response): Promise<void> => {
   res.setHeader('Cache-Control', 'no-store');
+  const requestedAttemptId = typeof req.body?.attemptId === 'string' ? req.body.attemptId : '';
+  const hasValidAttemptId = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestedAttemptId);
+  let correlationId: string = hasValidAttemptId
+    ? requestedAttemptId
+    : randomUUID();
   const code = typeof req.body?.code === 'string' ? req.body.code : '';
+  if (requestedAttemptId && !hasValidAttemptId) {
+    logOAuthFailure('oauth', 'exchange_attempt_validation', new Error('invalid_request'), correlationId);
+    res.status(400).json({ success: false, code: 'OAUTH_CODE_INVALID', message: 'This sign-in link is invalid or expired. Please try again.' });
+    return;
+  }
   if (code.length < 32 || code.length > 128) {
-    logOAuthFailure('oauth', 'exchange_code_validation', new Error('invalid_request'));
+    logOAuthFailure('oauth', 'exchange_code_validation', new Error('invalid_request'), correlationId);
     res.status(400).json({ success: false, code: 'OAUTH_CODE_INVALID', message: 'This sign-in link is invalid or expired. Please try again.' });
     return;
   }
@@ -741,18 +769,20 @@ export const exchangeOAuthSession = async (req: Request, res: Response): Promise
   try {
     exchange = await OAuthExchange.findOneAndDelete({
       codeHash: hashOAuthValue(code),
+      ...(hasValidAttemptId ? { correlationId: requestedAttemptId } : {}),
       expiresAt: { $gt: new Date() },
     });
   } catch (error) {
-    logOAuthFailure('oauth', 'exchange_code_lookup', error);
+    logOAuthFailure('oauth', 'exchange_code_lookup', error, correlationId);
     res.status(503).json({ success: false, code: 'OAUTH_UNAVAILABLE', message: 'Sign-in could not be completed. Please try again.' });
     return;
   }
   if (!exchange) {
-    logOAuthFailure('oauth', 'exchange_code_lookup', new Error('invalid_request'));
+    logOAuthFailure('oauth', 'exchange_code_lookup', new Error('invalid_request'), correlationId);
     res.status(400).json({ success: false, code: 'OAUTH_CODE_INVALID', message: 'This sign-in link is invalid or expired. Please try again.' });
     return;
   }
+  correlationId = exchange.correlationId || correlationId;
   let stage = 'user_lookup';
   try {
     if (exchange.audience === 'client') {
@@ -760,7 +790,7 @@ export const exchangeOAuthSession = async (req: Request, res: Response): Promise
         ? await ClientUser.findById(exchange.clientUserId)
         : null;
       if (!client || !client.isActive || !client.isVerified) {
-        logOAuthFailure('oauth', stage, new Error('account_unavailable'));
+        logOAuthFailure('oauth', stage, new Error('account_unavailable'), correlationId);
         res.status(403).json({ success: false, code: 'OAUTH_ACCOUNT_UNAVAILABLE', message: 'This client portal account cannot sign in right now.' });
         return;
       }
@@ -778,7 +808,7 @@ export const exchangeOAuthSession = async (req: Request, res: Response): Promise
     }
     const user = await User.findById(exchange.userId);
     if (!user || !user.isActive || user.isDeleted || !user.isVerified || user.isSuperAdmin || user.mfaEnabled) {
-      logOAuthFailure('oauth', stage, new Error('account_unavailable'));
+      logOAuthFailure('oauth', stage, new Error('account_unavailable'), correlationId);
       res.status(403).json({ success: false, code: 'OAUTH_ACCOUNT_UNAVAILABLE', message: 'This account cannot sign in right now.' });
       return;
     }
@@ -792,7 +822,7 @@ export const exchangeOAuthSession = async (req: Request, res: Response): Promise
       returnTo: exchange.returnTo,
     });
   } catch (error) {
-    logOAuthFailure('oauth', stage, error);
+    logOAuthFailure('oauth', stage, error, correlationId);
     res.status(500).json({ success: false, code: 'OAUTH_SESSION_FAILED', message: 'Sign-in could not be completed. Please try again.' });
   }
 };

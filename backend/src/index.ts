@@ -120,6 +120,7 @@ import { capturePolarWebhookRawBody } from './middleware/capturePolarWebhookBody
 import { runTaskDueReminderSweep } from './services/taskDueReminders';
 import { cleanupExpiredVerificationCodes, migrateRefreshTokensAtRest } from './services/refreshTokenMigration';
 import mongoose from 'mongoose';
+import { isOAuthCallbackRequest } from './utils/requestLogging';
 
 // Route imports
 import authRoutes from './routes/auth';
@@ -297,7 +298,7 @@ app.use(
 // OAuth callback query strings contain one-time authorization codes and state;
 // never write those callback URLs to request logs.
 const skipOAuthCallbackLogs = (req: express.Request) =>
-  /^\/api\/auth\/oauth\/(?:google|apple|linkedin)\/callback(?:\?|$)/.test(req.originalUrl);
+  isOAuthCallbackRequest(req.originalUrl) || isOAuthCallbackRequest(req.url);
 if (process.env.NODE_ENV !== 'production') {
   app.use(morgan('dev', { skip: skipOAuthCallbackLogs }));
 } else {

@@ -23,9 +23,11 @@ function ClientOAuthCallbackContent() {
   const searchParams = useSearchParams();
   const started = useRef(false);
   const [error, setError] = useState('');
+  const [supportId, setSupportId] = useState('');
 
   useEffect(() => {
     const code = searchParams.get('code');
+    const attemptId = searchParams.get('attemptId') || '';
     if (searchParams.has('error')) return;
     if (!code || started.current) {
       if (!code && !started.current) setError(errorMessages.invalid_request);
@@ -33,7 +35,7 @@ function ClientOAuthCallbackContent() {
     }
     started.current = true;
     window.history.replaceState({}, '', '/client-portal/oauth/callback');
-    void api.post('/auth/oauth/exchange', { code })
+    void api.post('/auth/oauth/exchange', { code, ...(attemptId ? { attemptId } : {}) })
       .then((response) => {
         const data = response.data;
         if (!data?.success || data.audience !== 'client' || !data.client?._id || !data.accessToken) {
@@ -46,10 +48,19 @@ function ClientOAuthCallbackContent() {
       .catch((requestError: unknown) => {
         const message = (requestError as AxiosError<{ message?: string }>).response?.data?.message;
         setError(message || errorMessages.try_again);
+        if (/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(attemptId)) {
+          setSupportId(attemptId);
+        }
       });
   }, [router, searchParams]);
 
   const errorCode = searchParams.get('error');
+  const querySupportId = searchParams.get('supportId');
+  const displayedSupportId = supportId || (
+    querySupportId && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(querySupportId)
+      ? querySupportId
+      : ''
+  );
   const displayedError = error || (errorCode ? errorMessages[errorCode] || errorMessages.try_again : '');
 
   return (
@@ -59,6 +70,9 @@ function ClientOAuthCallbackContent() {
           <div className="auth-error" role="alert">
             <AlertCircle size={16} className="mr-2 inline" />{displayedError}
           </div>
+          {displayedSupportId && (
+            <p className="mt-3 text-center text-xs text-stone-500">Reference ID: <code>{displayedSupportId}</code></p>
+          )}
           <p className="mt-5 text-center text-xs text-stone-500">
             <Link href="/client-portal" className="auth-link">Return to client portal sign in</Link>
           </p>

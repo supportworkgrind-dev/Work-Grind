@@ -4,6 +4,7 @@ import { OrganizationType, ORGANIZATION_TYPES } from '../config/organization';
 export type OAuthProvider = 'google' | 'apple' | 'linkedin';
 
 export interface IOAuthTransaction extends Document {
+  correlationId?: string;
   stateHash: string;
   provider: OAuthProvider;
   audience: 'user' | 'client';
@@ -19,6 +20,7 @@ export interface IOAuthTransaction extends Document {
 }
 
 const OAuthTransactionSchema = new Schema<IOAuthTransaction>({
+  correlationId: { type: String, maxlength: 64 },
   stateHash: { type: String, required: true, unique: true },
   provider: { type: String, required: true, enum: ['google', 'apple', 'linkedin'] },
   audience: { type: String, enum: ['user', 'client'], default: 'user', required: true },

@@ -1,6 +1,7 @@
 import mongoose, { Document, Schema } from 'mongoose';
 
 export interface IOAuthExchange extends Document {
+  correlationId?: string;
   codeHash: string;
   audience: 'user' | 'client';
   userId?: mongoose.Types.ObjectId;
@@ -10,6 +11,7 @@ export interface IOAuthExchange extends Document {
 }
 
 const OAuthExchangeSchema = new Schema<IOAuthExchange>({
+  correlationId: { type: String, maxlength: 64 },
   codeHash: { type: String, required: true, unique: true },
   audience: { type: String, enum: ['user', 'client'], default: 'user', required: true },
   userId: { type: Schema.Types.ObjectId, ref: 'User' },
