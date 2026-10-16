@@ -31,7 +31,7 @@
   "crons": [
     {
       "path": "/api/social-publishing/dispatch",
-      "schedule": "* * * * *"
+      "schedule": "0 0 * * *"
     }
   ]
 }

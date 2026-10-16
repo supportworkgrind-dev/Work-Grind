@@ -400,21 +400,28 @@ event promotions. Output remains an editable draft. Draft deletion, review,
 scheduling, status notifications and publishing history are available. Scheduled
 posts are displayed as distinct items in WorkGrind Calendar. The Vercel Cron
 dispatcher claims due records atomically; only explicit LinkedIn `429` responses
-receive up to two delayed retries. A timeout or other ambiguous result is not
-retried automatically because LinkedIn does not provide a verified idempotency
-mechanism for this integration.
+and transient subscription-check failures receive up to two delayed retries. A
+timeout or other ambiguous publishing result is not retried automatically because
+LinkedIn does not provide a verified idempotency mechanism for this integration.
 
 #### Scheduling deployment configuration
 
-The backend Vercel project must use Pro or Enterprise: the dispatcher is configured
-for a once-per-minute Cron, which is unavailable on Hobby (Hobby supports daily
-execution only and cannot provide reliable scheduled-post timing). Configure a
-high-entropy `CRON_SECRET` in the backend Vercel project's Production and Preview
-environment settings. Vercel sends it as `Authorization: Bearer ...`; the endpoint
+The backend Vercel Cron runs daily at `00:00 UTC` to remain compatible with the
+Hobby plan, which permits no more than one scheduled execution per day. Hobby
+scheduling has hourly timing precision, so this is not an exact-time publishing
+service: Vercel may invoke it up to 59 minutes from the scheduled time, a due post
+may wait almost 24 hours for the next run, and each run dispatches at most 10 due
+posts. Configure a high-entropy `CRON_SECRET` in the backend Vercel project's
+Production and Preview environment settings. Vercel sends it as `Authorization: Bearer ...`; the endpoint
 fails closed when it is absent or invalid. Verify the Cron appears in the deployed
 project before enabling schedules for users. The API stores the scheduled instant
-in UTC together with the IANA timezone used for display. Keep the Vercel Function
-duration and MongoDB connectivity sufficient to dispatch the bounded batch.
+in UTC together with the IANA timezone used for display.
+
+Transient subscription-check and LinkedIn rate-limit retries are scheduled after
+five minutes, with up to two retries. On Hobby, they are not picked up at
+five-minute intervals: they wait until a subsequent daily Cron run, so retries
+can extend over roughly two additional days. Use hosting with more frequent Cron
+support if near-time publishing or prompt retries are required.
 
 #### Provider capability and setup status
 
