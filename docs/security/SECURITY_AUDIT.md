@@ -25,7 +25,7 @@ Two high-impact authorization defects were confirmed and fixed:
 1. Workspace users could retrieve private-channel details and message history without being channel members. `getChannel` only constrained the tenant; `getMessages` constrained messages to the tenant but did not require a channel ID or authorize the requested channel. Both now require an active, same-tenant public channel or a channel that includes the requester. History requires a valid channel ID.
 2. Academic file downloads did not apply the academic uploader/share visibility filter, and file deletion accidentally replaced the edit-permission filter with the broader view-permission filter. Download now applies view scope; deletion composes the edit scope without overwriting it.
 
-Additional fixes make inbound integration HMAC mandatory, validate file signatures after multipart parsing, limit Vercel proxy trust to one hop, and use Redis-backed rate-limit counters when `REDIS_URL` is configured. The vulnerable legacy local Transformers.js dependency was replaced, and audited high backend production dependencies were updated.
+Additional fixes make inbound integration HMAC mandatory, validate file signatures after multipart parsing, limit Vercel proxy trust to one hop, and use Upstash REST-backed rate-limit counters when `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` are configured. The vulnerable legacy local Transformers.js dependency was replaced, and audited high backend production dependencies were updated.
 
 No claim is made that no other vulnerabilities exist. Deployment-dependent controls and the complete application-wide authorization matrix remain unverified.
 
@@ -66,7 +66,7 @@ No claim is made that no other vulnerabilities exist. Deployment-dependent contr
 ### WG-SEC-05 — Medium — Serverless rate-limit isolation (mitigated)
 
 - **Evidence before fix:** Vercel trusted all forwarded hops and the rate limiter used per-process memory.
-- **Fix:** Vercel now trusts one proxy hop. When configured, an atomic Redis store shares counters across instances; without `REDIS_URL`, the fallback logs that counters are local.
+- **Fix:** Vercel now trusts one proxy hop. When configured, an atomic Upstash REST store shares counters across instances; requests fail closed on Vercel if either required setting is absent or the store errors.
 - **Regression evidence:** Store tests verify the shared key prefix and atomic expiry command. Vercel header and Redis behavior still require deployment verification.
 
 ### WG-SEC-06 — Critical — Legacy local AI dependency chain (fixed)
@@ -93,7 +93,7 @@ The source review used the **OWASP ASVS 5.0.0** verification domains and the **O
 - **API1: Broken Object Level Authorization / ASVS access control:** verified channel membership and academic file access gaps and added regression tests for these specific cases. Other object types still require systematic two-tenant tests.
 - **API2: Broken Authentication:** inspected JWT reload, OAuth state/nonce/PKCE, and refresh paths; no end-to-end provider or production session test was run.
 - **API3/API5: Broken Object Property / Function Level Authorization:** selected role and update allowlists were inspected; complete endpoint and mass-assignment coverage remains unverified.
-- **API4: Unrestricted Resource Consumption:** request/upload limits remain. Rate limiting uses Redis-backed counters when `REDIS_URL` is present; without it the compatibility fallback is process-local and warns on Vercel. Distributed production enforcement depends on deployment configuration.
+- **API4: Unrestricted Resource Consumption:** request/upload limits remain. Rate limiting uses shared Upstash counters when both REST settings are valid; Vercel rate-limited requests fail closed when they are missing or unavailable. Distributed production enforcement still depends on deployment configuration.
 - **API7/API10: SSRF / Unsafe Consumption of APIs:** outbound integrations and external provider boundaries need further destination and response validation review; no live upstream exercise was performed.
 - **API8/API9: Security Misconfiguration / Improper Inventory Management:** Vercel and environment-dependent controls were documented for operator verification; no live deployment configuration was accessed.
 - **API6: Sensitive Business Flows:** OAuth and Polar protections were inspected, but no live provider or race/replay test was conducted.
@@ -114,7 +114,7 @@ OWASP references: [ASVS 5.0.0](https://owasp.org/www-project-application-securit
 Remaining items are deployment-dependent or require broader validation:
 
 1. **Unverified billing integration.** Raw Polar webhook bytes are now captured by the global JSON parser's endpoint-specific `verify` callback and the route rejects requests without a captured buffer. Unit tests verify the exact bytes are preserved, but an actual signed Polar sandbox event through the deployed middleware path is still required.
-2. **Deployment-dependent rate limiting.** Shared counters are used only when `REDIS_URL` is configured. Vercel without that setting falls back to per-instance memory and therefore does not enforce a global quota. Verify the intended production Redis configuration and one-hop edge forwarding behavior.
+2. **Deployment-dependent rate limiting.** Shared counters require valid `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` settings. Verify the Upstash production database configuration and one-hop edge forwarding behavior.
 3. **Remaining frontend advisories.** Production audit reports 6 High, 8 Moderate, and 2 Low advisories. The suggested npm remediation for Excalidraw downgrades to a release incompatible with the React 19 peer range; ExcelJS/Mermaid and development-tool advisories also remain.
 4. **Unverified billing reliability concern — Raw-body capture ordering.** `backend/src/index.ts` installs `express.json()` before mounting `subscriptionRoutes`; `backend/src/routes/subscription.ts` then installs `express.raw()` for the webhook and expects a Buffer. Validate an actual signed Polar test event in an isolated sandbox to ensure the raw bytes survive this middleware order. This is recorded as an integration test gap, not a confirmed signature bypass.
 5. **Secret-handling follow-up.** A prior session reported local environment values appeared in tool output. No values are reproduced here and no rotation was performed; privately identify any affected credentials and rotate through their issuing providers/deployment control plane.
@@ -124,7 +124,7 @@ Remaining items are deployment-dependent or require broader validation:
 ## Prioritized follow-up plan
 
 1. **P0 — Frontend dependencies:** resolve remaining Excalidraw High advisories with a React 19-compatible upstream release or a feature-tested replacement; assess ExcelJS/Mermaid paths without forced downgrades.
-2. **P1 — Distributed limits:** configure and verify shared `REDIS_URL` in each Vercel environment; confirm the edge supplies an unspoofable one-hop client IP.
+2. **P1 — Distributed limits:** configure and verify both Upstash REST variables in each Vercel environment; confirm the edge supplies an unspoofable one-hop client IP.
 4. **P1 — Tenant coverage:** add disposable-database tests with two organizations and multiple roles across files, tasks/projects, CRM, academic records, channels, API routes, and socket events.
 4. **P2 — Provider integration checks:** verify Polar raw-body/signature behavior with a sandbox event and exercise OAuth, R2, and realtime flows using test accounts.
 5. **P2 — Completion evidence:** run the full ASVS 5.0.0/API Security Top 10 control matrix and add secret scanning/SAST to CI, recording exceptions rather than treating them as passed.

@@ -19,17 +19,33 @@ let client: RedisCommands | null = null;
 let initializationFailed = false;
 let missingConfigurationLogged = false;
 
-function getRedisConfiguration(): RedisConfiguration | null {
+export function getRedisConfigurationIssue(): string | null {
   const url = process.env.UPSTASH_REDIS_REST_URL?.trim();
   const token = process.env.UPSTASH_REDIS_REST_TOKEN?.trim();
-  if (!url || !token) return null;
+  if (!url && !token) {
+    return process.env.VERCEL === '1'
+      ? 'UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN are required on Vercel.'
+      : null;
+  }
+  if (!url || !token) {
+    return 'UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN must both be configured.';
+  }
 
   try {
-    if (new URL(url).protocol !== 'https:') return null;
+    if (new URL(url).protocol !== 'https:') {
+      return 'UPSTASH_REDIS_REST_URL must be an absolute HTTPS URL.';
+    }
   } catch {
-    return null;
+    return 'UPSTASH_REDIS_REST_URL must be an absolute HTTPS URL.';
   }
-  return { url, token };
+  return null;
+}
+
+function getRedisConfiguration(): RedisConfiguration | null {
+  if (getRedisConfigurationIssue()) return null;
+  const url = process.env.UPSTASH_REDIS_REST_URL?.trim();
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN?.trim();
+  return url && token ? { url, token } : null;
 }
 
 export function isRedisConfigured(): boolean {
@@ -72,7 +88,7 @@ export function getRedisClient(): RedisCommands | null {
   const configuration = getRedisConfiguration();
   if (!configuration) {
     if (!missingConfigurationLogged) {
-      console.info('[Redis] A valid UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN are required for Redis operations.');
+      console.info('[Redis] A valid Upstash REST URL and token are required for Redis operations.');
       missingConfigurationLogged = true;
     }
     return null;

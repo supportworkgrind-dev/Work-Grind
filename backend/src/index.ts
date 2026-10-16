@@ -1,6 +1,7 @@
 import dotenv from 'dotenv';
 import path from 'path';
 import { getAllowedClientOrigins } from './utils/clientOrigins';
+import { checkRedisHealth, closeRedisClient, getRedisConfigurationIssue } from './config/redis';
 
 // Load environment variables immediately before any other module evaluation
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
@@ -22,6 +23,8 @@ dotenv.config();
     { key: 'GEMINI_API_KEY',           service: 'Gemini AI',                 note: 'AI features disabled if unset' },
     { key: 'GEMINI_MODEL',             service: 'Gemini AI model selection',  note: 'Defaults to gemini-2.5-flash' },
     { key: 'AI_PROVIDER_RETRY_ATTEMPTS', service: 'Tavro AI transient retry limit', note: 'Defaults to 1; capped at 2' },
+    { key: 'UPSTASH_REDIS_REST_URL',   service: 'Shared Redis cache and rate limits', note: 'HTTPS REST URL; required with its token on Vercel' },
+    { key: 'UPSTASH_REDIS_REST_TOKEN', service: 'Shared Redis cache and rate limits', note: 'Required with the REST URL on Vercel' },
     { key: 'POLAR_ACCESS_TOKEN',       service: 'Polar Payments',            note: 'Payments disabled if unset' },
     { key: 'POLAR_WEBHOOK_SECRET',     service: 'Polar Webhook verification', note: 'Webhooks disabled if unset' },
     { key: 'POLAR_STARTER_PRODUCT_ID', service: 'Polar Starter plan',        note: 'Starter checkout disabled if unset' },
@@ -65,6 +68,11 @@ dotenv.config();
     }
     console.warn('⚠️  Replace placeholders with real values in backend/.env');
     console.warn('');
+  }
+
+  const redisConfigurationIssue = getRedisConfigurationIssue();
+  if (redisConfigurationIssue) {
+    console.warn('[Redis] Shared Redis configuration issue.', { issue: redisConfigurationIssue });
   }
 
   const missingEmailSettings: string[] = [];
@@ -115,7 +123,6 @@ import { rateLimiter } from './middleware/rateLimiter';
 import { logPolarConfig } from './config/subscription';
 import { logR2Config }   from './services/r2Storage';
 import { logGeminiConfig } from './services/geminiService';
-import { checkRedisHealth, closeRedisClient } from './config/redis';
 import { capturePolarWebhookRawBody } from './middleware/capturePolarWebhookBody';
 import { runTaskDueReminderSweep } from './services/taskDueReminders';
 import { cleanupExpiredVerificationCodes, migrateRefreshTokensAtRest } from './services/refreshTokenMigration';

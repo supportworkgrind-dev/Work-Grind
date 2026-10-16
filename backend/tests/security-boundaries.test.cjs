@@ -254,7 +254,6 @@ test('file upload content validation rejects mismatched or spoofed file types', 
 test('Redis rate-limit stores share prefixed counters with an atomic expiry', async () => {
   const calls = [];
   const redis = {
-    status: 'ready',
     eval: async (...args) => {
       calls.push(args);
       return [1, 60_000];
@@ -266,9 +265,9 @@ test('Redis rate-limit stores share prefixed counters with an atomic expiry', as
 
   assert.equal(result.totalHits, 1);
   assert.ok(result.resetTime.getTime() > Date.now());
-  assert.equal(calls[0][1], 1);
-  assert.equal(calls[0][2], 'workgrind:rate-limit:test:client-key');
-  assert.equal(calls[0][3], '60000');
+  assert.match(calls[0][0], /PEXPIRE/);
+  assert.deepEqual(calls[0][1], ['workgrind:rate-limit:test:client-key']);
+  assert.deepEqual(calls[0][2], ['60000']);
 });
 
 test('Polar raw-body capture preserves exact webhook bytes only for its endpoint', () => {
