@@ -38,22 +38,15 @@ export function IncomingCallManager() {
     const onEnded = ({ sessionId }: { sessionId: string; status: string }) => {
       if (sessionId) clearCall(sessionId);
     };
-    const onDisconnect = () => {
-      const state = useCallingStore.getState();
-      if (state.activeCall) clearCall(state.activeCall.sessionId);
-      if (state.incomingCall) clearCall(state.incomingCall.sessionId);
-    };
     socket.on('call:incoming', onIncoming);
     socket.on('call:accepted', onAccepted);
     socket.on('call:declined', onDeclined);
     socket.on('call:ended', onEnded);
-    socket.on('disconnect', onDisconnect);
     return () => {
       socket.off('call:incoming', onIncoming);
       socket.off('call:accepted', onAccepted);
       socket.off('call:declined', onDeclined);
       socket.off('call:ended', onEnded);
-      socket.off('disconnect', onDisconnect);
     };
   }, [clearCall, playChime, setIncomingCall, updateActiveCall]);
 

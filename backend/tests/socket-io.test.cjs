@@ -2,7 +2,8 @@ const assert = require('node:assert/strict');
 const test = require('node:test');
 const { createServer } = require('node:http');
 const WebSocket = require('ws');
-const { initSocket, SOCKET_IO_PATH } = require('../dist/utils/socket');
+const { initSocket, isUserOnline, SOCKET_IO_PATH } = require('../dist/utils/socket');
+const RealtimePresence = require('../dist/models/RealtimePresence').default;
 
 function listen(server) {
   return new Promise((resolve, reject) => {
@@ -58,6 +59,26 @@ test('Socket.IO serves the configured path, verifies auth on both transports, an
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
     body: '40',
+  });
+
+  test('presence remains online while any authenticated device lease is active', async (t) => {
+    const originalExists = RealtimePresence.exists;
+    const activeSocketIds = new Set(['tab-one', 'tab-two']);
+    let receivedFilter;
+    RealtimePresence.exists = async (filter) => {
+      receivedFilter = filter;
+      return activeSocketIds.size > 0;
+    };
+    t.after(() => { RealtimePresence.exists = originalExists; });
+
+    assert.equal(await isUserOnline('user-id'), true);
+    assert.equal(receivedFilter.userId, 'user-id');
+    assert.ok(receivedFilter.expiresAt.$gt instanceof Date);
+
+    activeSocketIds.delete('tab-one');
+    assert.equal(await isUserOnline('user-id'), true);
+    activeSocketIds.delete('tab-two');
+    assert.equal(await isUserOnline('user-id'), false);
   });
   assert.equal(namespaceConnect.status, 200);
 

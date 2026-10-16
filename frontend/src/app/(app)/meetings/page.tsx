@@ -31,7 +31,8 @@ import {
 import { formatDate, formatTimeAgo, getInitials } from '@/lib/utils';
 import { BackButton } from '@/components/common/BackButton';
 import { Avatar } from '@/components/common/Avatar';
-import { getRtcConfiguration, logRtcIceDiagnostics } from '@/lib/rtcConfig';
+import { getRtcConfiguration, logRtcIceDiagnostics, type WorkGrindRtcConfiguration } from '@/lib/rtcConfig';
+import { shouldInitiateMeetingOffer } from '@/lib/meetingConnection';
 
 interface RemotePeer {
   socketId: string;
@@ -54,6 +55,20 @@ interface MeetingJoinResponse {
   meeting?: Meeting;
   meetingGrant?: string;
 }
+
+interface MeetingPeerInfo {
+  socketId: string;
+  userId: string;
+  user: RemotePeer['user'];
+  isMicOn?: boolean;
+  isCamOn?: boolean;
+  isScreenSharing?: boolean;
+  isHandRaised?: boolean;
+}
+
+type MeetingSignal =
+  | { type: 'offer' | 'answer'; sdp?: string }
+  | { type: 'candidate'; candidate?: RTCIceCandidateInit };
 
 const pendingMeetingJoins = new Map<string, Promise<MeetingJoinResponse>>();
 const pendingMeetingLoads = new Map<string, Promise<Meeting[]>>();
@@ -190,7 +205,9 @@ export default function MeetingsPage() {
   const localStreamRef = useRef<MediaStream | null>(null);
   const screenTrackRef = useRef<MediaStreamTrack | null>(null);
   const peersRef = useRef<{ [socketId: string]: RTCPeerConnection }>({});
-  const rtcConfigurationRef = useRef<RTCConfiguration | null>(null);
+  const initiatedOfferPeersRef = useRef(new Set<string>());
+  const makingOfferPeersRef = useRef(new Set<string>());
+  const rtcConfigurationRef = useRef<WorkGrindRtcConfiguration | null>(null);
   const signalQueuesRef = useRef<Record<string, Promise<void>>>({});
   const pendingMeetingCandidatesRef = useRef<Record<string, RTCIceCandidateInit[]>>({});
   const [remotePeers, setRemotePeers] = useState<{ [socketId: string]: RemotePeer }>({});
@@ -291,10 +308,16 @@ export default function MeetingsPage() {
 
   // Helper: Create an RTCPeerConnection for a remote peer socket
   const createPeerConnection = useCallback(
-    (targetSocketId: string, peerInfo?: any) => {
+    (targetSocketId: string, peerInfo?: MeetingPeerInfo) => {
       const socket = getSocket();
       if (!socket) return null;
 
+      const existingPeer = peersRef.current[targetSocketId];
+      if (existingPeer && existingPeer.connectionState !== 'closed') return existingPeer;
+      if (existingPeer) {
+        existingPeer.close();
+        delete peersRef.current[targetSocketId];
+      }
       const iceServers = rtcConfigurationRef.current?.iceServers;
       if (!iceServers?.length) {
         console.error('[Meeting WebRTC] ICE configuration is unavailable; refusing to create a peer connection.');
@@ -381,6 +404,13 @@ export default function MeetingsPage() {
         if (process.env.NODE_ENV === 'development') {
           console.debug('[Meeting WebRTC] Peer state:', pc.connectionState);
         }
+        if (pc.connectionState === 'failed') {
+          setRtcWarning('A meeting participant’s media connection failed. Check the network or ask your administrator to configure TURN.');
+        } else if (pc.connectionState === 'disconnected') {
+          setRtcWarning('A meeting participant’s media connection is interrupted. Check the network.');
+        } else if (pc.connectionState === 'connected') {
+          setRtcWarning((warning) => warning.startsWith('A meeting participant’s media connection') ? '' : warning);
+        }
       };
 
       return pc;
@@ -398,6 +428,36 @@ export default function MeetingsPage() {
     let isDisposed = false;
     let localMediaReady = false;
     let joinedSocketId: string | null = null;
+    const initiatedOfferPeers = initiatedOfferPeersRef.current;
+    const makingOfferPeers = makingOfferPeersRef.current;
+    const initiateOffer = async (peerSocketId: string, peerInfo?: MeetingPeerInfo) => {
+      if (isDisposed || !socket.id || !shouldInitiateMeetingOffer(socket.id, peerSocketId) ||
+          initiatedOfferPeers.has(peerSocketId)) return;
+      const pc = createPeerConnection(peerSocketId, peerInfo);
+      if (!pc || pc.signalingState !== 'stable') return;
+      initiatedOfferPeers.add(peerSocketId);
+      makingOfferPeers.add(peerSocketId);
+      try {
+        const offer = await pc.createOffer();
+        if (isDisposed || pc.signalingState !== 'stable') return;
+        await pc.setLocalDescription(offer);
+        if (isDisposed || !pc.localDescription) return;
+        socket.emit('meeting:signal', {
+          meetingId: activeMeeting.meetingLink,
+          targetSocketId: peerSocketId,
+          signal: {
+            type: 'offer',
+            sdp: pc.localDescription.sdp,
+          },
+        });
+      } catch (error) {
+        initiatedOfferPeers.delete(peerSocketId);
+        console.error('[Meeting WebRTC] Could not start peer negotiation.', error);
+        setRtcWarning('A meeting participant’s media connection could not be started. Check the network and try rejoining.');
+      } finally {
+        makingOfferPeers.delete(peerSocketId);
+      }
+    };
     const requestMeetingJoin = () => {
       if (isDisposed || !localMediaReady || !socket.connected || !socket.id || joinedSocketId === socket.id) return;
       joinedSocketId = socket.id;
@@ -479,7 +539,12 @@ export default function MeetingsPage() {
     setupLocalMedia();
 
     // Step C: Listen for existing participants in the room
-    const onRoomUsers = async ({ participants }: { participants: any[] }) => {
+    const onRoomUsers = async ({ participants }: { participants: MeetingPeerInfo[] }) => {
+      setRtcWarning((warning) => warning.startsWith('Meeting signaling disconnected')
+        ? rtcConfigurationRef.current?.turnConfigured === false
+          ? 'TURN is not configured. Participants behind restrictive NATs may not connect.'
+          : ''
+        : warning);
       for (const peer of participants) {
         const pc = createPeerConnection(peer.socketId, peer);
         if (!pc) continue;
@@ -498,26 +563,13 @@ export default function MeetingsPage() {
           },
         }));
 
-        // Initiator creates and sends WebRTC Offer
-        try {
-          const offer = await pc.createOffer();
-          await pc.setLocalDescription(offer);
-          socket.emit('meeting:signal', {
-            meetingId: activeMeeting.meetingLink,
-            targetSocketId: peer.socketId,
-            signal: {
-              type: 'offer',
-              sdp: offer.sdp,
-            },
-          });
-        } catch (e) {
-          console.error('Error creating offer for peer:', peer.socketId, e);
-        }
+        await initiateOffer(peer.socketId, peer);
       }
     };
 
     // Step D: A new peer joined the room
-    const onUserJoined = (newPeer: any) => {
+    const onUserJoined = (newPeer: MeetingPeerInfo) => {
+      createPeerConnection(newPeer.socketId, newPeer);
       setRemotePeers((prev) => ({
         ...prev,
         [newPeer.socketId]: {
@@ -530,6 +582,7 @@ export default function MeetingsPage() {
           isHandRaised: newPeer.isHandRaised,
         },
       }));
+      void initiateOffer(newPeer.socketId, newPeer);
     };
 
     // Step E: Handle incoming WebRTC signaling (Offer / Answer / Candidate)
@@ -539,7 +592,7 @@ export default function MeetingsPage() {
     }: {
       fromSocketId: string;
       userId: string;
-      signal: any;
+      signal: MeetingSignal;
     }) => {
       const previous = signalQueuesRef.current[fromSocketId] || Promise.resolve();
       const current = previous.catch(() => undefined).then(async () => {
@@ -552,6 +605,11 @@ export default function MeetingsPage() {
           }
           if (pc) {
             if (typeof signal.sdp !== 'string') throw new Error('Meeting offer did not include a valid SDP string.');
+            const offerCollision = makingOfferPeers.has(fromSocketId) || pc.signalingState !== 'stable';
+            const localSocketId = socket.id;
+            const polite = typeof localSocketId === 'string' && localSocketId > fromSocketId;
+            if (offerCollision && !polite) return;
+            if (offerCollision) await pc.setLocalDescription({ type: 'rollback' });
             await pc.setRemoteDescription({ type: 'offer', sdp: signal.sdp });
             if (process.env.NODE_ENV === 'development') {
               console.debug('[Meeting WebRTC] Remote description applied: offer');
@@ -597,7 +655,8 @@ export default function MeetingsPage() {
           }
         }
       }).catch((error: unknown) => {
-        console.error('Error processing meeting signal from peer:', fromSocketId, error);
+        console.error('[Meeting WebRTC] Signal negotiation failed.', error);
+        setRtcWarning('A meeting participant’s media connection could not be negotiated. Check the network and try rejoining.');
       });
       signalQueuesRef.current[fromSocketId] = current;
     };
@@ -608,7 +667,12 @@ export default function MeetingsPage() {
       isMicOn: peerMic,
       isCamOn: peerCam,
       isScreenSharing: peerScreen,
-    }: any) => {
+    }: {
+      socketId: string;
+      isMicOn?: boolean;
+      isCamOn?: boolean;
+      isScreenSharing?: boolean;
+    }) => {
       setRemotePeers((prev) => {
         if (!prev[socketId]) return prev;
         return {
@@ -624,7 +688,7 @@ export default function MeetingsPage() {
     };
 
     // Step G: Hand raise changed
-    const onHandRaiseChanged = ({ socketId, isHandRaised: hr }: any) => {
+    const onHandRaiseChanged = ({ socketId, isHandRaised: hr }: { socketId: string; isHandRaised: boolean }) => {
       setRemotePeers((prev) => {
         if (!prev[socketId]) return prev;
         return {
@@ -647,6 +711,8 @@ export default function MeetingsPage() {
       }
       delete signalQueuesRef.current[socketId];
       delete pendingMeetingCandidatesRef.current[socketId];
+      initiatedOfferPeers.delete(socketId);
+      makingOfferPeers.delete(socketId);
       setRemotePeers((prev) => {
         const next = { ...prev };
         delete next[socketId];
@@ -675,10 +741,13 @@ export default function MeetingsPage() {
     };
     const onSocketDisconnect = () => {
       joinedSocketId = null;
+      setRtcWarning('Meeting signaling disconnected. Reconnecting…');
       Object.values(peersRef.current).forEach((pc) => pc.close());
       peersRef.current = {};
       signalQueuesRef.current = {};
       pendingMeetingCandidatesRef.current = {};
+      initiatedOfferPeers.clear();
+      makingOfferPeers.clear();
       setRemotePeers({});
     };
 
@@ -720,6 +789,8 @@ export default function MeetingsPage() {
       peersRef.current = {};
       signalQueuesRef.current = {};
       pendingMeetingCandidatesRef.current = {};
+      initiatedOfferPeers.clear();
+      makingOfferPeers.clear();
       setRemotePeers({});
     };
   }, [activeMeeting, createPeerConnection, meetingGrant]);
@@ -1050,6 +1121,7 @@ export default function MeetingsPage() {
             </button>}
           </div>
         </div>
+        {rtcWarning && <p role="status" className="border-b border-amber-500/20 bg-amber-500/10 px-4 py-2 text-xs text-amber-200 lg:hidden">{rtcWarning}</p>}
 
         {/* Video Grid & Drawer */}
         <div className="relative flex min-h-0 flex-1 overflow-hidden">

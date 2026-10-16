@@ -13,6 +13,7 @@ export interface ICallSession extends Document {
   expiresAt: Date;
   answeredAt?: Date;
   acceptedAt?: Date;
+  lastSocketActivityAt?: Date;
   endedAt?: Date;
   durationSeconds?: number;
   crmContactId?: mongoose.Types.ObjectId;
@@ -28,6 +29,7 @@ const CallSessionSchema = new Schema<ICallSession>({
   expiresAt: { type: Date, required: true },
   answeredAt: Date,
   acceptedAt: Date,
+  lastSocketActivityAt: Date,
   endedAt: Date,
   durationSeconds: { type: Number, min: 0 },
   crmContactId: { type: Schema.Types.ObjectId, ref: 'CrmContact' },

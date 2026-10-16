@@ -16,6 +16,11 @@ import { getAllowedClientOrigins } from './clientOrigins';
 import { verifyCallSessionToken } from '../services/callSessionToken';
 import { getCompanySubscription, getEffectiveSubscription } from '../services/companySubscription';
 import { isAcademicOrganizationType, isOrganizationRoleEligible, roleMatches } from '../config/organization';
+import {
+  CALL_RECONNECT_GRACE_MS,
+  clearCallReconnectCleanup,
+  scheduleCallReconnectCleanup,
+} from './callReconnect';
 import type { OrganizationFeature } from '../middleware/organizationAccess';
 import {
   canSocketAccessFeature,
@@ -52,6 +57,7 @@ type PresenceStatus = 'online' | 'away' | 'busy' | 'offline';
 
 const MEETING_LINK_TTL_MS = 24 * 60 * 60 * 1000;
 const GLOBAL_CALLING_ROOM = 'calling:eligible';
+const callReconnectKey = (sessionId: string, userId: string) => `${sessionId}:${userId}`;
 
 const userRoom = (userId: string) => `user:${userId}`;
 const userFeatureRoom = (userId: string, feature: OrganizationFeature) => `user:${userId}:feature:${feature}`;
@@ -129,6 +135,7 @@ export async function ensureSocketAdapterReady(): Promise<void> {
 export async function terminateGlobalCall(
   sessionId: string,
   status: GlobalCallTerminalStatus,
+  disconnectedBefore?: Date,
 ): Promise<boolean> {
   const session = await CallSession.findOne({ sessionId, status: { $in: ['ringing', 'accepted'] } })
     .select('callerId calleeId acceptedAt answeredAt status');
@@ -137,7 +144,11 @@ export async function terminateGlobalCall(
   const endedAt = new Date();
   const answeredAt = session.answeredAt || session.acceptedAt;
   const ended = await CallSession.findOneAndUpdate(
-    { _id: session._id, status: session.status },
+    {
+      _id: session._id,
+      status: session.status,
+      ...(disconnectedBefore ? { lastSocketActivityAt: { $lte: disconnectedBefore } } : {}),
+    },
     {
       $set: {
         status,
@@ -157,6 +168,60 @@ export async function terminateGlobalCall(
     publishUserPresence(ended.calleeId.toString()),
   ]);
   return true;
+}
+
+async function markCallSocketActivity(sessionId: string, userId: string): Promise<void> {
+  await CallSession.updateOne(
+    {
+      sessionId,
+      status: { $in: ['ringing', 'accepted'] },
+      $or: [{ callerId: userId }, { calleeId: userId }],
+    },
+    { $set: { lastSocketActivityAt: new Date() } },
+  );
+}
+
+function scheduleDisconnectedCallCleanup(sessionId: string, userId: string): void {
+  const key = callReconnectKey(sessionId, userId);
+  scheduleCallReconnectCleanup(key, async () => {
+    try {
+      const activeSockets = await io.in(`call:${sessionId}`).fetchSockets();
+      if (activeSockets.some((activeSocket) => activeSocket.data.userId === userId)) return;
+
+      const disconnectedBefore = new Date(Date.now() - CALL_RECONNECT_GRACE_MS);
+      const session = await CallSession.findOne({
+        sessionId,
+        status: { $in: ['ringing', 'accepted'] },
+        lastSocketActivityAt: { $lte: disconnectedBefore },
+      }).select('callerId calleeId status');
+      if (!session) return;
+
+      const status: GlobalCallTerminalStatus = session.status === 'accepted'
+        ? 'completed'
+        : session.callerId.toString() === userId ? 'cancelled' : 'missed';
+      await terminateGlobalCall(sessionId, status, disconnectedBefore);
+    } catch (error) {
+      const errorName = error instanceof Error ? error.name : 'UnknownError';
+      console.error('[Socket] Failed to finalize disconnected call after reconnect grace period.', {
+        sessionId,
+        errorName,
+      });
+    }
+  }, CALL_RECONNECT_GRACE_MS);
+}
+
+async function finalizeStaleDisconnectedCalls(userId: string): Promise<void> {
+  const disconnectedBefore = new Date(Date.now() - CALL_RECONNECT_GRACE_MS);
+  const sessions = await CallSession.find({
+    status: 'accepted',
+    lastSocketActivityAt: { $lte: disconnectedBefore },
+    $or: [{ callerId: userId }, { calleeId: userId }],
+  }).select('sessionId');
+
+  for (const session of sessions) {
+    if (await hasCallSessionSockets(session.sessionId)) continue;
+    await terminateGlobalCall(session.sessionId, 'completed', disconnectedBefore);
+  }
 }
 
 function toCallingAvailability(status: PresenceStatus): 'offline' | 'busy' | 'away' | 'available' {
@@ -585,6 +650,10 @@ export const initSocket = (server: HTTPServer) => {
 
     const wasOnline = Boolean(socket.data.wasOnline);
     socket.join(userRoom(userId));
+    void finalizeStaleDisconnectedCalls(userId).catch((error: unknown) => {
+      const errorName = error instanceof Error ? error.name : 'UnknownError';
+      console.error('[Socket] Failed to recover stale call state after reconnect.', { errorName });
+    });
     if (hasSocketFeature(socket, 'companyWorkspace')) {
       socket.join(`company:${companyId}`);
       if (!wasOnline) io.to(`company:${companyId}`).emit('user:online', { userId });
@@ -872,7 +941,9 @@ export const initSocket = (server: HTTPServer) => {
         const existingSockets = await io.in(room).fetchSockets();
         const allowedPeerId = isCaller ? session.calleeId.toString() : session.callerId.toString();
         if (existingSockets.length > 1 || existingSockets.some((peer) => peer.data.userId !== allowedPeerId)) return;
+        await markCallSocketActivity(sessionId, userId);
         await socket.join(room);
+        clearCallReconnectCleanup(callReconnectKey(sessionId, userId));
         socket.data.callSessionIds ??= new Set<string>();
         (socket.data.callSessionIds as Set<string>).add(sessionId);
         const joinedSockets = await io.in(room).fetchSockets();
@@ -930,7 +1001,14 @@ export const initSocket = (server: HTTPServer) => {
       const room = typeof sessionId === 'string' ? `call:${sessionId}` : '';
       if (!room || !(socket.data.callSessionIds instanceof Set) || !socket.data.callSessionIds.has(sessionId!)) return;
       socket.data.callSessionIds.delete(sessionId!);
-      socket.leave(room);
+      await socket.leave(room);
+      try {
+        await markCallSocketActivity(sessionId!, userId);
+        scheduleDisconnectedCallCleanup(sessionId!, userId);
+      } catch (error) {
+        const errorName = error instanceof Error ? error.name : 'UnknownError';
+        console.error('[Socket] Failed to schedule call cleanup after participant left.', { sessionId, errorName });
+      }
     });
 
     // Track & broadcast media state (mic, cam, screen share)
@@ -1047,20 +1125,11 @@ export const initSocket = (server: HTTPServer) => {
         : [];
       for (const sessionId of callSessionIds) {
         try {
-          const room = `call:${sessionId}`;
-          const peers = await io.in(room).fetchSockets();
-          if (peers.some((peer) => peer.data.userId === userId)) continue;
-          const session = await CallSession.findOne({
-            sessionId,
-            status: { $in: ['ringing', 'accepted'] },
-          }).select('callerId calleeId status');
-          if (!session) continue;
-          const status: GlobalCallTerminalStatus = session.status === 'accepted'
-            ? 'completed'
-            : session.callerId.toString() === userId ? 'cancelled' : 'missed';
-          await terminateGlobalCall(sessionId, status);
+          await markCallSocketActivity(sessionId, userId);
+          scheduleDisconnectedCallCleanup(sessionId, userId);
         } catch (error) {
-          console.error('[Socket] Failed to finalize disconnected call:', error);
+          const errorName = error instanceof Error ? error.name : 'UnknownError';
+          console.error('[Socket] Failed to schedule cleanup for disconnected call.', { sessionId, errorName });
         }
       }
       void publishUserPresence(userId);

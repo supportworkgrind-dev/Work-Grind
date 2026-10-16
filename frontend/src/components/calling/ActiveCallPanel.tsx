@@ -3,8 +3,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { Activity, LoaderCircle, Mic, MicOff, PhoneOff, ShieldCheck, Video, VideoOff, Volume2, VolumeX } from 'lucide-react';
 import { Avatar } from '@/components/common/Avatar';
+import { api } from '@/lib/api';
 import { getSocket } from '@/lib/socket';
 import { getRtcConfiguration, logRtcIceDiagnostics } from '@/lib/rtcConfig';
+import { getApiErrorMessage } from '@/lib/getApiErrorMessage';
 import { useAuthStore } from '@/store/useAuthStore';
 import type { ActiveCall } from '@/store/useCallingStore';
 
@@ -34,6 +36,8 @@ export function ActiveCallPanel({ call, onHangUp }: { call: ActiveCall; onHangUp
     let offerStarted = false;
     let signalQueue = Promise.resolve();
     let disconnectedTimer: number | undefined;
+    let joinedSocketId: string | null = null;
+    let joinAttempt = 0;
     const pendingCandidates: RTCIceCandidateInit[] = [];
 
     const emitSignal = (
@@ -68,9 +72,33 @@ export function ActiveCallPanel({ call, onHangUp }: { call: ActiveCall; onHangUp
       }
     };
 
-    const joinCallRoom = () => socket.emit('call:join', { sessionId: call.sessionId, sessionToken: call.sessionToken });
+    const joinCallRoom = async () => {
+      const socketId = socket.id;
+      if (disposed || !socket.connected || !socketId || joinedSocketId === socketId) return;
+      joinedSocketId = socketId;
+      const attempt = ++joinAttempt;
+      try {
+        const response = await api.post<{
+          success: boolean;
+          sessionId: string;
+          sessionToken: string;
+        }>(`/calls/${encodeURIComponent(call.sessionId)}/token`);
+        const { success, sessionId, sessionToken } = response.data;
+        if (!success || sessionId !== call.sessionId || typeof sessionToken !== 'string') {
+          throw new Error('Call authorization could not be refreshed.');
+        }
+        if (disposed || attempt !== joinAttempt || !socket.connected || socket.id !== socketId) return;
+        socket.emit('call:join', { sessionId, sessionToken });
+      } catch (error: unknown) {
+        if (disposed || attempt !== joinAttempt) return;
+        joinedSocketId = null;
+        setMediaError(getApiErrorMessage(error, 'Call authorization could not be refreshed. Please end the call and start again.'));
+      }
+    };
     const onJoined = ({ sessionId, peerPresent }: { sessionId: string; peerPresent: boolean }) => {
-      if (sessionId === call.sessionId && peerPresent) void createOffer();
+      if (sessionId !== call.sessionId) return;
+      setNetworkWarning((warning) => warning.startsWith('Call signaling disconnected') ? '' : warning);
+      if (peerPresent) void createOffer();
     };
     const onPeerReady = ({ sessionId }: { sessionId: string }) => {
       if (sessionId === call.sessionId) void createOffer();
@@ -109,6 +137,14 @@ export function ActiveCallPanel({ call, onHangUp }: { call: ActiveCall; onHangUp
       }).catch(() => {
         if (!disposed) setMediaError('The secure audio connection was interrupted.');
       });
+    };
+    const onDisconnect = () => {
+      joinedSocketId = null;
+      joinAttempt += 1;
+      setNetworkWarning('Call signaling disconnected. Reconnecting…');
+    };
+    const onCallError = ({ message }: { message?: unknown }) => {
+      setMediaError(typeof message === 'string' ? message : 'Call signaling could not be completed.');
     };
 
     const setupMedia = async () => {
@@ -233,7 +269,9 @@ export function ActiveCallPanel({ call, onHangUp }: { call: ActiveCall; onHangUp
         socket.on('call:joined', onJoined);
         socket.on('call:peer-ready', onPeerReady);
         socket.on('call:signal', onSignal);
+        socket.on('call:error', onCallError);
         socket.on('connect', joinCallRoom);
+        socket.on('disconnect', onDisconnect);
         if (socket.connected) joinCallRoom();
       } catch (error) {
         setMediaError(error instanceof Error
@@ -251,7 +289,10 @@ export function ActiveCallPanel({ call, onHangUp }: { call: ActiveCall; onHangUp
       socket.off('call:joined', onJoined);
       socket.off('call:peer-ready', onPeerReady);
       socket.off('call:signal', onSignal);
+      socket.off('call:error', onCallError);
       socket.off('connect', joinCallRoom);
+      socket.off('disconnect', onDisconnect);
+      joinAttempt += 1;
       socket.emit('call:leave', { sessionId: call.sessionId });
       peer?.close();
       localStreamRef.current?.getTracks().forEach((track) => track.stop());
@@ -261,7 +302,7 @@ export function ActiveCallPanel({ call, onHangUp }: { call: ActiveCall; onHangUp
       if (localVideoRef.current) localVideoRef.current.srcObject = null;
       if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
     };
-  }, [call.sessionId, call.sessionToken, call.direction, call.status]);
+  }, [call.sessionId, call.direction, call.status]);
 
   function toggleMute() {
     const nextMuted = !muted;
