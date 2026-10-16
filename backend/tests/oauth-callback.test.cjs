@@ -84,6 +84,30 @@ test('LinkedIn callback rejects a missing or mismatched browser state cookie bef
   assert.equal(new URL(response.redirects[0].url).searchParams.get('error'), 'attempt_expired');
 });
 
+test('OAuth callback rejects missing or malformed state before transaction lookup', async (context) => {
+  let transactionLookups = 0;
+  OAuthTransaction.findOneAndDelete = async () => {
+    transactionLookups += 1;
+    return null;
+  };
+  context.after(() => { OAuthTransaction.findOneAndDelete = originalFindOneAndDelete; });
+
+  for (const state of ['', 'not a valid state']) {
+    const request = callbackRequest(state);
+    request.query.state = state;
+    const response = responseMock();
+    await completeOAuthCallback(request, response);
+
+    const destination = new URL(response.redirects[0].url);
+    assert.equal(destination.searchParams.get('error'), 'invalid_request');
+    assert.match(
+      destination.searchParams.get('supportId'),
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+    );
+  }
+  assert.equal(transactionLookups, 0);
+});
+
 test('OAuth signup cancellation returns to the selected workspace details step', async (context) => {
   process.env.CLIENT_URL = 'https://frontend.example.test';
   const selections = [
