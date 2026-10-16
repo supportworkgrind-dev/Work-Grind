@@ -1,51 +1,94 @@
-import Redis from 'ioredis';
+import { Redis } from '@upstash/redis';
 
 export interface RedisCommands {
   get(key: string): Promise<string | null>;
   set(key: string, value: string, expiryMode: 'EX', ttlSeconds: number): Promise<unknown>;
   del(key: string): Promise<number>;
+  decr(key: string): Promise<number>;
   ping(): Promise<string>;
-  status?: string;
-  connect?(): Promise<void>;
+  eval(script: string, keys: string[], args: string[]): Promise<unknown>;
 }
 
-const connectTimeoutMs = 1_000;
+type RedisConfiguration = {
+  url: string;
+  token: string;
+};
+
 const operationTimeoutMs = 350;
-let client: Redis | null = null;
+let client: RedisCommands | null = null;
 let initializationFailed = false;
 let missingConfigurationLogged = false;
 
-export function getRedisClient(): Redis | null {
-  const url = process.env.REDIS_URL?.trim();
-  if (!url || initializationFailed) {
-    if (!url && !missingConfigurationLogged) {
-      console.info('[Redis] REDIS_URL is not configured; using MongoDB-backed operations.');
+function getRedisConfiguration(): RedisConfiguration | null {
+  const url = process.env.UPSTASH_REDIS_REST_URL?.trim();
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN?.trim();
+  if (!url || !token) return null;
+
+  try {
+    if (new URL(url).protocol !== 'https:') return null;
+  } catch {
+    return null;
+  }
+  return { url, token };
+}
+
+export function isRedisConfigured(): boolean {
+  return getRedisConfiguration() !== null;
+}
+
+export class UpstashRedisCommands implements RedisCommands {
+  constructor(private readonly redis: Redis) {}
+
+  async get(key: string): Promise<string | null> {
+    return this.redis.get<string>(key);
+  }
+
+  set(key: string, value: string, expiryMode: 'EX', ttlSeconds: number): Promise<unknown> {
+    if (expiryMode !== 'EX') throw new Error('Unsupported Redis expiry mode.');
+    return this.redis.set(key, value, { ex: ttlSeconds });
+  }
+
+  del(key: string): Promise<number> {
+    return this.redis.del(key);
+  }
+
+  decr(key: string): Promise<number> {
+    return this.redis.decr(key);
+  }
+
+  ping(): Promise<string> {
+    return this.redis.ping();
+  }
+
+  eval(script: string, keys: string[], args: string[]): Promise<unknown> {
+    return this.redis.eval(script, keys, args);
+  }
+}
+
+export function getRedisClient(): RedisCommands | null {
+  if (initializationFailed) return null;
+  if (client) return client;
+
+  const configuration = getRedisConfiguration();
+  if (!configuration) {
+    if (!missingConfigurationLogged) {
+      console.info('[Redis] A valid UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN are required for Redis operations.');
       missingConfigurationLogged = true;
     }
     return null;
   }
-  if (client?.status === 'end') client = null;
-  if (client) return client;
 
   try {
-    client = new Redis(url, {
-      lazyConnect: true,
-      enableOfflineQueue: false,
-      maxRetriesPerRequest: 1,
-      connectTimeout: connectTimeoutMs,
-      retryStrategy: (attempt) => Math.min(attempt * 250, 5_000),
-      autoResendUnfulfilledCommands: false,
+    const upstash = new Redis({
+      ...configuration,
+      automaticDeserialization: false,
+      retry: { retries: 0 },
     });
-    client.on('error', (error: NodeJS.ErrnoException) => {
-      console.warn('[Redis] Connection error.', {
-        errorName: error.name || 'RedisError',
-        code: error.code,
-      });
-    });
+    client = new UpstashRedisCommands(upstash);
     return client;
   } catch (error) {
     initializationFailed = true;
-    console.warn('[Redis] Client initialization failed.', {
+    console.warn('[Redis] Upstash client initialization failed.', {
       errorName: error instanceof Error ? error.name : 'UnknownError',
     });
     return null;
@@ -55,15 +98,8 @@ export function getRedisClient(): Redis | null {
 export const REDIS_OPERATION_TIMEOUT_MS = operationTimeoutMs;
 
 export async function closeRedisClient(): Promise<void> {
-  const current = client;
   client = null;
-  if (!current || current.status === 'end') return;
-
-  try {
-    await withRedisTimeout(current.quit(), 1_500);
-  } catch {
-    current.disconnect();
-  }
+  initializationFailed = false;
 }
 
 export function withRedisTimeout<T>(operation: Promise<T>, timeoutMs = operationTimeoutMs): Promise<T> {
@@ -91,19 +127,14 @@ export interface RedisHealth {
 }
 
 export async function checkRedisHealth(redisClient: RedisCommands | null = getRedisClient()): Promise<RedisHealth> {
-  const configured = Boolean(process.env.REDIS_URL?.trim());
+  const configured = isRedisConfigured();
   if (!redisClient) {
     return { configured, status: 'disconnected', ping: configured ? 'failed' : 'not_configured', latencyMs: null };
   }
 
   const startedAt = Date.now();
   try {
-    const result = await withRedisTimeout((async () => {
-      if (redisClient.status === 'wait' && redisClient.connect) {
-        await redisClient.connect();
-      }
-      return redisClient.ping();
-    })(), 1_500);
+    const result = await withRedisTimeout(redisClient.ping(), 1_500);
     if (result !== 'PONG') {
       return { configured, status: 'disconnected', ping: 'failed', latencyMs: null };
     }

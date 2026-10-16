@@ -1,7 +1,6 @@
 import rateLimit, { Store } from 'express-rate-limit';
 import { Request, Response } from 'express';
-import Redis from 'ioredis';
-import { getRedisClient, withRedisTimeout } from '../config/redis';
+import { getRedisClient, withRedisTimeout, type RedisCommands } from '../config/redis';
 
 type RateLimiterOptions = {
   message?: Record<string, unknown>;
@@ -28,54 +27,56 @@ export class RedisRateLimitStore implements Store {
   readonly prefix: string;
 
   constructor(
-    private readonly redis: Redis,
+    private readonly redis: RedisCommands,
     private readonly windowMs: number,
     keyPrefix: string,
   ) {
     this.prefix = keyPrefix;
   }
 
-  private async ensureConnected(): Promise<void> {
-    if (this.redis.status === 'wait') await this.redis.connect();
-  }
-
   async increment(key: string): Promise<{ totalHits: number; resetTime: Date }> {
     const redisKey = `${this.prefix}:${key}`;
-    const result = await withRedisTimeout((async () => {
-      await this.ensureConnected();
-      return this.redis.eval(incrementScript, 1, redisKey, String(this.windowMs)) as Promise<[number, number]>;
-    })(), 1_500);
+    const result = await withRedisTimeout(
+      this.redis.eval(incrementScript, [redisKey], [String(this.windowMs)]),
+      1_500,
+    );
+    if (!Array.isArray(result) || result.length !== 2) {
+      throw new Error('Redis rate-limit increment returned an invalid response.');
+    }
     const [totalHits, ttl] = result.map(Number);
+    if (!Number.isFinite(totalHits) || !Number.isFinite(ttl) || ttl < 0) {
+      throw new Error('Redis rate-limit increment returned invalid counters.');
+    }
     return { totalHits, resetTime: new Date(Date.now() + ttl) };
   }
 
   async decrement(key: string): Promise<void> {
     const redisKey = `${this.prefix}:${key}`;
     await withRedisTimeout((async () => {
-      await this.ensureConnected();
       const hits = await this.redis.decr(redisKey);
       if (hits <= 0) await this.redis.del(redisKey);
     })(), 1_500);
   }
 
   async resetKey(key: string): Promise<void> {
-    await withRedisTimeout((async () => {
-      await this.ensureConnected();
-      await this.redis.del(`${this.prefix}:${key}`);
-    })(), 1_500);
+    await withRedisTimeout(this.redis.del(`${this.prefix}:${key}`), 1_500);
   }
 }
 
-export const rateLimiter = (windowMin: number, max: number, options: RateLimiterOptions = {}) => {
+export const rateLimiter = (
+  windowMin: number,
+  max: number,
+  options: RateLimiterOptions = {},
+  redisClient: RedisCommands | null = getRedisClient(),
+) => {
   const windowMs = windowMin * 60 * 1000;
-  const redis = getRedisClient();
   const { allowInMemoryOnVercel = false, ...rateLimitOptions } = options;
   let store: Store | undefined;
-  if (redis) {
-    store = new RedisRateLimitStore(redis, windowMs, `workgrind:rate-limit:${++storeSequence}`);
+  if (redisClient) {
+    store = new RedisRateLimitStore(redisClient, windowMs, `workgrind:rate-limit:${++storeSequence}`);
   } else if (process.env.VERCEL === '1' && !allowInMemoryOnVercel) {
     if (!missingRedisWarningLogged) {
-      console.error('[Rate limit] REDIS_URL is required on Vercel; rate-limited requests will fail closed until configured.');
+      console.error('[Rate limit] UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN are required on Vercel; rate-limited requests will fail closed until configured.');
       missingRedisWarningLogged = true;
     }
     return (_req: Request, res: Response) => res.status(503).json({
@@ -83,10 +84,10 @@ export const rateLimiter = (windowMin: number, max: number, options: RateLimiter
       code: 'RATE_LIMIT_UNAVAILABLE',
       message: 'Request protection is temporarily unavailable. Please retry later.',
     });
-  } else if (!redis && !missingRedisWarningLogged) {
+  } else if (!redisClient && !missingRedisWarningLogged) {
     const message = process.env.VERCEL === '1'
       ? '[Rate limit] In-memory rate limiting is enabled only for explicitly exempted health checks.'
-      : '[Rate limit] REDIS_URL is not configured; local development uses process-local rate limits.';
+      : '[Rate limit] Upstash is not configured; local development uses process-local rate limits.';
     console.warn(message);
     missingRedisWarningLogged = true;
   }
