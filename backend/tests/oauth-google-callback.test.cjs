@@ -5,11 +5,14 @@ const OAuthTransaction = require('../dist/models/OAuthTransaction').default;
 const OAuthExchange = require('../dist/models/OAuthExchange').default;
 const User = require('../dist/models/User').default;
 const { completeOAuthCallback, exchangeOAuthSession } = require('../dist/controllers/oauth.controller');
+const authController = require('../dist/controllers/auth.controller');
 
 const originalFindOneAndDelete = OAuthTransaction.findOneAndDelete;
 const originalExchangeFindOneAndDelete = OAuthExchange.findOneAndDelete;
 const originalExchangeCreate = OAuthExchange.create;
 const originalUserFindOne = User.findOne;
+const originalUserFindById = User.findById;
+const originalSessionForUser = authController.sessionForUser;
 
 function configureGoogle() {
   process.env.NODE_ENV = 'production';
@@ -49,6 +52,10 @@ function callbackResponse() {
     status(code) { this.statusCode = code; return this; },
     json(body) { this.body = body; return this; },
     redirect(status, url) { this.redirects.push({ status, url }); return this; },
+    cookie(name, value, options) {
+      this.cookies = [...(this.cookies || []), { name, value, options }];
+      return this;
+    },
   };
 }
 
@@ -212,4 +219,52 @@ test('OAuth session exchange rejects malformed attempt IDs before querying excha
   assert.equal(response.statusCode, 400);
   assert.equal(response.body.code, 'OAUTH_CODE_INVALID');
   assert.equal(lookupCount, 0);
+});
+
+test('OAuth session exchange creates a verified-user session and refresh cookie', async (context) => {
+  const correlationId = 'a522db08-4b6f-44f6-8b8d-08670e89934f';
+  const accessToken = 'workgrind-access-token';
+  const refreshToken = 'workgrind-refresh-token';
+  OAuthExchange.findOneAndDelete = async (query) => {
+    assert.equal(query.correlationId, correlationId);
+    return {
+      correlationId,
+      audience: 'user',
+      userId: { toString: () => 'verified-user-id' },
+      returnTo: '/dashboard',
+    };
+  };
+  User.findById = async (id) => {
+    assert.equal(id.toString(), 'verified-user-id');
+    return {
+      isActive: true,
+      isDeleted: false,
+      isVerified: true,
+      isSuperAdmin: false,
+      mfaEnabled: false,
+    };
+  };
+  authController.sessionForUser = async () => ({
+    accessToken,
+    refreshToken,
+    user: { _id: 'verified-user-id' },
+  });
+  context.after(() => {
+    OAuthExchange.findOneAndDelete = originalExchangeFindOneAndDelete;
+    User.findById = originalUserFindById;
+    authController.sessionForUser = originalSessionForUser;
+  });
+
+  const response = callbackResponse();
+  await exchangeOAuthSession({
+    body: { code: 'a'.repeat(32), attemptId: correlationId },
+  }, response);
+
+  assert.equal(response.body.success, true);
+  assert.equal(response.body.accessToken, accessToken);
+  assert.equal(response.body.user._id, 'verified-user-id');
+  assert.equal(response.body.returnTo, '/dashboard');
+  assert.deepEqual(response.cookies.map(({ name, value }) => ({ name, value })), [
+    { name: 'wg_refresh', value: refreshToken },
+  ]);
 });
