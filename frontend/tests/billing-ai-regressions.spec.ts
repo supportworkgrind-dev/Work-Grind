@@ -414,11 +414,15 @@ test('a protected request without an access token recovers through the refresh c
   });
   await page.goto('/billing');
   await expect(page.getByRole('heading', { name: 'Workspace Subscription', exact: true })).toBeVisible();
+  await expect.poll(() => state.subscriptionRequests.length).toBeGreaterThan(0);
+  await page.waitForTimeout(500);
+  const initialSubscriptionRequests = state.subscriptionRequests.length;
   await page.evaluate(() => sessionStorage.removeItem('workgrind_access_token'));
 
   await page.getByRole('button', { name: 'Refresh' }).click();
 
-  await expect.poll(() => state.subscriptionRequests.length).toBeGreaterThan(1);
+  await expect.poll(() => state.subscriptionRequests.length).toBeGreaterThan(initialSubscriptionRequests);
+  await expect.poll(() => refreshRequests.length).toBe(1);
   expect(missingTokenRequests).toEqual(['']);
   expect(refreshRequests).toHaveLength(1);
 });
@@ -478,7 +482,6 @@ test('concurrent expired API requests share one refresh and preserve the current
 });
 
 test('login 401 is not retried with a stale access token', async ({ page }) => {
-  await setSessionAuth(page);
   const refreshRequests: number[] = [];
   let loginRequests = 0;
   await page.route('**/api/**', async (route) => {
@@ -496,17 +499,22 @@ test('login 401 is not retried with a stale access token', async ({ page }) => {
       ...makeApiState(),
       failSubscriptionRequestAt: undefined,
       failFirstAgentRequest: false,
+      refreshStatus: 401,
       refreshRequests,
     });
   });
   await page.goto('/login');
-  await page.getByLabel('Work email').fill('invalid@example.invalid');
+  await page.getByLabel('Email address').fill('invalid@example.invalid');
+  await expect.poll(() => refreshRequests.length).toBe(1);
+  await page.evaluate(() => {
+    sessionStorage.setItem('workgrind_access_token', 'playwright-stale-access');
+  });
   await page.locator('#login-password').fill('not-a-real-secret');
   await page.getByRole('button', { name: /Sign in to WorkGrind/ }).click();
 
-  await expect(page.getByRole('alert')).toContainText('Invalid credentials.');
+  await expect(page.locator('.auth-error[role="alert"]')).toContainText('Invalid credentials.');
   expect(loginRequests).toBe(1);
-  expect(refreshRequests).toHaveLength(0);
+  expect(refreshRequests).toHaveLength(1);
   await expect(page).toHaveURL(/\/login$/);
 });
 
@@ -534,7 +542,7 @@ test('logout does not refresh a session after its logout request is rejected', a
   });
   await page.goto('/ai');
   await expect(page.getByPlaceholder(/Ask me to find tasks/)).toBeVisible();
-  await page.locator('button[aria-haspopup="menu"]').click();
+  await page.locator('aside button[aria-haspopup="menu"]').click();
   await page.getByRole('menuitem', { name: 'Sign out' }).click();
 
   await expect(page).toHaveURL(/\/login\?redirect=/);

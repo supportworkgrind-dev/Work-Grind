@@ -125,6 +125,11 @@ api.interceptors.response.use(
         }
         return Promise.reject(error);
       }
+      if (!currentToken && !requestToken && process.env.NODE_ENV !== 'production') {
+        console.warn('[Auth] Protected request was rejected without an access token; attempting cookie refresh.', {
+          path: failedPath,
+        });
+      }
       originalRequest._retry = true;
       if (failedPath.endsWith('/auth/me')) {
         console.info('[Auth] Refreshing an access token after current-user request was rejected.', {
