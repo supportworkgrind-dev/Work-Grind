@@ -116,11 +116,11 @@ api.interceptors.response.use(
     ) {
       const requestToken = originalRequest.headers?.Authorization;
       const currentToken = getAuthValue('workgrind_access_token');
-      if (!currentToken || requestToken !== `Bearer ${currentToken}`) {
+      if (requestToken && (!currentToken || requestToken !== `Bearer ${currentToken}`)) {
         if (failedPath.endsWith('/auth/me')) {
           console.warn('[Auth] Current-user request rejected; refresh was not attempted.', {
             path: failedPath,
-            reason: !currentToken ? 'access_token_missing' : 'session_token_changed',
+            reason: 'session_token_changed',
           });
         }
         return Promise.reject(error);

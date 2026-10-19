@@ -380,6 +380,44 @@ test('Tavro remains on the same route when /auth/me recovers through refresh', a
   expect(currentUserTokens.slice(1).every((token) => token === 'Bearer playwright-refreshed-access')).toBe(true);
 });
 
+test('a protected request without an access token recovers through the refresh cookie', async ({ page }) => {
+  const state = makeApiState();
+  const refreshRequests: number[] = [];
+  const missingTokenRequests: string[] = [];
+  await setSessionAuth(page);
+  await page.route('**/api/**', async (route) => {
+    const request = route.request();
+    const pathname = new URL(request.url()).pathname;
+    if (pathname.endsWith('/subscription/status')) {
+      const authorization = request.headers().authorization ?? '';
+      if (!authorization) {
+        missingTokenRequests.push(authorization);
+        await route.fulfill({
+          status: 401,
+          contentType: 'application/json',
+          body: JSON.stringify({ success: false, message: 'No token provided' }),
+        });
+        return;
+      }
+    }
+    await mockApi(route, {
+      ...state,
+      failSubscriptionRequestAt: undefined,
+      failFirstAgentRequest: false,
+      refreshRequests,
+    });
+  });
+  await page.goto('/billing');
+  await expect(page.getByRole('heading', { name: 'Workspace Subscription', exact: true })).toBeVisible();
+  await page.evaluate(() => sessionStorage.removeItem('workgrind_access_token'));
+
+  await page.getByRole('button', { name: 'Refresh' }).click();
+
+  await expect.poll(() => state.subscriptionRequests.length).toBeGreaterThan(1);
+  expect(missingTokenRequests).toEqual(['']);
+  expect(refreshRequests).toHaveLength(1);
+});
+
 test('an expired or revoked refresh credential leaves a logged-out visitor on the public landing page', async ({ page }) => {
   const refreshRequests: number[] = [];
   const mainFrameNavigations: number[] = [];
