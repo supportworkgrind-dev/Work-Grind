@@ -5,6 +5,7 @@ const OAuthTransaction = require('../dist/models/OAuthTransaction').default;
 const { completeOAuthCallback } = require('../dist/controllers/oauth.controller');
 
 const originalFindOneAndDelete = OAuthTransaction.findOneAndDelete;
+const originalFindOne = OAuthTransaction.findOne;
 
 function responseMock() {
   return {
@@ -26,7 +27,7 @@ function callbackRequest(state, cookieState = state, extraQuery = {}) {
     params: { provider: 'linkedin' },
     query: { state, ...extraQuery },
     body: {},
-    headers: { cookie: cookieState ? `wg_oauth_linkedin_state_${cookieState}=${cookieState}` : '' },
+    headers: { cookie: cookieState ? `wg_oauth_linkedin_state_${state}=${cookieState}` : '' },
     ip: '127.0.0.1',
   };
 }
@@ -68,13 +69,17 @@ test('LinkedIn callback accepts independent per-attempt state cookies for concur
     ))));
 });
 
-test('LinkedIn callback rejects a missing or mismatched browser state cookie before transaction lookup', async (context) => {
+test('LinkedIn callback rejects a missing or mismatched browser state cookie before transaction consumption', async (context) => {
   let transactionLookups = 0;
+  OAuthTransaction.findOne = async () => null;
   OAuthTransaction.findOneAndDelete = async () => {
     transactionLookups += 1;
     return null;
   };
-  context.after(() => { OAuthTransaction.findOneAndDelete = originalFindOneAndDelete; });
+  context.after(() => {
+    OAuthTransaction.findOne = originalFindOne;
+    OAuthTransaction.findOneAndDelete = originalFindOneAndDelete;
+  });
 
   const state = randomBytes(32).toString('base64url');
   const response = responseMock();
