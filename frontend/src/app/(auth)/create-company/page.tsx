@@ -39,6 +39,10 @@ export default function CreateCompanyPage() {
   const canCreateWorkspace = Boolean(user && isAuthenticated && hasAccessToken && !isAuthLoading);
 
   useEffect(() => {
+    void restoreSession();
+  }, [restoreSession]);
+
+  useEffect(() => {
     if (isAuthLoading || authError || canCreateWorkspace) return;
     router.replace(`/login?redirect=${encodeURIComponent('/create-company')}`);
   }, [authError, canCreateWorkspace, isAuthLoading, router]);

@@ -1,0 +1,1 @@
+{"version":10,"type":"context-options","origin":"library","browserName":"","playwrightVersion":"1.64.0","options":{},"platform":"win32","wallTime":1792402550774,"monotonicTime":124008.783,"sdkLanguage":"javascript","title":"billing-ai-regressions.spec.ts:471 › verified signup creates its workspace with the authenticated owner and stores the rotated access token"}

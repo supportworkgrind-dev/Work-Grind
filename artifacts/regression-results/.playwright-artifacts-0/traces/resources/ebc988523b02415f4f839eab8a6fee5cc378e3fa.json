@@ -1,0 +1,1 @@
+{"success":true,"accessToken":"rotated-workspace-access","company":{"_id":"school-workspace","name":"North School","ownerId":"signup-owner","organizationType":"school","accountType":"company"},"user":{"_id":"signup-owner","fullName":"School Owner","email":"school-owner@example.test","role":"owner","accountType":"company","companyId":"school-workspace"}}
