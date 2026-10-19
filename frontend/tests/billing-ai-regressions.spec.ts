@@ -126,7 +126,12 @@ async function mockApi(
           fullName: 'Regression User',
           email: 'regression@example.invalid',
           role: 'owner',
-          companyId: { _id: 'playwright-company', name: 'Regression Workspace' },
+          companyId: {
+            _id: 'playwright-company',
+            name: 'Regression Workspace',
+            organizationType: 'business',
+            accountType: 'company',
+          },
           theme: 'light',
           preferredLanguage: 'en',
         },
