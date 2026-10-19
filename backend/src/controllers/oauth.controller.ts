@@ -96,6 +96,8 @@ const knownOAuthFailures = new Set([
   'provider_already_linked',
   'missing_state',
   'invalid_state_format',
+  'missing_state_cookie',
+  'state_cookie_mismatch',
   'Identity token nonce was invalid.',
   'Identity token claims were invalid.',
   'Identity token signing key was not recognized.',
