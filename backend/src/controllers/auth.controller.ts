@@ -152,6 +152,11 @@ export const sessionForUser = async (user: IUser) => {
       workspaceProfile: user.workspaceProfile,
       accountType: user.accountType,
       signupOrganizationType: user.signupOrganizationType,
+      authProviders: {
+        google: Boolean(user.googleId),
+        apple: Boolean(user.appleId),
+        linkedin: Boolean(user.linkedinId),
+      },
       onboardingStatus: user.onboardingStatus,
       onboardingStep: user.onboardingStep,
       companyId: user.companyId,
@@ -1436,7 +1441,20 @@ export const getMe = async (req: AuthRequest, res: Response): Promise<void> => {
       'Cache-Control': 'private, no-store, no-cache, must-revalidate',
       Vary: 'Authorization',
     });
-    res.json({ success: true, user: await refreshAvatarUrls(user.toObject()), trialDaysRemaining });
+    const userProfile = await refreshAvatarUrls(user.toObject());
+    const authProviders = {
+      google: Boolean(user.googleId),
+      apple: Boolean(user.appleId),
+      linkedin: Boolean(user.linkedinId),
+    };
+    delete userProfile.googleId;
+    delete userProfile.appleId;
+    delete userProfile.linkedinId;
+    res.json({
+      success: true,
+      user: { ...userProfile, authProviders },
+      trialDaysRemaining,
+    });
   } catch (error) {
     const errorCode = (error as { code?: unknown })?.code;
     const safeErrorCode = typeof errorCode === 'number'
