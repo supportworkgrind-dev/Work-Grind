@@ -116,7 +116,7 @@
       "line": 0,
       "specs": [
         {
-          "title": "returning business users go to their existing workspace",
+          "title": "Settings reports Google sign-in only from the backend provider status",
           "ok": true,
           "tags": [],
           "tests": [
@@ -131,12 +131,114 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 39,
+                  "duration": 61,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-19T12:02:45.246Z",
+                  "startTime": "2026-10-19T14:31:58.495Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "94dd336dc752385ec50a-81be399e261d18b5da16",
+          "file": "auth-routing.spec.ts",
+          "line": 6,
+          "column": 5
+        },
+        {
+          "title": "Google sign-in status does not imply a LinkedIn connection",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 35,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-19T14:31:58.548Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "94dd336dc752385ec50a-153d9661e4e56e7aaf42",
+          "file": "auth-routing.spec.ts",
+          "line": 12,
+          "column": 5
+        },
+        {
+          "title": "public signup and OAuth callback routes do not trigger refresh-cookie restoration",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 2,
+                  "status": "passed",
+                  "duration": 71,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-19T14:31:58.540Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "94dd336dc752385ec50a-ca6c1d52cc759d58bc0f",
+          "file": "auth-routing.spec.ts",
+          "line": 16,
+          "column": 5
+        },
+        {
+          "title": "returning business users go to their existing workspace",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 3,
+                  "parallelIndex": 3,
+                  "status": "passed",
+                  "duration": 32,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-19T14:31:58.414Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -146,7 +248,7 @@
           ],
           "id": "94dd336dc752385ec50a-888c43da58d49a1f8e1f",
           "file": "auth-routing.spec.ts",
-          "line": 4,
+          "line": 25,
           "column": 5
         },
         {
@@ -162,15 +264,15 @@
               "projectName": "chromium",
               "results": [
                 {
-                  "workerIndex": 1,
-                  "parallelIndex": 1,
+                  "workerIndex": 3,
+                  "parallelIndex": 3,
                   "status": "passed",
-                  "duration": 72,
+                  "duration": 9,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-19T12:02:44.875Z",
+                  "startTime": "2026-10-19T14:31:58.685Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -180,7 +282,7 @@
           ],
           "id": "94dd336dc752385ec50a-91be313bc231cfa5fae7",
           "file": "auth-routing.spec.ts",
-          "line": 11,
+          "line": 32,
           "column": 5
         },
         {
@@ -196,15 +298,15 @@
               "projectName": "chromium",
               "results": [
                 {
-                  "workerIndex": 2,
-                  "parallelIndex": 2,
+                  "workerIndex": 3,
+                  "parallelIndex": 3,
                   "status": "passed",
-                  "duration": 83,
+                  "duration": 8,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-19T12:02:44.762Z",
+                  "startTime": "2026-10-19T14:31:58.743Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -214,7 +316,7 @@
           ],
           "id": "94dd336dc752385ec50a-d78c4c7f1e08c5bca917",
           "file": "auth-routing.spec.ts",
-          "line": 20,
+          "line": 41,
           "column": 5
         },
         {
@@ -230,15 +332,15 @@
               "projectName": "chromium",
               "results": [
                 {
-                  "workerIndex": 3,
-                  "parallelIndex": 3,
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 81,
+                  "duration": 10,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-19T12:02:45.307Z",
+                  "startTime": "2026-10-19T14:31:58.762Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -248,7 +350,7 @@
           ],
           "id": "94dd336dc752385ec50a-d21e2809df49f4b7b795",
           "file": "auth-routing.spec.ts",
-          "line": 27,
+          "line": 48,
           "column": 5
         },
         {
@@ -264,15 +366,15 @@
               "projectName": "chromium",
               "results": [
                 {
-                  "workerIndex": 2,
-                  "parallelIndex": 2,
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
                   "status": "passed",
-                  "duration": 5,
+                  "duration": 7,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-19T12:02:45.261Z",
+                  "startTime": "2026-10-19T14:31:58.785Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -282,7 +384,7 @@
           ],
           "id": "94dd336dc752385ec50a-4c62049cc7f7fdd73e46",
           "file": "auth-routing.spec.ts",
-          "line": 33,
+          "line": 54,
           "column": 5
         }
       ]
@@ -290,9 +392,9 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-10-19T12:02:34.277Z",
-    "duration": 11622.79,
-    "expected": 5,
+    "startTime": "2026-10-19T14:31:56.246Z",
+    "duration": 2713.707,
+    "expected": 8,
     "skipped": 0,
     "unexpected": 0,
     "flaky": 0
