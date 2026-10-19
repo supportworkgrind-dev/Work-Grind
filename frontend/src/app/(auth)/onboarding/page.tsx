@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/store/useAuthStore';
-import { getSafeReturnPath } from '@/lib/authRedirect';
+import { getAuthenticatedDestination, getSafeReturnPath } from '@/lib/authRedirect';
 import { api } from '@/lib/api';
 import { normalizeTheme, useThemeStore } from '@/lib/themeStore';
 import { getWorkspaceProfile, WORKSPACE_PROFILES, type WorkspaceProfile } from '@/lib/workspaceProfiles';
@@ -81,8 +81,10 @@ export default function OnboardingPage() {
       router.replace(`/login?redirect=${encodeURIComponent('/onboarding')}`);
     } else if (!user.companyId) {
       router.replace('/create-company');
+    } else if (user.onboardingStatus !== 'pending') {
+      router.replace(getAuthenticatedDestination(user, getSafeReturnPath(searchParams.get('redirect'))));
     }
-  }, [hasHydratedAuth, isLoading, router, user]);
+  }, [hasHydratedAuth, isLoading, router, searchParams, user]);
 
   useEffect(() => {
     if (user?.onboardingStatus === 'pending' &&
