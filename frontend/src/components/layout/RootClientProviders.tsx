@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuthStore } from '@/store/useAuthStore';
+import { shouldRestoreSessionOnRoute } from '@/lib/authRoutes';
 import { ArrowUpRight, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
@@ -87,7 +88,7 @@ export function RootClientProviders({ children }: { children: React.ReactNode })
   }, []);
 
   useEffect(() => {
-    if (pathname === '/auth/callback' || pathname === '/client-portal/oauth/callback') return;
+    if (!shouldRestoreSessionOnRoute(pathname)) return;
     if (restoreAttempted.current) return;
     restoreAttempted.current = true;
     void useAuthStore.getState().restoreSession();

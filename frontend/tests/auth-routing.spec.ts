@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { getAuthenticatedDestination } from '../src/lib/authRedirect';
 import { isAuthProviderConnected } from '../src/lib/authProviderStatus';
+import { shouldRestoreSessionOnRoute } from '../src/lib/authRoutes';
 
 test('Settings reports Google sign-in only from the backend provider status', () => {
   expect(isAuthProviderConnected({ google: true, linkedin: false }, 'google')).toBe(true);
@@ -10,6 +11,15 @@ test('Settings reports Google sign-in only from the backend provider status', ()
 
 test('Google sign-in status does not imply a LinkedIn connection', () => {
   expect(isAuthProviderConnected({ google: true, linkedin: false }, 'linkedin')).toBe(false);
+});
+
+test('public signup and OAuth callback routes do not trigger refresh-cookie restoration', () => {
+  for (const pathname of ['/signup', '/login', '/verify-email', '/auth/callback', '/client-portal/oauth/callback']) {
+    expect(shouldRestoreSessionOnRoute(pathname)).toBe(false);
+  }
+  expect(shouldRestoreSessionOnRoute('/reset-password/verification-token')).toBe(false);
+  expect(shouldRestoreSessionOnRoute('/settings')).toBe(true);
+  expect(shouldRestoreSessionOnRoute(null)).toBe(false);
 });
 
 test('returning business users go to their existing workspace', () => {
