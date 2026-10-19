@@ -207,6 +207,27 @@ function stateCookieMatches(cookieValue: string, state: string) {
   return actual.length === expected.length && timingSafeEqual(actual, expected);
 }
 
+async function correlationIdForState(
+  provider: OAuthProvider,
+  state: string,
+  fallback: string,
+): Promise<string> {
+  try {
+    const transaction = await OAuthTransaction.findOne(
+      {
+        stateHash: hashOAuthValue(state),
+        provider,
+        expiresAt: { $gt: new Date() },
+      },
+      { correlationId: 1 },
+    );
+    return transaction?.correlationId || fallback;
+  } catch (error) {
+    logOAuthFailure(provider, 'state_transaction_correlation_lookup', error, fallback);
+    return fallback;
+  }
+}
+
 export const startOAuth = async (req: Request, res: Response): Promise<void> => {
   const provider = req.params.provider as OAuthProvider;
   if (!isOAuthProvider(provider)) {
@@ -547,7 +568,13 @@ export const completeOAuthCallback = async (req: Request, res: Response): Promis
   const stateCookie = readStateCookie(req, provider, state);
   clearStateCookie(res, provider, state, stateCookie.legacy);
   if (!stateCookieMatches(stateCookie.value, state)) {
-    logOAuthFailure(provider, 'state_cookie_validation', new Error('invalid_request'), correlationId);
+    correlationId = await correlationIdForState(provider, state, correlationId);
+    logOAuthFailure(
+      provider,
+      'state_cookie_validation',
+      new Error(stateCookie.value ? 'state_cookie_mismatch' : 'missing_state_cookie'),
+      correlationId,
+    );
     errorRedirect(res, 'attempt_expired', undefined, false, 'user', false, correlationId);
     return;
   }

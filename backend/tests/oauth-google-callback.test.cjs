@@ -1,13 +1,15 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
-const { generateKeyPairSync, randomBytes, sign } = require('node:crypto');
+const { generateKeyPairSync, randomBytes, randomUUID, sign } = require('node:crypto');
 const OAuthTransaction = require('../dist/models/OAuthTransaction').default;
 const OAuthExchange = require('../dist/models/OAuthExchange').default;
 const User = require('../dist/models/User').default;
 const { completeOAuthCallback, exchangeOAuthSession } = require('../dist/controllers/oauth.controller');
 const authController = require('../dist/controllers/auth.controller');
+const { hashOAuthValue } = require('../dist/services/oauth');
 
 const originalFindOneAndDelete = OAuthTransaction.findOneAndDelete;
+const originalFindOne = OAuthTransaction.findOne;
 const originalExchangeFindOneAndDelete = OAuthExchange.findOneAndDelete;
 const originalExchangeCreate = OAuthExchange.create;
 const originalUserFindOne = User.findOne;
@@ -59,12 +61,14 @@ function callbackResponse() {
   };
 }
 
-function callbackRequest(state) {
+function callbackRequest(state, cookieValue = state) {
   return {
     params: { provider: 'google' },
     query: { state, code: 'google-authorization-code' },
     body: {},
-    headers: { cookie: `wg_oauth_google_state_${state}=${state}` },
+    headers: {
+      cookie: cookieValue === null ? '' : `wg_oauth_google_state_${state}=${cookieValue}`,
+    },
     ip: '127.0.0.1',
   };
 }
