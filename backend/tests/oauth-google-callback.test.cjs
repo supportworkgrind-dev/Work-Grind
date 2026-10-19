@@ -4,6 +4,8 @@ const { generateKeyPairSync, randomBytes, randomUUID, sign } = require('node:cry
 const OAuthTransaction = require('../dist/models/OAuthTransaction').default;
 const OAuthExchange = require('../dist/models/OAuthExchange').default;
 const User = require('../dist/models/User').default;
+const callingId = require('../dist/services/callingId');
+const email = require('../dist/utils/email');
 const { completeOAuthCallback, exchangeOAuthSession, startOAuth } = require('../dist/controllers/oauth.controller');
 const authController = require('../dist/controllers/auth.controller');
 const { hashOAuthValue } = require('../dist/services/oauth');
@@ -16,6 +18,8 @@ const originalExchangeCreate = OAuthExchange.create;
 const originalUserFindOne = User.findOne;
 const originalUserFindById = User.findById;
 const originalSessionForUser = authController.sessionForUser;
+const originalCreateUser = callingId.createWorkGrindUser;
+const originalWelcomeEmail = email.sendWelcomeEmail;
 
 function configureGoogle() {
   process.env.NODE_ENV = 'production';
@@ -155,7 +159,10 @@ test('Google callback completes an existing verified-user login and persists the
     codeVerifier: 'google-verifier',
     nonce: 'google-callback-nonce',
   });
-  User.findOne = async () => user;
+  User.findOne = async (query) => {
+    assert.deepEqual(query, { googleId: 'google-callback-subject' });
+    return user;
+  };
   OAuthExchange.create = async (exchange) => { savedExchange = exchange; return exchange; };
   context.after(() => {
     OAuthTransaction.findOneAndDelete = originalFindOneAndDelete;
@@ -171,6 +178,126 @@ test('Google callback completes an existing verified-user login and persists the
   assert.equal(destination.searchParams.get('attemptId'), savedExchange.correlationId);
   assert.equal(destination.searchParams.has('code'), true);
   assert.equal(savedExchange.userId.toString(), 'user-id');
+});
+
+test('Google signup persists the verified Google subject for later sign-in status', async (context) => {
+  configureGoogle();
+  await installGoogleProviderResponse(context);
+  const state = randomBytes(32).toString('base64url');
+  const createdUsers = [];
+  let savedExchange;
+  OAuthTransaction.findOneAndDelete = async () => ({
+    correlationId: randomUUID(),
+    returnTo: '/create-company',
+    intent: 'signup',
+    audience: 'user',
+    accountType: 'company',
+    organizationType: 'business',
+    codeVerifier: 'google-verifier',
+    nonce: 'google-callback-nonce',
+  });
+  User.findOne = async () => null;
+  callingId.createWorkGrindUser = async (input) => {
+    createdUsers.push(input);
+    return { _id: { toString: () => 'new-google-user-id' } };
+  };
+  email.sendWelcomeEmail = async () => ({ success: true });
+  OAuthExchange.create = async (exchange) => { savedExchange = exchange; return exchange; };
+  context.after(() => {
+    OAuthTransaction.findOneAndDelete = originalFindOneAndDelete;
+    OAuthExchange.create = originalExchangeCreate;
+    User.findOne = originalUserFindOne;
+    callingId.createWorkGrindUser = originalCreateUser;
+    email.sendWelcomeEmail = originalWelcomeEmail;
+  });
+
+  const response = callbackResponse();
+  await completeOAuthCallback(callbackRequest(state), response);
+
+  assert.equal(createdUsers.length, 1);
+  assert.equal(createdUsers[0].googleId, 'google-callback-subject');
+  assert.equal(createdUsers[0].isVerified, true);
+  assert.equal(savedExchange.userId.toString(), 'new-google-user-id');
+});
+
+test('Google account linking rejects a verified email that differs from the signed-in WorkGrind account', async (context) => {
+  configureGoogle();
+  await installGoogleProviderResponse(context);
+  const state = randomBytes(32).toString('base64url');
+  let saveCalled = false;
+  OAuthTransaction.findOneAndDelete = async () => ({
+    correlationId: randomUUID(),
+    returnTo: '/settings?tab=security',
+    intent: 'link',
+    audience: 'user',
+    userId: 'workgrind-user-id',
+    codeVerifier: 'google-verifier',
+    nonce: 'google-callback-nonce',
+  });
+  User.findById = async () => ({
+    email: 'different@example.test',
+    isActive: true,
+    isDeleted: false,
+    isVerified: true,
+    googleId: undefined,
+    save: async () => { saveCalled = true; },
+    get: () => undefined,
+    set: () => { saveCalled = true; },
+  });
+  context.after(() => {
+    OAuthTransaction.findOneAndDelete = originalFindOneAndDelete;
+    User.findById = originalUserFindById;
+  });
+
+  const response = callbackResponse();
+  await completeOAuthCallback(callbackRequest(state), response);
+
+  const destination = new URL(response.redirects[0].url);
+  assert.equal(destination.searchParams.get('oauth_error'), 'link_email_mismatch');
+  assert.equal(saveCalled, false);
+});
+
+test('Google account linking rejects a subject already owned by another WorkGrind account', async (context) => {
+  configureGoogle();
+  await installGoogleProviderResponse(context);
+  const state = randomBytes(32).toString('base64url');
+  let saveCalled = false;
+  OAuthTransaction.findOneAndDelete = async () => ({
+    correlationId: randomUUID(),
+    returnTo: '/settings?tab=security',
+    intent: 'link',
+    audience: 'user',
+    userId: 'workgrind-user-id',
+    codeVerifier: 'google-verifier',
+    nonce: 'google-callback-nonce',
+  });
+  User.findById = async () => ({
+    _id: { toString: () => 'workgrind-user-id' },
+    email: 'person@example.test',
+    isActive: true,
+    isDeleted: false,
+    isVerified: true,
+    googleId: undefined,
+    save: async () => { saveCalled = true; },
+    get: () => undefined,
+    set: () => { saveCalled = true; },
+  });
+  User.findOne = async (query) => {
+    assert.deepEqual(query, { googleId: 'google-callback-subject' });
+    return { _id: { toString: () => 'another-workgrind-user-id' } };
+  };
+  context.after(() => {
+    OAuthTransaction.findOneAndDelete = originalFindOneAndDelete;
+    User.findById = originalUserFindById;
+    User.findOne = originalUserFindOne;
+  });
+
+  const response = callbackResponse();
+  await completeOAuthCallback(callbackRequest(state), response);
+
+  const destination = new URL(response.redirects[0].url);
+  assert.equal(destination.searchParams.get('oauth_error'), 'identity_in_use');
+  assert.equal(saveCalled, false);
 });
 
 test('Google signup reports duplicate email and returns to the selected education workspace', async (context) => {

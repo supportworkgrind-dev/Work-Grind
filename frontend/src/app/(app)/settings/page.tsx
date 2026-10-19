@@ -1663,9 +1663,9 @@ export default function SettingsPage() {
               <section className="rounded-xl border border-slate-200 bg-white p-4">
                 <h4 className="text-xs font-bold text-slate-900">Sign-in providers</h4>
                 <p className="mb-3 mt-1 text-xs leading-relaxed text-slate-500">
-                  Link a provider to this account. Its verified email must match your WorkGrind email.
+                  Connect a provider for WorkGrind sign-in. This does not connect Google Drive, Calendar, or other Google services.
                 </p>
-                <SocialAuthButtons intent="link" />
+                <SocialAuthButtons intent="link" connectedProviders={user?.authProviders} />
               </section>
               {company?.accountType === 'company' &&
                 company.organizationType === 'business' &&

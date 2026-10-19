@@ -4,6 +4,12 @@ export type WorkspaceProfile = 'developer' | 'creative' | 'marketing' | 'sales' 
 export type OrganizationType = 'business' | 'school' | 'college' | 'university';
 export type WorkGrindTheme = 'original' | 'midnight' | 'slate' | 'forest' | 'ocean' | 'sand' | 'plum' | 'high-contrast' | 'light' | 'aurora' | 'graphite' | 'dark' | 'neutral' | WorkspaceProfile;
 
+export interface AuthProviders {
+  google: boolean;
+  apple: boolean;
+  linkedin: boolean;
+}
+
 export interface User {
   _id: string;
   callingId?: string;
@@ -21,6 +27,7 @@ export interface User {
   skills?: string[];
   status: UserStatus;
   isVerified: boolean;
+  authProviders?: AuthProviders;
   notificationPreferences?: {
     taskAssigned: boolean;
     meetingReminder: boolean;

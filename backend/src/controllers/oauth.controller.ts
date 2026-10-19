@@ -59,7 +59,7 @@ function providerPicture(provider: OAuthProvider, picture?: string): string | un
 }
 const safeError = (value: string) =>
   ['cancelled', 'mfa_required', 'provider_unavailable', 'authorization_failed', 'invalid_request', 'attempt_expired', 'account_exists', 'signup_required',
-    'identity_in_use', 'verified_email_required', 'client_invitation_required', 'publishing_permission_denied',
+    'identity_in_use', 'link_email_mismatch', 'verified_email_required', 'client_invitation_required', 'publishing_permission_denied',
     'provider_already_linked', 'try_again'].includes(value)
     ? value
     : 'try_again';
@@ -759,6 +759,7 @@ export const completeOAuthCallback = async (req: Request, res: Response): Promis
       : error?.message === 'signup_required' ? 'signup_required'
       : error?.message === 'mfa_required' ? 'mfa_required'
       : error?.message === 'identity_in_use' ? 'identity_in_use'
+      : error?.message === 'link_email_mismatch' ? 'link_email_mismatch'
       : error?.message === 'verified_email_required' ? 'verified_email_required'
       : error?.message === 'publishing_permission_denied' ? 'publishing_permission_denied'
       : error?.message === 'provider_already_linked' ? 'provider_already_linked'

@@ -94,6 +94,43 @@ test('current-user organization projection includes education navigation setting
   }
 });
 
+test('current-user response exposes provider connection booleans without provider subjects', async () => {
+  const originalFindById = User.findById;
+  const user = {
+    callingId: 'WG-GOOGLE',
+    subscriptionStatus: 'none',
+    googleId: 'private-google-subject',
+    appleId: undefined,
+    linkedinId: undefined,
+    companyId: null,
+    toObject() {
+      return {
+        _id: recordId,
+        googleId: this.googleId,
+        appleId: this.appleId,
+        linkedinId: this.linkedinId,
+      };
+    },
+  };
+  User.findById = () => ({
+    populate: async () => user,
+  });
+  try {
+    const res = makeResponse();
+    await authController.getMe({ user: { userId: recordId.toString(), companyId: '' } }, res);
+    assert.deepEqual(res.body.user.authProviders, {
+      google: true,
+      apple: false,
+      linkedin: false,
+    });
+    assert.equal('googleId' in res.body.user, false);
+    assert.equal('appleId' in res.body.user, false);
+    assert.equal('linkedinId' in res.body.user, false);
+  } finally {
+    User.findById = originalFindById;
+  }
+});
+
 test('academic records require a tenant and supported person types', () => {
   const personWithoutTenant = new AcademicPerson({ type: 'student', firstName: 'A', lastName: 'Learner' });
   assert.equal(personWithoutTenant.validateSync().errors.companyId.kind, 'required');
