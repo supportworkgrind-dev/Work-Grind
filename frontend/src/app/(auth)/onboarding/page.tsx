@@ -48,7 +48,7 @@ const PROFILE_ICONS: Record<WorkspaceProfile, LucideIcon> = {
 export default function OnboardingPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user, company, isLoading, fetchCurrentUser, setUser } = useAuthStore();
+  const { user, company, isLoading, fetchCurrentUser, restoreSession, setUser } = useAuthStore();
   const setTheme = useThemeStore((state) => state.setTheme);
   const isIndividual = company?.accountType === 'individual' || user?.accountType === 'individual';
   const isEducationWorkspace = ['school', 'college', 'university'].includes(
@@ -62,13 +62,34 @@ export default function OnboardingPage() {
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileError, setProfileError] = useState('');
   const [inviteEmails, setInviteEmails] = useState<string[]>(['']);
+  const [educationInviteRole, setEducationInviteRole] = useState<'teacher' | 'student'>('teacher');
   const [isSendingInvites, setIsSendingInvites] = useState(false);
   const [projectTemplate, setProjectTemplate] = useState<string>(getWorkspaceProfile(user?.workspaceProfile).starterProject);
   const [isCompleting, setIsCompleting] = useState(false);
 
   useEffect(() => {
-    setHasHydratedAuth(true);
-  }, []);
+    let active = true;
+    void restoreSession().finally(() => {
+      if (active) setHasHydratedAuth(true);
+    });
+    return () => { active = false; };
+  }, [restoreSession]);
+
+  useEffect(() => {
+    if (!hasHydratedAuth || isLoading) return;
+    if (!user) {
+      router.replace(`/login?redirect=${encodeURIComponent('/onboarding')}`);
+    } else if (!user.companyId) {
+      router.replace('/create-company');
+    }
+  }, [hasHydratedAuth, isLoading, router, user]);
+
+  useEffect(() => {
+    if (user?.onboardingStatus === 'pending' &&
+        (user.onboardingStep === 1 || user.onboardingStep === 2 || user.onboardingStep === 3)) {
+      setStep(user.onboardingStep);
+    }
+  }, [user?.onboardingStatus, user?.onboardingStep]);
 
   useEffect(() => {
     if (company?.name) setWorkspaceName(company.name);
@@ -82,6 +103,16 @@ export default function OnboardingPage() {
 
   const handleRemoveEmail = (index: number) => {
     setInviteEmails((emails) => emails.filter((_, row) => row !== index));
+  };
+
+  const advanceToProjects = async () => {
+    setProfileError('');
+    try {
+      await api.patch('/auth/onboarding/progress', { step: 3 });
+      setStep(3);
+    } catch (err: any) {
+      setProfileError(err.response?.data?.message || 'Unable to save your onboarding progress. Please try again.');
+    }
   };
 
   const handleProfileSelect = async (profileId: WorkspaceProfile) => {
@@ -126,7 +157,13 @@ export default function OnboardingPage() {
     if (workspaceName.trim() && workspaceName !== company?.name) {
       await api.patch('/companies', { name: workspaceName.trim() }).catch(() => {});
     }
-    setStep(isIndividual ? 3 : 2);
+    const nextStep = isIndividual ? 3 : 2;
+    try {
+      await api.patch('/auth/onboarding/progress', { step: nextStep });
+      setStep(nextStep);
+    } catch (err: any) {
+      setProfileError(err.response?.data?.message || 'Unable to save your onboarding progress. Please try again.');
+    }
   };
 
   const handleSendInvitesAndNext = async () => {
@@ -134,14 +171,19 @@ export default function OnboardingPage() {
     if (validEmails.length && company?._id) {
       setIsSendingInvites(true);
       try {
-        for (const email of validEmails) await api.post('/companies/invite', { email, role: 'employee' });
+        for (const email of validEmails) {
+          await api.post('/companies/invite', {
+            email,
+            role: isEducationWorkspace ? educationInviteRole : 'employee',
+          });
+        }
       } catch (err) {
         console.error(err);
       } finally {
         setIsSendingInvites(false);
       }
     }
-    setStep(3);
+    await advanceToProjects();
   };
 
   const handleFinishOnboarding = async () => {
@@ -160,11 +202,16 @@ export default function OnboardingPage() {
           priority: 'high',
         });
       }
+    } catch (err) {
+      console.error('Unable to create the optional starter project.', err);
+    }
+    try {
+      await api.post('/auth/onboarding/complete');
       await fetchCurrentUser();
-      router.push(returnTo || defaultDestination);
+      router.replace(returnTo || defaultDestination);
     } catch (err) {
       console.error(err);
-      router.push(returnTo || defaultDestination);
+      setProfileError('We could not save your onboarding completion. Please try again.');
     } finally {
       setIsCompleting(false);
     }
@@ -259,6 +306,7 @@ export default function OnboardingPage() {
                 {Math.round((currentDisplayStep / totalSteps) * 100)}%
               </span>
             </div>
+            {profileError && <p role="alert" className="mb-5 text-xs text-rose-600">{profileError}</p>}
             {/* Progress Bar */}
             <div className="h-2 w-full rounded-full overflow-hidden" style={{ background: 'var(--bg-sunken)' }}>
               <div
@@ -368,6 +416,22 @@ export default function OnboardingPage() {
                   Invite colleagues, staff, or other workspace members now, or skip this step and invite people later.
                 </p>
               </div>
+              {isEducationWorkspace && (
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider theme-text-secondary">
+                    Invitation Role
+                  </label>
+                  <select
+                    value={educationInviteRole}
+                    onChange={(event) => setEducationInviteRole(event.target.value as 'teacher' | 'student')}
+                    className="mt-2 block w-full rounded-xl border py-2 px-3 text-xs focus:outline-none focus:ring-2"
+                    style={{ background: 'var(--bg-input)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+                  >
+                    <option value="teacher">Teacher / Faculty</option>
+                    <option value="student">Student</option>
+                  </select>
+                </div>
+              )}
 
               <div className="space-y-2.5">
                 {inviteEmails.map((email, idx) => (
@@ -416,7 +480,7 @@ export default function OnboardingPage() {
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => setStep(3)}
+                    onClick={() => void advanceToProjects()}
                     className="rounded-xl border px-4 py-2 text-xs font-semibold theme-text-secondary hover:bg-[var(--bg-hover)]"
                     style={{ borderColor: 'var(--border-color)' }}
                   >

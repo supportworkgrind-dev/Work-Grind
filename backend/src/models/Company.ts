@@ -14,6 +14,13 @@ export type CompanySubscriptionStatus =
   | 'none';
 
 export type CompanyPlan = 'free' | 'starter' | 'pro' | 'school' | 'college' | 'university';
+export type EducationOrganizationDetails = {
+  schoolType?: 'primary' | 'secondary' | 'combined' | 'other';
+  gradeRange?: 'early_years' | 'primary' | 'middle' | 'secondary' | 'mixed' | 'other';
+  collegeType?: 'community' | 'technical' | 'vocational' | 'sixth_form' | 'other';
+  programs?: string[];
+  faculties?: string[];
+};
 
 export interface ICouponRedemption {
   code:         string;
@@ -53,6 +60,7 @@ export interface ICompany extends Document {
   isActive: boolean;
   accountType: 'company' | 'individual';
   organizationType: OrganizationType;
+  organizationDetails?: EducationOrganizationDetails;
 
   // ── Company subscription (Polar-based) ────────────────────────────────────
   subscriptionStatus:     CompanySubscriptionStatus;
@@ -138,6 +146,13 @@ const CompanySchema = new Schema<ICompany>(
     },
     accountType: { type: String, enum: ['company', 'individual'], default: 'company' },
     organizationType: { type: String, enum: ORGANIZATION_TYPES, default: 'business', required: true },
+    organizationDetails: {
+      schoolType: { type: String, enum: ['primary', 'secondary', 'combined', 'other'] },
+      gradeRange: { type: String, enum: ['early_years', 'primary', 'middle', 'secondary', 'mixed', 'other'] },
+      collegeType: { type: String, enum: ['community', 'technical', 'vocational', 'sixth_form', 'other'] },
+      programs: [{ type: String, trim: true, maxlength: 80 }],
+      faculties: [{ type: String, trim: true, maxlength: 80 }],
+    },
     isActive:    { type: Boolean, default: true },
 
     // ── Subscription ──────────────────────────────────────────────────────────

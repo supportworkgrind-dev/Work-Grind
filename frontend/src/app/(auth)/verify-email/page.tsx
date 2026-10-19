@@ -9,6 +9,7 @@ import { api } from '@/lib/api';
 import { AuthShell } from '@/components/auth/AuthShell';
 import { useAuthStore } from '@/store/useAuthStore';
 import { OtpCodeInput } from '@/components/auth/OtpCodeInput';
+import { getAuthenticatedDestination } from '@/lib/authRedirect';
 
 function VerifyEmailContent() {
   const router = useRouter();
@@ -80,7 +81,9 @@ function VerifyEmailContent() {
         }
       } else {
         setStatus('success');
-        window.setTimeout(() => router.push(response.data.user.companyId ? '/dashboard' : '/create-company'), 700);
+        window.setTimeout(() => router.replace(
+          getAuthenticatedDestination(response.data.user),
+        ), 700);
       }
     } catch (requestError: unknown) {
       setStatus('entry');

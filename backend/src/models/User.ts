@@ -41,6 +41,10 @@ export interface IUser extends Document {
   lastLogin?: Date;
   accountType?: 'company' | 'individual';
   signupOrganizationType?: OrganizationType;
+  onboardingStatus?: 'pending' | 'completed';
+  onboardingStep?: 1 | 2 | 3;
+  workspaceCreationLock?: string;
+  workspaceCreationLockExpiresAt?: Date;
   isSuperAdmin?: boolean;
   mfaEnabled?: boolean;
   mfaSecretEncrypted?: string;
@@ -125,6 +129,10 @@ const S = new Schema<IUser>({
   role: { type: String, default: 'employee' },
   accountType: { type: String, enum: ['company', 'individual'], default: 'company' },
   signupOrganizationType: { type: String, enum: ORGANIZATION_TYPES },
+  onboardingStatus: { type: String, enum: ['pending', 'completed'] },
+  onboardingStep: { type: Number, enum: [1, 2, 3] },
+  workspaceCreationLock: { type: String, select: false },
+  workspaceCreationLockExpiresAt: { type: Date, select: false },
   isSuperAdmin: { type: Boolean, default: false },
   mfaEnabled: { type: Boolean, default: false },
   mfaSecretEncrypted: { type: String, select: false },

@@ -42,6 +42,58 @@ const validPassword = (password: string) =>
   password.length >= 8 && /[A-Z]/.test(password) && /[a-z]/.test(password) &&
   /[0-9]/.test(password) && /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password);
 
+function parseOrganizationDetails(
+  value: unknown,
+  organizationType: string,
+): {
+  schoolType?: 'primary' | 'secondary' | 'combined' | 'other';
+  gradeRange?: 'early_years' | 'primary' | 'middle' | 'secondary' | 'mixed' | 'other';
+  collegeType?: 'community' | 'technical' | 'vocational' | 'sixth_form' | 'other';
+  programs?: string[];
+  faculties?: string[];
+} | null {
+  if (value === undefined) return {};
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const details = value as Record<string, unknown>;
+  const lists = (key: 'programs' | 'faculties'): { valid: boolean; values?: string[] } => {
+    const input = details[key];
+    if (input === undefined) return { valid: true };
+    if (!Array.isArray(input) || input.length > 30 ||
+        input.some((item) => typeof item !== 'string' || !item.trim() || item.trim().length > 80)) {
+      return { valid: false };
+    }
+    return { valid: true, values: [...new Set(input.map((item) => (item as string).trim()))] };
+  };
+  const parsedPrograms = lists('programs');
+  const parsedFaculties = lists('faculties');
+  if (!parsedPrograms.valid || !parsedFaculties.valid) return null;
+  const programs = parsedPrograms.values;
+  const faculties = parsedFaculties.values;
+
+  if (organizationType === 'school') {
+    const schoolType = details.schoolType;
+    const gradeRange = details.gradeRange;
+    if (!['primary', 'secondary', 'combined', 'other'].includes(String(schoolType)) ||
+        !['early_years', 'primary', 'middle', 'secondary', 'mixed', 'other'].includes(String(gradeRange))) return null;
+    return {
+      schoolType: schoolType as 'primary' | 'secondary' | 'combined' | 'other',
+      gradeRange: gradeRange as 'early_years' | 'primary' | 'middle' | 'secondary' | 'mixed' | 'other',
+    };
+  }
+  if (organizationType === 'college') {
+    const collegeType = details.collegeType;
+    if (!['community', 'technical', 'vocational', 'sixth_form', 'other'].includes(String(collegeType))) return null;
+    return {
+      collegeType: collegeType as 'community' | 'technical' | 'vocational' | 'sixth_form' | 'other',
+      ...(programs?.length ? { programs } : {}),
+    };
+  }
+  if (organizationType === 'university') {
+    return faculties?.length ? { faculties } : {};
+  }
+  return {};
+}
+
 export async function restoreWorkspaceCreatorRole(
   user: IUser,
   company: Pick<ICompany, '_id' | 'ownerId' | 'accountType'>,
@@ -100,6 +152,8 @@ export const sessionForUser = async (user: IUser) => {
       workspaceProfile: user.workspaceProfile,
       accountType: user.accountType,
       signupOrganizationType: user.signupOrganizationType,
+      onboardingStatus: user.onboardingStatus,
+      onboardingStep: user.onboardingStep,
       companyId: user.companyId,
       role: user.role,
       isVerified: user.isVerified,
@@ -253,6 +307,8 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       status: user.status,
       accountType: user.accountType,
       signupOrganizationType: user.signupOrganizationType,
+      onboardingStatus: user.onboardingStatus,
+      onboardingStep: user.onboardingStep,
     } });
   } catch (e: any) { res.status(500).json({ success: false, message: e.message }); }
 };
@@ -746,7 +802,110 @@ export const changePassword = async (req: AuthRequest, res: Response): Promise<v
   }
 };
 
+export const saveWorkspaceSelection = async (req: AuthRequest, res: Response): Promise<void> => {
+  const { accountType, organizationType } = req.body || {};
+  if (!['company', 'individual'].includes(accountType) ||
+      !isOrganizationType(organizationType) ||
+      (accountType === 'individual' && organizationType !== 'business')) {
+    res.status(400).json({ success: false, message: 'Choose a valid account type and organization.' });
+    return;
+  }
+
+  try {
+    const user = await User.findOneAndUpdate(
+      { _id: req.user!.userId, companyId: { $in: [null] } },
+      {
+        $set: {
+          accountType,
+          signupOrganizationType: organizationType,
+        },
+      },
+      { new: true, runValidators: true },
+    ).select('_id accountType signupOrganizationType companyId');
+
+    if (!user) {
+      res.status(409).json({ success: false, code: 'WORKSPACE_ALREADY_EXISTS', message: 'Workspace selection can no longer be changed for this account.' });
+      return;
+    }
+
+    res.json({
+      success: true,
+      accountType: user.accountType,
+      organizationType: user.signupOrganizationType,
+    });
+  } catch (error) {
+    console.error('[Auth] Workspace selection could not be saved.', {
+      errorName: error instanceof Error ? error.name : 'UnknownError',
+    });
+    res.status(500).json({ success: false, message: 'Unable to save your workspace selection. Please try again.' });
+  }
+};
+
+export const saveOnboardingProgress = async (req: AuthRequest, res: Response): Promise<void> => {
+  const step = req.body?.step;
+  if (!Number.isInteger(step) || step < 1 || step > 3 || !req.user?.companyId) {
+    res.status(400).json({ success: false, message: 'Choose a valid onboarding step.' });
+    return;
+  }
+
+  try {
+    const company = await Company.findOne({
+      _id: req.user.companyId,
+      ownerId: req.user.userId,
+      isActive: true,
+    }).select('_id');
+    if (!company) {
+      res.status(403).json({ success: false, message: 'Only the workspace owner can update onboarding.' });
+      return;
+    }
+    const user = await User.findOneAndUpdate(
+      { _id: req.user.userId, companyId: company._id, onboardingStatus: { $ne: 'completed' } },
+      { $max: { onboardingStep: step } },
+      { new: true },
+    ).select('_id onboardingStep onboardingStatus');
+    res.json({
+      success: true,
+      onboardingStep: user?.onboardingStep ?? 3,
+      onboardingStatus: user?.onboardingStatus,
+    });
+  } catch (error) {
+    console.error('[Auth] Onboarding progress could not be saved.', {
+      errorName: error instanceof Error ? error.name : 'UnknownError',
+    });
+    res.status(500).json({ success: false, message: 'Unable to save onboarding progress. Please try again.' });
+  }
+};
+
+export const completeOnboarding = async (req: AuthRequest, res: Response): Promise<void> => {
+  if (!req.user?.companyId) {
+    res.status(400).json({ success: false, message: 'Create or join a workspace before completing onboarding.' });
+    return;
+  }
+  try {
+    const company = await Company.findOne({
+      _id: req.user.companyId,
+      ownerId: req.user.userId,
+      isActive: true,
+    }).select('_id');
+    if (!company) {
+      res.status(403).json({ success: false, message: 'Only the workspace owner can complete onboarding.' });
+      return;
+    }
+    await User.updateOne(
+      { _id: req.user.userId, companyId: company._id },
+      { $set: { onboardingStatus: 'completed', onboardingStep: 3 } },
+    );
+    res.json({ success: true, onboardingStatus: 'completed', onboardingStep: 3 });
+  } catch (error) {
+    console.error('[Auth] Onboarding completion could not be saved.', {
+      errorName: error instanceof Error ? error.name : 'UnknownError',
+    });
+    res.status(500).json({ success: false, message: 'Unable to finish onboarding. Please try again.' });
+  }
+};
+
 export const createCompany = async (req: AuthRequest, res: Response): Promise<void> => {
+  let workspaceCreationLock: string | undefined;
   try {
     const uid = req.user!.userId;
     const { name, industry, size, country, timeZone } = req.body;
@@ -762,38 +921,52 @@ export const createCompany = async (req: AuthRequest, res: Response): Promise<vo
     }
     const user = await User.findById(uid);
     if (!user) { res.status(404).json({ success: false, message: 'User not found' }); return; }
-    const accountType = requestedAccountType ?? user.accountType ?? 'company';
-    const organizationType = requestedOrganizationType ?? user.signupOrganizationType ?? 'business';
+    const accountType = user.signupOrganizationType
+      ? user.accountType ?? requestedAccountType ?? 'company'
+      : requestedAccountType ?? user.accountType ?? 'company';
+    const organizationType = user.signupOrganizationType ?? requestedOrganizationType ?? 'business';
 
-    // Defensive Idempotency: If user already has a company, return it gracefully rather than crashing with 400
+    const respondWithExistingWorkspace = async (existingUser: IUser, existingCompany: ICompany, statusCode = 200) => {
+      await restoreWorkspaceCreatorRole(existingUser, existingCompany, req.ip);
+      const tokens = issue(uid, existingCompany._id.toString(), existingUser.role || 'owner');
+      existingUser.signupOrganizationType = undefined;
+      existingUser.refreshTokens = [...normalizeRefreshTokenStore(existingUser.refreshTokens), hashRefreshToken(tokens.refreshToken)];
+      await existingUser.save();
+      setRefreshCookie(res, tokens.refreshToken);
+      res.status(statusCode).json({
+        success: true,
+        message: 'Workspace already exists for this account',
+        company: existingCompany,
+        user: {
+          _id: existingUser._id,
+          callingId: existingUser.callingId,
+          fullName: existingUser.fullName,
+          email: existingUser.email,
+          companyId: existingUser.companyId,
+          role: existingUser.role,
+          accountType: existingUser.accountType || existingCompany.accountType,
+          onboardingStatus: existingUser.onboardingStatus,
+          onboardingStep: existingUser.onboardingStep,
+          theme: existingUser.theme,
+          workspaceProfile: existingUser.workspaceProfile,
+        },
+        accessToken: tokens.accessToken,
+      });
+    };
+
     if (user.companyId) {
       const existingCompany = await Company.findById(user.companyId);
       if (existingCompany) {
-        await restoreWorkspaceCreatorRole(user, existingCompany, req.ip);
-        const tokens = issue(uid, existingCompany._id.toString(), user.role || 'owner');
-        user.signupOrganizationType = undefined;
-        user.refreshTokens = [...normalizeRefreshTokenStore(user.refreshTokens), hashRefreshToken(tokens.refreshToken)];
-        await user.save();
-        setRefreshCookie(res, tokens.refreshToken);
-        res.status(200).json({
-          success: true,
-          message: 'Workspace already exists for this account',
-          company: existingCompany,
-          user: {
-            _id: user._id,
-            callingId: user.callingId,
-            fullName: user.fullName,
-            email: user.email,
-            companyId: user.companyId,
-            role: user.role,
-            accountType: user.accountType || existingCompany.accountType,
-            theme: user.theme,
-            workspaceProfile: user.workspaceProfile,
-          },
-          accessToken: tokens.accessToken,
-        });
+        await respondWithExistingWorkspace(user, existingCompany);
         return;
       }
+    }
+    if ((user.signupOrganizationType && requestedOrganizationType &&
+         requestedOrganizationType !== user.signupOrganizationType) ||
+        (user.signupOrganizationType && requestedAccountType &&
+         requestedAccountType !== user.accountType)) {
+      res.status(409).json({ success: false, code: 'WORKSPACE_SELECTION_CHANGED', message: 'Save your workspace selection before continuing.' });
+      return;
     }
 
     const isIndividual = accountType === 'individual';
@@ -801,9 +974,49 @@ export const createCompany = async (req: AuthRequest, res: Response): Promise<vo
       res.status(400).json({ success: false, message: 'Individual workspaces must use the business organization type.' });
       return;
     }
+    const organizationDetails = parseOrganizationDetails(req.body?.organizationDetails, organizationType);
+    if (!organizationDetails) {
+      res.status(400).json({ success: false, message: 'Enter valid details for the selected organization type.' });
+      return;
+    }
     const workspaceName = name?.trim() || (isIndividual ? `${user.fullName}'s Workspace` : '');
     if (!workspaceName) {
       res.status(400).json({ success: false, message: 'Company or organization name is required' });
+      return;
+    }
+
+    workspaceCreationLock = uuidv4();
+    const claimedUser = await User.findOneAndUpdate(
+      {
+        _id: uid,
+        companyId: { $in: [null] },
+        $or: [
+          { workspaceCreationLockExpiresAt: { $exists: false } },
+          { workspaceCreationLockExpiresAt: { $lte: new Date() } },
+        ],
+      },
+      {
+        $set: {
+          workspaceCreationLock,
+          workspaceCreationLockExpiresAt: new Date(Date.now() + 2 * 60_000),
+        },
+      },
+      { new: true },
+    );
+    if (!claimedUser) {
+      const latestUser = await User.findById(uid);
+      if (latestUser?.companyId) {
+        const existingCompany = await Company.findById(latestUser.companyId);
+        if (existingCompany) {
+          await respondWithExistingWorkspace(latestUser, existingCompany);
+          return;
+        }
+      }
+      res.status(409).json({
+        success: false,
+        code: 'WORKSPACE_SETUP_IN_PROGRESS',
+        message: 'Workspace setup is already in progress. Wait a moment and try again.',
+      });
       return;
     }
 
@@ -816,6 +1029,7 @@ export const createCompany = async (req: AuthRequest, res: Response): Promise<vo
       ownerId: uid,
       accountType: isIndividual ? 'individual' : 'company',
       organizationType,
+      ...(Object.keys(organizationDetails).length ? { organizationDetails } : {}),
       inviteCode: uuidv4().split('-')[0].toUpperCase(),
       subscriptionStatus: 'trialing',
       subscriptionPlan: 'free',
@@ -824,6 +1038,36 @@ export const createCompany = async (req: AuthRequest, res: Response): Promise<vo
         (user.trialStartDate ?? user.createdAt).getTime() + TRIAL_DAYS * 24 * 60 * 60 * 1000,
       ),
     });
+
+    const tokens = issue(uid, company._id.toString(), 'owner');
+    user.companyId = company._id;
+    user.role = 'owner';
+    user.accountType = isIndividual ? 'individual' : 'company';
+    user.signupOrganizationType = undefined;
+    user.onboardingStatus = 'pending';
+    user.onboardingStep = 1;
+    user.refreshTokens = [...normalizeRefreshTokenStore(user.refreshTokens), hashRefreshToken(tokens.refreshToken)];
+    try {
+      await user.save();
+    } catch (saveError) {
+      try {
+        const persistedUser = await User.findById(uid).select('_id companyId');
+        if (persistedUser?.companyId?.toString() !== company._id.toString()) {
+          await Company.deleteOne({ _id: company._id, ownerId: uid });
+        }
+      } catch (cleanupError) {
+        console.error('[Auth] Failed to clean up an unlinked workspace after setup failed.', {
+          errorName: cleanupError instanceof Error ? cleanupError.name : 'UnknownError',
+        });
+      }
+      throw saveError;
+    }
+    await User.updateOne(
+      { _id: uid, workspaceCreationLock },
+      { $unset: { workspaceCreationLock: 1, workspaceCreationLockExpiresAt: 1 } },
+    );
+    workspaceCreationLock = undefined;
+    setRefreshCookie(res, tokens.refreshToken);
 
     // Batch create default channels in 1 database roundtrip
     const channelsToCreate = [
@@ -920,14 +1164,6 @@ export const createCompany = async (req: AuthRequest, res: Response): Promise<vo
       });
     }
 
-    // Update user in a SINGLE save call
-    const tokens = issue(uid, company._id.toString(), 'owner');
-    user.companyId = company._id;
-    user.role = 'owner';
-    user.accountType = isIndividual ? 'individual' : 'company';
-    user.signupOrganizationType = undefined;
-    user.refreshTokens = [hashRefreshToken(tokens.refreshToken)];
-    await user.save();
     await AuditLog.create({
       companyId: company._id,
       userId: user._id,
@@ -938,7 +1174,6 @@ export const createCompany = async (req: AuthRequest, res: Response): Promise<vo
       ipAddress: req.ip,
     });
 
-    setRefreshCookie(res, tokens.refreshToken);
     res.status(201).json({
       success: true,
       company,
@@ -950,12 +1185,22 @@ export const createCompany = async (req: AuthRequest, res: Response): Promise<vo
         companyId: user.companyId,
         role: user.role,
         accountType: user.accountType,
+        onboardingStatus: user.onboardingStatus,
+        onboardingStep: user.onboardingStep,
         theme: user.theme,
         workspaceProfile: user.workspaceProfile,
       },
       accessToken: tokens.accessToken,
     });
-  } catch (e: any) { res.status(500).json({ success: false, message: e.message }); }
+  } catch (e: any) {
+    if (workspaceCreationLock) {
+      await User.updateOne(
+        { _id: req.user!.userId, workspaceCreationLock },
+        { $unset: { workspaceCreationLock: 1, workspaceCreationLockExpiresAt: 1 } },
+      );
+    }
+    res.status(500).json({ success: false, message: e.message });
+  }
 };
 
 export const validateInvite = async (req: Request, res: Response): Promise<void> => {
@@ -1160,7 +1405,7 @@ export const getMe = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const user = await User.findById(req.user!.userId).populate(
       'companyId',
-      'name logo plan inviteCode accountType organizationType industry size country timeZone currency settings academicSettings'
+      'name logo plan inviteCode accountType organizationType organizationDetails industry size country timeZone currency settings academicSettings'
     );
     if (!user) { res.status(404).json({ success: false, message: 'User not found' }); return; }
     if (!user.callingId) {

@@ -1,12 +1,12 @@
 ﻿'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import axios from 'axios';
 import { api } from '@/lib/api';
 import { getAuthValue, updateAuthTokens } from '@/lib/authSession';
 import { useAuthStore } from '@/store/useAuthStore';
-import { getSafeReturnPath } from '@/lib/authRedirect';
+import { getAuthenticatedDestination, getSafeReturnPath } from '@/lib/authRedirect';
 import { ThemeAwareLogo } from '@/components/common/ThemeAwareLogo';
 import { CountrySelect } from '@/components/common/CountrySelect';
 import {
@@ -34,6 +34,7 @@ export default function CreateCompanyPage() {
     authError,
     restoreSession,
     setCompany,
+    setUser,
   } = useAuthStore();
   const hasAccessToken = Boolean(getAuthValue('workgrind_access_token'));
   const canCreateWorkspace = Boolean(user && isAuthenticated && hasAccessToken && !isAuthLoading);
@@ -47,9 +48,38 @@ export default function CreateCompanyPage() {
     router.replace(`/login?redirect=${encodeURIComponent('/create-company')}`);
   }, [authError, canCreateWorkspace, isAuthLoading, router]);
 
+  const confirmExistingWorkspace = useCallback(async () => {
+    if (!user?.companyId) return;
+    existingWorkspaceCheck.current = true;
+    setCheckingExistingWorkspace(true);
+    setError('');
+    try {
+      const response = await api.get('/auth/me');
+      const currentUser = response.data?.user;
+      if (!response.data?.success || !currentUser?._id || !currentUser.companyId) {
+        throw new Error('The workspace profile could not be confirmed.');
+      }
+      setUser(currentUser);
+      if (typeof currentUser.companyId === 'object') setCompany(currentUser.companyId);
+      const returnTo = getSafeReturnPath(searchParams.get('redirect'));
+      router.replace(getAuthenticatedDestination(currentUser, returnTo));
+    } catch {
+      existingWorkspaceCheck.current = false;
+      setError('We could not confirm your existing workspace yet. Please retry before creating another one.');
+    } finally {
+      setCheckingExistingWorkspace(false);
+    }
+  }, [router, searchParams, setCompany, setUser, user?.companyId]);
+
+  useEffect(() => {
+    if (!canCreateWorkspace || !user?.companyId || existingWorkspaceCheck.current) return;
+    void confirmExistingWorkspace();
+  }, [canCreateWorkspace, confirmExistingWorkspace, user?.companyId]);
+
   const hasPersistedSignupContext = Boolean(user?.signupOrganizationType);
   // Step 1: Account Type selection | Step 2: Workspace details
   const [step, setStep] = useState<1 | 2>(1);
+  const [selectionEditRequested, setSelectionEditRequested] = useState(false);
   const [accountTypeOverride, setAccountType] = useState<'company' | 'individual' | null>(null);
   const [organizationTypeOverride, setOrganizationType] = useState<'business' | 'school' | 'college' | 'university' | null>(null);
   const accountType = accountTypeOverride ??
@@ -57,15 +87,20 @@ export default function CreateCompanyPage() {
   const organizationType = organizationTypeOverride ?? user?.signupOrganizationType ?? 'business';
 
   useEffect(() => {
-    if (hasPersistedSignupContext && step === 1) {
+    if (hasPersistedSignupContext && step === 1 && !selectionEditRequested) {
       setStep(2);
     }
-  }, [hasPersistedSignupContext, step]);
+  }, [hasPersistedSignupContext, selectionEditRequested, step]);
 
   // Form Fields
   const [name, setName] = useState('');
   const [industryOverride, setIndustry] = useState<string | null>(null);
   const [sizeOverride, setSize] = useState<string | null>(null);
+  const [schoolType, setSchoolType] = useState('');
+  const [gradeRange, setGradeRange] = useState('');
+  const [collegeType, setCollegeType] = useState('');
+  const [programs, setPrograms] = useState('');
+  const [faculties, setFaculties] = useState('');
   const industry = industryOverride ?? (organizationType !== 'business'
     ? 'Education'
     : accountType === 'individual' ? 'Freelance / Solo Work' : 'Technology');
@@ -75,6 +110,8 @@ export default function CreateCompanyPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isRedirecting, setIsRedirecting] = useState(false);
   const [error, setError] = useState('');
+  const existingWorkspaceCheck = useRef(false);
+  const [checkingExistingWorkspace, setCheckingExistingWorkspace] = useState(false);
 
   const handleSelectType = (type: 'company' | 'individual') => {
     setAccountType(type);
@@ -95,13 +132,27 @@ export default function CreateCompanyPage() {
     setIndustry(value === 'business' ? 'Technology' : 'Education');
   };
 
-  const handleContinueToDetails = () => {
+  const handleContinueToDetails = async () => {
     if (!accountType) {
       setError('Please select how you plan to use WorkGrind to continue.');
       return;
     }
     setError('');
-    setStep(2);
+    setIsLoading(true);
+    try {
+      await api.put('/auth/workspace-selection', {
+        accountType,
+        organizationType: accountType === 'individual' ? 'business' : organizationType,
+      });
+      setSelectionEditRequested(false);
+      setStep(2);
+    } catch (requestError: unknown) {
+      setError(axios.isAxiosError<{ message?: string }>(requestError)
+        ? requestError.response?.data?.message || 'Unable to save your workspace selection. Please try again.'
+        : 'Unable to save your workspace selection. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -111,6 +162,10 @@ export default function CreateCompanyPage() {
     setIsLoading(true);
 
     try {
+      await api.put('/auth/workspace-selection', {
+        accountType: accountType || 'company',
+        organizationType: accountType === 'individual' ? 'business' : organizationType,
+      });
       const res = await api.post('/auth/create-company', {
         name,
         industry,
@@ -119,6 +174,16 @@ export default function CreateCompanyPage() {
         timeZone,
         accountType: accountType || 'company',
         organizationType: accountType === 'company' ? organizationType : 'business',
+        organizationDetails: organizationType === 'school'
+          ? { schoolType, gradeRange }
+          : organizationType === 'college'
+            ? {
+              collegeType,
+              programs: programs.split(',').map((value) => value.trim()).filter(Boolean),
+            }
+            : organizationType === 'university'
+              ? { faculties: faculties.split(',').map((value) => value.trim()).filter(Boolean) }
+              : undefined,
       });
 
       if (res.data.success) {
@@ -129,7 +194,7 @@ export default function CreateCompanyPage() {
         }
         setCompany(res.data.company);
         if (res.data.user) {
-          useAuthStore.getState().setUser(res.data.user);
+          setUser(res.data.user);
         }
         const returnTo = getSafeReturnPath(searchParams.get('redirect'));
         router.push(returnTo ? `/onboarding?redirect=${encodeURIComponent(returnTo)}` : '/onboarding');
@@ -166,6 +231,29 @@ export default function CreateCompanyPage() {
           >
             Retry session check
           </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (user?.companyId) {
+    return (
+      <div className="theme-scope theme-bg-base flex min-h-screen items-center justify-center px-4">
+        <div className="max-w-md text-center">
+          {error
+            ? <>
+              <p className="text-sm text-rose-700" role="alert">{error}</p>
+              <button
+                type="button"
+                className="mt-4 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white"
+                onClick={() => void confirmExistingWorkspace()}
+              >
+                Retry workspace check
+              </button>
+            </>
+            : <p className="text-sm text-slate-600" role="status">
+              {checkingExistingWorkspace ? 'Checking your existing workspace…' : 'Opening your workspace…'}
+            </p>}
         </div>
       </div>
     );
@@ -373,7 +461,10 @@ export default function CreateCompanyPage() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => setStep(1)}
+                  onClick={() => {
+                    setSelectionEditRequested(true);
+                    setStep(1);
+                  }}
                   className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 flex items-center gap-1"
                 >
                   <ArrowLeft className="h-3.5 w-3.5" />
@@ -425,9 +516,102 @@ export default function CreateCompanyPage() {
                     </select>
                   </div>
                 )}
+                {accountType === 'company' && organizationType === 'school' && (
+                  <>
+                    <div>
+                      <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700">
+                        School Type
+                      </label>
+                      <select
+                        required
+                        value={schoolType}
+                        disabled={isLoading || isRedirecting}
+                        onChange={(event) => setSchoolType(event.target.value)}
+                        className="mt-1.5 block w-full rounded-xl border border-slate-200 py-2.5 px-3 text-slate-900 focus:ring-2 focus:ring-indigo-600 text-xs transition-all disabled:opacity-60"
+                      >
+                        <option value="">Select school type</option>
+                        <option value="primary">Primary</option>
+                        <option value="secondary">Secondary</option>
+                        <option value="combined">Combined levels</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700">
+                        Grade or Level Range
+                      </label>
+                      <select
+                        required
+                        value={gradeRange}
+                        disabled={isLoading || isRedirecting}
+                        onChange={(event) => setGradeRange(event.target.value)}
+                        className="mt-1.5 block w-full rounded-xl border border-slate-200 py-2.5 px-3 text-slate-900 focus:ring-2 focus:ring-indigo-600 text-xs transition-all disabled:opacity-60"
+                      >
+                        <option value="">Select grade range</option>
+                        <option value="early_years">Early years</option>
+                        <option value="primary">Primary</option>
+                        <option value="middle">Middle school</option>
+                        <option value="secondary">Secondary</option>
+                        <option value="mixed">Multiple levels</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </div>
+                  </>
+                )}
+                {accountType === 'company' && organizationType === 'college' && (
+                  <>
+                    <div>
+                      <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700">
+                        College Type
+                      </label>
+                      <select
+                        required
+                        value={collegeType}
+                        disabled={isLoading || isRedirecting}
+                        onChange={(event) => setCollegeType(event.target.value)}
+                        className="mt-1.5 block w-full rounded-xl border border-slate-200 py-2.5 px-3 text-slate-900 focus:ring-2 focus:ring-indigo-600 text-xs transition-all disabled:opacity-60"
+                      >
+                        <option value="">Select college type</option>
+                        <option value="community">Community</option>
+                        <option value="technical">Technical</option>
+                        <option value="vocational">Vocational</option>
+                        <option value="sixth_form">Sixth form</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700">
+                        Programs (optional)
+                      </label>
+                      <input
+                        value={programs}
+                        maxLength={2400}
+                        disabled={isLoading || isRedirecting}
+                        onChange={(event) => setPrograms(event.target.value)}
+                        placeholder="Science, business, arts"
+                        className="mt-1.5 block w-full rounded-xl border border-slate-200 py-2.5 px-3 text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-600 text-xs transition-all disabled:opacity-60"
+                      />
+                    </div>
+                  </>
+                )}
+                {accountType === 'company' && organizationType === 'university' && (
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700">
+                      Faculties or Departments (optional)
+                    </label>
+                    <input
+                      value={faculties}
+                      maxLength={2400}
+                      disabled={isLoading || isRedirecting}
+                      onChange={(event) => setFaculties(event.target.value)}
+                      placeholder="Arts, Engineering, Sciences"
+                      className="mt-1.5 block w-full rounded-xl border border-slate-200 py-2.5 px-3 text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-600 text-xs transition-all disabled:opacity-60"
+                    />
+                  </div>
+                )}
                 <div>
                   <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700">
-                    {accountType === 'individual' ? 'Primary Focus' : 'Industry or focus'}
+                    {accountType === 'individual' ? 'Primary Focus' : organizationType === 'business' ? 'Business Type' : 'Institution Focus'}
                   </label>
                   <select
                     value={industry}
@@ -532,7 +716,10 @@ export default function CreateCompanyPage() {
                 <button
                   type="button"
                   disabled={isLoading || isRedirecting}
-                  onClick={() => setStep(1)}
+                  onClick={() => {
+                    setSelectionEditRequested(true);
+                    setStep(1);
+                  }}
                   className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-all disabled:opacity-50"
                 >
                   Back

@@ -11,6 +11,9 @@ import {
   resetPassword,
   changePassword,
   createCompany,
+  saveWorkspaceSelection,
+  saveOnboardingProgress,
+  completeOnboarding,
   joinCompany,
   getMe,
   validateInvite,
@@ -69,6 +72,9 @@ router.post('/oauth/:provider/callback', rateLimiter(15, 20), completeOAuthCallb
 router.post('/oauth/exchange', rateLimiter(15, 10), exchangeOAuthSessionRoute);
 router.get('/invite/:tokenOrCode', validateInvite);
 router.post('/create-company', authenticate, createCompany);
+router.put('/workspace-selection', authenticate, saveWorkspaceSelection);
+router.patch('/onboarding/progress', authenticate, saveOnboardingProgress);
+router.post('/onboarding/complete', authenticate, completeOnboarding);
 router.post('/join-company', authenticate, joinCompany);
 router.get('/me', authenticate, getMe);
 

@@ -10,7 +10,7 @@ import { AuthShell } from '@/components/auth/AuthShell';
 import { SocialAuthButtons } from '@/components/auth/SocialAuthButtons';
 import { useAuthStore } from '@/store/useAuthStore';
 import type { User } from '@/types';
-import { getSafeReturnPath, getWorkspaceSetupDestination } from '@/lib/authRedirect';
+import { getAuthenticatedDestination, getSafeReturnPath } from '@/lib/authRedirect';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -28,24 +28,15 @@ export default function LoginPage() {
 
   const completeLogin = async (response: { data: { user: User; accessToken: string } }) => {
     login(response.data.user, response.data.accessToken);
-    const returnTo = getReturnTo();
-    if (!response.data.user.companyId) {
-      router.push(getWorkspaceSetupDestination(returnTo));
-      return;
-    }
     try {
       const current = await api.get('/auth/me');
       const user = current.data?.user as User | undefined;
-      if (user) {
-        login(user, response.data.accessToken);
-        const company = typeof user.companyId === 'object' ? user.companyId : undefined;
-        router.push(returnTo || (company?.organizationType && company.organizationType !== 'business' ? '/academic' : '/dashboard'));
-        return;
-      }
+      if (!current.data?.success || !user?._id) throw new Error('The account profile was incomplete.');
+      login(user, response.data.accessToken);
+      router.replace(getAuthenticatedDestination(user, getReturnTo()));
     } catch {
-      // Authentication succeeded; if profile hydration is temporarily unavailable, keep the standard dashboard entry.
+      setError('You are signed in, but we could not load your workspace yet. Please try again.');
     }
-    router.push(returnTo || '/dashboard');
   };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {

@@ -8,7 +8,7 @@ import type { AxiosError } from 'axios';
 import { AuthShell } from '@/components/auth/AuthShell';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/store/useAuthStore';
-import { getSafeReturnPath, getWorkspaceSetupDestination } from '@/lib/authRedirect';
+import { getAuthenticatedDestination, getSafeReturnPath } from '@/lib/authRedirect';
 
 const errorMessages: Record<string, string> = {
   mfa_required: 'Administrator accounts must sign in through the Admin Portal and complete multi-factor authentication.',
@@ -44,18 +44,21 @@ function CallbackContent() {
     started.current = true;
     window.history.replaceState({}, '', '/auth/callback');
     void api.post('/auth/oauth/exchange', { code, ...(attemptId ? { attemptId } : {}) })
-      .then((response) => {
+      .then(async (response) => {
         const data = response.data;
         if (!data?.success || !data.user?._id || !data.accessToken) {
           throw new Error('Sign-in response was incomplete.');
         }
         login(data.user, data.accessToken);
-        const returnTo = getSafeReturnPath(data.returnTo);
-        const company = typeof data.user.companyId === 'object' ? data.user.companyId : undefined;
-        const destination = data.user.companyId
-          ? returnTo || (company?.organizationType && company.organizationType !== 'business' ? '/academic' : '/dashboard')
-          : getWorkspaceSetupDestination(returnTo);
-        router.replace(destination);
+        const current = await api.get('/auth/me');
+        if (!current.data?.success || !current.data?.user?._id) {
+          throw new Error('The account profile was incomplete.');
+        }
+        login(current.data.user, data.accessToken);
+        router.replace(getAuthenticatedDestination(
+          current.data.user,
+          getSafeReturnPath(data.returnTo),
+        ));
       })
       .catch((requestError: unknown) => {
         const message = (requestError as AxiosError<{ message?: string }>).response?.data?.message;

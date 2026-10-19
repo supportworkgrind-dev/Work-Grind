@@ -36,6 +36,8 @@ export interface User {
   isActive: boolean;
   accountType?: 'company' | 'individual';
   signupOrganizationType?: OrganizationType;
+  onboardingStatus?: 'pending' | 'completed';
+  onboardingStep?: 1 | 2 | 3;
   isSuperAdmin?: boolean;
   mfaEnabled?: boolean;
   lastSeen?: string;
@@ -93,6 +95,13 @@ export interface Company {
   inviteCode?: string;
   accountType?: 'company' | 'individual';
   organizationType?: OrganizationType;
+  organizationDetails?: {
+    schoolType?: 'primary' | 'secondary' | 'combined' | 'other';
+    gradeRange?: 'early_years' | 'primary' | 'middle' | 'secondary' | 'mixed' | 'other';
+    collegeType?: 'community' | 'technical' | 'vocational' | 'sixth_form' | 'other';
+    programs?: string[];
+    faculties?: string[];
+  };
   /** Legacy plan field */
   plan: 'free' | 'starter' | 'pro';
   storage: {
