@@ -27,7 +27,21 @@ import {
 export default function CreateCompanyPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user, setCompany, fetchCurrentUser } = useAuthStore();
+  const {
+    user,
+    isAuthenticated,
+    isLoading: isAuthLoading,
+    authError,
+    restoreSession,
+    setCompany,
+  } = useAuthStore();
+  const hasAccessToken = Boolean(getAuthValue('workgrind_access_token'));
+  const canCreateWorkspace = Boolean(user && isAuthenticated && hasAccessToken && !isAuthLoading);
+
+  useEffect(() => {
+    if (isAuthLoading || authError || canCreateWorkspace) return;
+    router.replace(`/login?redirect=${encodeURIComponent('/create-company')}`);
+  }, [authError, canCreateWorkspace, isAuthLoading, router]);
 
   const hasPersistedSignupContext = Boolean(user?.signupOrganizationType);
   // Step 1: Account Type selection | Step 2: Workspace details
@@ -88,10 +102,9 @@ export default function CreateCompanyPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isLoading || isRedirecting) return;
+    if (isLoading || isRedirecting || !canCreateWorkspace) return;
     setError('');
     setIsLoading(true);
-    const currentToken = getAuthValue('workgrind_access_token');
 
     try {
       const res = await api.post('/auth/create-company', {
@@ -106,6 +119,7 @@ export default function CreateCompanyPage() {
 
       if (res.data.success) {
         setIsRedirecting(true);
+        const currentToken = getAuthValue('workgrind_access_token');
         if (res.data.accessToken && currentToken) {
           updateAuthTokens(res.data.accessToken, currentToken);
         }
@@ -117,12 +131,41 @@ export default function CreateCompanyPage() {
         router.push(returnTo ? `/onboarding?redirect=${encodeURIComponent(returnTo)}` : '/onboarding');
       }
     } catch (err: unknown) {
+      if (axios.isAxiosError(err) && err.response?.status === 401) {
+        router.replace(`/login?redirect=${encodeURIComponent('/create-company')}`);
+        return;
+      }
       setError(axios.isAxiosError<{ message?: string }>(err)
         ? err.response?.data?.message || 'Failed to create workspace. Please try again.'
         : 'Failed to create workspace. Please try again.');
       setIsLoading(false);
     }
   };
+
+  if (isAuthLoading || (!canCreateWorkspace && !authError)) {
+    return (
+      <div className="theme-scope theme-bg-base flex min-h-screen items-center justify-center px-4">
+        <p className="text-sm text-slate-600" role="status">Checking your sign-in session…</p>
+      </div>
+    );
+  }
+
+  if (authError && !canCreateWorkspace) {
+    return (
+      <div className="theme-scope theme-bg-base flex min-h-screen items-center justify-center px-4">
+        <div className="max-w-md text-center">
+          <p className="text-sm text-slate-700" role="alert">{authError}</p>
+          <button
+            type="button"
+            className="mt-4 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white"
+            onClick={() => void restoreSession()}
+          >
+            Retry session check
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="theme-scope theme-bg-base flex min-h-screen flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">

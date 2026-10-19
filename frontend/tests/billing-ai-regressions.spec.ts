@@ -427,6 +427,129 @@ test('a protected request without an access token recovers through the refresh c
   expect(refreshRequests).toHaveLength(1);
 });
 
+test('workspace creation waits for an authenticated session and redirects anonymous visitors', async ({ page }) => {
+  let createCompanyRequests = 0;
+  let refreshRequests = 0;
+  const requestedUrls: string[] = [];
+  page.on('request', (request) => requestedUrls.push(request.url()));
+  await page.route('**/api/**', async (route) => {
+    const pathname = new URL(route.request().url()).pathname;
+    if (pathname.endsWith('/auth/refresh')) {
+      refreshRequests += 1;
+      await route.fulfill({
+        status: 401,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: false, message: 'Refresh token required' }),
+      });
+      return;
+    }
+    if (pathname.endsWith('/auth/create-company')) {
+      createCompanyRequests += 1;
+      await route.fulfill({
+        status: 401,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: false, message: 'No token provided' }),
+      });
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ success: true }),
+    });
+  });
+  await page.goto('/create-company');
+
+  await expect(page).toHaveURL(/\/login\?redirect=%2Fcreate-company$/, {
+    timeout: 15000,
+  });
+  expect(refreshRequests, requestedUrls.join('\n')).toBeGreaterThan(0);
+  expect(createCompanyRequests).toBe(0);
+});
+
+test('verified signup creates its workspace with the authenticated owner and stores the rotated access token', async ({ page }) => {
+  let createCompanyAuthorization = '';
+  let createCompanyBody: Record<string, unknown> | undefined;
+  await setSessionAuth(page);
+  await page.route('**/api/**', async (route) => {
+    const request = route.request();
+    const pathname = new URL(request.url()).pathname;
+    if (pathname.endsWith('/auth/me')) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          user: {
+            _id: 'signup-owner',
+            fullName: 'School Owner',
+            email: 'school-owner@example.test',
+            role: 'owner',
+            accountType: 'company',
+            signupOrganizationType: 'school',
+            companyId: null,
+          },
+        }),
+      });
+      return;
+    }
+    if (pathname.endsWith('/subscription/status')) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true, subscription: { hasActiveAccess: true } }),
+      });
+      return;
+    }
+    if (pathname.endsWith('/auth/create-company')) {
+      createCompanyAuthorization = request.headers().authorization ?? '';
+      createCompanyBody = request.postDataJSON() as Record<string, unknown>;
+      await route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          accessToken: 'rotated-workspace-access',
+          company: {
+            _id: 'school-workspace',
+            name: 'North School',
+            ownerId: 'signup-owner',
+            organizationType: 'school',
+            accountType: 'company',
+          },
+          user: {
+            _id: 'signup-owner',
+            fullName: 'School Owner',
+            email: 'school-owner@example.test',
+            role: 'owner',
+            accountType: 'company',
+            companyId: 'school-workspace',
+          },
+        }),
+      });
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ success: true }),
+    });
+  });
+  await page.goto('/create-company');
+  await page.getByPlaceholder('Apex Technologies').fill('North School');
+  await page.getByRole('button', { name: 'Launch Workspace' }).click();
+
+  await expect(page).toHaveURL(/\/onboarding$/);
+  expect(createCompanyAuthorization).toBe('Bearer playwright-regression-access');
+  expect(createCompanyBody).toMatchObject({
+    name: 'North School',
+    accountType: 'company',
+    organizationType: 'school',
+  });
+  await expect.poll(() => page.evaluate(() => sessionStorage.getItem('workgrind_access_token')))
+    .toBe('rotated-workspace-access');
+});
+
 test('an expired or revoked refresh credential leaves a logged-out visitor on the public landing page', async ({ page }) => {
   const refreshRequests: number[] = [];
   const mainFrameNavigations: number[] = [];
