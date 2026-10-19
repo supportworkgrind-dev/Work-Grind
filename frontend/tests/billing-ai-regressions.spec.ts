@@ -460,10 +460,11 @@ test('workspace creation waits for an authenticated session and redirects anonym
   });
   await page.goto('/create-company');
 
+  await page.waitForTimeout(1000);
+  expect(refreshRequests, requestedUrls.join('\n')).toBeGreaterThan(0);
   await expect(page).toHaveURL(/\/login\?redirect=%2Fcreate-company$/, {
     timeout: 15000,
   });
-  expect(refreshRequests, requestedUrls.join('\n')).toBeGreaterThan(0);
   expect(createCompanyRequests).toBe(0);
 });
 
