@@ -212,13 +212,20 @@ export default function MeetingsPage() {
   const pendingMeetingCandidatesRef = useRef<Record<string, RTCIceCandidateInit[]>>({});
   const instantMeetingRequestRef = useRef<{ pending: boolean; key: string | null }>({ pending: false, key: null });
   const [remotePeers, setRemotePeers] = useState<{ [socketId: string]: RemotePeer }>({});
+  const terminalMeetingLinksRef = useRef(new Set<string>());
 
   // 1. Fetch Meetings from API
   const fetchMeetings = useCallback(async () => {
     if (!user?._id) return;
     try {
       setIsLoadingMeetings(true);
-      setMeetings(await requestMeetings(user._id));
+      const loadedMeetings = await requestMeetings(user._id);
+      for (const meeting of loadedMeetings) {
+        if (meeting.status === 'ended' || meeting.status === 'cancelled') {
+          terminalMeetingLinksRef.current.add(meeting.meetingLink);
+        }
+      }
+      setMeetings(loadedMeetings);
     } catch (err) {
       console.error('Failed to fetch meetings:', err);
     } finally {
@@ -235,16 +242,38 @@ export default function MeetingsPage() {
     const socket = getSocket();
     if (!socket) return;
 
-    const onMeetingAvailable = ({ meeting }: { meeting?: Meeting }) => {
-      if (!meeting?._id) return;
+    const onMeetingAvailable = ({ meeting, meetingLink, status }: {
+      meeting?: Meeting;
+      meetingLink?: string;
+      status?: Meeting['status'];
+    }) => {
+      if (!meeting?._id) {
+        if (meetingLink && status === 'active') {
+          if (terminalMeetingLinksRef.current.has(meetingLink)) return;
+          setMeetings((prev) => prev.map((current) =>
+            current.meetingLink === meetingLink ? { ...current, status } : current
+          ));
+          void fetchMeetings();
+        }
+        return;
+      }
+      if (terminalMeetingLinksRef.current.has(meeting.meetingLink)) return;
+      if (meeting.status === 'ended' || meeting.status === 'cancelled') {
+        terminalMeetingLinksRef.current.add(meeting.meetingLink);
+      }
       setMeetings((prev) => {
         const exists = prev.some((m) => m._id === meeting._id);
-        if (exists) return prev.map((m) => (m._id === meeting._id ? meeting : m));
+        if (exists) return prev.map((current) => {
+          if (current._id !== meeting._id) return current;
+          if (current.status === 'active' && meeting.status === 'scheduled') return current;
+          return meeting;
+        });
         return [meeting, ...prev];
       });
     };
 
     const onMeetingEnded = ({ meetingLink: endedLink }: { meetingId: string; meetingLink: string }) => {
+      terminalMeetingLinksRef.current.add(endedLink);
       setMeetings((prev) =>
         prev.map((m) => (m.meetingLink === endedLink ? { ...m, status: 'ended' } : m))
       );
@@ -259,7 +288,7 @@ export default function MeetingsPage() {
       socket.off('meeting:started', onMeetingAvailable);
       socket.off('meeting:ended', onMeetingEnded);
     };
-  }, []);
+  }, [fetchMeetings]);
 
   // 3. Auto-join meeting if join query param is in URL
   useEffect(() => {

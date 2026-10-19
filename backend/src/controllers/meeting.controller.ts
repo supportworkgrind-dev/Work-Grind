@@ -109,7 +109,7 @@ const getMeetingLinkUnavailableMessage = (meeting: IMeeting) => {
 };
 
 const reconcileActiveMeeting = async (meeting: IMeeting) => {
-  if (meeting.status !== 'active' || !getIO()) {
+  if (meeting.status !== 'active') {
     return { meeting, activeParticipants: [] as Awaited<ReturnType<typeof getMeetingParticipants>> };
   }
 
@@ -406,6 +406,10 @@ export const createMeeting = async (req: AuthRequest, res: Response): Promise<vo
           meeting: await getMeetingSafeView(existing, req.user!.userId),
           meetingGrant,
         });
+        return;
+      }
+      if (existing) {
+        res.status(409).json({ success: false, message: 'This meeting request key was already used for a different meeting.' });
         return;
       }
     }
