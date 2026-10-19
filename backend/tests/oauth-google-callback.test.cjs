@@ -4,12 +4,13 @@ const { generateKeyPairSync, randomBytes, randomUUID, sign } = require('node:cry
 const OAuthTransaction = require('../dist/models/OAuthTransaction').default;
 const OAuthExchange = require('../dist/models/OAuthExchange').default;
 const User = require('../dist/models/User').default;
-const { completeOAuthCallback, exchangeOAuthSession } = require('../dist/controllers/oauth.controller');
+const { completeOAuthCallback, exchangeOAuthSession, startOAuth } = require('../dist/controllers/oauth.controller');
 const authController = require('../dist/controllers/auth.controller');
 const { hashOAuthValue } = require('../dist/services/oauth');
 
 const originalFindOneAndDelete = OAuthTransaction.findOneAndDelete;
 const originalFindOne = OAuthTransaction.findOne;
+const originalTransactionCreate = OAuthTransaction.create;
 const originalExchangeFindOneAndDelete = OAuthExchange.findOneAndDelete;
 const originalExchangeCreate = OAuthExchange.create;
 const originalUserFindOne = User.findOne;
@@ -98,6 +99,39 @@ async function installGoogleProviderResponse(context) {
   };
   context.after(() => { global.fetch = originalFetch; });
 }
+
+test('Google OAuth initiation persists state and sets a secure callback cookie', async (context) => {
+  configureGoogle();
+  let savedTransaction;
+  OAuthTransaction.create = async (transaction) => {
+    savedTransaction = transaction;
+    return transaction;
+  };
+  context.after(() => { OAuthTransaction.create = originalTransactionCreate; });
+
+  const response = callbackResponse();
+  await startOAuth({
+    params: { provider: 'google' },
+    query: {},
+    body: {},
+    headers: {},
+    accepts: () => false,
+  }, response);
+
+  assert.equal(response.body.success, true);
+  const authorizationUrl = new URL(response.body.authUrl);
+  const cookie = response.headers['Set-Cookie'][0];
+  const cookieState = cookie.split(';', 1)[0].split('=').slice(1).join('=');
+  assert.equal(authorizationUrl.searchParams.get('state'), cookieState);
+  assert.equal(savedTransaction.stateHash, hashOAuthValue(cookieState));
+  assert.match(savedTransaction.correlationId, /^[0-9a-f-]{36}$/i);
+  assert.match(cookie, /^wg_oauth_google_state_[A-Za-z0-9_-]+=.+; Path=\/api\/auth\/oauth; Max-Age=600; HttpOnly; SameSite=None; Secure$/);
+  assert.equal(
+    authorizationUrl.searchParams.get('redirect_uri'),
+    'https://backend.example.test/api/auth/oauth/google/callback',
+  );
+  assert.equal(authorizationUrl.searchParams.get('code_challenge_method'), 'S256');
+});
 
 test('Google callback completes an existing verified-user login and persists the correlation ID', async (context) => {
   configureGoogle();
