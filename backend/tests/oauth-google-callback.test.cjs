@@ -207,6 +207,108 @@ test('Google token rejection redirects with a support ID without exposing provid
   assert.equal(destination.toString().includes('Private provider response detail'), false);
 });
 
+test('Google callback correlates missing and mismatched state cookies without logging state values', async (context) => {
+  configureGoogle();
+  const correlations = new Map();
+  const failures = [];
+  const originalConsoleError = console.error;
+  console.error = (...args) => failures.push(args);
+  OAuthTransaction.findOne = async (query, projection) => {
+    assert.equal(query.provider, 'google');
+    assert.match(query.stateHash, /^[a-f0-9]{64}$/);
+    assert.ok(query.expiresAt.$gt instanceof Date);
+    assert.deepEqual(projection, { correlationId: 1 });
+    return { correlationId: correlations.get(query.stateHash) };
+  };
+  context.after(() => {
+    OAuthTransaction.findOne = originalFindOne;
+    console.error = originalConsoleError;
+  });
+
+  const attempts = [
+    { cookieValue: null, reason: 'missing_state_cookie' },
+    { cookieValue: randomBytes(32).toString('base64url'), reason: 'state_cookie_mismatch' },
+  ];
+  for (const attempt of attempts) {
+    const state = randomBytes(32).toString('base64url');
+    const correlationId = randomUUID();
+    correlations.set(hashOAuthValue(state), correlationId);
+
+    const response = callbackResponse();
+    await completeOAuthCallback(callbackRequest(state, attempt.cookieValue), response);
+
+    const destination = new URL(response.redirects[0].url);
+    assert.equal(destination.searchParams.get('error'), 'attempt_expired');
+    assert.equal(destination.searchParams.get('supportId'), correlationId);
+    assert.equal(failures.at(-1)[1].reason, attempt.reason);
+    assert.equal(JSON.stringify(failures).includes(state), false);
+  }
+});
+
+test('Google callback keeps concurrent state transactions and correlation IDs isolated', async (context) => {
+  configureGoogle();
+  const transactions = new Map();
+  const states = [
+    randomBytes(32).toString('base64url'),
+    randomBytes(32).toString('base64url'),
+  ];
+  const correlationIds = states.map(() => randomUUID());
+  states.forEach((state, index) => {
+    transactions.set(hashOAuthValue(state), {
+      correlationId: correlationIds[index],
+      returnTo: '/dashboard',
+      intent: 'login',
+      audience: 'user',
+    });
+  });
+  OAuthTransaction.findOneAndDelete = async ({ stateHash, provider }) => {
+    assert.equal(provider, 'google');
+    const transaction = transactions.get(stateHash) || null;
+    transactions.delete(stateHash);
+    return transaction;
+  };
+  context.after(() => {
+    OAuthTransaction.findOneAndDelete = originalFindOneAndDelete;
+  });
+
+  const responses = await Promise.all(states.map(async (state) => {
+    const response = callbackResponse();
+    await completeOAuthCallback({
+      ...callbackRequest(state),
+      query: { state, error: 'access_denied' },
+    }, response);
+    return response;
+  }));
+
+  assert.deepEqual(responses.map((response) =>
+    new URL(response.redirects[0].url).searchParams.get('supportId')), correlationIds);
+  assert.ok(responses.every((response) =>
+    new URL(response.redirects[0].url).searchParams.get('error') === 'cancelled'));
+});
+
+test('Google callback rejects expired or replayed state transactions', async (context) => {
+  configureGoogle();
+  let transactionLookups = 0;
+  OAuthTransaction.findOneAndDelete = async () => {
+    transactionLookups += 1;
+    return null;
+  };
+  context.after(() => {
+    OAuthTransaction.findOneAndDelete = originalFindOneAndDelete;
+  });
+
+  const state = randomBytes(32).toString('base64url');
+  const response = callbackResponse();
+  await completeOAuthCallback(callbackRequest(state), response);
+
+  assert.equal(transactionLookups, 1);
+  assert.equal(new URL(response.redirects[0].url).searchParams.get('error'), 'attempt_expired');
+  assert.match(
+    new URL(response.redirects[0].url).searchParams.get('supportId'),
+    /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+  );
+});
+
 test('OAuth session exchange rejects malformed attempt IDs before querying exchange codes', async (context) => {
   let lookupCount = 0;
   OAuthExchange.findOneAndDelete = async () => {
