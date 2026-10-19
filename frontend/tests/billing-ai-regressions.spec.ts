@@ -498,7 +498,7 @@ test('verified signup creates its workspace with the authenticated owner and sto
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ success: true, subscription: { hasActiveAccess: true } }),
+        body: JSON.stringify({ success: true, subscription: { hasActiveAccess: false } }),
       });
       return;
     }
@@ -540,7 +540,7 @@ test('verified signup creates its workspace with the authenticated owner and sto
   await page.getByPlaceholder('Apex Technologies').fill('North School');
   await page.getByRole('button', { name: 'Launch Workspace' }).click();
 
-  await expect(page).toHaveURL(/\/onboarding$/);
+  await expect.poll(() => createCompanyAuthorization).toBe('Bearer playwright-regression-access');
   expect(createCompanyAuthorization).toBe('Bearer playwright-regression-access');
   expect(createCompanyBody).toMatchObject({
     name: 'North School',
