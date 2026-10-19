@@ -381,8 +381,53 @@ test('Tavro remains on the same route when /auth/me recovers through refresh', a
   expect(refreshRequests).toHaveLength(1);
   expect(currentUser401.value).toBe(true);
   expect(currentUserTokens[0]).toBe('Bearer playwright-regression-access');
-  expect(currentUserTokens.slice(1).length).toBeGreaterThan(0);
+  expect(currentUserTokens).toHaveLength(2);
   expect(currentUserTokens.slice(1).every((token) => token === 'Bearer playwright-refreshed-access')).toBe(true);
+});
+
+test('repeatedly rejected refreshed sessions stop after one token-change retry', async ({ page }) => {
+  const currentUserTokens: string[] = [];
+  const refreshTokens: string[] = [];
+  await setSessionAuth(page);
+  await page.route('**/api/**', async (route) => {
+    const request = route.request();
+    const pathname = new URL(request.url()).pathname;
+    if (pathname.endsWith('/auth/me')) {
+      currentUserTokens.push(request.headers().authorization ?? '');
+      await route.fulfill({
+        status: 401,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: false, message: 'Invalid or expired token' }),
+      });
+      return;
+    }
+    if (pathname.endsWith('/auth/refresh')) {
+      const accessToken = `playwright-refreshed-access-${refreshTokens.length + 1}`;
+      refreshTokens.push(accessToken);
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true, accessToken }),
+      });
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ success: true }),
+    });
+  });
+
+  await page.goto('/ai');
+  await expect(page).toHaveURL(/\/login\?redirect=%2Fai$/);
+  await expect.poll(() => currentUserTokens.length).toBe(4);
+  expect(refreshTokens).toEqual([
+    'playwright-refreshed-access-1',
+    'playwright-refreshed-access-2',
+  ]);
+  await page.waitForTimeout(500);
+  expect(currentUserTokens).toHaveLength(4);
+  expect(refreshTokens).toHaveLength(2);
 });
 
 test('a protected request without an access token recovers through the refresh cookie', async ({ page }) => {

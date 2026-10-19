@@ -21,7 +21,7 @@ interface AuthState {
   login: (userData: User, accessToken: string) => void;
   logout: () => Promise<void>;
   expireSession: () => void;
-  fetchCurrentUser: () => Promise<void>;
+  fetchCurrentUser: (allowTokenChangeRetry?: boolean) => Promise<void>;
   restoreSession: () => Promise<void>;
   refreshSubscription: () => Promise<void>;
   canUse: (entitlement: EntitlementId) => boolean;
@@ -246,7 +246,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
       return restoreRequest;
     },
 
-    fetchCurrentUser: async () => {
+    fetchCurrentUser: async (allowTokenChangeRetry = true) => {
       const token = getAuthValue('workgrind_access_token');
       if (!token) {
         await get().restoreSession();
@@ -262,6 +262,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
       if (!get().user) {
         set({ isLoading: true });
       }
+      const generation = authGeneration;
 
       const request = (async () => {
         try {
@@ -270,17 +271,11 @@ export const useAuthStore = create<AuthState>((set, get) => {
               Authorization: `Bearer ${token}`,
             },
           });
+          if (generation !== authGeneration) return;
           const latestToken = getAuthValue('workgrind_access_token');
           const resolvedUser = res.data?.user as User | undefined;
           if (!latestToken) {
             set({ user: null, company: null, subscription: null, subscriptionLoading: false, subscriptionError: null, isAuthenticated: false, isLoading: false });
-            return;
-          }
-          if (latestToken !== token) {
-            if (!get().user) {
-              set({ isLoading: true });
-            }
-            void get().fetchCurrentUser();
             return;
           }
           if (!res.data?.success || !resolvedUser?._id) {
@@ -300,16 +295,24 @@ export const useAuthStore = create<AuthState>((set, get) => {
           });
           await get().refreshSubscription();
         } catch (err: any) {
+          if (generation !== authGeneration) return;
           const latestToken = getAuthValue('workgrind_access_token');
           if (!latestToken) {
             set({ user: null, company: null, subscription: null, subscriptionLoading: false, subscriptionError: null, isAuthenticated: false, isLoading: false });
             return;
           }
           if (latestToken !== token) {
-            if (!get().user) {
-              set({ isLoading: true });
+            if (allowTokenChangeRetry) {
+              if (!get().user) set({ isLoading: true });
+              void get().fetchCurrentUser(false);
+            } else if (!get().user) {
+              set({
+                isLoading: false,
+                authError: 'Unable to restore your session. Check your connection and retry.',
+              });
+            } else {
+              set({ isLoading: false });
             }
-            void get().fetchCurrentUser();
             return;
           }
           // If offline, preserve cached user credentials instead of forcing logout

@@ -4,9 +4,6 @@ import { useEffect } from 'react';
 import { syncPendingActionsToServer } from '@/lib/offlineSync';
 import { shouldReloadForServiceWorkerControllerChange } from '@/lib/serviceWorkerUpdate';
 
-const DEV_BUILD_ID_KEY = 'workgrind:dev-build-id';
-const DEV_BUILD_RELOAD_KEY = 'workgrind:dev-build-reloaded:';
-
 export function ServiceWorkerRegister() {
   useEffect(() => {
     // Service workers cause problems in development:
@@ -17,48 +14,14 @@ export function ServiceWorkerRegister() {
 
     const isDev = process.env.NODE_ENV !== 'production';
     const buildId = process.env.NEXT_PUBLIC_BUILD_ID;
-    let cleanupBuildListener: (() => void) | undefined;
 
-    if (isDev && buildId) {
-      const handleBuildChange = (event: StorageEvent) => {
-        if (event.key === DEV_BUILD_ID_KEY && event.newValue && event.newValue !== buildId) {
-          window.location.reload();
-        }
-      };
-      window.addEventListener('storage', handleBuildChange);
-      cleanupBuildListener = () => window.removeEventListener('storage', handleBuildChange);
-
-      try {
-        const storedBuildId = localStorage.getItem(DEV_BUILD_ID_KEY);
-        if (storedBuildId && storedBuildId !== buildId) {
-          const reloadKey = `${DEV_BUILD_RELOAD_KEY}${buildId}`;
-          if (sessionStorage.getItem(reloadKey) !== '1') {
-            sessionStorage.setItem(reloadKey, '1');
-            window.location.reload();
-            return cleanupBuildListener;
-          }
-        }
-        localStorage.setItem(DEV_BUILD_ID_KEY, buildId);
-      } catch {
-        // Keep the page usable when browser storage is disabled.
-      }
-    }
-
-    if (!('serviceWorker' in navigator)) return cleanupBuildListener;
+    if (!('serviceWorker' in navigator)) return;
 
     const cleanupDevServiceWorkers = async () => {
       if (isDev) {
         try {
           const registrations = await navigator.serviceWorker.getRegistrations();
-          const hadController = Boolean(navigator.serviceWorker.controller);
-          const removed = await Promise.all(registrations.map((registration) => registration.unregister()));
-          const reloadKey = 'workgrind-dev-sw-cleanup-reloaded';
-          if (hadController && removed.every(Boolean) && !sessionStorage.getItem(reloadKey)) {
-            sessionStorage.setItem(reloadKey, '1');
-            window.location.reload();
-            return;
-          }
-          if (!navigator.serviceWorker.controller) sessionStorage.removeItem(reloadKey);
+          await Promise.all(registrations.map((registration) => registration.unregister()));
         } catch {
           // Ignore cleanup failures in dev; stale registrations are worse than a quiet no-op.
         }
@@ -67,7 +30,7 @@ export function ServiceWorkerRegister() {
 
     cleanupDevServiceWorkers();
 
-    if (isDev) return cleanupBuildListener;
+    if (isDev) return;
 
     const hadController = Boolean(navigator.serviceWorker.controller);
     let refreshing = false;
