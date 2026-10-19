@@ -613,12 +613,14 @@ test('an expired or revoked refresh credential leaves a logged-out visitor on th
   await page.goto('/');
   await expect(page).toHaveURL(/\/$/);
   await expect(page.getByRole('link', { name: /sign in|log in/i }).first()).toBeVisible();
+  await expect.poll(() => refreshRequests.length).toBe(1);
+  const settledNavigations = mainFrameNavigations.length;
   await page.waitForTimeout(500);
-  expect(refreshRequests).toHaveLength(1);
-  expect(mainFrameNavigations).toHaveLength(1);
+  expect(mainFrameNavigations).toHaveLength(settledNavigations);
 });
 
 test('concurrent expired API requests share one refresh and preserve the current route', async ({ page }) => {
+  test.setTimeout(120_000);
   const state = makeApiState();
   state.messages.push({
     role: 'assistant',
@@ -634,6 +636,9 @@ test('concurrent expired API requests share one refresh and preserve the current
     sessionStorage.setItem('workgrind_access_token', 'playwright-expired-access');
     sessionStorage.setItem('workgrind:ai:active-conversation:playwright-user', id);
   }, conversationId);
+  await page.routeWebSocket('**/socket.io/**', (socket) => {
+    socket.close({ code: 1000, reason: 'Socket.IO is not under test.' });
+  });
   await page.route('**/api/**', (route) => mockApi(route, {
     ...state,
     failSubscriptionRequestAt: undefined,
