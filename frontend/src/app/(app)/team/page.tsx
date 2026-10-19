@@ -35,6 +35,10 @@ export default function TeamDirectoryPage() {
   const [liveMeetings,  setLiveMeetings]  = useState<Meeting[]>([]);
   const [starting,      setStarting]      = useState(false);
   const [dmError,       setDmError]       = useState('');
+  const instantMeetingPending = useRef(false);
+  const instantMeetingKey = useRef<string | null>(null);
+  const callMeetingKeys = useRef(new Map<string, string>());
+  const pendingCallRecipients = useRef(new Set<string>());
 
   useEffect(() => {
     api.get('/users').then((r) => {
@@ -93,7 +97,11 @@ export default function TeamDirectoryPage() {
         ? status === 'busy' || status === 'away' ? status : 'online'
         : 'offline',
     } : m));
-    const onStart   = ({ meeting }: { meeting: Meeting }) => setLiveMeetings((p) => { const ex = p.some((x) => x._id === meeting._id); return ex ? p.map((x) => x._id === meeting._id ? meeting : x) : [meeting, ...p]; });
+    const onStart   = () => {
+      api.get('/meetings/active')
+        .then((response) => { if (response.data.success) setLiveMeetings(response.data.meetings); })
+        .catch(() => {});
+    };
     const onEnd     = ({ meetingLink }: { meetingLink: string }) => setLiveMeetings((p) => p.filter((m) => m.meetingLink !== meetingLink));
     s.on('user:online', onOnline); s.on('user:offline', onOffline); s.on('user:status-changed', onStatus);
     s.on('users:online-list', onOnlineList);
@@ -115,11 +123,23 @@ export default function TeamDirectoryPage() {
     } catch { /* silent */ } finally { setInviteLoading(false); }
   };
   const handleInstantMeeting = async () => {
+    if (instantMeetingPending.current) return;
+    instantMeetingPending.current = true;
+    instantMeetingKey.current ??= crypto.randomUUID();
     setStarting(true);
     try {
-      const r = await api.post('/meetings', { title: `${user?.fullName?.split(' ')[0] ?? 'Team'}'s Instant Meeting`, isInstant: true });
-      if (r.data.success) router.push(`/meetings?join=${r.data.meeting.meetingLink}`);
-    } catch { /* silent */ } finally { setStarting(false); }
+      const r = await api.post('/meetings', {
+        title: `${user?.fullName?.split(' ')[0] ?? 'Team'}'s Instant Meeting`,
+        isInstant: true,
+      }, { headers: { 'Idempotency-Key': instantMeetingKey.current } });
+      if (r.data.success) {
+        instantMeetingKey.current = null;
+        router.push(`/meetings?join=${r.data.meeting.meetingLink}`);
+      }
+    } catch { /* silent */ } finally {
+      instantMeetingPending.current = false;
+      setStarting(false);
+    }
   };
   const handleDM = async (member: User) => {
     setDmError('');
@@ -140,10 +160,24 @@ export default function TeamDirectoryPage() {
     }
   };
   const handleCall = async (member: User) => {
+    if (pendingCallRecipients.current.has(member._id)) return;
+    pendingCallRecipients.current.add(member._id);
+    if (!callMeetingKeys.current.has(member._id)) {
+      callMeetingKeys.current.set(member._id, crypto.randomUUID());
+    }
     try {
-      const r = await api.post('/meetings', { title: `Call with ${member.fullName}`, participantIds: [member._id], isInstant: true });
-      if (r.data.success) router.push(`/meetings?join=${r.data.meeting.meetingLink}`);
-    } catch { /* silent */ }
+      const r = await api.post('/meetings', {
+        title: `Call with ${member.fullName}`,
+        participantIds: [member._id],
+        isInstant: true,
+      }, { headers: { 'Idempotency-Key': callMeetingKeys.current.get(member._id) } });
+      if (r.data.success) {
+        callMeetingKeys.current.delete(member._id);
+        router.push(`/meetings?join=${r.data.meeting.meetingLink}`);
+      }
+    } catch { /* silent */ } finally {
+      pendingCallRecipients.current.delete(member._id);
+    }
   };
 
   const depts = Array.from(new Set(members.map((m) => m.department).filter(Boolean)));

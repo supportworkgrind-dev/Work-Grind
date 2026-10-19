@@ -210,6 +210,7 @@ export default function MeetingsPage() {
   const rtcConfigurationRef = useRef<WorkGrindRtcConfiguration | null>(null);
   const signalQueuesRef = useRef<Record<string, Promise<void>>>({});
   const pendingMeetingCandidatesRef = useRef<Record<string, RTCIceCandidateInit[]>>({});
+  const instantMeetingRequestRef = useRef<{ pending: boolean; key: string | null }>({ pending: false, key: null });
   const [remotePeers, setRemotePeers] = useState<{ [socketId: string]: RemotePeer }>({});
 
   // 1. Fetch Meetings from API
@@ -234,7 +235,8 @@ export default function MeetingsPage() {
     const socket = getSocket();
     if (!socket) return;
 
-    const onMeetingAvailable = ({ meeting }: { meeting: Meeting }) => {
+    const onMeetingAvailable = ({ meeting }: { meeting?: Meeting }) => {
+      if (!meeting?._id) return;
       setMeetings((prev) => {
         const exists = prev.some((m) => m._id === meeting._id);
         if (exists) return prev.map((m) => (m._id === meeting._id ? meeting : m));
@@ -985,20 +987,26 @@ export default function MeetingsPage() {
 
   // ── 7. START INSTANT MEETING ──────────────────────────────────────────────
   const handleStartInstant = async () => {
+    if (instantMeetingRequestRef.current.pending) return;
+    instantMeetingRequestRef.current.pending = true;
+    instantMeetingRequestRef.current.key ??= crypto.randomUUID();
     try {
       const title = `${user?.fullName?.split(' ')[0] || 'My'}'s Instant Meeting`;
       const res = await api.post('/meetings', {
         title,
         description: 'Instant live collaborative audio/video session',
         isInstant: true,
-      });
+      }, { headers: { 'Idempotency-Key': instantMeetingRequestRef.current.key } });
       if (res.data.success && res.data.meeting) {
+        instantMeetingRequestRef.current.key = null;
         setActiveMeeting(res.data.meeting);
         setMeetingGrant(res.data.meetingGrant || null);
         setMeetings((prev) => [res.data.meeting, ...prev]);
       }
     } catch (err) {
       console.error('Failed to start instant meeting:', err);
+    } finally {
+      instantMeetingRequestRef.current.pending = false;
     }
   };
 

@@ -27,12 +27,14 @@ import {
   socketEventFeature,
   socketUserEventFeature,
 } from './socketAuthorization';
+import { isMeetingInactive, MEETING_DISCONNECT_GRACE_MS } from './meetingLifecycle';
 
 let io: SocketServer;
 let adapterReady: Promise<void> | null = null;
 const ADAPTER_COLLECTION = 'socket.io-adapter-events';
 const PRESENCE_LEASE_MS = 90_000;
 const PRESENCE_HEARTBEAT_MS = 30_000;
+const meetingCleanupTimers = new Map<string, NodeJS.Timeout>();
 export const SOCKET_IO_PATH = '/api/socket-io/socket.io';
 
 export interface MeetingParticipant {
@@ -55,7 +57,6 @@ export interface MeetingParticipant {
 type GlobalCallTerminalStatus = 'completed' | 'missed' | 'rejected' | 'cancelled';
 type PresenceStatus = 'online' | 'away' | 'busy' | 'offline';
 
-const MEETING_LINK_TTL_MS = 24 * 60 * 60 * 1000;
 const GLOBAL_CALLING_ROOM = 'calling:eligible';
 const callReconnectKey = (sessionId: string, userId: string) => `${sessionId}:${userId}`;
 
@@ -63,6 +64,72 @@ const userRoom = (userId: string) => `user:${userId}`;
 const userFeatureRoom = (userId: string, feature: OrganizationFeature) => `user:${userId}:feature:${feature}`;
 const meetingParticipantFor = (socket: Pick<Socket, 'data'>, meetingId: string) =>
   (socket.data.meetingParticipants as Record<string, MeetingParticipant> | undefined)?.[meetingId];
+const meetingCleanupKey = (companyId: string, meetingLink: string) => `${companyId}:${meetingLink}`;
+
+function clearMeetingCleanup(companyId: string, meetingLink: string) {
+  const key = meetingCleanupKey(companyId, meetingLink);
+  const timer = meetingCleanupTimers.get(key);
+  if (timer) clearTimeout(timer);
+  meetingCleanupTimers.delete(key);
+}
+
+function scheduleMeetingCleanup(companyId: string, meetingLink: string) {
+  clearMeetingCleanup(companyId, meetingLink);
+  const key = meetingCleanupKey(companyId, meetingLink);
+  const timer = setTimeout(async () => {
+    try {
+      const room = `meeting:${meetingLink}`;
+      if ((await io.in(room).fetchSockets()).length) return;
+      const cutoff = new Date(Date.now() - MEETING_DISCONNECT_GRACE_MS);
+      const candidate = await Meeting.findOne({
+        meetingLink,
+        companyId,
+        status: 'active',
+        lastActivityAt: { $lte: cutoff },
+      }).select('_id startedAt').lean();
+      if (!candidate) return;
+      const endedAt = new Date();
+      const meeting = await Meeting.findOneAndUpdate({
+        _id: candidate._id,
+        status: 'active',
+        lastActivityAt: { $lte: cutoff },
+      }, {
+        $set: {
+          status: 'ended',
+          endedAt,
+          duration: candidate.startedAt
+            ? Math.max(0, Math.round((endedAt.getTime() - new Date(candidate.startedAt).getTime()) / 60000))
+            : 0,
+        },
+      }, { new: true }).select('hostId participants.userId');
+      if (!meeting) return;
+      const event = { meetingId: meeting._id, meetingLink };
+      io.to(room).emit('meeting:ended', event);
+      const memberIds = new Set([
+        meeting.hostId.toString(),
+        ...meeting.participants.map((participant) => participant.userId.toString()),
+      ]);
+      for (const memberId of memberIds) emitToUser(memberId, 'meeting:ended', event);
+    } catch (error: unknown) {
+      const errorName = error instanceof Error ? error.name : 'UnknownError';
+      console.error('[Socket] Failed to end an idle meeting.', { errorName });
+    } finally {
+      if (meetingCleanupTimers.get(key) === timer) meetingCleanupTimers.delete(key);
+    }
+  }, MEETING_DISCONNECT_GRACE_MS);
+  timer.unref();
+  meetingCleanupTimers.set(key, timer);
+}
+
+async function recordMeetingRoomDeparture(companyId: string, meetingLink: string) {
+  const room = `meeting:${meetingLink}`;
+  if ((await io.in(room).fetchSockets()).length) return;
+  await Meeting.updateOne(
+    { meetingLink, companyId, status: 'active' },
+    { $set: { lastActivityAt: new Date() } },
+  );
+  scheduleMeetingCleanup(companyId, meetingLink);
+}
 
 function hasSocketFeature(
   socket: Pick<Socket, 'data'>,
@@ -427,10 +494,9 @@ const authorizeMeetingSocket = async (socket: Pick<Socket, 'data'>, meetingLink:
       meetingLink,
       companyId,
       status: 'active',
-    }).select('_id companyId hostId startedAt scheduledAt');
+    }).select('_id companyId hostId startedAt lastActivityAt createdAt');
     if (!meeting) return null;
-    const expirationAnchor = meeting.startedAt || meeting.scheduledAt;
-    if (expirationAnchor && Date.now() - new Date(expirationAnchor).getTime() > MEETING_LINK_TTL_MS) return null;
+    if (isMeetingInactive(meeting) && !(await io.in(`meeting:${meetingLink}`).fetchSockets()).length) return null;
     const user = await User.findOne({
       _id: userId,
       companyId,
@@ -854,6 +920,11 @@ export const initSocket = (server: HTTPServer) => {
       }
       await socket.join(`meeting:${meetingId}`);
       const roomKey = `meeting:${meetingId}`;
+      clearMeetingCleanup(companyId, meetingId);
+      await Meeting.updateOne(
+        { meetingLink: meetingId, status: 'active', companyId },
+        { $set: { lastActivityAt: new Date() } },
+      );
 
       const participant: MeetingParticipant = {
         socketId: socket.id,
@@ -874,6 +945,18 @@ export const initSocket = (server: HTTPServer) => {
         .filter((peer): peer is MeetingParticipant => Boolean(peer));
       socket.emit('meeting:room-users', { meetingId, participants: existingParticipants });
       socket.to(roomKey).emit('meeting:user-joined', participant);
+      const meetingMembers = await Meeting.findOne({ meetingLink: meetingId, companyId })
+        .select('hostId participants.userId')
+        .lean();
+      if (meetingMembers) {
+        const memberIds = new Set([
+          meetingMembers.hostId.toString(),
+          ...meetingMembers.participants.map((member) => member.userId.toString()),
+        ]);
+        for (const memberId of memberIds) {
+          emitToUser(memberId, 'meeting:started', { meetingId: access.meeting._id, meetingLink: meetingId });
+        }
+      }
       void publishUserPresence(userId);
     });
 
@@ -1068,6 +1151,7 @@ export const initSocket = (server: HTTPServer) => {
       delete (socket.data.meetingGrants as Record<string, string> | undefined)?.[meetingId];
       delete (socket.data.meetingParticipants as Record<string, MeetingParticipant> | undefined)?.[meetingId];
       if (access) socket.to(`meeting:${meetingId}`).emit('meeting:user-left', { socketId: socket.id, userId });
+      await recordMeetingRoomDeparture(companyId, meetingId);
       void publishUserPresence(userId);
     });
 
@@ -1109,12 +1193,11 @@ export const initSocket = (server: HTTPServer) => {
     socket.on('disconnect', async () => {
       if (subscriptionExpiryTimer) clearTimeout(subscriptionExpiryTimer);
       if (presenceHeartbeat) clearInterval(presenceHeartbeat);
-      for (const room of socket.rooms) {
-        if (!room.startsWith('meeting:')) continue;
-        const meetingId = room.slice('meeting:'.length);
-        if (meetingParticipantFor(socket, meetingId)) {
-          socket.to(room).emit('meeting:user-left', { socketId: socket.id, userId });
-        }
+      const meetingParticipants = socket.data.meetingParticipants as Record<string, MeetingParticipant> | undefined;
+      for (const [meetingId, participant] of Object.entries(meetingParticipants ?? {})) {
+        if (participant.userId !== userId) continue;
+        socket.to(`meeting:${meetingId}`).emit('meeting:user-left', { socketId: socket.id, userId });
+        await recordMeetingRoomDeparture(companyId, meetingId);
       }
       await RealtimePresence.deleteOne({ socketId: socket.id, userId });
       const stillOnline = await RealtimePresence.exists({ userId, expiresAt: { $gt: new Date() } });

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAppStore } from '@/store/useAppStore';
 import { api } from '@/lib/api';
 import { fetchAllProjects } from '@/lib/projects';
@@ -31,6 +31,8 @@ export function ScheduleMeetingModal({ onCreated }: { onCreated?: () => void }) 
   const [isLookingUpInvitee, setIsLookingUpInvitee] = useState(false);
   const [inviteError, setInviteError] = useState('');
   const [submitError, setSubmitError] = useState('');
+  const requestKeyRef = useRef<{ fingerprint: string; key: string } | null>(null);
+  const submitPendingRef = useRef(false);
 
   useEffect(() => {
     if (!isCreateModalOpen || createModalType !== 'meeting') return;
@@ -78,22 +80,31 @@ export function ScheduleMeetingModal({ onCreated }: { onCreated?: () => void }) 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim()) return;
+    if (!title.trim() || submitPendingRef.current) return;
 
+    const requestBody = {
+      title,
+      description,
+      scheduledAt: scheduledAt ? new Date(scheduledAt) : undefined,
+      participantIds: invitees.map((invitee) => invitee._id),
+      crmCompanyId: crmCompanyId || undefined,
+      crmContactIds,
+      projectId: projectId || undefined,
+    };
+    const fingerprint = JSON.stringify(requestBody);
+    if (requestKeyRef.current?.fingerprint !== fingerprint) {
+      requestKeyRef.current = { fingerprint, key: crypto.randomUUID() };
+    }
+    submitPendingRef.current = true;
     setIsLoading(true);
     setSubmitError('');
     try {
-      const res = await api.post('/meetings', {
-        title,
-        description,
-        scheduledAt: scheduledAt ? new Date(scheduledAt) : new Date(),
-        participantIds: invitees.map((invitee) => invitee._id),
-        crmCompanyId: crmCompanyId || undefined,
-        crmContactIds,
-        projectId: projectId || undefined,
+      const res = await api.post('/meetings', requestBody, {
+        headers: { 'Idempotency-Key': requestKeyRef.current.key },
       });
 
       if (res.data.success) {
+        requestKeyRef.current = null;
         closeCreateModal();
         setTitle('');
         setDescription('');
@@ -111,6 +122,7 @@ export function ScheduleMeetingModal({ onCreated }: { onCreated?: () => void }) 
           || 'The meeting could not be scheduled. Please try again.'
       );
     } finally {
+      submitPendingRef.current = false;
       setIsLoading(false);
     }
   };

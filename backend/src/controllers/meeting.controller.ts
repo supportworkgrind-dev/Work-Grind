@@ -18,9 +18,9 @@ import { reserveAiRequest } from '../utils/planLimits';
 import { emitToUser, getIO, getMeetingParticipants } from '../utils/socket';
 import { createNotification } from './channel.controller';
 import { refreshAvatarUrls } from '../services/avatarUrls';
+import { isMeetingInactive, isScheduledMeetingLinkExpired } from '../utils/meetingLifecycle';
 
 const MEETING_GRANT_TTL_MS = 8 * 60 * 60 * 1000;
-const MEETING_LINK_TTL_MS = 24 * 60 * 60 * 1000;
 
 const getMeetingUser = async (userId: string) =>
   User.findOne({
@@ -99,8 +99,50 @@ const meetingMemberIds = (meeting: IMeeting): string[] => [...new Set([
 
 const isMeetingLinkAvailable = (meeting: IMeeting) => {
   if (meeting.status !== 'scheduled' && meeting.status !== 'active') return false;
-  const expirationAnchor = meeting.startedAt || meeting.scheduledAt;
-  return !expirationAnchor || Date.now() - new Date(expirationAnchor).getTime() <= MEETING_LINK_TTL_MS;
+  return !isScheduledMeetingLinkExpired(meeting);
+};
+
+const getMeetingLinkUnavailableMessage = (meeting: IMeeting) => {
+  if (meeting.status === 'ended') return 'This meeting has ended.';
+  if (meeting.status === 'cancelled') return 'This meeting was cancelled.';
+  return 'This meeting link has expired.';
+};
+
+const reconcileActiveMeeting = async (meeting: IMeeting) => {
+  if (meeting.status !== 'active' || !getIO()) {
+    return { meeting, activeParticipants: [] as Awaited<ReturnType<typeof getMeetingParticipants>> };
+  }
+
+  const activeParticipants = await getMeetingParticipants(meeting.meetingLink);
+  if (activeParticipants.length || !isMeetingInactive(meeting)) {
+    return { meeting, activeParticipants };
+  }
+
+  const endedAt = new Date();
+  const filter: Record<string, unknown> = { _id: meeting._id, status: 'active' };
+  filter.lastActivityAt = meeting.lastActivityAt ? meeting.lastActivityAt : { $exists: false };
+  const updated = await Meeting.findOneAndUpdate(filter, {
+    $set: {
+      status: 'ended',
+      endedAt,
+      duration: meeting.startedAt
+        ? Math.max(0, Math.round((endedAt.getTime() - new Date(meeting.startedAt).getTime()) / 60000))
+        : 0,
+    },
+  }, { new: true });
+  if (!updated) {
+    return { meeting, activeParticipants: await getMeetingParticipants(meeting.meetingLink) };
+  }
+
+  meeting.status = 'ended';
+  meeting.endedAt = endedAt;
+  meeting.duration = updated.duration;
+  const event = { meetingId: meeting._id, meetingLink: meeting.meetingLink };
+  getIO()?.to(`meeting:${meeting.meetingLink}`).emit('meeting:ended', event);
+  for (const participantId of meetingMemberIds(meeting)) {
+    emitToUser(participantId, 'meeting:ended', event);
+  }
+  return { meeting, activeParticipants: [] };
 };
 
 export const getMeetings = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -120,9 +162,10 @@ export const getMeetings = async (req: AuthRequest, res: Response): Promise<void
       { path: 'hostId', select: 'fullName avatar avatarStorageKey' },
       { path: 'participants.userId', select: 'fullName avatar avatarStorageKey' },
     ]);
-    const safeMeetings = await Promise.all(
-      meetings.map((meeting) => getMeetingSafeView(meeting, req.user!.userId)),
-    );
+    const safeMeetings = await Promise.all(meetings.map(async (meeting) => {
+      const reconciled = await reconcileActiveMeeting(meeting);
+      return getMeetingSafeView(reconciled.meeting, req.user!.userId);
+    }));
 
     res.set('Cache-Control', 'private, no-store');
     res.json({ success: true, meetings: safeMeetings });
@@ -144,13 +187,14 @@ export const getActiveMeetings = async (req: AuthRequest, res: Response): Promis
       ])
       .exec();
 
-    const enriched = await Promise.all(meetings.map(async (meeting) => {
-      const activeSockets = await getMeetingParticipants(meeting.meetingLink);
+    const enriched = (await Promise.all(meetings.map(async (meeting) => {
+      const reconciled = await reconcileActiveMeeting(meeting);
+      if (reconciled.meeting.status !== 'active' || !reconciled.activeParticipants.length) return null;
       return {
-        ...await getMeetingSafeView(meeting, req.user!.userId),
-        activeParticipantCount: Math.max(activeSockets.length, 1),
+        ...await getMeetingSafeView(reconciled.meeting, req.user!.userId),
+        activeParticipantCount: new Set(reconciled.activeParticipants.map((participant) => participant.userId)).size,
       };
-    }));
+    }))).filter((meeting): meeting is NonNullable<typeof meeting> => meeting !== null);
 
     res.set('Cache-Control', 'private, no-store');
     res.json({ success: true, meetings: enriched });
@@ -160,6 +204,8 @@ export const getActiveMeetings = async (req: AuthRequest, res: Response): Promis
 };
 
 export const createMeeting = async (req: AuthRequest, res: Response): Promise<void> => {
+  let idempotencyKeyHash: string | undefined;
+  let idempotencyPayloadHash: string | undefined;
   try {
     const { title, description, scheduledAt, participantIds = [], projectId, crmCompanyId, crmContactIds = [], isInstant } = req.body;
     if (!title) {
@@ -168,6 +214,14 @@ export const createMeeting = async (req: AuthRequest, res: Response): Promise<vo
     }
 
     const companyId = req.user!.companyId;
+    const idempotencyKey = req.get('Idempotency-Key');
+    if (idempotencyKey !== undefined) {
+      if (idempotencyKey.length < 16 || idempotencyKey.length > 128 || !/^[A-Za-z0-9_-]+$/.test(idempotencyKey)) {
+        res.status(400).json({ success: false, message: 'Invalid meeting request key.' });
+        return;
+      }
+      idempotencyKeyHash = createHash('sha256').update(idempotencyKey).digest('hex');
+    }
     const hasCompanyId = crmCompanyId !== undefined && crmCompanyId !== null && crmCompanyId !== '';
     if (hasCompanyId && (!mongoose.Types.ObjectId.isValid(crmCompanyId) || !await CrmCompany.exists({ _id: crmCompanyId, companyId }))) {
       res.status(400).json({ success: false, message: 'CRM company must belong to this workspace.' });
@@ -193,6 +247,7 @@ export const createMeeting = async (req: AuthRequest, res: Response): Promise<vo
     if (uniqueParticipantIds.length) {
       const participantCount = await User.countDocuments({
         _id: { $in: uniqueParticipantIds },
+        companyId,
         isActive: true,
         isDeleted: { $ne: true },
       });
@@ -202,7 +257,7 @@ export const createMeeting = async (req: AuthRequest, res: Response): Promise<vo
       }
     }
     const invitedUsers = uniqueParticipantIds.length
-      ? await User.find({ _id: { $in: uniqueParticipantIds }, isActive: true, isDeleted: { $ne: true } })
+      ? await User.find({ _id: { $in: uniqueParticipantIds }, companyId, isActive: true, isDeleted: { $ne: true } })
         .select('_id companyId')
         .lean()
       : [];
@@ -218,6 +273,44 @@ export const createMeeting = async (req: AuthRequest, res: Response): Promise<vo
       const contactCount = await CrmContact.countDocuments(contactFilter);
       if (contactCount !== uniqueCrmContactIds.length) {
         res.status(400).json({ success: false, message: 'Meeting contacts must belong to the selected workspace company.' });
+        return;
+      }
+    }
+
+    const normalizedScheduledAt = scheduledAt ? new Date(scheduledAt) : new Date();
+    if (Number.isNaN(normalizedScheduledAt.getTime())) {
+      res.status(400).json({ success: false, message: 'Enter a valid meeting date and time.' });
+      return;
+    }
+    if (idempotencyKeyHash) {
+      idempotencyPayloadHash = createHash('sha256').update(JSON.stringify({
+        title: String(title).trim(),
+        description: description ?? '',
+        scheduledAt: scheduledAt ? normalizedScheduledAt.toISOString() : null,
+        participantIds: [...uniqueParticipantIds].sort(),
+        projectId: projectId || null,
+        crmCompanyId: hasCompanyId ? crmCompanyId : null,
+        crmContactIds: [...uniqueCrmContactIds].sort(),
+        isInstant: Boolean(isInstant),
+      })).digest('hex');
+      const existing = await Meeting.findOne({
+        companyId,
+        hostId: req.user!.userId,
+        idempotencyKeyHash,
+      });
+      if (existing) {
+        if (existing.idempotencyPayloadHash !== idempotencyPayloadHash) {
+          res.status(409).json({ success: false, message: 'This meeting request key was already used for a different meeting.' });
+          return;
+        }
+        const meetingGrant = isInstant && existing.status === 'active'
+          ? await createMeetingGrant(existing._id, req.user!.userId)
+          : undefined;
+        res.status(200).json({
+          success: true,
+          meeting: await getMeetingSafeView(existing, req.user!.userId),
+          meetingGrant,
+        });
         return;
       }
     }
@@ -242,8 +335,11 @@ export const createMeeting = async (req: AuthRequest, res: Response): Promise<vo
       hostId: req.user!.userId,
       title,
       description,
-      scheduledAt: scheduledAt || new Date(),
+      scheduledAt: normalizedScheduledAt,
       startedAt: isInstant ? new Date() : undefined,
+      lastActivityAt: isInstant ? new Date() : undefined,
+      idempotencyKeyHash,
+      idempotencyPayloadHash,
       meetingLink,
       participants,
       crmCompanyId: hasCompanyId ? new mongoose.Types.ObjectId(crmCompanyId) : undefined,
@@ -291,13 +387,28 @@ export const createMeeting = async (req: AuthRequest, res: Response): Promise<vo
     for (const participantId of meetingMemberIds(meeting)) {
       const safeMeeting = await getMeetingSafeView(meeting, participantId);
       emitToUser(participantId, 'meeting:created', { meeting: safeMeeting });
-      if (isInstant) {
-        emitToUser(participantId, 'meeting:started', { meeting: safeMeeting });
-      }
     }
 
     res.status(201).json({ success: true, meeting: await getMeetingSafeView(meeting, req.user!.userId), meetingGrant });
   } catch (err: any) {
+    if (err?.code === 11000 && idempotencyKeyHash && idempotencyPayloadHash) {
+      const existing = await Meeting.findOne({
+        companyId: req.user!.companyId,
+        hostId: req.user!.userId,
+        idempotencyKeyHash,
+      });
+      if (existing?.idempotencyPayloadHash === idempotencyPayloadHash) {
+        const meetingGrant = req.body?.isInstant && existing.status === 'active'
+          ? await createMeetingGrant(existing._id, req.user!.userId)
+          : undefined;
+        res.status(200).json({
+          success: true,
+          meeting: await getMeetingSafeView(existing, req.user!.userId),
+          meetingGrant,
+        });
+        return;
+      }
+    }
     res.status(500).json({ success: false, message: err.message });
   }
 };
@@ -311,6 +422,7 @@ export const resolveMeetingInvitee = async (req: AuthRequest, res: Response): Pr
 
   const invitee = await User.findOne({
     callingId,
+    companyId: req.user!.companyId,
     isActive: true,
     isDeleted: { $ne: true },
   }).select('_id fullName callingId').lean();
@@ -341,19 +453,20 @@ export const getMeetingByLink = async (req: AuthRequest, res: Response): Promise
       res.status(403).json({ success: false, message: 'Active account required' });
       return;
     }
-    const meeting = await Meeting.findOne({ meetingLink: req.params.link });
+    const meeting = await Meeting.findOne({ meetingLink: req.params.link, companyId: user.companyId });
 
     if (!meeting) {
       res.status(404).json({ success: false, message: 'Meeting not found' });
       return;
     }
 
-    if (!isMeetingLinkAvailable(meeting)) {
-      res.status(410).json({ success: false, message: 'This meeting link is no longer available' });
+    const reconciled = await reconcileActiveMeeting(meeting);
+    if (!isMeetingLinkAvailable(reconciled.meeting)) {
+      res.status(410).json({ success: false, message: getMeetingLinkUnavailableMessage(reconciled.meeting) });
       return;
     }
 
-    res.json({ success: true, meeting: await getMeetingSafeView(meeting, user._id.toString()) });
+    res.json({ success: true, meeting: await getMeetingSafeView(reconciled.meeting, user._id.toString()) });
   } catch (err: any) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -366,50 +479,48 @@ export const joinMeeting = async (req: AuthRequest, res: Response): Promise<void
       res.status(403).json({ success: false, message: 'Active account required' });
       return;
     }
-    const meeting = await Meeting.findOne({ meetingLink: req.params.link });
+    const meeting = await Meeting.findOne({ meetingLink: req.params.link, companyId: user.companyId });
 
     if (!meeting) {
       res.status(404).json({ success: false, message: 'Meeting not found' });
       return;
     }
 
-    if (!isMeetingLinkAvailable(meeting)) {
-      res.status(410).json({ success: false, message: 'This meeting link is no longer available' });
+    const reconciled = await reconcileActiveMeeting(meeting);
+    if (!isMeetingLinkAvailable(reconciled.meeting)) {
+      res.status(410).json({ success: false, message: getMeetingLinkUnavailableMessage(reconciled.meeting) });
       return;
     }
 
+    const currentMeeting = reconciled.meeting;
     const userIdStr = user._id.toString();
-    const participant = meeting.participants.find((p) => p.userId?.toString() === userIdStr);
+    const participant = currentMeeting.participants.find((p) => p.userId?.toString() === userIdStr);
     if (participant) {
       participant.status = 'joined';
       participant.joinedAt = new Date();
       participant.leftAt = undefined;
     } else {
-      meeting.participants.push({
+      currentMeeting.participants.push({
         userId: user._id,
         status: 'joined',
         joinedAt: new Date(),
       });
     }
 
-    const startedNow = meeting.status === 'scheduled';
+    const startedNow = currentMeeting.status === 'scheduled';
     if (startedNow) {
-      meeting.status = 'active';
-      meeting.startedAt = new Date();
+      currentMeeting.status = 'active';
+      currentMeeting.startedAt = new Date();
     }
+    currentMeeting.lastActivityAt = new Date();
 
-    await meeting.save();
-    const meetingGrant = await createMeetingGrant(meeting._id, userIdStr);
+    await currentMeeting.save();
+    const meetingGrant = await createMeetingGrant(currentMeeting._id, userIdStr);
 
-    const safeMeeting = await getMeetingSafeView(meeting, userIdStr);
-    if (startedNow) {
-      for (const participantId of meetingMemberIds(meeting)) {
-        emitToUser(participantId, 'meeting:started', { meeting: safeMeeting });
-      }
-    }
-    for (const participantId of meetingMemberIds(meeting)) {
+    const safeMeeting = await getMeetingSafeView(currentMeeting, userIdStr);
+    for (const participantId of meetingMemberIds(currentMeeting)) {
       emitToUser(participantId, 'meeting:participant-joined', {
-        meetingLink: meeting.meetingLink,
+        meetingLink: currentMeeting.meetingLink,
         userId: userIdStr,
       });
     }
@@ -437,12 +548,13 @@ export const startMeeting = async (req: AuthRequest, res: Response): Promise<voi
       return;
     }
     if (!isMeetingLinkAvailable(meeting)) {
-      res.status(410).json({ success: false, message: 'This meeting link is no longer available' });
+      res.status(410).json({ success: false, message: getMeetingLinkUnavailableMessage(meeting) });
       return;
     }
     if (meeting.status === 'scheduled') {
       meeting.status = 'active';
       meeting.startedAt = new Date();
+      meeting.lastActivityAt = meeting.startedAt;
       await meeting.save();
     }
     await meeting.populate([
