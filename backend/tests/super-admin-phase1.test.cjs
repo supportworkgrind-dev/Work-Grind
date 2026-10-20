@@ -134,8 +134,8 @@ test('admin user list and detail responses contain only required fields', async 
     'subscriptionStatus',
   ].sort());
   assert.deepEqual(Object.keys(listedUser.companyId).sort(), [
-    '_id', 'accountType', 'name', 'plan', 'subscriptionEndDate', 'subscriptionPlan',
-    'subscriptionStatus', 'trialEndDate', 'trialStartDate',
+    '_id', 'accountType', 'country', 'industry', 'name', 'plan', 'subscriptionEndDate',
+    'subscriptionPlan', 'subscriptionStatus', 'trialEndDate', 'trialStartDate',
   ].sort());
   assert.equal(JSON.stringify(listResponse.body).includes('secret'), false);
 
@@ -148,7 +148,9 @@ test('admin user list and detail responses contain only required fields', async 
   assert.equal(detailResponse.statusCode, 200);
   assert.equal(detailResponse.body.user.fullName, 'A User');
   assert.deepEqual(Object.keys(detailResponse.body.user.companyId).sort(), [
-    '_id', 'country', 'industry', 'name', 'plan',
+    '_id', 'accountType', 'country', 'industry', 'name', 'plan',
+    'subscriptionEndDate', 'subscriptionPlan', 'subscriptionStatus', 'trialEndDate',
+    'trialStartDate',
   ].sort());
   assert.equal(JSON.stringify(detailResponse.body).includes('secret'), false);
   assert.deepEqual(detailResponse.body.stats, {
@@ -262,10 +264,10 @@ test('support ticket listing applies filters, stable pagination, and a minimal r
     return result;
   };
   SupportTicket.countDocuments = async (filter = {}) => {
+    if (filter.status === 'new' && filter.type === 'demo') return 61;
     if (filter.isRead === false) return 4;
     if (filter.type === 'demo') return 2;
     if (filter.type?.$ne === 'demo') return 3;
-    if (filter.status === 'new' && filter.type === 'demo') return 61;
     return 5;
   };
 
