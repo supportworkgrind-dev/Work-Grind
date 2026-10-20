@@ -21,9 +21,50 @@ const REQUIRED_ENVIRONMENT = [
   'WORKGRIND_BACKEND_URL',
 ] as const;
 
-const missingEnvironment = REQUIRED_ENVIRONMENT.filter((name) => !process.env[name]?.trim());
+const missingEnvironment: string[] = REQUIRED_ENVIRONMENT.filter((name) => !process.env[name]?.trim());
+function isValidLiveKitUrl(value: string | undefined): boolean {
+  if (!value) return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'wss:' &&
+      (url.pathname === '/' || url.pathname === '') &&
+      !url.username &&
+      !url.password &&
+      !url.search &&
+      !url.hash;
+  } catch {
+    return false;
+  }
+}
+
+function isValidBackendUrl(value: string | undefined): boolean {
+  if (!value) return false;
+  try {
+    const url = new URL(value);
+    const localDevelopment =
+      process.env.NODE_ENV !== 'production' &&
+      url.protocol === 'http:' &&
+      ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+    return (url.protocol === 'https:' || localDevelopment) &&
+      (url.pathname === '/' || url.pathname === '') &&
+      !url.username &&
+      !url.password &&
+      !url.search &&
+      !url.hash;
+  } catch {
+    return false;
+  }
+}
+
+if (!missingEnvironment.includes('LIVEKIT_URL') && !isValidLiveKitUrl(process.env.LIVEKIT_URL?.trim())) {
+  missingEnvironment.push('LIVEKIT_URL (must be a secure wss:// URL)');
+}
+if (!missingEnvironment.includes('WORKGRIND_BACKEND_URL') &&
+    !isValidBackendUrl(process.env.WORKGRIND_BACKEND_URL?.trim())) {
+  missingEnvironment.push('WORKGRIND_BACKEND_URL (must be an HTTPS backend origin in production)');
+}
 if (missingEnvironment.length > 0) {
-  console.error('[Tavro Voice Agent] Missing required environment variables.', {
+  console.error('[Tavro Voice Agent] Required worker configuration is missing or invalid.', {
     missingEnvironment,
   });
   process.exit(1);

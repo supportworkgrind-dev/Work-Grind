@@ -3,5 +3,6 @@ dist
 .env
 .env.*
 !/.env.example
+!/voice-agent/.env.example
 *.log
 uploads

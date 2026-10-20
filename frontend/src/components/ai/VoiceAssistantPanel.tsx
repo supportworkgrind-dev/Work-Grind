@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ConnectionState,
   Room,
   RoomEvent,
   Track,
@@ -29,7 +28,16 @@ import {
   type VoiceTranscriptMessage,
 } from './voiceTranscript';
 
-type VoiceStatus = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'error';
+type VoiceStatus =
+  | 'idle'
+  | 'connecting'
+  | 'waiting-for-agent'
+  | 'listening'
+  | 'thinking'
+  | 'speaking'
+  | 'reconnecting'
+  | 'failed';
+type ActiveAgentStatus = 'listening' | 'thinking' | 'speaking';
 type VoiceSessionResponse = {
   success: boolean;
   serverUrl: string;
@@ -69,6 +77,9 @@ function getSafeErrorMessage(error: unknown): string {
   if (code === 'VOICE_NOT_CONFIGURED') {
     return 'Tavro Voice is not configured on this server yet. Text chat is still available.';
   }
+  if (code === 'VOICE_SESSION_UNAVAILABLE') {
+    return 'Tavro could not start a voice session. The voice service may be unavailable; please retry shortly.';
+  }
   if (code === 'WORKSPACE_MEMBERSHIP_REQUIRED' || code === 'WORKSPACE_UNAVAILABLE') {
     return value.response?.data?.message ?? 'An active WorkGrind workspace membership is required.';
   }
@@ -86,6 +97,11 @@ function getSafeErrorMessage(error: unknown): string {
 
 function isTavro(participant: Participant): boolean {
   return participant.isAgent || participant.attributes[AGENT_NAME_ATTRIBUTE] === AGENT_NAME;
+}
+
+function activeAgentStatus(value: string | undefined): ActiveAgentStatus | null {
+  if (value === 'listening' || value === 'thinking' || value === 'speaking') return value;
+  return null;
 }
 
 export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProps) {
@@ -106,11 +122,16 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
   const startInProgressRef = useRef(false);
   const intentionalDisconnectRef = useRef(false);
   const agentReadyRef = useRef(false);
+  const microphonePublishedRef = useRef(false);
   const requestAbortRef = useRef<AbortController | null>(null);
   const agentJoinTimerRef = useRef<number | null>(null);
   const audioContainerRef = useRef<HTMLDivElement>(null);
   const transcriptEndRef = useRef<HTMLDivElement>(null);
-  const isConnected = status === 'connected' || status === 'reconnecting';
+  const isConnected = status === 'waiting-for-agent' ||
+    status === 'listening' ||
+    status === 'thinking' ||
+    status === 'speaking' ||
+    status === 'reconnecting';
 
   const clearAgentJoinTimer = useCallback(() => {
     if (agentJoinTimerRef.current !== null) {
@@ -133,12 +154,14 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
       } catch {
         if (showError) {
           setErrorMessage('The call ended, but the audio connection did not close cleanly. Please reload before starting another call.');
-          setStatus('error');
+          setStatus('failed');
         }
       }
     }
     setIsMuted(false);
     setIsAgentReady(false);
+    agentReadyRef.current = false;
+    microphonePublishedRef.current = false;
     setIsAgentSpeaking(false);
     setIsUserSpeaking(false);
     setAgentState('initializing');
@@ -217,6 +240,7 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
     startInProgressRef.current = true;
     intentionalDisconnectRef.current = false;
     agentReadyRef.current = false;
+    microphonePublishedRef.current = false;
     setErrorMessage('');
     setIsAgentReady(false);
     setAgentState('initializing');
@@ -243,6 +267,19 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
 
       room = new Room(ROOM_OPTIONS);
       roomRef.current = room;
+      const startAgentReadinessTimeout = () => {
+        if (agentJoinTimerRef.current !== null) return;
+        agentJoinTimerRef.current = window.setTimeout(() => {
+          if (agentReadyRef.current || intentionalDisconnectRef.current) return;
+          console.error('[Tavro Voice] Agent readiness timed out.', {
+            roomId: response.data.roomName,
+            timeoutMs: AGENT_JOIN_TIMEOUT_MS,
+          });
+          setErrorMessage('The voice room connected, but Tavro did not become ready. The voice service may be offline or unable to reach WorkGrind. Please retry shortly.');
+          setStatus('failed');
+          void disconnectRoom(true, 'agent_readiness_timeout');
+        }, AGENT_JOIN_TIMEOUT_MS);
+      };
 
       const onTrackSubscribed = (track: RemoteTrack) => {
         if (track.kind !== Track.Kind.Audio || !audioContainerRef.current) return;
@@ -263,10 +300,18 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
           roomId: response.data.roomName,
           participantKind: participant.kind,
         });
+        const state = activeAgentStatus(participant.attributes[AGENT_STATE_ATTRIBUTE]);
+        if (!state) {
+          agentReadyRef.current = false;
+          setStatus(microphonePublishedRef.current ? 'waiting-for-agent' : 'connecting');
+          setIsAgentReady(false);
+          return;
+        }
         agentReadyRef.current = true;
         clearAgentJoinTimer();
         setIsAgentReady(true);
-        setAgentState(participant.attributes[AGENT_STATE_ATTRIBUTE] ?? 'listening');
+        setAgentState(state);
+        setStatus(state);
         setErrorMessage('');
       };
       const onParticipantDisconnected = (participant: RemoteParticipant) => {
@@ -280,13 +325,19 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
         setIsAgentReady(false);
         setAgentState('initializing');
         setErrorMessage('Tavro left the voice session. End the call and retry to reconnect.');
-        setStatus('error');
+        setStatus('failed');
         void disconnectRoom(true, 'agent_participant_disconnected');
       };
       const onActiveSpeakersChanged = (speakers: Participant[]) => {
         const localIdentity = room?.localParticipant.identity;
-        setIsAgentSpeaking(speakers.some((speaker) => isTavro(speaker)));
+        const agentSpeaking = speakers.some((speaker) => isTavro(speaker));
+        setIsAgentSpeaking(agentSpeaking);
         setIsUserSpeaking(speakers.some((speaker) => speaker.identity === localIdentity));
+        if (agentReadyRef.current) {
+          const currentAgent = Array.from(room?.remoteParticipants.values() ?? []).find(isTavro);
+          const currentAgentStatus = activeAgentStatus(currentAgent?.attributes[AGENT_STATE_ATTRIBUTE]);
+          setStatus(agentSpeaking ? 'speaking' : currentAgentStatus ?? 'listening');
+        }
       };
       const onTranscriptionReceived = (
         segments: Array<{ id: string; text: string; final: boolean }>,
@@ -303,18 +354,35 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
       const onParticipantAttributesChanged = (_changed: Record<string, string>, participant: Participant) => {
         if (!isTavro(participant)) return;
         const nextState = participant.attributes[AGENT_STATE_ATTRIBUTE];
-        if (nextState && AGENT_STATES.has(nextState)) setAgentState(nextState);
+        if (!nextState || !AGENT_STATES.has(nextState)) return;
+        setAgentState(nextState);
+        const activeState = activeAgentStatus(nextState);
+        if (!activeState) {
+          agentReadyRef.current = false;
+          setIsAgentReady(false);
+          setStatus(microphonePublishedRef.current ? 'waiting-for-agent' : 'connecting');
+          if (microphonePublishedRef.current) startAgentReadinessTimeout();
+          return;
+        }
+        agentReadyRef.current = true;
+        clearAgentJoinTimer();
+        setIsAgentReady(true);
+        setStatus(activeState);
+        setErrorMessage('');
       };
       const onReconnecting = () => {
         setStatus('reconnecting');
         setErrorMessage('');
       };
       const onReconnected = () => {
-        setStatus('connected');
+        const currentAgent = Array.from(room?.remoteParticipants.values() ?? []).find(isTavro);
+        const currentState = activeAgentStatus(currentAgent?.attributes[AGENT_STATE_ATTRIBUTE]);
+        agentReadyRef.current = currentState !== null;
+        setIsAgentReady(agentReadyRef.current);
+        setStatus(currentState ?? 'waiting-for-agent');
+        if (currentState) clearAgentJoinTimer();
+        else startAgentReadinessTimeout();
         setErrorMessage('');
-      };
-      const onConnectionStateChanged = (state: ConnectionState) => {
-        if (state === ConnectionState.Connected) setStatus('connected');
       };
       const onDisconnected = (reason?: unknown) => {
         console.warn('[Tavro Voice] LiveKit room disconnected.', {
@@ -324,8 +392,11 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
         });
         if (intentionalDisconnectRef.current) return;
         clearAgentJoinTimer();
+        agentReadyRef.current = false;
+        microphonePublishedRef.current = false;
+        setIsAgentReady(false);
         roomRef.current = null;
-        setStatus('error');
+        setStatus('failed');
         setAgentState('initializing');
         setErrorMessage('The voice connection ended unexpectedly. Retry to start a new session.');
       };
@@ -340,7 +411,6 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
         .on(RoomEvent.ActiveSpeakersChanged, onActiveSpeakersChanged)
         .on(RoomEvent.Reconnecting, onReconnecting)
         .on(RoomEvent.Reconnected, onReconnected)
-        .on(RoomEvent.ConnectionStateChanged, onConnectionStateChanged)
         .on(RoomEvent.Disconnected, onDisconnected);
 
       await Promise.race([
@@ -368,6 +438,7 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
         });
       }
       await room.localParticipant.setMicrophoneEnabled(true);
+      microphonePublishedRef.current = true;
       console.info('[Tavro Voice] Microphone published.', { roomId: response.data.roomName });
       setIsMuted(false);
       try {
@@ -375,32 +446,25 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
       } catch {
         setAudioPlaybackBlocked(true);
       }
-      setStatus('connected');
+      setStatus('waiting-for-agent');
       setRoomName(response.data.roomName);
 
-      const agentAlreadyJoined = Array.from(room.remoteParticipants.values()).some(isTavro);
-      if (agentAlreadyJoined) {
+      const agentParticipant = Array.from(room.remoteParticipants.values()).find(isTavro);
+      const currentAgentState = activeAgentStatus(agentParticipant?.attributes[AGENT_STATE_ATTRIBUTE]);
+      if (currentAgentState) {
         agentReadyRef.current = true;
+        clearAgentJoinTimer();
         setIsAgentReady(true);
-        const participant = Array.from(room.remoteParticipants.values()).find(isTavro);
-        const currentAgentState = participant?.attributes[AGENT_STATE_ATTRIBUTE];
-        if (currentAgentState && AGENT_STATES.has(currentAgentState)) setAgentState(currentAgentState);
+        setAgentState(currentAgentState);
+        setStatus(currentAgentState);
       } else {
-        agentJoinTimerRef.current = window.setTimeout(() => {
-          if (agentReadyRef.current || intentionalDisconnectRef.current) return;
-          console.error('[Tavro Voice] Agent join timed out.', {
-            roomId: response.data.roomName,
-            timeoutMs: AGENT_JOIN_TIMEOUT_MS,
-          });
-          setErrorMessage('Tavro could not join the conversation. Please retry in a moment.');
-          setStatus('error');
-          void disconnectRoom(true, 'agent_join_timeout');
-        }, AGENT_JOIN_TIMEOUT_MS);
+        startAgentReadinessTimeout();
       }
     } catch (error) {
       if (connectTimeoutId !== null) window.clearTimeout(connectTimeoutId);
       if (room) {
         intentionalDisconnectRef.current = true;
+        microphonePublishedRef.current = false;
         roomRef.current = null;
         try {
           await room.disconnect();
@@ -409,7 +473,7 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
         }
       }
       if (!abortController.signal.aborted) {
-        setStatus('error');
+        setStatus('failed');
         setErrorMessage(getSafeErrorMessage(error));
       }
     } finally {
@@ -420,7 +484,7 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
 
   const toggleMicrophone = async () => {
     const room = roomRef.current;
-    if (!room || status !== 'connected') return;
+    if (!room || !isConnected) return;
     try {
       const nextMuted = !isMuted;
       await room.localParticipant.setMicrophoneEnabled(!nextMuted);
@@ -466,17 +530,16 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
   };
 
   const isConnecting = status === 'connecting';
-  const activityLabel = status === 'reconnecting'
-    ? 'Reconnecting…'
-    : isAgentSpeaking || agentState === 'speaking'
-      ? 'Tavro is speaking'
-      : isUserSpeaking
-        ? 'Listening to you'
-        : agentState === 'thinking'
-          ? 'Tavro is thinking'
-          : isAgentReady
-            ? 'Listening'
-            : 'Tavro is joining';
+  const statusLabel: Record<VoiceStatus, string> = {
+    idle: 'Ready when you are',
+    connecting: 'Connecting securely…',
+    'waiting-for-agent': 'Waiting for Tavro',
+    listening: isUserSpeaking ? 'Listening to you' : 'Listening',
+    thinking: 'Tavro is processing',
+    speaking: isAgentSpeaking || agentState === 'speaking' ? 'Tavro is speaking' : 'Speaking',
+    reconnecting: 'Reconnecting…',
+    failed: 'Voice session failed',
+  };
 
   return (
     <section
@@ -531,24 +594,22 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
           )}
           <span
             className={`absolute -bottom-1 -right-1 h-5 w-5 rounded-full border-4 ${
-              status === 'connected' && isAgentReady ? 'bg-emerald-500' :
-                status === 'reconnecting' || isConnecting ? 'bg-amber-400' :
-                  status === 'error' ? 'bg-rose-500' : 'bg-slate-400'
+              status === 'listening' || status === 'thinking' || status === 'speaking' ? 'bg-emerald-500' :
+                status === 'reconnecting' || status === 'waiting-for-agent' || isConnecting ? 'bg-amber-400' :
+                  status === 'failed' ? 'bg-rose-500' : 'bg-slate-400'
             }`}
             style={{ borderColor: 'var(--bg-card)' }}
           />
         </div>
         <p className="mt-5 text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-          {status === 'idle' ? 'Ready when you are' :
-            status === 'connecting' ? 'Connecting securely…' :
-              status === 'error' ? 'Voice session needs attention' : activityLabel}
+          {statusLabel[status]}
         </p>
         <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
           {status === 'idle' ? 'Your browser will ask for microphone permission.' :
             status === 'connecting' ? 'Connecting to your voice session…' :
-              isMuted ? 'Microphone muted' :
-                isAgentReady ? 'Your microphone is on.' :
-                  status === 'error' ? 'No audio is being sent while the session is stopped.' : 'Microphone is on'}
+              status === 'waiting-for-agent' ? 'Your microphone is ready. Tavro is joining the room.' :
+                status === 'failed' ? 'No audio is being sent while the session is stopped.' :
+                  isMuted ? 'Microphone muted' : isAgentReady ? 'Your microphone is on.' : 'Microphone is on'}
         </p>
         {isConnected && audioInputs.length > 1 && (
           <label className="mt-3 flex items-center gap-2 text-xs" style={{ color: 'var(--text-muted)' }}>
@@ -658,7 +719,7 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
               End conversation
             </button>
           </>
-        ) : status === 'error' ? (
+        ) : status === 'failed' ? (
           <>
             <button
               type="button"

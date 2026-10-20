@@ -97,8 +97,14 @@ production worker, and `npm start` starts that compiled worker in production
 mode.
 
 For production, deploy this directory as a LiveKit Agent named `tavro-voice` and
-configure the variables above as deployment secrets. Configure the backend
-secrets in the backend's runtime separately. Follow LiveKit's
+configure the variables above as deployment secrets. This worker is separate
+from the Vercel backend deployment and must remain running and registered with
+the same LiveKit project. `WORKGRIND_BACKEND_URL` must be the actual HTTPS
+origin of the deployed WorkGrind API; do not use the frontend origin unless it
+routes `/api/ai/voice/turn` to that backend. The worker exits before registering
+if any required setting is missing or malformed. Configure the backend secrets
+in the backend's runtime separately. A successful backend dispatch response
+does not itself confirm a worker accepted or started the job. Follow LiveKit's
 [Agent deployment guide](https://docs.livekit.io/deploy/agents/) and
 [Agent dispatch guide](https://docs.livekit.io/agents/server/agent-dispatch/).
 
