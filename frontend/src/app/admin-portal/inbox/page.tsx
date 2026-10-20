@@ -315,25 +315,6 @@ export default function AdminPortalInboxPage() {
                 </button>
               ))}
             </div>
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between border-t border-slate-800 px-4 py-3 text-xs">
-                <button
-                  onClick={() => setPage((current) => Math.max(1, current - 1))}
-                  disabled={page <= 1 || isLoading}
-                  className="rounded-lg border border-slate-700 px-3 py-1.5 font-semibold text-slate-300 disabled:opacity-40"
-                >
-                  Previous
-                </button>
-                <span className="text-slate-400">Page {page} of {totalPages}</span>
-                <button
-                  onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
-                  disabled={page >= totalPages || isLoading}
-                  className="rounded-lg border border-slate-700 px-3 py-1.5 font-semibold text-slate-300 disabled:opacity-40"
-                >
-                  Next
-                </button>
-              </div>
-            )}
           </div>
 
           {/* Ticket Items List */}
@@ -474,6 +455,25 @@ export default function AdminPortalInboxPage() {
               })
             )}
           </div>
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between border-t border-slate-800 px-4 py-3 text-xs">
+              <button
+                onClick={() => setPage((current) => Math.max(1, current - 1))}
+                disabled={page <= 1 || isLoading}
+                className="rounded-lg border border-slate-700 px-3 py-1.5 font-semibold text-slate-300 disabled:opacity-40"
+              >
+                Previous
+              </button>
+              <span className="text-slate-400">Page {page} of {totalPages}</span>
+              <button
+                onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+                disabled={page >= totalPages || isLoading}
+                className="rounded-lg border border-slate-700 px-3 py-1.5 font-semibold text-slate-300 disabled:opacity-40"
+              >
+                Next
+              </button>
+            </div>
+          )}
         </div>
 
         {/* ── RIGHT PANE: DETAIL & DIRECT REPLY (7 cols) ── */}

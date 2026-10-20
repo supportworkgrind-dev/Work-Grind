@@ -20,7 +20,11 @@ import {
 } from 'lucide-react';
 
 export default function SuperAdminSupportPage() {
+  const pageSize = 25;
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('all');
   const [search, setSearch] = useState('');
@@ -43,19 +47,23 @@ export default function SuperAdminSupportPage() {
     setIsLoading(true);
     try {
       const params = new URLSearchParams({
+        page: String(page),
+        limit: String(pageSize),
         status: statusFilter,
         q: search.trim(),
       });
       const res = await adminApi.get(`/tickets?${params.toString()}`);
       if (res.data.success) {
         setTickets(res.data.tickets);
+        setTotal(res.data.pagination?.total ?? 0);
+        setTotalPages(res.data.pagination?.totalPages || 1);
       }
     } catch (err: any) {
       console.error('Failed to load tickets:', err);
     } finally {
       setIsLoading(false);
     }
-  }, [statusFilter, search]);
+  }, [statusFilter, search, page]);
 
   useEffect(() => {
     fetchTickets();
@@ -117,7 +125,7 @@ export default function SuperAdminSupportPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-white">Support Inquiries & Moderation</h1>
           <p className="mt-1 text-xs text-slate-400">
-            Total {tickets.length} inquiries &bull; Review contact form leads, customer reports, and user feedback
+            Total {total} inquiries &bull; Review contact form leads, customer reports, and user feedback
           </p>
         </div>
 
@@ -147,7 +155,7 @@ export default function SuperAdminSupportPage() {
           <input
             type="text"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
             placeholder="Search tickets by sender name, email, or subject..."
             className="w-full rounded-xl border border-slate-800 bg-slate-950/80 py-2 pl-10 pr-4 text-xs text-slate-100 placeholder:text-slate-500 focus:border-indigo-500 outline-none"
           />
@@ -155,7 +163,7 @@ export default function SuperAdminSupportPage() {
 
         <select
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
+          onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
           className="rounded-xl border border-slate-800 bg-slate-950/80 py-2 px-3 text-xs text-slate-300 focus:border-indigo-500 outline-none"
         >
           <option value="all">All Ticket Statuses</option>
@@ -222,6 +230,25 @@ export default function SuperAdminSupportPage() {
           ))
         )}
       </div>
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900/60 px-4 py-3 text-xs">
+          <button
+            onClick={() => setPage((current) => Math.max(1, current - 1))}
+            disabled={page <= 1 || isLoading}
+            className="rounded-lg border border-slate-700 px-3 py-1.5 font-semibold text-slate-300 disabled:opacity-40"
+          >
+            Previous
+          </button>
+          <span className="text-slate-400">Page {page} of {totalPages}</span>
+          <button
+            onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+            disabled={page >= totalPages || isLoading}
+            className="rounded-lg border border-slate-700 px-3 py-1.5 font-semibold text-slate-300 disabled:opacity-40"
+          >
+            Next
+          </button>
+        </div>
+      )}
 
       {/* Ticket Drawer */}
       {selectedTicket && (
