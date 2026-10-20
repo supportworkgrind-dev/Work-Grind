@@ -13,7 +13,8 @@ Create a LiveKit Cloud project and configure:
 
 - `LIVEKIT_URL`: the project's secure WebSocket URL (`wss://...`)
 - `LIVEKIT_API_KEY` and `LIVEKIT_API_SECRET`: project credentials
-- `WORKGRIND_BACKEND_URL`: the HTTPS origin of the WorkGrind backend
+- `WORKGRIND_BACKEND_URL`: the WorkGrind backend origin (HTTPS in production;
+  `http://localhost` is supported for local development)
 
 The worker exits during startup if any of these four variables are missing.
 `TAVRO_VOICE_AGENT_SECRET` is only required by the backend; the worker receives
@@ -112,6 +113,13 @@ secrets in the backend's runtime separately. Follow LiveKit's
 - Backend, agent, and browser voice-panel logs include lifecycle stage, room
   correlation ID, participant kind, timeout/disconnect reason, and error class.
   They do not log credentials, access tokens, audio, or transcripts.
+- The worker publishes user and Tavro speech transcriptions through LiveKit room
+  transcription events. The browser renders those provider-generated events; it
+  does not use browser speech recognition or synthetic transcript content.
+- If the member can join but Tavro does not, confirm the separately deployed
+  `tavro-voice` worker is healthy and registered with the same LiveKit project.
+  The worker requires LiveKit Inference access for its configured AssemblyAI STT
+  and Cartesia TTS models; the Tavro AI provider remains configured on the backend.
 - Voice mode is optional; existing Tavro text chat and its workspace tools are
   unchanged.
 - The configured LiveKit STT/TTS providers determine language support.

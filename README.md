@@ -736,6 +736,9 @@ redeploy both projects so build-time and runtime configuration is applied:
 | Frontend | `NEXT_PUBLIC_LIVEKIT_URL` | The same LiveKit Cloud WSS URL configured as backend `LIVEKIT_URL` |
 | Backend | `BACKEND_URL` | `https://backend-workgrind.vercel.app` |
 | Backend | `CLIENT_URL` | `https://workgrind.vercel.app` |
+| Backend | `LIVEKIT_URL` | The project's secure LiveKit Cloud WSS URL |
+| Backend | `LIVEKIT_API_KEY` | LiveKit project API key (secret) |
+| Backend | `LIVEKIT_API_SECRET` | Matching LiveKit project API secret (secret) |
 | Backend | `TAVRO_VOICE_AGENT_SECRET` | Unique random secret with at least 32 characters |
 | Backend | `GOOGLE_REDIRECT_URI` | `https://backend-workgrind.vercel.app/api/auth/oauth/google/callback` |
 | Backend | `MONGODB_URI` | MongoDB connection string (secret) |
@@ -769,6 +772,12 @@ the backend's `LIVEKIT_URL`; the frontend uses it to allow only that LiveKit
 origin in its production CSP. The backend voice-session endpoint also requires
 `TAVRO_VOICE_AGENT_SECRET`; generate a unique value and configure it only as a
 backend secret. Redeploy the frontend and backend after applying these settings.
+Deploy `backend/voice-agent` separately as a LiveKit Agent named `tavro-voice`.
+Configure `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`, and
+`WORKGRIND_BACKEND_URL` in that worker's secret environment. Keep LiveKit
+Inference enabled for the worker's configured speech-to-text and text-to-speech
+models; configure Tavro's AI provider credentials only on the backend. The
+worker is not part of either Vercel deployment.
 
 ### Realtime Socket.IO deployment
 
