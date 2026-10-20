@@ -66,6 +66,27 @@ test('Connect API response DTOs omit unrelated and sensitive stored fields', () 
   }
 });
 
+test('team Connect API DTO does not return authentication or recovery data', () => {
+  const result = serializeConnectResource('team', {
+    _id: 'user-id',
+    fullName: 'Team Member',
+    email: 'member@example.test',
+    role: 'member',
+    password: 'password-hash',
+    resetPasswordToken: 'reset-token',
+    emailVerificationToken: 'verification-token',
+    mfaSecret: 'mfa-secret',
+    recoveryCodes: ['recovery-code'],
+    refreshTokens: ['refresh-token'],
+  });
+
+  assert.equal(result.id, 'user-id');
+  assert.equal(result.fullName, 'Team Member');
+  for (const excluded of ['password', 'resetPasswordToken', 'emailVerificationToken', 'mfaSecret', 'recoveryCodes', 'refreshTokens']) {
+    assert.equal(Object.hasOwn(result, excluded), false, `${excluded} should not be exposed`);
+  }
+});
+
 test('Connect API list caps page size, sorts stably, filters by workspace, and returns safe fields', async () => {
   const companyId = new mongoose.Types.ObjectId();
   let findFilter;
@@ -174,5 +195,22 @@ test('developer request logs reject malformed filters and deep pages without que
   }, res);
 
   assert.equal(res.statusCode, 400);
+  assert.equal(queried, false);
+});
+
+test('developer request logs reject unsupported status and malformed key filters', async () => {
+  let queried = false;
+  DeveloperApiRequestLog.find = () => { queried = true; throw new Error('unexpected query'); };
+  DeveloperApiRequestLog.countDocuments = async () => { queried = true; return 0; };
+  const user = { companyId: new mongoose.Types.ObjectId().toString(), userId: new mongoose.Types.ObjectId().toString() };
+
+  const invalidStatus = response();
+  await listApiRequestLogs({ query: { status: 'pending' }, user }, invalidStatus);
+  assert.equal(invalidStatus.statusCode, 400);
+  assert.equal(queried, false);
+
+  const invalidKeyId = response();
+  await listApiRequestLogs({ query: { keyId: 'not-an-object-id' }, user }, invalidKeyId);
+  assert.equal(invalidKeyId.statusCode, 400);
   assert.equal(queried, false);
 });
