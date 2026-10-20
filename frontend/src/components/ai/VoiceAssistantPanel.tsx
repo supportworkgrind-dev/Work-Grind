@@ -41,19 +41,6 @@ type VoiceAssistantPanelProps = {
   onClose: () => void;
 };
 
-const enableAudioPlayback = async () => {
-  const room = roomRef.current;
-  if (!room) return;
-  try {
-    await room.startAudio();
-    const audioElements = audioContainerRef.current?.querySelectorAll('audio') ?? [];
-    for (const audioElement of audioElements) await audioElement.play();
-    setAudioPlaybackBlocked(false);
-  } catch {
-    setAudioPlaybackBlocked(true);
-  }
-};
-
 const AGENT_NAME_ATTRIBUTE = 'lk.agent.name';
 const AGENT_NAME = 'tavro-voice';
 const CONNECT_TIMEOUT_MS = 20_000;
@@ -110,6 +97,9 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
   const [agentState, setAgentState] = useState('initializing');
   const [transcriptMessages, setTranscriptMessages] = useState<VoiceTranscriptMessage[]>([]);
   const [audioPlaybackBlocked, setAudioPlaybackBlocked] = useState(false);
+  const [audioInputs, setAudioInputs] = useState<MediaDeviceInfo[]>([]);
+  const [selectedAudioInputId, setSelectedAudioInputId] = useState('');
+  const [audioDeviceError, setAudioDeviceError] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [roomName, setRoomName] = useState('');
   const roomRef = useRef<Room | null>(null);
@@ -120,6 +110,7 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
   const agentJoinTimerRef = useRef<number | null>(null);
   const audioContainerRef = useRef<HTMLDivElement>(null);
   const transcriptEndRef = useRef<HTMLDivElement>(null);
+  const isConnected = status === 'connected' || status === 'reconnecting';
 
   const clearAgentJoinTimer = useCallback(() => {
     if (agentJoinTimerRef.current !== null) {
@@ -158,6 +149,34 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
   useEffect(() => {
     transcriptEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [transcriptMessages]);
+
+  const refreshAudioInputs = useCallback(async () => {
+    if (!navigator.mediaDevices?.enumerateDevices) return;
+    try {
+      const devices = (await navigator.mediaDevices.enumerateDevices())
+        .filter((device) => device.kind === 'audioinput');
+      setAudioInputs(devices);
+      const activeDeviceId = roomRef.current?.getActiveDevice('audioinput');
+      setSelectedAudioInputId(
+        activeDeviceId && devices.some((device) => device.deviceId === activeDeviceId)
+          ? activeDeviceId
+          : devices[0]?.deviceId ?? '',
+      );
+      setAudioDeviceError('');
+    } catch {
+      setAudioDeviceError('Microphone devices could not be loaded. Check your browser permissions.');
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isConnected) return;
+    const initialRefresh = window.setTimeout(() => void refreshAudioInputs(), 0);
+    navigator.mediaDevices?.addEventListener('devicechange', refreshAudioInputs);
+    return () => {
+      window.clearTimeout(initialRefresh);
+      navigator.mediaDevices?.removeEventListener('devicechange', refreshAudioInputs);
+    };
+  }, [isConnected, refreshAudioInputs]);
 
   useEffect(() => () => {
     intentionalDisconnectRef.current = true;
@@ -281,7 +300,7 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
         if (!speaker) return;
         setTranscriptMessages((messages) => mergeVoiceTranscriptSegments(messages, speaker, segments));
       };
-      const onParticipantAttributesChanged = (_changed: string[], participant: Participant) => {
+      const onParticipantAttributesChanged = (_changed: Record<string, string>, participant: Participant) => {
         if (!isTavro(participant)) return;
         const nextState = participant.attributes[AGENT_STATE_ATTRIBUTE];
         if (nextState && AGENT_STATES.has(nextState)) setAgentState(nextState);
@@ -411,6 +430,31 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
     }
   };
 
+  const selectAudioInput = async (deviceId: string) => {
+    const room = roomRef.current;
+    if (!room) return;
+    try {
+      await room.switchActiveDevice('audioinput', deviceId);
+      setSelectedAudioInputId(deviceId);
+      setAudioDeviceError('');
+    } catch {
+      setAudioDeviceError('This microphone could not be selected. Check its connection and permissions.');
+    }
+  };
+
+  const enableAudioPlayback = async () => {
+    const room = roomRef.current;
+    if (!room) return;
+    try {
+      await room.startAudio();
+      const audioElements = audioContainerRef.current?.querySelectorAll('audio') ?? [];
+      for (const audioElement of audioElements) await audioElement.play();
+      setAudioPlaybackBlocked(false);
+    } catch {
+      setAudioPlaybackBlocked(true);
+    }
+  };
+
   const endConversation = async (source: 'close_button' | 'end_button' | 'error_close_button') => {
     setErrorMessage('');
     console.info('[Tavro Voice] User requested voice session end.', {
@@ -422,7 +466,6 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
   };
 
   const isConnecting = status === 'connecting';
-  const isConnected = status === 'connected' || status === 'reconnecting';
   const activityLabel = status === 'reconnecting'
     ? 'Reconnecting…'
     : isAgentSpeaking || agentState === 'speaking'
@@ -507,6 +550,27 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
                 isAgentReady ? 'Your microphone is on.' :
                   status === 'error' ? 'No audio is being sent while the session is stopped.' : 'Microphone is on'}
         </p>
+        {isConnected && audioInputs.length > 1 && (
+          <label className="mt-3 flex items-center gap-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+            Microphone
+            <select
+              aria-label="Choose microphone"
+              value={selectedAudioInputId}
+              onChange={(event) => void selectAudioInput(event.target.value)}
+              className="max-w-[220px] rounded-lg border bg-[var(--bg-card)] px-2 py-1.5"
+              style={{ borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+            >
+              {audioInputs.map((device, index) => (
+                <option key={device.deviceId} value={device.deviceId}>
+                  {device.label || `Microphone ${index + 1}`}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        {audioDeviceError && (
+          <p className="mt-2 text-xs text-rose-600 dark:text-rose-300" role="status">{audioDeviceError}</p>
+        )}
         {roomName && (
           <details className="mt-3 text-left text-[11px]" style={{ color: 'var(--text-muted)' }}>
             <summary className="cursor-pointer">Diagnostics</summary>
