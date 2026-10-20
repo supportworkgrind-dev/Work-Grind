@@ -325,6 +325,7 @@ export const runVoiceTurn = async (req: AuthRequest, res: Response): Promise<voi
     });
     return;
   }
+  const requestId = req.get('x-request-id')?.replace(/[^\w.-]/g, '').slice(0, 128);
 
   const message = typeof req.body?.message === 'string' ? req.body.message.trim() : '';
   if (!message || message.length > MAX_VOICE_PROMPT_LENGTH) {
@@ -380,7 +381,8 @@ export const runVoiceTurn = async (req: AuthRequest, res: Response): Promise<voi
     currentSubscription = await getEffectiveSubscription(credential.sub);
   } catch (error) {
     console.error('[Tavro Voice] Subscription authorization failed.', {
-      roomId: credential.roomName,
+      requestId,
+      voiceSessionId: credential.roomName,
       errorName: error instanceof Error ? error.name : 'UnknownError',
       httpStatus: 503,
     });
@@ -414,7 +416,8 @@ export const runVoiceTurn = async (req: AuthRequest, res: Response): Promise<voi
     reservation = await reserveAiRequest(credential.sub);
   } catch (error) {
     console.error('[Tavro Voice] Usage authorization failed.', {
-      roomId: credential.roomName,
+      requestId,
+      voiceSessionId: credential.roomName,
       errorName: error instanceof Error ? error.name : 'UnknownError',
       httpStatus: 503,
     });
@@ -586,6 +589,13 @@ export const runVoiceTurn = async (req: AuthRequest, res: Response): Promise<voi
       success: Boolean(result.reply),
       durationMs,
     });
+    console.info('[Tavro Voice] Voice turn completed.', {
+      requestId,
+      voiceSessionId: credential.roomName,
+      durationMs,
+      provider,
+      httpStatus: 200,
+    });
 
     if (res.destroyed || res.writableEnded) return;
     res.status(200).json({
@@ -597,13 +607,15 @@ export const runVoiceTurn = async (req: AuthRequest, res: Response): Promise<voi
     const providerFailure = error instanceof AIProviderUnavailableError;
     const safeError = safeAIErrorLog(error);
     console.error('[Tavro Voice] Turn failed.', {
-      roomId: credential.roomName,
+      requestId,
+      voiceSessionId: credential.roomName,
       provider: providerFailure ? error.provider ?? 'none' : undefined,
       model: providerFailure ? error.model ?? 'none' : undefined,
       status: providerFailure ? error.statusCode : safeError.status ?? 500,
       errorCategory: providerFailure ? error.category : safeError.category,
       fallbackAttempted: providerFailure ? error.fallbackAttempted : undefined,
       fallbackResult: providerFailure ? error.fallbackResult : undefined,
+      elapsedMs: Date.now() - startedAt,
     });
     await recordUsage({
       companyId: credential.companyId,

@@ -45,6 +45,8 @@ class TavroBackendLLMStream extends LLMStream {
     const message = latestUserMessage(this.chatCtx);
     if (!message) throw new Error('Tavro did not receive a final speech transcript.');
 
+    const turnId = randomUUID();
+    const startedAt = Date.now();
     const controllerSignal = this.abortController.signal;
     const timeoutSignal = AbortSignal.timeout(55_000);
     const signal = AbortSignal.any([controllerSignal, timeoutSignal]);
@@ -55,6 +57,7 @@ class TavroBackendLLMStream extends LLMStream {
         headers: {
           Authorization: `Bearer ${this.voiceTurnToken}`,
           'Content-Type': 'application/json',
+          'X-Request-ID': turnId,
         },
         body: JSON.stringify({
           roomName: this.roomName,
@@ -63,13 +66,31 @@ class TavroBackendLLMStream extends LLMStream {
         }),
         signal,
       });
-    } catch {
+    } catch (error) {
+      const outcome = controllerSignal.aborted
+        ? 'cancelled'
+        : timeoutSignal.aborted
+          ? 'timed_out'
+          : 'network_error';
+      console.warn('[Tavro Voice Agent] Backend voice turn request failed.', {
+        voiceSessionId: this.roomName,
+        turnId,
+        outcome,
+        errorName: error instanceof Error ? error.name : 'UnknownError',
+        elapsedMs: Date.now() - startedAt,
+      });
       if (signal.aborted) throw new Error('Tavro voice request was cancelled or timed out.');
       this.emitSafeMessage('I could not reach WorkGrind right now. Please check your connection and try again.');
       return;
     }
 
     if (!response.ok) {
+      console.warn('[Tavro Voice Agent] Backend rejected a voice turn.', {
+        voiceSessionId: this.roomName,
+        turnId,
+        httpStatus: response.status,
+        elapsedMs: Date.now() - startedAt,
+      });
       const messageByStatus: Record<number, string> = {
         401: 'The Tavro voice session expired. Start a new session.',
         403: 'Tavro AI access is unavailable for this workspace. Contact your workspace administrator.',
@@ -83,16 +104,32 @@ class TavroBackendLLMStream extends LLMStream {
     let result: VoiceTurnResponse;
     try {
       result = await response.json() as VoiceTurnResponse;
-    } catch {
+    } catch (error) {
+      console.warn('[Tavro Voice Agent] Backend voice turn response was invalid.', {
+        voiceSessionId: this.roomName,
+        turnId,
+        errorName: error instanceof Error ? error.name : 'UnknownError',
+        elapsedMs: Date.now() - startedAt,
+      });
       this.emitSafeMessage('Tavro returned an invalid response. Please try again.');
       return;
     }
     if (!result.success || typeof result.reply !== 'string' || !result.reply.trim()) {
+      console.warn('[Tavro Voice Agent] Backend voice turn response was incomplete.', {
+        voiceSessionId: this.roomName,
+        turnId,
+        elapsedMs: Date.now() - startedAt,
+      });
       this.emitSafeMessage('Tavro could not complete that request. Please try again.');
       return;
     }
     if (typeof result.conversationId === 'string') this.onConversationId(result.conversationId);
 
+    console.info('[Tavro Voice Agent] Backend voice turn completed.', {
+      voiceSessionId: this.roomName,
+      turnId,
+      elapsedMs: Date.now() - startedAt,
+    });
     this.emitSafeMessage(result.reply);
   }
 

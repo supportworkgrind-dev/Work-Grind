@@ -75,6 +75,8 @@ const AGENT_NAME = 'tavro-voice';
 
 console.info('[Tavro Voice Agent] Worker process starting.', {
   agentName: AGENT_NAME,
+  livekitConfigured: Boolean(process.env.LIVEKIT_URL?.trim()),
+  backendConfigured: Boolean(process.env.WORKGRIND_BACKEND_URL?.trim()),
 });
 
 function readVoiceTurnToken(ctx: JobContext): string {
@@ -95,9 +97,10 @@ export default defineAgent({
     const roomName = ctx.room.name;
     const jobId = ctx.job.id;
     const dispatchId = ctx.job.dispatchId;
+    const jobStartedAt = Date.now();
     let stage = 'dispatch_credential_validation';
     console.info('[Tavro Voice Agent] Job assigned.', {
-      roomId: roomName,
+      voiceSessionId: roomName,
       jobId,
       dispatchId,
       agentName: ctx.job.agentName,
@@ -160,10 +163,11 @@ export default defineAgent({
         room: ctx.room,
       });
       console.info('[Tavro Voice Agent] Session initialized.', {
-        roomId: roomName,
+        voiceSessionId: roomName,
         jobId,
         dispatchId,
         stage: 'session_initialization',
+        elapsedMs: Date.now() - jobStartedAt,
       });
       stage = 'agent_room_connect';
       const localParticipant = ctx.room.localParticipant;
@@ -171,25 +175,28 @@ export default defineAgent({
       stage = 'readiness_signal';
       await publishTavroReady(localParticipant);
       console.info('[Tavro Voice Agent] Readiness signal published.', {
-        roomId: roomName,
+        voiceSessionId: roomName,
         jobId,
         dispatchId,
         stage,
+        elapsedMs: Date.now() - jobStartedAt,
       });
       console.info('[Tavro Voice Agent] Agent joined room.', {
-        roomId: roomName,
+        voiceSessionId: roomName,
         jobId,
         dispatchId,
         stage: 'agent_room_connect',
+        elapsedMs: Date.now() - jobStartedAt,
       });
       stage = 'awaiting_user';
     } catch (error) {
       console.error('[Tavro Voice Agent] Session failed.', {
-        roomId: roomName,
+        voiceSessionId: roomName,
         jobId,
         dispatchId,
         stage,
         errorName: error instanceof Error ? error.name : 'UnknownError',
+        elapsedMs: Date.now() - jobStartedAt,
       });
       if (session) {
         try {
