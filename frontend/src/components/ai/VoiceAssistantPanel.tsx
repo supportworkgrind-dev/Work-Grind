@@ -23,6 +23,11 @@ import {
   X,
 } from 'lucide-react';
 import { api } from '@/lib/api';
+import {
+  mergeVoiceTranscriptSegments,
+  type VoiceSpeaker,
+  type VoiceTranscriptMessage,
+} from './voiceTranscript';
 
 type VoiceStatus = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'error';
 type VoiceSessionResponse = {
@@ -36,6 +41,19 @@ type VoiceAssistantPanelProps = {
   onClose: () => void;
 };
 
+const enableAudioPlayback = async () => {
+  const room = roomRef.current;
+  if (!room) return;
+  try {
+    await room.startAudio();
+    const audioElements = audioContainerRef.current?.querySelectorAll('audio') ?? [];
+    for (const audioElement of audioElements) await audioElement.play();
+    setAudioPlaybackBlocked(false);
+  } catch {
+    setAudioPlaybackBlocked(true);
+  }
+};
+
 const AGENT_NAME_ATTRIBUTE = 'lk.agent.name';
 const AGENT_NAME = 'tavro-voice';
 const CONNECT_TIMEOUT_MS = 20_000;
@@ -44,6 +62,8 @@ const ROOM_OPTIONS: RoomOptions = {
   adaptiveStream: true,
   dynacast: true,
 };
+const AGENT_STATE_ATTRIBUTE = 'lk.agent.state';
+const AGENT_STATES = new Set(['initializing', 'listening', 'thinking', 'speaking']);
 
 function getSafeErrorMessage(error: unknown): string {
   const value = error as {
@@ -87,6 +107,9 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
   const [isAgentReady, setIsAgentReady] = useState(false);
   const [isAgentSpeaking, setIsAgentSpeaking] = useState(false);
   const [isUserSpeaking, setIsUserSpeaking] = useState(false);
+  const [agentState, setAgentState] = useState('initializing');
+  const [transcriptMessages, setTranscriptMessages] = useState<VoiceTranscriptMessage[]>([]);
+  const [audioPlaybackBlocked, setAudioPlaybackBlocked] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [roomName, setRoomName] = useState('');
   const roomRef = useRef<Room | null>(null);
@@ -96,6 +119,7 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
   const requestAbortRef = useRef<AbortController | null>(null);
   const agentJoinTimerRef = useRef<number | null>(null);
   const audioContainerRef = useRef<HTMLDivElement>(null);
+  const transcriptEndRef = useRef<HTMLDivElement>(null);
 
   const clearAgentJoinTimer = useCallback(() => {
     if (agentJoinTimerRef.current !== null) {
@@ -126,8 +150,14 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
     setIsAgentReady(false);
     setIsAgentSpeaking(false);
     setIsUserSpeaking(false);
+    setAgentState('initializing');
+    setAudioPlaybackBlocked(false);
     if (!showError) setStatus('idle');
   }, [clearAgentJoinTimer]);
+
+  useEffect(() => {
+    transcriptEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  }, [transcriptMessages]);
 
   useEffect(() => () => {
     intentionalDisconnectRef.current = true;
@@ -170,6 +200,8 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
     agentReadyRef.current = false;
     setErrorMessage('');
     setIsAgentReady(false);
+    setAgentState('initializing');
+    setAudioPlaybackBlocked(false);
     setStatus('connecting');
     const abortController = new AbortController();
     requestAbortRef.current = abortController;
@@ -200,7 +232,7 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
         audioElement.setAttribute('aria-hidden', 'true');
         audioContainerRef.current.appendChild(audioElement);
         void audioElement.play().catch(() => {
-          setErrorMessage('Your browser blocked audio playback. Use the audio permission prompt or check your browser settings.');
+          setAudioPlaybackBlocked(true);
         });
       };
       const onTrackUnsubscribed = (track: RemoteTrack) => {
@@ -215,6 +247,7 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
         agentReadyRef.current = true;
         clearAgentJoinTimer();
         setIsAgentReady(true);
+        setAgentState(participant.attributes[AGENT_STATE_ATTRIBUTE] ?? 'listening');
         setErrorMessage('');
       };
       const onParticipantDisconnected = (participant: RemoteParticipant) => {
@@ -226,6 +259,7 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
         });
         agentReadyRef.current = false;
         setIsAgentReady(false);
+        setAgentState('initializing');
         setErrorMessage('Tavro left the voice session. End the call and retry to reconnect.');
         setStatus('error');
         void disconnectRoom(true, 'agent_participant_disconnected');
@@ -234,6 +268,23 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
         const localIdentity = room?.localParticipant.identity;
         setIsAgentSpeaking(speakers.some((speaker) => isTavro(speaker)));
         setIsUserSpeaking(speakers.some((speaker) => speaker.identity === localIdentity));
+      };
+      const onTranscriptionReceived = (
+        segments: Array<{ id: string; text: string; final: boolean }>,
+        participant?: Participant,
+      ) => {
+        const speaker: VoiceSpeaker | null = participant && isTavro(participant)
+          ? 'Tavro AI'
+          : participant?.identity === room?.localParticipant.identity
+            ? 'You'
+            : null;
+        if (!speaker) return;
+        setTranscriptMessages((messages) => mergeVoiceTranscriptSegments(messages, speaker, segments));
+      };
+      const onParticipantAttributesChanged = (_changed: string[], participant: Participant) => {
+        if (!isTavro(participant)) return;
+        const nextState = participant.attributes[AGENT_STATE_ATTRIBUTE];
+        if (nextState && AGENT_STATES.has(nextState)) setAgentState(nextState);
       };
       const onReconnecting = () => {
         setStatus('reconnecting');
@@ -256,6 +307,7 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
         clearAgentJoinTimer();
         roomRef.current = null;
         setStatus('error');
+        setAgentState('initializing');
         setErrorMessage('The LiveKit connection ended unexpectedly. Retry to start a new voice session.');
       };
 
@@ -264,6 +316,8 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
         .on(RoomEvent.TrackUnsubscribed, onTrackUnsubscribed)
         .on(RoomEvent.ParticipantConnected, onParticipantConnected)
         .on(RoomEvent.ParticipantDisconnected, onParticipantDisconnected)
+        .on(RoomEvent.ParticipantAttributesChanged, onParticipantAttributesChanged)
+        .on(RoomEvent.TranscriptionReceived, onTranscriptionReceived)
         .on(RoomEvent.ActiveSpeakersChanged, onActiveSpeakersChanged)
         .on(RoomEvent.Reconnecting, onReconnecting)
         .on(RoomEvent.Reconnected, onReconnected)
@@ -297,7 +351,11 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
       await room.localParticipant.setMicrophoneEnabled(true);
       console.info('[Tavro Voice] Microphone published.', { roomId: response.data.roomName });
       setIsMuted(false);
-      await room.startAudio();
+      try {
+        await room.startAudio();
+      } catch {
+        setAudioPlaybackBlocked(true);
+      }
       setStatus('connected');
       setRoomName(response.data.roomName);
 
@@ -305,6 +363,9 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
       if (agentAlreadyJoined) {
         agentReadyRef.current = true;
         setIsAgentReady(true);
+        const participant = Array.from(room.remoteParticipants.values()).find(isTavro);
+        const currentAgentState = participant?.attributes[AGENT_STATE_ATTRIBUTE];
+        if (currentAgentState && AGENT_STATES.has(currentAgentState)) setAgentState(currentAgentState);
       } else {
         agentJoinTimerRef.current = window.setTimeout(() => {
           if (agentReadyRef.current || intentionalDisconnectRef.current) return;
@@ -363,14 +424,16 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
   const isConnecting = status === 'connecting';
   const isConnected = status === 'connected' || status === 'reconnecting';
   const activityLabel = status === 'reconnecting'
-    ? 'Reconnecting to LiveKit…'
-    : isAgentSpeaking
+    ? 'Reconnecting…'
+    : isAgentSpeaking || agentState === 'speaking'
       ? 'Tavro is speaking'
       : isUserSpeaking
-        ? 'You are speaking'
-        : isAgentReady
-          ? 'Listening'
-          : 'Waiting for Tavro to join';
+        ? 'Listening to you'
+        : agentState === 'thinking'
+          ? 'Tavro is thinking'
+          : isAgentReady
+            ? 'Listening'
+            : 'Tavro is joining';
 
   return (
     <section
@@ -404,7 +467,8 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
         </button>
       </div>
 
-      <div className="flex flex-1 flex-col items-center justify-center py-7 text-center">
+      <div className="mt-5 grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(260px,0.85fr)]">
+      <div className="flex min-h-[280px] flex-col items-center justify-center py-5 text-center">
         <div
           className={`relative flex h-28 w-28 items-center justify-center rounded-full border transition-all duration-300 sm:h-32 sm:w-32 ${
             isAgentSpeaking ? 'scale-105 shadow-[0_0_55px_color-mix(in_srgb,var(--accent)_45%,transparent)]' : ''
@@ -438,22 +502,69 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
         </p>
         <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
           {status === 'idle' ? 'Your browser will ask for microphone permission.' :
-            status === 'connecting' ? 'Requesting a short-lived room token and connecting to LiveKit.' :
+            status === 'connecting' ? 'Connecting to your voice session…' :
               isMuted ? 'Microphone muted' :
-                isAgentReady ? 'Your audio is private to this voice room.' :
+                isAgentReady ? 'Your microphone is on.' :
                   status === 'error' ? 'No audio is being sent while the session is stopped.' : 'Microphone is on'}
         </p>
-        {roomName && status !== 'idle' && (
-          <span className="mt-2 font-mono text-[10px]" style={{ color: 'var(--text-muted)' }}>
-            Session {roomName.slice(-8)}
-          </span>
+        {roomName && (
+          <details className="mt-3 text-left text-[11px]" style={{ color: 'var(--text-muted)' }}>
+            <summary className="cursor-pointer">Diagnostics</summary>
+            <p className="mt-1 break-all font-mono">Session ID: {roomName}</p>
+          </details>
         )}
+      </div>
+      <aside className="flex min-h-[260px] max-h-[420px] flex-col overflow-hidden rounded-2xl border text-left" style={{ borderColor: 'var(--border-color)', background: 'var(--bg-base)' }}>
+        <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: 'var(--border-color)' }}>
+          <div>
+            <h4 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Live conversation</h4>
+            <p className="mt-0.5 text-[11px]" style={{ color: 'var(--text-muted)' }}>Speech and Tavro replies appear here.</p>
+          </div>
+          {transcriptMessages.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setTranscriptMessages([])}
+              className="rounded-lg px-2 py-1 text-[11px] hover:bg-[var(--bg-hover)]"
+              style={{ color: 'var(--text-muted)' }}
+            >
+              Clear
+            </button>
+          )}
+        </div>
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4" aria-live="polite" aria-relevant="additions text">
+          {transcriptMessages.length === 0 ? (
+            <p className="py-8 text-center text-xs" style={{ color: 'var(--text-muted)' }}>
+              {isAgentReady ? 'Start speaking to begin the conversation.' : 'Your conversation will appear here.'}
+            </p>
+          ) : transcriptMessages.map((message) => (
+            <article key={`${message.speaker}:${message.id}`} className="rounded-xl border p-3" style={{ borderColor: 'var(--border-color)', background: 'var(--bg-card)' }}>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-semibold" style={{ color: 'var(--accent)' }}>{message.speaker}</span>
+                <time className="text-[10px]" style={{ color: 'var(--text-muted)' }} dateTime={new Date(message.timestamp).toISOString()}>
+                  {new Date(message.timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                </time>
+              </div>
+              <p className="mt-1 whitespace-pre-wrap text-sm leading-5" style={{ color: 'var(--text-primary)' }}>{message.text}</p>
+              {!message.final && <span className="mt-1 inline-block text-[10px]" style={{ color: 'var(--text-muted)' }}>Transcribing…</span>}
+            </article>
+          ))}
+          <div ref={transcriptEndRef} />
+        </div>
+      </aside>
       </div>
 
       {errorMessage && (
         <div className="mb-4 flex items-start gap-2 rounded-xl border border-rose-300/70 bg-rose-500/10 px-3 py-2.5 text-left text-xs text-rose-700 dark:text-rose-300" role="alert">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
           <span>{errorMessage}</span>
+        </div>
+      )}
+      {audioPlaybackBlocked && isConnected && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-300/60 bg-amber-500/10 px-3 py-2.5 text-xs text-amber-800 dark:text-amber-200" role="status">
+          <span>Your browser needs permission to play Tavro’s audio.</span>
+          <button type="button" onClick={() => void enableAudioPlayback()} className="rounded-lg bg-amber-500/20 px-3 py-1.5 font-semibold hover:bg-amber-500/30">
+            Enable audio
+          </button>
         </div>
       )}
 

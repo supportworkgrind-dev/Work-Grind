@@ -127,7 +127,7 @@ export function LinkedInConnectionCard({
             LinkedIn publishing
           </h3>
           <p className="mt-1 text-xs theme-text-muted">
-            Publish text posts to the connected member profile. Organization-page publishing and media are not enabled.
+            Publish text posts to the LinkedIn profile you connect. Company-page publishing and media sharing are not available yet.
           </p>
         </div>
         {loading && <LoaderCircle className="h-4 w-4 animate-spin theme-text-muted" aria-label="Loading LinkedIn status" />}
@@ -171,9 +171,6 @@ export function LinkedInConnectionCard({
       <div className="mt-3">
         <SocialAuthButtons intent="publishing" returnTo={returnTo} />
       </div>
-      <p className="mt-2 text-[11px] theme-text-muted">
-        Only LinkedIn&rsquo;s granted <code>w_member_social</code> scope is used for member posts. This does not enable organization events.
-      </p>
     </section>
   );
 }
