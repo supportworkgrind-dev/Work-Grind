@@ -233,16 +233,18 @@ async function logToolAction(
   durationMs: number,
 ): Promise<void> {
   try {
-    const safeArgs = sanitize(toolArgs) ?? {};
-    delete safeArgs.content;
-    delete safeArgs.description;
-    delete safeArgs.notes;
     await AuditLog.create({
       companyId: new mongoose.Types.ObjectId(ctx.companyId),
       userId: new mongoose.Types.ObjectId(ctx.userId),
       action: `AI_AGENT_TOOL:${toolName}`,
       resource: 'AiAgent',
-      details: { toolName, args: safeArgs, success: result.success, durationMs, error: result.error },
+      details: {
+        toolName,
+        argumentNames: Object.keys(toolArgs),
+        success: result.success,
+        durationMs,
+        error: result.success ? undefined : 'Workspace tool execution failed.',
+      },
     });
   } catch {
     // Audit logging must not interrupt an otherwise successful assistant turn.
@@ -318,6 +320,14 @@ async function executeToolCall(
   toolSteps.push({ toolName, toolArgs: sanitize(toolArgs), toolResult: result, durationMs });
   await logToolAction(actionContext, toolName, toolArgs, result, durationMs);
   return result;
+}
+
+export async function executeWorkspaceTool(
+  toolName: string,
+  toolArgs: Record<string, unknown>,
+  ctx: ToolContext,
+): Promise<ToolResult> {
+  return executeToolCall(toolName, toolArgs, ctx, []);
 }
 
 function parseToolArgs(json: string): Record<string, any> {

@@ -120,6 +120,7 @@ import { runTaskDueReminderSweep } from './services/taskDueReminders';
 import { cleanupExpiredVerificationCodes, migrateRefreshTokensAtRest } from './services/refreshTokenMigration';
 import mongoose from 'mongoose';
 import { isOAuthCallbackRequest } from './utils/requestLogging';
+import mcpRoutes from './routes/mcp';
 
 // Route imports
 import authRoutes from './routes/auth';
@@ -261,6 +262,15 @@ app.use(
   })
 );
 
+app.use('/mcp', (req, res, next) => {
+  const origin = req.get('origin');
+  if (origin && !getAllowedClientOrigins().includes(origin)) {
+    res.status(403).json({ success: false, message: 'MCP origin is not allowed.' });
+    return;
+  }
+  next();
+});
+
 app.use(
   cors({
     origin: (origin, callback) => {
@@ -351,8 +361,10 @@ app.use('/api/analytics',           rateLimiter(15, 60));   // 60 analytics requ
 app.use('/api/workflows',           rateLimiter(15, 120));  // reasonable workflow management limit
 app.use('/api/v1',                 rateLimiter(15, 600, { message: { success: false, error: { code: 'RATE_LIMITED', message: 'API request limit exceeded. Retry later.' } } }));
 app.use('/api',                     rateLimiter(15, 600, { skip: (req) => req.originalUrl.startsWith('/api/v1') }));
+app.use('/mcp',                    rateLimiter(15, 120));
 
 // API Routes
+app.use('/mcp', mcpRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/whatsapp', whatsappRoutes);
 app.use('/api/users', userRoutes);

@@ -12,6 +12,10 @@
   ],
   "routes": [
     {
+      "src": "/mcp(?:/.*)?",
+      "dest": "/api/index.ts"
+    },
+    {
       "src": "/api/socket-io(?:/.*)?",
       "dest": "/api/socket-io.ts"
     },

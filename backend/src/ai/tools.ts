@@ -25,8 +25,25 @@ import { CrmDeal }    from '../models/CrmDeal';
 import { CrmCompany } from '../models/CrmCompany';
 import Document  from '../models/Document';
 import File      from '../models/File';
-import { roleMatches } from '../config/organization';
+import Workflow from '../models/Workflow';
+import { isOrganizationType, roleMatches } from '../config/organization';
+import { isOrganizationFeatureAllowed } from '../middleware/organizationAccess';
 import type { TavroLanguagePreference } from './language';
+
+export const MCP_TOOL_NAMES = [
+  'searchTasks',
+  'getTaskDetails',
+  'createTask',
+  'updateTask',
+  'searchProjects',
+  'searchContacts',
+  'getContactDetails',
+  'searchCalendarEvents',
+  'listWorkflows',
+  'getWorkspaceSummary',
+  'getWorkgrindCapabilities',
+] as const;
+const MCP_TOOL_NAME_SET: ReadonlySet<string> = new Set(MCP_TOOL_NAMES);
 
 // ── Tool context injected server-side ─────────────────────────────────────────
 
@@ -79,6 +96,10 @@ function sanitizeArr(arr: any[]): any[] {
   return arr.map(sanitize);
 }
 
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // TOOL REGISTRY
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -124,7 +145,7 @@ export const TOOLS: AgentTool[] = [
       if (args.priority) filter.priority = args.priority;
       if (args.assignedToMe) filter.assigneeId = new mongoose.Types.ObjectId(ctx.userId);
       if (args.overdue)  { filter.dueDate = { $lt: new Date() }; filter.status = { $ne: 'completed' }; }
-      if (args.query)    filter.title = { $regex: args.query, $options: 'i' };
+      if (args.query)    filter.title = { $regex: escapeRegex(args.query), $options: 'i' };
 
       const tasks = await Task.find(filter)
         .populate('assigneeId', 'fullName email avatar')
@@ -134,6 +155,33 @@ export const TOOLS: AgentTool[] = [
         .lean();
 
       return { success: true, data: { tasks: sanitizeArr(tasks), count: tasks.length } };
+    },
+  },
+
+  {
+    name: 'getTaskDetails',
+    readOnly: true,
+    description: 'Retrieve a task by ID if it is in the authenticated workspace and the user can access it.',
+    parameters: {
+      type: 'object',
+      required: ['taskId'],
+      properties: { taskId: { type: 'string' } },
+    },
+    async execute(args, ctx) {
+      if (!mongoose.isValidObjectId(args.taskId)) return { success: false, error: 'Invalid task ID.' };
+      const filter: Record<string, unknown> = { _id: args.taskId, companyId: ctx.companyId, isArchived: false };
+      if (!canManageWorkspace(ctx)) {
+        filter.$or = [
+          { assigneeId: new mongoose.Types.ObjectId(ctx.userId) },
+          { creatorId: new mongoose.Types.ObjectId(ctx.userId) },
+        ];
+      }
+      const task = await Task.findOne(filter)
+        .populate('assigneeId', 'fullName email avatar')
+        .populate('projectId', 'name color')
+        .lean();
+      if (!task) return { success: false, error: 'Task not found or access denied.' };
+      return { success: true, data: { task: sanitize(task) } };
     },
   },
 
@@ -166,7 +214,7 @@ export const TOOLS: AgentTool[] = [
 
       let projectId: mongoose.Types.ObjectId | undefined;
       if (args.projectName) {
-        const project = await Project.findOne({ companyId: ctx.companyId, name: { $regex: args.projectName, $options: 'i' } }).select('_id');
+        const project = await Project.findOne({ companyId: ctx.companyId, name: { $regex: escapeRegex(args.projectName), $options: 'i' } }).select('_id');
         if (project) projectId = project._id as mongoose.Types.ObjectId;
       }
 
@@ -243,7 +291,7 @@ export const TOOLS: AgentTool[] = [
     async execute(args, ctx) {
       const filter: any = { companyId: ctx.companyId, isArchived: false };
       if (args.status) filter.status = args.status;
-      if (args.query)  filter.name = { $regex: args.query, $options: 'i' };
+      if (args.query)  filter.name = { $regex: escapeRegex(args.query), $options: 'i' };
       if (args.behindSchedule) {
         filter.deadline = { $lt: new Date() };
         filter.status   = { $ne: 'completed' };
@@ -427,7 +475,7 @@ export const TOOLS: AgentTool[] = [
       const filter: any = { companyId: ctx.companyId };
       if (args.status) filter.status = args.status;
       if (args.query) {
-        const re = new RegExp(args.query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+        const re = new RegExp(escapeRegex(args.query), 'i');
         filter.$or = [{ firstName: re }, { lastName: re }, { email: re }, { jobTitle: re }];
       }
 
@@ -439,6 +487,28 @@ export const TOOLS: AgentTool[] = [
         .lean();
 
       return { success: true, data: { contacts: sanitizeArr(contacts), count: contacts.length } };
+    },
+  },
+
+  {
+    name: 'getContactDetails',
+    readOnly: true,
+    description: 'Retrieve a CRM contact by ID in the authenticated business workspace.',
+    parameters: {
+      type: 'object',
+      required: ['contactId'],
+      properties: { contactId: { type: 'string' } },
+    },
+    async execute(args, ctx) {
+      if (!mongoose.isValidObjectId(args.contactId)) return { success: false, error: 'Invalid contact ID.' };
+      const contact = await CrmContact.findOne({ _id: args.contactId, companyId: ctx.companyId })
+        .select('firstName lastName email phone jobTitle department status tags notes linkedInUrl avatarUrl ownerId crmCompanyId dealIds createdAt updatedAt')
+        .populate('ownerId', 'fullName avatar')
+        .populate('crmCompanyId', 'name domain')
+        .populate('dealIds', 'title value stage priority closeDate')
+        .lean();
+      if (!contact) return { success: false, error: 'Contact not found or access denied.' };
+      return { success: true, data: { contact: sanitize(contact) } };
     },
   },
 
@@ -656,6 +726,21 @@ export const TOOLS: AgentTool[] = [
   // ── WORKSPACE SUMMARY ──────────────────────────────────────────────────────
 
   {
+    name: 'listWorkflows',
+    readOnly: true,
+    description: 'List automation workflows available to managers in the authenticated business workspace without returning action configuration or execution payloads.',
+    parameters: { type: 'object', properties: { limit: { type: 'number' } } },
+    async execute(args, ctx) {
+      const workflows = await Workflow.find({ companyId: ctx.companyId })
+        .select('name description isEnabled trigger.type lastRunAt runCount failCount createdAt updatedAt')
+        .sort({ updatedAt: -1 })
+        .limit(Math.min(args.limit ?? 20, 50))
+        .lean();
+      return { success: true, data: { workflows: sanitizeArr(workflows), count: workflows.length } };
+    },
+  },
+
+  {
     name: 'getWorkspaceSummary',
     readOnly: true,
     description: 'Get a high-level summary of the workspace: task counts, active projects, upcoming meetings, and CRM overview when available.',
@@ -736,6 +821,22 @@ export const TOOLS: AgentTool[] = [
           deals:    sanitizeArr(deals),
         },
       };
+    },
+  },
+
+  {
+    name: 'getWorkgrindCapabilities',
+    readOnly: true,
+    description: 'Report the WorkGrind AI tools currently available to the authenticated user and identify which are exposed through MCP.',
+    parameters: { type: 'object', properties: {} },
+    async execute(_args, ctx) {
+      const tools = getAvailableTools(ctx).map(({ name, description, readOnly }) => ({
+        name,
+        description,
+        readOnly: readOnly === true,
+        mcpAvailable: MCP_TOOL_NAME_SET.has(name),
+      }));
+      return { success: true, data: { tools, count: tools.length } };
     },
   },
 ];
@@ -988,14 +1089,26 @@ const EXTRA_TOOLS: AgentTool[] = [
 TOOLS.push(...EXTRA_TOOLS);
 
 const TOOL_ENTITLEMENTS: Partial<Record<string, string>> = {
-  searchTasks: 'tasksProjects', createTask: 'tasksProjects', updateTask: 'tasksProjects', completeTask: 'tasksProjects', assignTask: 'tasksProjects',
+  searchTasks: 'tasksProjects', getTaskDetails: 'tasksProjects', createTask: 'tasksProjects', updateTask: 'tasksProjects', completeTask: 'tasksProjects', assignTask: 'tasksProjects',
   searchProjects: 'tasksProjects', createProject: 'tasksProjects',
   searchMeetings: 'meetingsCalendar', createMeeting: 'meetingsCalendar', searchCalendarEvents: 'meetingsCalendar',
-  searchContacts: 'crm', searchDeals: 'crm', searchCrmCompanies: 'crm', createDeal: 'crm', updateDeal: 'crm', getCrmAccountSummary: 'crm',
+  searchContacts: 'crm', getContactDetails: 'crm', searchDeals: 'crm', searchCrmCompanies: 'crm', createDeal: 'crm', updateDeal: 'crm', getCrmAccountSummary: 'crm',
   createContact: 'crm',
   searchDocuments: 'fileStorage', searchFiles: 'fileStorage',
   searchMessages: 'teamChat', searchTeamMembers: 'teamChat', getTeamMembers: 'teamChat',
 };
+
+const TOOL_ORGANIZATION_FEATURES = {
+  searchContacts: 'businessCrm',
+  getContactDetails: 'businessCrm',
+  searchDeals: 'businessCrm',
+  searchCrmCompanies: 'businessCrm',
+  createDeal: 'businessCrm',
+  updateDeal: 'businessCrm',
+  getCrmAccountSummary: 'businessCrm',
+  createContact: 'businessCrm',
+  listWorkflows: 'businessAutomation',
+} as const;
 
 export function isToolAvailable(name: string, ctx: ToolContext): boolean {
   const entitlement = TOOL_ENTITLEMENTS[name];
@@ -1003,6 +1116,19 @@ export function isToolAvailable(name: string, ctx: ToolContext): boolean {
     entitlement === 'crm' &&
     (ctx.accountType === 'individual' || (ctx.organizationType && ctx.organizationType !== 'business'))
   ) return false;
+  const organizationFeature = TOOL_ORGANIZATION_FEATURES[name as keyof typeof TOOL_ORGANIZATION_FEATURES];
+  if (organizationFeature) {
+    if (
+      !ctx.organizationType ||
+      !ctx.accountType ||
+      !isOrganizationType(ctx.organizationType) ||
+      !isOrganizationFeatureAllowed(
+        { organizationType: ctx.organizationType, accountType: ctx.accountType },
+        ctx.userRole,
+        organizationFeature,
+      )
+    ) return false;
+  }
   return !entitlement || !ctx.enabledFeatures || ctx.enabledFeatures.includes(entitlement);
 }
 
