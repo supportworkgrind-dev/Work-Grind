@@ -27,6 +27,14 @@ import {
   type VoiceSpeaker,
   type VoiceTranscriptMessage,
 } from './voiceTranscript';
+import {
+  AGENT_NAME,
+  AGENT_NAME_ATTRIBUTE,
+  AGENT_READY_ATTRIBUTE,
+  AGENT_STATE_ATTRIBUTE,
+  inspectTavroReadiness,
+  isTavroParticipant,
+} from './voiceReadiness';
 
 type VoiceStatus =
   | 'idle'
@@ -49,18 +57,12 @@ type VoiceAssistantPanelProps = {
   onClose: () => void;
 };
 
-const AGENT_NAME_ATTRIBUTE = 'lk.agent.name';
-const AGENT_NAME = 'tavro-voice';
 const CONNECT_TIMEOUT_MS = 20_000;
 const AGENT_JOIN_TIMEOUT_MS = 30_000;
 const ROOM_OPTIONS: RoomOptions = {
   adaptiveStream: true,
   dynacast: true,
 };
-const AGENT_STATE_ATTRIBUTE = 'lk.agent.state';
-const AGENT_READY_ATTRIBUTE = 'workgrind.tavro.ready';
-const AGENT_STATES = new Set(['initializing', 'listening', 'thinking', 'speaking']);
-
 function getSafeErrorMessage(error: unknown): string {
   const value = error as {
     name?: string;
@@ -94,20 +96,6 @@ function getSafeErrorMessage(error: unknown): string {
     return 'The voice connection timed out. Check your internet connection and retry.';
   }
   return 'Tavro Voice could not connect. Check your microphone and network, then retry.';
-}
-
-function isTavro(participant: Participant): boolean {
-  return participant.attributes[AGENT_NAME_ATTRIBUTE] === AGENT_NAME;
-}
-
-function activeAgentStatus(value: string | undefined): ActiveAgentStatus | null {
-  if (value === 'listening' || value === 'thinking' || value === 'speaking') return value;
-  return null;
-}
-
-function hasAgentReadySignal(participant: Participant): boolean {
-  return participant.attributes[AGENT_READY_ATTRIBUTE] === 'true' &&
-    activeAgentStatus(participant.attributes[AGENT_STATE_ATTRIBUTE]) !== null;
 }
 
 export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProps) {
@@ -277,11 +265,19 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
         if (agentJoinTimerRef.current !== null) return;
         agentJoinTimerRef.current = window.setTimeout(() => {
           if (agentReadyRef.current || intentionalDisconnectRef.current) return;
+          const agentParticipant = Array.from(room?.remoteParticipants.values() ?? [])
+            .find(isTavroParticipant);
+          const readiness = inspectTavroReadiness(agentParticipant);
           console.error('[Tavro Voice] Agent readiness timed out.', {
-            roomId: response.data.roomName,
+            voiceSessionId: response.data.roomName,
             timeoutMs: AGENT_JOIN_TIMEOUT_MS,
+            readinessFailure: readiness.failure,
+            microphonePublished: microphonePublishedRef.current,
+            remoteParticipantCount: room?.remoteParticipants.size ?? 0,
           });
-          setErrorMessage('The voice room connected, but Tavro did not become ready. The voice service may be offline or unable to reach WorkGrind. Please retry shortly.');
+          setErrorMessage(readiness.failure === 'participant_not_joined'
+            ? 'Your microphone is ready, but the Tavro voice worker did not join this room. Retry once. If it continues, share the session ID in Diagnostics with WorkGrind support.'
+            : 'Tavro joined the room but did not finish its readiness check. Retry once. If it continues, share the session ID in Diagnostics with WorkGrind support.');
           setStatus('failed');
           void disconnectRoom(true, 'agent_readiness_timeout');
         }, AGENT_JOIN_TIMEOUT_MS);
@@ -301,13 +297,15 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
         for (const element of track.detach()) element.remove();
       };
       const onParticipantConnected = (participant: RemoteParticipant) => {
-        if (!isTavro(participant)) return;
+        const readiness = inspectTavroReadiness(participant);
+        if (!readiness.isTavro) return;
         console.info('[Tavro Voice] Agent participant joined.', {
-          roomId: response.data.roomName,
+          voiceSessionId: response.data.roomName,
           participantKind: participant.kind,
+          readySignal: participant.attributes[AGENT_READY_ATTRIBUTE] === 'true',
+          agentState: readiness.state,
         });
-        const state = activeAgentStatus(participant.attributes[AGENT_STATE_ATTRIBUTE]);
-        if (!hasAgentReadySignal(participant) || !state) {
+        if (!readiness.ready || !readiness.state) {
           agentReadyRef.current = false;
           setStatus(microphonePublishedRef.current ? 'waiting-for-agent' : 'connecting');
           setIsAgentReady(false);
@@ -316,14 +314,14 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
         agentReadyRef.current = true;
         clearAgentJoinTimer();
         setIsAgentReady(true);
-        setAgentState(state);
-        setStatus(state);
+        setAgentState(readiness.state);
+        setStatus(readiness.state);
         setErrorMessage('');
       };
       const onParticipantDisconnected = (participant: RemoteParticipant) => {
-        if (!isTavro(participant) || intentionalDisconnectRef.current) return;
+        if (!isTavroParticipant(participant) || intentionalDisconnectRef.current) return;
         console.warn('[Tavro Voice] Agent participant disconnected.', {
-          roomId: response.data.roomName,
+          voiceSessionId: response.data.roomName,
           participantKind: participant.kind,
           reason: 'agent_participant_disconnected',
         });
@@ -336,12 +334,13 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
       };
       const onActiveSpeakersChanged = (speakers: Participant[]) => {
         const localIdentity = room?.localParticipant.identity;
-        const agentSpeaking = speakers.some((speaker) => isTavro(speaker));
+        const agentSpeaking = speakers.some(isTavroParticipant);
         setIsAgentSpeaking(agentSpeaking);
         setIsUserSpeaking(speakers.some((speaker) => speaker.identity === localIdentity));
         if (agentReadyRef.current) {
-          const currentAgent = Array.from(room?.remoteParticipants.values() ?? []).find(isTavro);
-          const currentAgentStatus = activeAgentStatus(currentAgent?.attributes[AGENT_STATE_ATTRIBUTE]);
+          const currentAgent = Array.from(room?.remoteParticipants.values() ?? [])
+            .find(isTavroParticipant);
+          const currentAgentStatus = inspectTavroReadiness(currentAgent).state;
           setStatus(agentSpeaking ? 'speaking' : currentAgentStatus ?? 'listening');
         }
       };
@@ -349,7 +348,7 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
         segments: Array<{ id: string; text: string; final: boolean }>,
         participant?: Participant,
       ) => {
-        const speaker: VoiceSpeaker | null = participant && isTavro(participant)
+        const speaker: VoiceSpeaker | null = participant && isTavroParticipant(participant)
           ? 'Tavro AI'
           : participant?.identity === room?.localParticipant.identity
             ? 'You'
@@ -358,21 +357,27 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
         setTranscriptMessages((messages) => mergeVoiceTranscriptSegments(messages, speaker, segments));
       };
       const onParticipantAttributesChanged = (_changed: Record<string, string>, participant: Participant) => {
-        if (!isTavro(participant)) return;
-        const nextState = participant.attributes[AGENT_STATE_ATTRIBUTE];
-        if (nextState && AGENT_STATES.has(nextState)) setAgentState(nextState);
-        const activeState = activeAgentStatus(nextState);
-        if (!hasAgentReadySignal(participant) || !activeState) {
+        const readiness = inspectTavroReadiness(participant);
+        if (!readiness.isTavro) return;
+        if (readiness.state) setAgentState(readiness.state);
+        if (!readiness.ready || !readiness.state) {
           agentReadyRef.current = false;
           setIsAgentReady(false);
           setStatus(microphonePublishedRef.current ? 'waiting-for-agent' : 'connecting');
-          if (microphonePublishedRef.current) startAgentReadinessTimeout();
+          if (microphonePublishedRef.current) {
+            console.info('[Tavro Voice] Agent readiness update received.', {
+              voiceSessionId: response.data.roomName,
+              readinessFailure: readiness.failure,
+              agentState: readiness.state,
+            });
+            startAgentReadinessTimeout();
+          }
           return;
         }
         agentReadyRef.current = true;
         clearAgentJoinTimer();
         setIsAgentReady(true);
-        setStatus(activeState);
+        setStatus(readiness.state);
         setErrorMessage('');
       };
       const onReconnecting = () => {
@@ -380,10 +385,10 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
         setErrorMessage('');
       };
       const onReconnected = () => {
-        const currentAgent = Array.from(room?.remoteParticipants.values() ?? []).find(isTavro);
-        const currentState = currentAgent && hasAgentReadySignal(currentAgent)
-          ? activeAgentStatus(currentAgent.attributes[AGENT_STATE_ATTRIBUTE])
-          : null;
+        const currentAgent = Array.from(room?.remoteParticipants.values() ?? [])
+          .find(isTavroParticipant);
+        const readiness = inspectTavroReadiness(currentAgent);
+        const currentState = readiness.ready ? readiness.state : null;
         agentReadyRef.current = currentState !== null;
         setIsAgentReady(agentReadyRef.current);
         setStatus(currentState ?? 'waiting-for-agent');
@@ -433,7 +438,10 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
       if (connectTimeoutId !== null) window.clearTimeout(connectTimeoutId);
       connectTimeoutId = null;
 
-      console.info('[Tavro Voice] LiveKit room connected.', { roomId: response.data.roomName });
+      console.info('[Tavro Voice] LiveKit room connected.', {
+        voiceSessionId: response.data.roomName,
+        remoteParticipantCount: room.remoteParticipants.size,
+      });
       try {
         console.info('[Tavro Voice] LiveKit signaling origin.', {
           roomId: response.data.roomName,
@@ -456,10 +464,16 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
       setStatus('waiting-for-agent');
       setRoomName(response.data.roomName);
 
-      const agentParticipant = Array.from(room.remoteParticipants.values()).find(isTavro);
-      const currentAgentState = agentParticipant && hasAgentReadySignal(agentParticipant)
-        ? activeAgentStatus(agentParticipant.attributes[AGENT_STATE_ATTRIBUTE])
-        : null;
+      const agentParticipant = Array.from(room.remoteParticipants.values())
+        .find(isTavroParticipant);
+      const readiness = inspectTavroReadiness(agentParticipant);
+      const currentAgentState = readiness.ready ? readiness.state : null;
+      console.info('[Tavro Voice] Initial agent readiness check completed.', {
+        voiceSessionId: response.data.roomName,
+        remoteParticipantCount: room.remoteParticipants.size,
+        readinessFailure: readiness.failure,
+        agentState: readiness.state,
+      });
       if (currentAgentState) {
         agentReadyRef.current = true;
         clearAgentJoinTimer();

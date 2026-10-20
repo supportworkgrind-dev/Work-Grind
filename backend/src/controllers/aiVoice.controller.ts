@@ -124,10 +124,13 @@ function explicitVoiceConfirmation(message: string): 'approve' | 'reject' | null
 }
 
 export const createVoiceSession = async (req: AuthRequest, res: Response): Promise<void> => {
+  const requestId = req.get('x-request-id')?.replace(/[^\w.-]/g, '').slice(0, 128);
+  const startedAt = Date.now();
+  let voiceSessionId: string | undefined;
   const missingConfiguration = getMissingVoiceConfiguration();
   if (missingConfiguration.length > 0) {
     console.warn('[Tavro Voice] Session request rejected: configuration is incomplete.', {
-      requestId: req.get('x-request-id')?.replace(/[^\w.-]/g, '').slice(0, 128),
+      requestId,
       missingConfiguration,
       httpStatus: 503,
     });
@@ -178,6 +181,7 @@ export const createVoiceSession = async (req: AuthRequest, res: Response): Promi
 
     failureStage = 'session_token_creation';
     const roomName = `tavro-${randomUUID()}`;
+    voiceSessionId = roomName;
     const accessToken = new AccessToken(
       process.env.LIVEKIT_API_KEY!.trim(),
       process.env.LIVEKIT_API_SECRET!.trim(),
@@ -226,37 +230,51 @@ export const createVoiceSession = async (req: AuthRequest, res: Response): Promi
 
     failureStage = 'livekit_room_creation';
     await roomService.createRoom({ name: roomName, emptyTimeout: 300, maxParticipants: 2 });
+    console.info('[Tavro Voice] LiveKit room created.', {
+      requestId,
+      voiceSessionId,
+      stage: failureStage,
+    });
     failureStage = 'livekit_agent_dispatch';
     let dispatchId: string | undefined;
     try {
+      console.info('[Tavro Voice] LiveKit agent dispatch requested.', {
+        requestId,
+        voiceSessionId,
+        agentName: AGENT_NAME,
+        stage: failureStage,
+      });
       const dispatch = await dispatchService.createDispatch(roomName, AGENT_NAME, {
         metadata: JSON.stringify({ voiceTurnToken }),
       });
       dispatchId = dispatch.id;
       console.info('[Tavro Voice] LiveKit agent dispatch accepted.', {
-        requestId: req.get('x-request-id')?.replace(/[^\w.-]/g, '').slice(0, 128),
-        roomId: roomName,
+        requestId,
+        voiceSessionId,
         agentName: AGENT_NAME,
         dispatchId,
         jobIds: dispatch.state?.jobs.map((job) => job.id) ?? [],
+        elapsedMs: Date.now() - startedAt,
       });
     } catch (error) {
       try {
         await roomService.deleteRoom(roomName);
       } catch {
         console.warn('[Tavro Voice] Could not clean up an undispatched LiveKit room.', {
-          roomId: roomName,
+          requestId,
+          voiceSessionId,
         });
       }
       throw error;
     }
 
     console.info('[Tavro Voice] Session token issued.', {
-      requestId: req.get('x-request-id')?.replace(/[^\w.-]/g, '').slice(0, 128),
-      roomId: roomName,
+      requestId,
+      voiceSessionId,
       dispatchId,
       role,
       httpStatus: 200,
+      elapsedMs: Date.now() - startedAt,
     });
     res.status(200).json({
       success: true,
@@ -280,12 +298,14 @@ export const createVoiceSession = async (req: AuthRequest, res: Response): Promi
         : undefined;
     const rawStatus = candidate?.statusCode ?? candidate?.status ?? candidate?.$metadata?.httpStatusCode;
     console.error('[Tavro Voice] Session dispatch failed.', {
-      requestId: req.get('x-request-id')?.replace(/[^\w.-]/g, '').slice(0, 128),
+      requestId,
+      voiceSessionId,
       stage: failureStage,
       errorName: error instanceof Error ? error.name : 'UnknownError',
       ...(errorCode !== undefined ? { errorCode } : {}),
       ...(typeof rawStatus === 'number' ? { providerStatus: rawStatus } : {}),
       httpStatus: 503,
+      elapsedMs: Date.now() - startedAt,
     });
     res.status(503).json({
       success: false,
