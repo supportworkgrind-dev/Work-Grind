@@ -3,6 +3,7 @@ import { Request, Response } from 'express';
 import mongoose from 'mongoose';
 import { DeveloperApiKey, DeveloperApiRequestLog, WebhookRegistration, CONNECT_SCOPES, type ConnectScope } from '../models/DeveloperAccess';
 import { AuthRequest } from '../middleware/auth';
+import { parsePagination } from '../utils/pagination';
 
 const VALID_SCOPES = new Set<string>(CONNECT_SCOPES);
 const RATE_LIMIT = 120;
@@ -76,12 +77,35 @@ export async function rotateApiKey(req: AuthRequest, res: Response) {
 }
 
 export async function listApiRequestLogs(req: AuthRequest, res: Response) {
-  const page = Math.max(1, Number.parseInt(String(req.query.page || '1'), 10) || 1);
-  const limit = Math.min(100, Math.max(1, Number.parseInt(String(req.query.limit || '50'), 10) || 50));
-  const logs = await DeveloperApiRequestLog.find({ companyId: companyId(req) })
-    .sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit)
-    .populate('apiKeyId', 'name').lean();
-  const total = await DeveloperApiRequestLog.countDocuments({ companyId: companyId(req) });
+  const pagination = parsePagination(
+    { page: req.query.page, limit: req.query.limit },
+    { defaultLimit: 50, maxLimit: 100 },
+  );
+  if (!pagination) {
+    res.status(400).json({ success: false, message: 'Page and limit must be positive integers within the supported range.' });
+    return;
+  }
+  const filter: Record<string, unknown> = { companyId: companyId(req) };
+  if (req.query.status === 'success') filter.statusCode = { $lt: 400 };
+  else if (req.query.status === 'errors') filter.statusCode = { $gte: 400 };
+  else if (req.query.status !== undefined && req.query.status !== 'all') {
+    res.status(400).json({ success: false, message: 'Status must be one of: all, success, errors.' });
+    return;
+  }
+  if (req.query.keyId !== undefined) {
+    if (typeof req.query.keyId !== 'string' || !mongoose.isValidObjectId(req.query.keyId)) {
+      res.status(400).json({ success: false, message: 'Key ID is invalid.' });
+      return;
+    }
+    filter.apiKeyId = req.query.keyId;
+  }
+  const { page, limit, skip } = pagination;
+  const [logs, total] = await Promise.all([
+    DeveloperApiRequestLog.find(filter)
+      .sort({ createdAt: -1, _id: -1 }).skip(skip).limit(limit)
+      .populate('apiKeyId', 'name').lean(),
+    DeveloperApiRequestLog.countDocuments(filter),
+  ]);
   res.json({ success: true, data: logs.map((log: any) => ({
     id: log._id,
     keyName: log.apiKeyId?.name || 'Revoked key',
@@ -90,7 +114,7 @@ export async function listApiRequestLogs(req: AuthRequest, res: Response) {
     statusCode: log.statusCode,
     durationMs: log.durationMs,
     createdAt: log.createdAt,
-  })), pagination: { page, limit, total } });
+  })), pagination: { page, limit, total, pages: Math.ceil(total / limit), totalPages: Math.ceil(total / limit) } });
 }
 
 export async function listWebhooks(req: AuthRequest, res: Response) {

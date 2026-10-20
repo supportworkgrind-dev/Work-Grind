@@ -11,6 +11,7 @@ import { useAuthStore } from '@/store/useAuthStore';
 
 type ApiKey = { id: string; name: string; prefix: string; scopes: string[]; createdAt: string; lastUsedAt?: string | null; rotatedAt?: string | null; revokedAt?: string | null };
 type RequestLog = { id: string; keyName: string; method: string; path: string; statusCode: number; durationMs: number; createdAt: string };
+type LogStatusFilter = 'all' | 'success' | 'errors';
 type Webhook = { _id: string; name: string; url: string; events: string[]; isEnabled: boolean; deliveryStatus: 'not_configured'; createdAt: string };
 
 const RESOURCES = ['contacts', 'companies', 'deals', 'projects', 'tasks', 'team'] as const;
@@ -40,6 +41,10 @@ export default function DeveloperPage() {
   const [keys, setKeys] = useState<ApiKey[]>([]);
   const [webhooks, setWebhooks] = useState<Webhook[]>([]);
   const [logs, setLogs] = useState<RequestLog[]>([]);
+  const [logsPage, setLogsPage] = useState(1);
+  const [logsTotalPages, setLogsTotalPages] = useState(1);
+  const [logStatus, setLogStatus] = useState<LogStatusFilter>('all');
+  const [logKeyId, setLogKeyId] = useState('');
   const [loading, setLoading] = useState(false);
   const [reloadTick, setReloadTick] = useState(0);
   const [error, setError] = useState('');
@@ -63,12 +68,15 @@ export default function DeveloperPage() {
     setLoading(true);
     setError('');
     try {
+      const logParams = new URLSearchParams({ limit: '50', page: String(logsPage), status: logStatus });
+      if (logKeyId) logParams.set('keyId', logKeyId);
       const [keyResponse, webhookResponse, logResponse] = await Promise.all([
-        api.get('/developer/keys'), api.get('/developer/webhooks'), api.get('/developer/logs?limit=50'),
+        api.get('/developer/keys'), api.get('/developer/webhooks'), api.get(`/developer/logs?${logParams.toString()}`),
       ]);
       setKeys(keyResponse.data.data || []);
       setWebhooks(webhookResponse.data.data || []);
       setLogs(logResponse.data.data || []);
+      setLogsTotalPages(logResponse.data.pagination?.totalPages || 1);
     } catch (error: unknown) {
       setError(getApiErrorMessage(error, 'Developer settings could not be loaded.'));
     } finally {
@@ -80,7 +88,7 @@ export default function DeveloperPage() {
     if (!allowed) return;
     const timer = window.setTimeout(() => { void load(); }, 0);
     return () => window.clearTimeout(timer);
-  }, [allowed, reloadTick]);
+  }, [allowed, logKeyId, logStatus, logsPage, reloadTick]);
 
   useEffect(() => {
     if (user && !allowed) router.replace('/dashboard');
@@ -185,10 +193,16 @@ export default function DeveloperPage() {
   }
 
   async function testRequest() {
+    const readScope = scopes.find((scope) => scope.endsWith(':read'));
+    if (!readScope) {
+      setTestResult('This key has no read scope. Add a read scope to test a GET request.');
+      return;
+    }
+    const resource = readScope.slice(0, -':read'.length);
     setTestLoading(true);
     setTestResult('');
     try {
-      const response = await fetch(`${API_BASE}/v1/contacts?limit=5`, { headers: { Authorization: `Bearer ${newSecret}` } });
+      const response = await fetch(`${API_BASE}/v1/${resource}?limit=5`, { headers: { Authorization: `Bearer ${newSecret}` } });
       const body = await response.json();
       setTestResult(JSON.stringify({ status: response.status, body }, null, 2));
     } catch {
@@ -294,6 +308,25 @@ export default function DeveloperPage() {
         </div>}
 
         {tab === 'logs' && <section className="overflow-hidden rounded-xl border theme-border theme-bg-card"><div className="border-b theme-border p-4"><h2 className="font-bold theme-text-primary">Recent API requests</h2><p className="mt-1 text-xs theme-text-muted">Up to 50 recent requests. No raw keys or query-string values are recorded.</p></div>{logs.length === 0 ? <Empty icon={Activity} title="No API activity yet" text="Requests made with a valid key will appear here." /> : <div className="overflow-x-auto"><table className="w-full min-w-[680px] text-left text-xs"><thead className="theme-text-muted"><tr className="border-b theme-border"><th className="p-3 font-semibold">Time</th><th className="p-3 font-semibold">Key</th><th className="p-3 font-semibold">Request</th><th className="p-3 font-semibold">Status</th><th className="p-3 text-right font-semibold">Duration</th></tr></thead><tbody className="divide-y theme-border">{logs.map((log) => <tr key={log.id} className="theme-text-secondary"><td className="whitespace-nowrap p-3">{new Date(log.createdAt).toLocaleString()}</td><td className="p-3">{log.keyName}</td><td className="p-3"><code>{log.method} /api/v1/{log.path}</code></td><td className="p-3">{log.statusCode}</td><td className="p-3 text-right">{log.durationMs} ms</td></tr>)}</tbody></table></div>}</section>}
+        {tab === 'logs' && <section className="flex flex-col gap-3 rounded-xl border theme-border theme-bg-card p-3 sm:flex-row sm:items-end sm:justify-between">
+          <div className="grid flex-1 grid-cols-1 gap-3 sm:grid-cols-2">
+            <label className="text-xs font-medium theme-text-secondary">Status
+              <select value={logStatus} onChange={(event) => { setLogStatus(event.target.value as LogStatusFilter); setLogsPage(1); }} className={inputClass}>
+                <option value="all">All responses</option><option value="success">Successful (&lt; 400)</option><option value="errors">Errors (400+)</option>
+              </select>
+            </label>
+            <label className="text-xs font-medium theme-text-secondary">API key
+              <select value={logKeyId} onChange={(event) => { setLogKeyId(event.target.value); setLogsPage(1); }} className={inputClass}>
+                <option value="">All keys</option>{keys.map((key) => <option key={key.id} value={key.id}>{key.name}</option>)}
+              </select>
+            </label>
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <button disabled={logsPage <= 1} onClick={() => setLogsPage((page) => Math.max(1, page - 1))} className="min-h-9 rounded-lg border theme-border px-3 text-xs font-semibold theme-text-primary disabled:opacity-50">Previous</button>
+            <span className="whitespace-nowrap text-xs theme-text-muted">Page {logsPage} of {logsTotalPages}</span>
+            <button disabled={logsPage >= logsTotalPages} onClick={() => setLogsPage((page) => Math.min(logsTotalPages, page + 1))} className="min-h-9 rounded-lg border theme-border px-3 text-xs font-semibold theme-text-primary disabled:opacity-50">Next</button>
+          </div>
+        </section>}
       </>}
     </div>
   );

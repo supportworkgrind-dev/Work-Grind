@@ -55,6 +55,7 @@ const DeveloperApiRequestLogSchema = new Schema<IDeveloperApiRequestLog>({
   durationMs: { type: Number, required: true },
 }, { timestamps: { createdAt: true, updatedAt: false } });
 DeveloperApiRequestLogSchema.index({ companyId: 1, createdAt: -1 });
+DeveloperApiRequestLogSchema.index({ companyId: 1, apiKeyId: 1, createdAt: -1 });
 DeveloperApiRequestLogSchema.index({ createdAt: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 90 });
 
 export const DeveloperApiRequestLog = mongoose.model<IDeveloperApiRequestLog>('DeveloperApiRequestLog', DeveloperApiRequestLogSchema);

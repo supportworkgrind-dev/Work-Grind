@@ -79,7 +79,7 @@ function getSafeErrorMessage(error: unknown): string {
   if (status === 429) return 'Too many voice session requests. Please wait a little and try again.';
   if (status === 503) return 'Tavro Voice is temporarily unavailable. Please try again shortly.';
   if (value.name === 'VoiceConnectionTimeout') {
-    return 'The LiveKit connection timed out. Check your connection and retry.';
+    return 'The voice connection timed out. Check your internet connection and retry.';
   }
   return 'Tavro Voice could not connect. Check your microphone and network, then retry.';
 }
@@ -327,7 +327,7 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
         roomRef.current = null;
         setStatus('error');
         setAgentState('initializing');
-        setErrorMessage('The LiveKit connection ended unexpectedly. Retry to start a new voice session.');
+        setErrorMessage('The voice connection ended unexpectedly. Retry to start a new session.');
       };
 
       room
@@ -392,7 +392,7 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
             roomId: response.data.roomName,
             timeoutMs: AGENT_JOIN_TIMEOUT_MS,
           });
-          setErrorMessage('Tavro did not join the voice session. Check that the LiveKit Agent is running, then retry.');
+          setErrorMessage('Tavro could not join the conversation. Please retry in a moment.');
           setStatus('error');
           void disconnectRoom(true, 'agent_join_timeout');
         }, AGENT_JOIN_TIMEOUT_MS);
@@ -496,7 +496,7 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
             Talk naturally with Tavro
           </h3>
           <p className="mt-1 max-w-xl text-xs leading-5" style={{ color: 'var(--text-muted)' }}>
-            LiveKit securely streams microphone audio. Voice mode answers general questions; use text chat for workspace records and actions.
+            Voice mode lets you speak with Tavro for general questions. Use text chat for workspace records and actions.
           </p>
         </div>
         <button

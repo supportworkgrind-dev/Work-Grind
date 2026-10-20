@@ -7,7 +7,8 @@ import Project from '../models/Project';
 import Task from '../models/Task';
 import User from '../models/User';
 import { ConnectApiRequest } from '../middleware/connectApiKey';
-import { CONNECT_RESOURCES, type ConnectResource } from '../models/DeveloperAccess';
+import { CONNECT_RESOURCES, type ConnectResource, type ConnectScope } from '../models/DeveloperAccess';
+import { parsePagination } from '../utils/pagination';
 
 const models: Record<ConnectResource, Model<any>> = {
   contacts: CrmContact,
@@ -26,6 +27,14 @@ const fields: Record<Exclude<ConnectResource, 'team'>, string[]> = {
   tasks: ['title', 'description', 'projectId', 'assigneeId', 'priority', 'status', 'startDate', 'dueDate', 'estimatedMinutes', 'tags', 'subtasks'],
 };
 
+const responseFields: Record<Exclude<ConnectResource, 'team'>, string[]> = {
+  contacts: [...fields.contacts, 'avatarUrl'],
+  companies: [...fields.companies, 'logoUrl'],
+  deals: [...fields.deals],
+  projects: [...fields.projects, 'progress', 'managerId'],
+  tasks: [...fields.tasks, 'creatorId', 'completedAt', 'recurrence'],
+};
+
 function resourceName(req: Request): ConnectResource | undefined {
   return CONNECT_RESOURCES.find((resource) => resource === req.params.resource);
 }
@@ -34,7 +43,7 @@ function filteredPayload(resource: Exclude<ConnectResource, 'team'>, body: Recor
   return Object.fromEntries(fields[resource].filter((field) => body[field] !== undefined).map((field) => [field, body[field]]));
 }
 
-function serialize(resource: ConnectResource, value: any) {
+export function serializeConnectResource(resource: ConnectResource, value: any) {
   if (resource === 'team') return {
     id: value._id,
     fullName: value.fullName,
@@ -48,12 +57,21 @@ function serialize(resource: ConnectResource, value: any) {
     createdAt: value.createdAt,
   };
   const record = typeof value.toObject === 'function' ? value.toObject() : value;
-  delete record.__v;
-  delete record.password;
-  delete record.refreshTokens;
-  delete record.verificationToken;
-  delete record.resetPasswordToken;
-  return { ...record, id: record._id };
+  const allowedFields = [
+    '_id',
+    'companyId',
+    ...responseFields[resource],
+    'createdAt',
+    'updatedAt',
+  ];
+  return Object.fromEntries(
+    [
+      ['id', record._id],
+      ...allowedFields
+      .filter((field) => record[field] !== undefined)
+      .map((field) => [field, record[field]]),
+    ],
+  );
 }
 
 async function ensureRelatedRecords(resource: Exclude<ConnectResource, 'team'>, payload: Record<string, any>, companyId: mongoose.Types.ObjectId) {
@@ -96,7 +114,7 @@ export function connectResourceMiddleware(req: ConnectApiRequest, res: Response,
   }
   const access = req.connectApiKey;
   const scope = `${resource}:${req.method === 'GET' ? 'read' : 'write'}`;
-  if (!access?.scopes.includes(scope as any)) {
+  if (!access?.scopes.includes(scope as ConnectScope)) {
     res.status(403).json({ success: false, error: { code: 'INSUFFICIENT_SCOPE', message: `This API key requires the ${scope} scope.` } });
     return;
   }
@@ -106,8 +124,15 @@ export function connectResourceMiddleware(req: ConnectApiRequest, res: Response,
 export async function listConnectResource(req: ConnectApiRequest, res: Response) {
   const resource = resourceName(req)!;
   const companyId = req.connectApiKey!.companyId;
-  const page = Math.max(1, Number.parseInt(String(req.query.page || '1'), 10) || 1);
-  const limit = Math.min(100, Math.max(1, Number.parseInt(String(req.query.limit || '25'), 10) || 25));
+  const pagination = parsePagination(
+    { page: req.query.page, limit: req.query.limit },
+    { defaultLimit: 25, maxLimit: 100 },
+  );
+  if (!pagination) {
+    res.status(400).json({ success: false, error: { code: 'INVALID_PAGINATION', message: 'Page and limit must be positive integers within the supported range.' } });
+    return;
+  }
+  const { page, limit, skip } = pagination;
   const filter: Record<string, any> = resource === 'team'
     ? { companyId, isActive: true, isDeleted: { $ne: true } }
     : { companyId };
@@ -123,12 +148,19 @@ export async function listConnectResource(req: ConnectApiRequest, res: Response)
           : [{ name: pattern }, { title: pattern }];
   }
   const model = models[resource];
-  const projection = resource === 'team' ? 'fullName email role jobTitle department avatar status lastSeen createdAt' : undefined;
+  const projection = resource === 'team'
+    ? 'fullName email role jobTitle department avatar status lastSeen createdAt'
+    : [...new Set(['companyId', ...responseFields[resource], 'createdAt', 'updatedAt'])].join(' ');
   const [records, total] = await Promise.all([
-    model.find(filter, projection).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).lean(),
+    model.find(filter, projection).sort({ createdAt: -1, _id: -1 }).skip(skip).limit(limit).lean(),
     model.countDocuments(filter),
   ]);
-  res.json({ success: true, data: records.map((record) => serialize(resource, record)), pagination: { page, limit, total, pages: Math.ceil(total / limit) } });
+  const totalPages = Math.ceil(total / limit);
+  res.json({
+    success: true,
+    data: records.map((record) => serializeConnectResource(resource, record)),
+    pagination: { page, limit, total, pages: totalPages, totalPages },
+  });
 }
 
 export async function getConnectResource(req: ConnectApiRequest, res: Response) {
@@ -139,10 +171,12 @@ export async function getConnectResource(req: ConnectApiRequest, res: Response) 
   }
   const filter: Record<string, unknown> = { _id: req.params.id, companyId: req.connectApiKey!.companyId };
   if (resource === 'team') Object.assign(filter, { isActive: true, isDeleted: { $ne: true } });
-  const projection = resource === 'team' ? 'fullName email role jobTitle department avatar status lastSeen createdAt' : undefined;
+  const projection = resource === 'team'
+    ? 'fullName email role jobTitle department avatar status lastSeen createdAt'
+    : [...new Set(['companyId', ...responseFields[resource], 'createdAt', 'updatedAt'])].join(' ');
   const record = await models[resource].findOne(filter, projection).lean();
   if (!record) { res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Resource record was not found in this workspace.' } }); return; }
-  res.json({ success: true, data: serialize(resource, record) });
+  res.json({ success: true, data: serializeConnectResource(resource, record) });
 }
 
 export async function createConnectResource(req: ConnectApiRequest, res: Response) {
@@ -160,7 +194,7 @@ export async function createConnectResource(req: ConnectApiRequest, res: Respons
   if (resource === 'projects') payload.managerId = creatorId;
   if (resource === 'tasks') payload.creatorId = creatorId;
   const created = await models[resource].create(payload);
-  res.status(201).json({ success: true, data: serialize(resource, created) });
+  res.status(201).json({ success: true, data: serializeConnectResource(resource, created) });
 }
 
 export async function updateConnectResource(req: ConnectApiRequest, res: Response) {
@@ -182,5 +216,5 @@ export async function updateConnectResource(req: ConnectApiRequest, res: Respons
     { new: true, runValidators: true },
   ).lean();
   if (!updated) { res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Resource record was not found in this workspace.' } }); return; }
-  res.json({ success: true, data: serialize(resource, updated) });
+  res.json({ success: true, data: serializeConnectResource(resource, updated) });
 }
