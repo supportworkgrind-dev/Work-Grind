@@ -87,7 +87,7 @@ test('LinkedIn video publishing uploads verified byte ranges and finalizes befor
       return Response.json({
         value: {
           video: 'urn:li:video:video123',
-          uploadToken: 'opaque-upload-token',
+          uploadToken: '',
           uploadInstructions: [{ firstByte: 0, lastByte: 3, uploadUrl: 'https://www.linkedin.com/dms-uploads/video-part' }],
         },
       }, { status: 200 });
@@ -121,7 +121,7 @@ test('LinkedIn video publishing uploads verified byte ranges and finalizes befor
   assert.deepEqual(JSON.parse(requests[2].options.body), {
     finalizeUploadRequest: {
       video: 'urn:li:video:video123',
-      uploadToken: 'opaque-upload-token',
+      uploadToken: '',
       uploadedPartIds: ['part-etag'],
     },
   });
@@ -144,6 +144,12 @@ test('LinkedIn publishing refuses untrusted upload destinations and missing post
       title: 'Image',
     }),
     /untrusted upload destination/,
+  );
+
+  global.fetch = async () => new Response(null, { status: 201 });
+  await assert.rejects(
+    publishLinkedInPost('access-token', 'member-42', 'Text post'),
+    /valid post identifier/,
   );
 });
 
@@ -174,7 +180,7 @@ test('provider catalog exposes only verified capabilities and leaves unconfigure
   assert.deepEqual(linkedin.capabilities, {
     connect: true,
     publishText: true,
-    publishMedia: false,
+    publishMedia: true,
     schedule: true,
     analytics: false,
     organizationPublishing: false,

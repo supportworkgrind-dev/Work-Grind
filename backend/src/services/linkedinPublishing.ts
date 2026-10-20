@@ -109,9 +109,19 @@ async function uploadVideo(accessToken: string, owner: string, buffer: Buffer): 
   const videoUrn = typeof init.value?.video === 'string' ? init.value.video : '';
   const uploadToken = typeof init.value?.uploadToken === 'string' ? init.value.uploadToken : '';
   const instructions = init.value?.uploadInstructions;
-  if (!/^urn:li:video:[A-Za-z0-9_-]+$/.test(videoUrn) || !uploadToken ||
+  if (!/^urn:li:video:[A-Za-z0-9_-]+$/.test(videoUrn) || typeof uploadToken !== 'string' ||
       !Array.isArray(instructions) || instructions.length === 0) {
     throw new Error('LinkedIn returned incomplete video upload instructions.');
+  }
+  let expectedFirstByte = 0;
+  for (const instruction of instructions) {
+    if (instruction.firstByte !== expectedFirstByte) {
+      throw new Error('LinkedIn returned incomplete video byte ranges.');
+    }
+    expectedFirstByte = instruction.lastByte + 1;
+  }
+  if (expectedFirstByte !== buffer.length) {
+    throw new Error('LinkedIn returned incomplete video byte ranges.');
   }
 
   const uploadedPartIds: string[] = [];
@@ -165,6 +175,13 @@ export async function publishLinkedInPost(
   const author = `urn:li:person:${subject}`;
   let mediaContent: { title: string; id: string } | undefined;
   if (media) {
+    const image = media.mimeType === 'image/jpeg' || media.mimeType === 'image/png';
+    const video = media.mimeType === 'video/mp4';
+    if ((!image && !video) || !media.buffer.length ||
+        (image && media.buffer.length > LINKEDIN_MAX_IMAGE_BYTES) ||
+        (video && media.buffer.length > LINKEDIN_MAX_VIDEO_BYTES)) {
+      throw new Error('The selected media type or size is not supported by LinkedIn publishing.');
+    }
     const id = media.mimeType === 'video/mp4'
       ? await uploadVideo(accessToken, author, media.buffer)
       : await uploadImage(accessToken, author, media.buffer);
@@ -192,7 +209,24 @@ export async function publishLinkedInPost(
   if (!postUrn || !/^urn:li:(?:share|ugcPost):[A-Za-z0-9_-]+$/.test(postUrn)) {
     throw new Error('LinkedIn did not confirm a valid post identifier.');
   }
-  return { postUrn };
+  let postUrl: string | undefined;
+  if (response.headers.get('content-type')?.includes('application/json')) {
+    try {
+      const body = await response.json() as { url?: unknown; postUrl?: unknown };
+      const candidate = typeof body.url === 'string' ? body.url : body.postUrl;
+      if (typeof candidate === 'string') {
+        const parsed = new URL(candidate);
+        if (parsed.protocol === 'https:' &&
+            (parsed.hostname === 'linkedin.com' || parsed.hostname.endsWith('.linkedin.com')) &&
+            !parsed.username && !parsed.password) {
+          postUrl = parsed.toString();
+        }
+      }
+    } catch {
+      postUrl = undefined;
+    }
+  }
+  return { postUrn, ...(postUrl ? { postUrl } : {}) };
 }
 
 export async function publishLinkedInTextPost(

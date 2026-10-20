@@ -1,7 +1,8 @@
 'use client';
 
+import Image from 'next/image';
 import { useEffect, useState, type ChangeEvent } from 'react';
-import { CalendarClock, Check, Eye, Facebook, ImagePlus, Instagram, LoaderCircle, Pencil, Plus, Send, Sparkles, ThumbsDown, Trash2, Video, X, Youtube } from 'lucide-react';
+import { CalendarClock, Camera, Check, Eye, ImagePlus, LoaderCircle, Pencil, Play, Plus, Send, Sparkles, ThumbsDown, Trash2, Video, X } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/store/useAuthStore';
 import { LinkedInConnection, LinkedInConnectionCard } from './LinkedInConnectionCard';
@@ -78,6 +79,7 @@ export function SocialPublishingPanel() {
   const [posts, setPosts] = useState<SocialPost[]>([]);
   const [composerMedia, setComposerMedia] = useState<SocialMedia | null>(null);
   const [mediaPreviews, setMediaPreviews] = useState<Record<string, string>>({});
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [loading, setLoading] = useState(true);
   const [text, setText] = useState('');
   const [topic, setTopic] = useState('');
@@ -256,7 +258,12 @@ export function SocialPublishingPanel() {
     try {
       const formData = new FormData();
       formData.append('file', file);
-      const response = await api.post('/files/upload', formData);
+      setUploadProgress(0);
+      const response = await api.post('/files/upload', formData, {
+        onUploadProgress: (event) => {
+          if (event.total) setUploadProgress(Math.min(100, Math.round((event.loaded / event.total) * 100)));
+        },
+      });
       const storedFile = response.data.file;
       setComposerMedia({
         fileId: storedFile._id,
@@ -270,6 +277,7 @@ export function SocialPublishingPanel() {
       setError(message || 'The media file could not be uploaded.');
     } finally {
       setBusy(false);
+      setUploadProgress(0);
     }
   };
 
@@ -422,9 +430,9 @@ export function SocialPublishingPanel() {
         <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {[
             { id: 'linkedin' as const, name: 'LinkedIn', description: 'Publish text, images, and videos to a member profile.', icon: <span className="flex h-8 w-8 items-center justify-center rounded-md bg-[#0A66C2] text-sm font-bold text-white">in</span>, available: true, accent: '#0A66C2' },
-            { id: 'instagram' as const, name: 'Instagram', description: 'Visual content and Reels publishing.', icon: <Instagram className="h-5 w-5 text-fuchsia-600" />, available: false, accent: '#C13584' },
-            { id: 'facebook' as const, name: 'Facebook Pages', description: 'Publish and manage content for your Pages.', icon: <Facebook className="h-5 w-5 text-blue-700" />, available: false, accent: '#1877F2' },
-            { id: 'youtube' as const, name: 'YouTube', description: 'Video publishing and channel management.', icon: <Youtube className="h-5 w-5 text-red-600" />, available: false, accent: '#FF0000' },
+            { id: 'instagram' as const, name: 'Instagram', description: 'Visual content and Reels publishing.', icon: <Camera className="h-5 w-5 text-fuchsia-600" />, available: false, accent: '#C13584' },
+            { id: 'facebook' as const, name: 'Facebook Pages', description: 'Publish and manage content for your Pages.', icon: <span className="flex h-6 w-6 items-end justify-center text-2xl font-black leading-none text-blue-700">f</span>, available: false, accent: '#1877F2' },
+            { id: 'youtube' as const, name: 'YouTube', description: 'Video publishing and channel management.', icon: <span className="flex h-5 w-7 items-center justify-center rounded bg-red-600 text-white"><Play className="h-3 w-3 fill-current" /></span>, available: false, accent: '#FF0000' },
           ].map((destination) => (
             <button
               key={destination.id}
@@ -536,7 +544,7 @@ export function SocialPublishingPanel() {
                   <div className="mt-3 overflow-hidden rounded-lg border theme-border">
                     {composerMedia.mimeType === 'video/mp4'
                       ? <video controls preload="metadata" src={mediaPreviews[socialMediaFileId(composerMedia)!]} className="max-h-80 w-full bg-black" />
-                      : <img src={mediaPreviews[socialMediaFileId(composerMedia)!]} alt={composerMedia.altText || composerMedia.name || 'Post attachment'} className="max-h-80 w-full object-contain" />}
+                      : <Image unoptimized width={640} height={480} src={mediaPreviews[socialMediaFileId(composerMedia)!]} alt={composerMedia.altText || composerMedia.name || 'Post attachment'} className="max-h-80 w-full object-contain" />}
                   </div>
                 )}
               </div>
@@ -549,12 +557,13 @@ export function SocialPublishingPanel() {
             </label>
             <span className="text-[11px] theme-text-muted">JPEG/PNG up to 36 MB · MP4 up to 50 MB</span>
           </div>
+          {busy && uploadProgress > 0 && <div className="mt-2" aria-live="polite"><div className="h-1.5 overflow-hidden rounded-full bg-black/10"><div className="h-full bg-[var(--accent)] transition-[width]" style={{ width: `${uploadProgress}%` }} /></div><p className="mt-1 text-[11px] theme-text-muted">Uploading media · {uploadProgress}%</p></div>}
           {composerMedia && <div className="mt-3 flex flex-col gap-3 rounded-xl border p-3 sm:flex-row sm:items-center" style={{ borderColor: 'var(--border-color)', background: 'var(--bg-base)' }}>
             <div className="flex h-20 w-28 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-black/5">
               {mediaPreviews[socialMediaFileId(composerMedia)!]
                 ? composerMedia.mimeType === 'video/mp4'
                   ? <video src={mediaPreviews[socialMediaFileId(composerMedia)!]} className="h-full w-full object-cover" />
-                  : <img src={mediaPreviews[socialMediaFileId(composerMedia)!]} alt={composerMedia.altText || composerMedia.name || 'Selected post attachment'} className="h-full w-full object-cover" />
+                  : <Image unoptimized width={224} height={160} src={mediaPreviews[socialMediaFileId(composerMedia)!]} alt={composerMedia.altText || composerMedia.name || 'Selected post attachment'} className="h-full w-full object-cover" />
                 : composerMedia.mimeType === 'video/mp4' ? <Video className="h-6 w-6 theme-text-muted" /> : <ImagePlus className="h-6 w-6 theme-text-muted" />}
             </div>
             <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium theme-text-primary">{composerMedia.name || 'LinkedIn media attachment'}</p><p className="text-xs theme-text-muted">{composerMedia.mimeType} · {composerMedia.size ? `${(composerMedia.size / 1024 / 1024).toFixed(1)} MB` : 'Ready to publish'}</p></div>
@@ -610,7 +619,7 @@ export function SocialPublishingPanel() {
                   return <div key={fileId} className="mt-3 max-w-xl overflow-hidden rounded-xl border theme-border">
                     {media.mimeType === 'video/mp4'
                       ? <video controls preload="metadata" src={src} className="max-h-96 w-full bg-black" />
-                      : <img src={src} alt={media.altText || (typeof media.fileId === 'object' ? media.fileId.name : undefined) || 'LinkedIn post attachment'} className="max-h-96 w-full object-contain" />}
+                      : <Image unoptimized width={640} height={480} src={src} alt={media.altText || (typeof media.fileId === 'object' ? media.fileId.name : undefined) || 'LinkedIn post attachment'} className="max-h-96 w-full object-contain" />}
                   </div>;
                 })}
                 {post.rejectionReason && <p className="mt-2 text-xs text-rose-700">Review note: {post.rejectionReason}</p>}

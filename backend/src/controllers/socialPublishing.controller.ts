@@ -575,8 +575,11 @@ export const publishSocialPost = async (req: AuthRequest, res: Response): Promis
       post.text,
       media ? { buffer: media.buffer, mimeType: media.mimeType, title: mediaRecord.altText || media.title } : undefined,
     );
+    if (!result.externalPostId) {
+      throw new Error('LinkedIn did not return a valid post identifier.');
+    }
     linkedinConfirmed = true;
-    await SocialPost.updateOne(
+    const persisted = await SocialPost.updateOne(
       { _id: post._id, companyId: post.companyId, status: 'publishing' },
       {
         $set: {
@@ -596,6 +599,9 @@ export const publishSocialPost = async (req: AuthRequest, res: Response): Promis
         $unset: { failureCode: 1 },
       },
     );
+    if (persisted.matchedCount !== 1) {
+      throw new Error('LinkedIn confirmed the post but the publishing record could not be updated.');
+    }
     try {
       await audit(req, 'SOCIAL_POST_PUBLISHED', post._id.toString(), { platform: adapter.id });
     } catch (auditError) {
@@ -822,7 +828,7 @@ async function publishScheduledPost(postId: mongoose.Types.ObjectId): Promise<'p
       errorName: error instanceof Error ? error.name : 'UnknownError',
     });
     if (post.scheduleAttempts < MAX_SCHEDULE_RETRIES) {
-      await SocialPost.updateOne(
+      const persisted = await SocialPost.updateOne(
         { _id: post._id, status: 'publishing' },
         {
           $set: {
@@ -833,6 +839,9 @@ async function publishScheduledPost(postId: mongoose.Types.ObjectId): Promise<'p
           $inc: { scheduleAttempts: 1 },
         },
       );
+      if (persisted.matchedCount !== 1) {
+        throw new Error('LinkedIn confirmed the scheduled post but the publishing record could not be updated.');
+      }
       return 'retrying';
     }
     await markPostFailed(post, 'subscription_check_unavailable');
@@ -882,11 +891,23 @@ async function publishScheduledPost(postId: mongoose.Types.ObjectId): Promise<'p
 
   let providerConfirmed = false;
   try {
+    const mediaRecord = post.media?.[0];
+    const media = mediaRecord?.fileId
+      ? await readLinkedInMediaAsset(mediaRecord.fileId, post.companyId, {
+        userId: post.authorId.toString(),
+        role: publisher.role,
+        organizationType: company.organizationType,
+      })
+      : undefined;
     const result = await adapter.publishText(
       decryptProviderToken(connection.accessToken),
       String(connection.config.linkedinSubject),
       post.text,
+      media ? { buffer: media.buffer, mimeType: media.mimeType, title: mediaRecord.altText || media.title } : undefined,
     );
+    if (!result.externalPostId) {
+      throw new Error('LinkedIn did not return a valid post identifier.');
+    }
     providerConfirmed = true;
     await SocialPost.updateOne(
       { _id: post._id, status: 'publishing' },
@@ -968,6 +989,8 @@ async function publishScheduledPost(postId: mongoose.Types.ObjectId): Promise<'p
           ? 'rate_limited'
           : error instanceof Error && error.name === 'TimeoutError'
             ? 'provider_timeout'
+            : error instanceof SocialMediaValidationError
+              ? 'media_unavailable'
             : status && status >= 400 && status < 500
               ? 'post_rejected'
               : 'provider_unavailable';

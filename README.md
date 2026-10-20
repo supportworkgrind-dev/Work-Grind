@@ -390,9 +390,14 @@ publishing are not exposed until the storage/index model supports multiple accou
 LinkedIn is the only connected/publishing provider. The publishing-consent flow
 reuses LinkedIn OIDC and requests `openid profile email w_member_social`; it does
 not change the WorkGrind user's LinkedIn sign-in identity. Tokens remain encrypted
-server-side. Only member-profile text posts are enabled. LinkedIn must confirm the
-Posts API request before a post is marked published. Media, LinkedIn organization
-pages, event management, and LinkedIn analytics are not enabled.
+server-side. Member-profile text, JPEG/PNG image, and MP4 video posts are supported.
+Media is stored through the existing workspace file-storage service; LinkedIn's
+Images and Videos APIs upload and process each asset before the Posts API is called.
+LinkedIn must confirm a valid post URN before a post is marked published. Company
+page publishing remains unavailable because the current consent flow does not
+request `w_organization_social`. Event management and LinkedIn analytics are not
+enabled. Images are capped at 36 MB and videos at 50 MB by this application's
+upload/publishing flow.
 
 Tavro uses WorkGrind's existing AI runtime, entitlement and usage accounting to
 generate or revise professional updates, product announcements, marketing posts and
@@ -449,8 +454,8 @@ and [Vercel Cron availability and frequency](https://vercel.com/docs/cron-jobs/u
 Provider API access and app review are external prerequisites; no unsupported
 features or metrics are simulated.
 
-`LINKEDIN_API_VERSION` selects the monthly Posts API version. It defaults to
-`202609` for this release and must be updated before LinkedIn retires it. LinkedIn's
+`LINKEDIN_API_VERSION` selects the monthly Posts, Images, and Videos API version.
+It defaults to `202610` and must be updated before LinkedIn retires it. LinkedIn's
 app products, granted scopes, member eligibility, and rate limits still apply.
 Disconnect removes WorkGrind's stored token; revoke WorkGrind separately in
 LinkedIn's app authorization settings if provider-side revocation is needed.
