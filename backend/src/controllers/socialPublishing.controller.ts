@@ -30,6 +30,7 @@ import {
   LINKEDIN_TEXT_POST_MAX_LENGTH,
   getLinkedInApiVersion,
 } from '../services/linkedinPublishing';
+import { readLinkedInMediaAsset, SocialMediaValidationError } from '../services/socialMedia';
 
 const MAX_SCHEDULE_RETRIES = 2;
 const SCHEDULE_RETRY_DELAY_MS = 5 * 60_000;
@@ -235,8 +236,56 @@ export const listSocialPosts = async (req: AuthRequest, res: Response): Promise<
     .limit(100)
     .populate('authorId', 'fullName avatar')
     .populate('reviewerId', 'fullName avatar')
+    .populate('media.fileId', 'name mimeType size')
     .lean();
   res.json({ success: true, posts });
+};
+
+async function getDraftMedia(req: AuthRequest): Promise<Array<{ mimeType: string; fileId: mongoose.Types.ObjectId; altText?: string }> | undefined> {
+  if (req.body?.media === undefined) return undefined;
+  if (!Array.isArray(req.body.media) || req.body.media.length > 1) {
+    throw new SocialMediaValidationError('Attach one LinkedIn image or video per post.');
+  }
+  if (req.body.media.length === 0) return [];
+  const item = req.body.media[0];
+  if (!item || typeof item !== 'object' || !mongoose.isValidObjectId(item.fileId) ||
+      (item.altText !== undefined && (typeof item.altText !== 'string' || item.altText.length > 1000))) {
+    throw new SocialMediaValidationError('Choose a valid media file.');
+  }
+  const fileId = new mongoose.Types.ObjectId(item.fileId);
+  const asset = await readLinkedInMediaAsset(fileId, companyIdOf(req), {
+    userId: req.user!.userId,
+    role: req.user!.role,
+    organizationType: req.user!.organizationType,
+  });
+  return [{
+    fileId,
+    mimeType: asset.mimeType,
+    ...(typeof item.altText === 'string' && item.altText.trim() ? { altText: item.altText.trim() } : {}),
+  }];
+}
+
+export const previewSocialMedia = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const asset = await readLinkedInMediaAsset(req.params.id, companyIdOf(req), {
+      userId: req.user!.userId,
+      role: req.user!.role,
+      organizationType: req.user!.organizationType,
+    });
+    const filename = asset.title.replace(/[^\w\s.\-()]/g, '_').slice(0, 120);
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+    res.setHeader('Content-Length', String(asset.size));
+    res.setHeader('Content-Type', asset.mimeType);
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.send(asset.buffer);
+  } catch (error) {
+    if (error instanceof SocialMediaValidationError) {
+      res.status(404).json({ success: false, message: error.message });
+      return;
+    }
+    throw error;
+  }
 };
 
 export const createSocialDraft = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -254,6 +303,16 @@ export const createSocialDraft = async (req: AuthRequest, res: Response): Promis
       message: validationError,
     });
     return;
+  }
+  let media: Awaited<ReturnType<typeof getDraftMedia>>;
+  try {
+    media = await getDraftMedia(req);
+  } catch (error) {
+    if (error instanceof SocialMediaValidationError) {
+      res.status(400).json({ success: false, code: 'INVALID_MEDIA', message: error.message });
+      return;
+    }
+    throw error;
   }
   let integrationId: mongoose.Types.ObjectId | undefined;
   if (req.body?.integrationId !== undefined) {
@@ -278,6 +337,7 @@ export const createSocialDraft = async (req: AuthRequest, res: Response): Promis
     authorId: new mongoose.Types.ObjectId(req.user!.userId),
     text,
     platform,
+    ...(media !== undefined ? { media } : {}),
     ...(integrationId ? { integrationId } : {}),
     status: 'draft',
   });
@@ -292,7 +352,7 @@ export const updateSocialDraft = async (req: AuthRequest, res: Response): Promis
     companyId: companyIdOf(req),
     $or: [
       { status: { $in: ['draft', 'rejected'] } },
-      { status: 'failed', failureCode: { $in: ['rate_limited', 'post_rejected'] } },
+      { status: 'failed', failureCode: { $in: ['rate_limited', 'post_rejected', 'media_unavailable'] } },
     ],
     ...(canReview(req) ? {} : { authorId: new mongoose.Types.ObjectId(req.user!.userId) }),
   };
@@ -315,6 +375,16 @@ export const updateSocialDraft = async (req: AuthRequest, res: Response): Promis
     return;
   }
   post.text = text;
+  try {
+    const media = await getDraftMedia(req);
+    if (media !== undefined) post.media = media;
+  } catch (error) {
+    if (error instanceof SocialMediaValidationError) {
+      res.status(400).json({ success: false, code: 'INVALID_MEDIA', message: error.message });
+      return;
+    }
+    throw error;
+  }
   post.status = 'draft';
   post.reviewerId = undefined;
   post.rejectionReason = undefined;
@@ -457,14 +527,17 @@ export const publishSocialPost = async (req: AuthRequest, res: Response): Promis
     });
     return;
   }
-  const allowedStatuses = canReview(req) ? ['draft', 'approved'] : ['approved'];
+  const publishablePostStates: Record<string, unknown>[] = [
+    { status: { $in: canReview(req) ? ['draft', 'approved'] : ['approved'] } },
+  ];
+  if (canReview(req)) publishablePostStates.push({ status: 'failed', failureCode: 'rate_limited' });
   const post = await SocialPost.findOneAndUpdate(
     {
       _id: req.params.id,
       companyId: companyIdOf(req),
       platform: adapter.id,
       ...(req.body?.integrationId ? { integrationId: req.body.integrationId } : {}),
-      status: { $in: allowedStatuses },
+      $or: publishablePostStates,
     },
     {
       $set: {
@@ -488,10 +561,19 @@ export const publishSocialPost = async (req: AuthRequest, res: Response): Promis
   let linkedinConfirmed = false;
   try {
     const accessToken = decryptProviderToken(connection.accessToken);
+    const mediaRecord = post.media?.[0];
+    const media = mediaRecord?.fileId
+      ? await readLinkedInMediaAsset(mediaRecord.fileId, post.companyId, {
+        userId: req.user!.userId,
+        role: req.user!.role,
+        organizationType: req.user!.organizationType,
+      })
+      : undefined;
     const result = await adapter.publishText(
       accessToken,
       String(connection.config.linkedinSubject),
       post.text,
+      media ? { buffer: media.buffer, mimeType: media.mimeType, title: mediaRecord.altText || media.title } : undefined,
     );
     linkedinConfirmed = true;
     await SocialPost.updateOne(
@@ -559,6 +641,7 @@ export const publishSocialPost = async (req: AuthRequest, res: Response): Promis
       return;
     }
     const status = error instanceof LinkedInApiError ? error.status : undefined;
+    const mediaUnavailable = error instanceof SocialMediaValidationError;
     const failureCode = status === 401
       ? 'authorization_revoked'
       : status === 403
@@ -567,6 +650,8 @@ export const publishSocialPost = async (req: AuthRequest, res: Response): Promis
           ? 'rate_limited'
           : error instanceof Error && error.name === 'TimeoutError'
             ? 'provider_timeout'
+            : mediaUnavailable
+              ? 'media_unavailable'
             : status && status >= 400 && status < 500
               ? 'post_rejected'
               : 'provider_unavailable';
@@ -577,10 +662,12 @@ export const publishSocialPost = async (req: AuthRequest, res: Response): Promis
       await connection.save();
     }
     await audit(req, 'SOCIAL_POST_PUBLISH_FAILED', post._id.toString(), { platform: adapter.id, failureCode });
-    res.status(status === 429 ? 429 : status === 401 || status === 403 ? 409 : 502).json({
+    res.status(mediaUnavailable ? 400 : status === 429 ? 429 : status === 401 || status === 403 ? 409 : 502).json({
       success: false,
       code: failureCode,
-      message: failureCode === 'rate_limited'
+      message: failureCode === 'media_unavailable'
+        ? error instanceof Error ? error.message : 'The attached media is unavailable. Replace it and try again.'
+        : failureCode === 'rate_limited'
         ? 'LinkedIn is rate limiting publish requests. Wait before trying again.'
         : failureCode === 'authorization_revoked' || failureCode === 'permission_or_member_access_denied'
           ? 'LinkedIn authorization or member posting permission is unavailable. Reconnect LinkedIn and verify access.'

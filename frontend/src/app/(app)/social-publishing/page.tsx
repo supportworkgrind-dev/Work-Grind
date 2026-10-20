@@ -10,7 +10,7 @@ export default function SocialPublishingPage() {
       <PageHeader
         hero
         title="Social Publishing"
-        subtitle="Create, review, schedule and publish posts across connected social accounts."
+        subtitle="Create, manage, and publish content across your social channels."
         icon={Share2}
       />
       <SocialPublishingPanel />

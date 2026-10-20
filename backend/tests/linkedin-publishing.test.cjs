@@ -3,7 +3,10 @@ const assert = require('node:assert/strict');
 const {
   getLinkedInApiVersion,
   LinkedInApiError,
+  LINKEDIN_MAX_IMAGE_BYTES,
+  LINKEDIN_MAX_VIDEO_BYTES,
   LINKEDIN_TEXT_POST_MAX_LENGTH,
+  publishLinkedInPost,
   publishLinkedInTextPost,
 } = require('../dist/services/linkedinPublishing');
 const {
@@ -39,6 +42,109 @@ test('LinkedIn text publisher sends only supported member-post fields and API he
   assert.equal(body.lifecycleState, 'PUBLISHED');
   assert.deepEqual(result, { postUrn: 'urn:li:share:123456' });
   assert.equal(LINKEDIN_TEXT_POST_MAX_LENGTH, 3000);
+});
+
+test('LinkedIn image publishing initializes, uploads, verifies processing, then creates a post', async (context) => {
+  const originalFetch = global.fetch;
+  const requests = [];
+  global.fetch = async (url, options = {}) => {
+    requests.push({ url, options });
+    if (url.endsWith('/images?action=initializeUpload')) {
+      return Response.json({ value: { uploadUrl: 'https://www.linkedin.com/dms-uploads/upload-image', image: 'urn:li:image:img123' } }, { status: 200 });
+    }
+    if (url === 'https://www.linkedin.com/dms-uploads/upload-image') return new Response(null, { status: 201 });
+    if (url.includes('/images/')) return Response.json({ status: 'AVAILABLE' }, { status: 200 });
+    return new Response(null, { status: 201, headers: { 'x-restli-id': 'urn:li:share:image-post-1' } });
+  };
+  context.after(() => { global.fetch = originalFetch; });
+
+  const result = await publishLinkedInPost(
+    'access-token',
+    'member-42',
+    'Image post',
+    { buffer: Buffer.from('image'), mimeType: 'image/png', title: 'Campaign image' },
+  );
+
+  assert.deepEqual(result, { postUrn: 'urn:li:share:image-post-1' });
+  assert.equal(requests.length, 4);
+  const initialization = JSON.parse(requests[0].options.body);
+  assert.deepEqual(initialization.initializeUploadRequest, { owner: 'urn:li:person:member-42' });
+  assert.equal(requests[1].options.method, 'PUT');
+  assert.equal(requests[1].options.headers.Authorization, undefined);
+  assert.equal(requests[2].options.method, undefined);
+  const postBody = JSON.parse(requests[3].options.body);
+  assert.deepEqual(postBody.content, { media: { title: 'Campaign image', id: 'urn:li:image:img123' } });
+  assert.equal(postBody.author, 'urn:li:person:member-42');
+  assert.equal(LINKEDIN_MAX_IMAGE_BYTES, 36 * 1024 * 1024);
+});
+
+test('LinkedIn video publishing uploads verified byte ranges and finalizes before post creation', async (context) => {
+  const originalFetch = global.fetch;
+  const requests = [];
+  global.fetch = async (url, options = {}) => {
+    requests.push({ url, options });
+    if (url.endsWith('/videos?action=initializeUpload')) {
+      return Response.json({
+        value: {
+          video: 'urn:li:video:video123',
+          uploadToken: 'opaque-upload-token',
+          uploadInstructions: [{ firstByte: 0, lastByte: 3, uploadUrl: 'https://www.linkedin.com/dms-uploads/video-part' }],
+        },
+      }, { status: 200 });
+    }
+    if (url === 'https://www.linkedin.com/dms-uploads/video-part') {
+      return new Response(null, { status: 200, headers: { etag: '"part-etag"' } });
+    }
+    if (url.endsWith('/videos?action=finalizeUpload')) return new Response(null, { status: 200 });
+    if (url.includes('/videos/')) return Response.json({ status: 'AVAILABLE' }, { status: 200 });
+    return new Response(null, { status: 201, headers: { 'x-restli-id': 'urn:li:share:video-post-1' } });
+  };
+  context.after(() => { global.fetch = originalFetch; });
+
+  const result = await publishLinkedInPost(
+    'access-token',
+    'member-42',
+    'Video post',
+    { buffer: Buffer.from('data'), mimeType: 'video/mp4', title: 'Product video' },
+  );
+
+  assert.deepEqual(result, { postUrn: 'urn:li:share:video-post-1' });
+  assert.equal(requests.length, 5);
+  const initialize = JSON.parse(requests[0].options.body);
+  assert.deepEqual(initialize.initializeUploadRequest, {
+    owner: 'urn:li:person:member-42',
+    fileSizeBytes: 4,
+    uploadCaptions: false,
+    uploadThumbnail: false,
+  });
+  assert.equal(requests[1].options.headers['Content-Range'], 'bytes 0-3/4');
+  assert.deepEqual(JSON.parse(requests[2].options.body), {
+    finalizeUploadRequest: {
+      video: 'urn:li:video:video123',
+      uploadToken: 'opaque-upload-token',
+      uploadedPartIds: ['part-etag'],
+    },
+  });
+  const postBody = JSON.parse(requests[4].options.body);
+  assert.deepEqual(postBody.content, { media: { title: 'Product video', id: 'urn:li:video:video123' } });
+  assert.equal(LINKEDIN_MAX_VIDEO_BYTES, 50 * 1024 * 1024);
+});
+
+test('LinkedIn publishing refuses untrusted upload destinations and missing post identifiers', async (context) => {
+  const originalFetch = global.fetch;
+  global.fetch = async () => Response.json({
+    value: { uploadUrl: 'https://attacker.invalid/upload', image: 'urn:li:image:img123' },
+  }, { status: 200 });
+  context.after(() => { global.fetch = originalFetch; });
+
+  await assert.rejects(
+    publishLinkedInPost('access-token', 'member-42', 'Image post', {
+      buffer: Buffer.from('image'),
+      mimeType: 'image/png',
+      title: 'Image',
+    }),
+    /untrusted upload destination/,
+  );
 });
 
 test('LinkedIn post failures are surfaced without treating non-201 as published', async (context) => {

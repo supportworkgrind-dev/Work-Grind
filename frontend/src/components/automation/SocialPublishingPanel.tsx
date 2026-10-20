@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { CalendarClock, Check, Eye, LoaderCircle, Pencil, Send, Sparkles, ThumbsDown, Trash2, X } from 'lucide-react';
+import { useEffect, useState, type ChangeEvent } from 'react';
+import { CalendarClock, Check, Eye, Facebook, ImagePlus, Instagram, LoaderCircle, Pencil, Plus, Send, Sparkles, ThumbsDown, Trash2, Video, X, Youtube } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/store/useAuthStore';
 import { LinkedInConnection, LinkedInConnectionCard } from './LinkedInConnectionCard';
@@ -18,11 +18,26 @@ type SocialPost = {
   linkedinPostUrn?: string;
   linkedinPostUrl?: string;
   failureCode?: string;
+  createdAt: string;
   updatedAt: string;
   publishedAt?: string;
   scheduledAt?: string;
   scheduleTimeZone?: string;
+  media?: SocialMedia[];
 };
+
+type SocialMedia = {
+  fileId: string | { _id: string; name?: string; mimeType?: string; size?: number };
+  mimeType: string;
+  altText?: string;
+  name?: string;
+  size?: number;
+};
+
+function socialMediaFileId(media: SocialMedia | undefined): string | undefined {
+  if (!media) return undefined;
+  return typeof media.fileId === 'string' ? media.fileId : media.fileId?._id;
+}
 
 type SocialProvider = {
   id: 'linkedin' | 'instagram' | 'facebook' | 'youtube';
@@ -61,6 +76,8 @@ export function SocialPublishingPanel() {
   const [accounts, setAccounts] = useState<SocialAccount[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState('');
   const [posts, setPosts] = useState<SocialPost[]>([]);
+  const [composerMedia, setComposerMedia] = useState<SocialMedia | null>(null);
+  const [mediaPreviews, setMediaPreviews] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [text, setText] = useState('');
   const [topic, setTopic] = useState('');
@@ -105,6 +122,31 @@ export function SocialPublishingPanel() {
     return () => { active = false; };
   }, []);
 
+  useEffect(() => {
+    let active = true;
+    const ids = [...new Set([
+      ...posts.flatMap((post) => post.media ?? []).map(socialMediaFileId),
+      socialMediaFileId(composerMedia ?? undefined),
+    ].filter((id): id is string => Boolean(id)))];
+    const objectUrls: string[] = [];
+    void Promise.all(ids.map(async (id) => {
+      try {
+        const response = await api.get(`/social-publishing/media/${id}`, { responseType: 'blob' });
+        const url = URL.createObjectURL(response.data as Blob);
+        objectUrls.push(url);
+        return [id, url] as const;
+      } catch {
+        return [id, ''] as const;
+      }
+    })).then((entries) => {
+      if (active) setMediaPreviews(Object.fromEntries(entries.filter(([, url]) => url)));
+    });
+    return () => {
+      active = false;
+      objectUrls.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [composerMedia, posts]);
+
   const saveDraft = async () => {
     if (!text.trim() || text.trim().length > 3000) {
       setError('Enter post text between 1 and 3000 characters.');
@@ -114,9 +156,17 @@ export function SocialPublishingPanel() {
     setError('');
     setNotice('');
     try {
-      if (editingId) await api.patch(`/social-publishing/posts/${editingId}`, { text: text.trim() });
-      else await api.post('/social-publishing/posts', {
+      const payload = {
         text: text.trim(),
+        media: composerMedia ? [{
+          fileId: socialMediaFileId(composerMedia),
+          mimeType: composerMedia.mimeType,
+          ...(composerMedia.altText ? { altText: composerMedia.altText } : {}),
+        }] : [],
+      };
+      if (editingId) await api.patch(`/social-publishing/posts/${editingId}`, payload);
+      else await api.post('/social-publishing/posts', {
+        ...payload,
         platform: selectedPlatform,
         ...(accounts.find((account) => account.id === selectedAccountId && account.canPublish)
           ? { integrationId: selectedAccountId }
@@ -124,12 +174,100 @@ export function SocialPublishingPanel() {
       });
       await refreshPosts();
       setText('');
+      setComposerMedia(null);
       setEditingId(null);
       setPreview(false);
       setNotice('Draft saved.');
     } catch (requestError: unknown) {
       const message = (requestError as { response?: { data?: { message?: string } } }).response?.data?.message;
       setError(message || 'The draft could not be saved.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const publishCurrentNow = async () => {
+    if (!connection?.canPublishMemberPosts) {
+      setError('Connect LinkedIn publishing before publishing this post.');
+      return;
+    }
+    if (!text.trim() || text.trim().length > 3000) {
+      setError('Enter post text between 1 and 3000 characters.');
+      return;
+    }
+    setBusy(true);
+    setError('');
+    setNotice('');
+    try {
+      const payload = {
+        text: text.trim(),
+        platform: 'linkedin',
+        media: composerMedia ? [{
+          fileId: socialMediaFileId(composerMedia),
+          mimeType: composerMedia.mimeType,
+          ...(composerMedia.altText ? { altText: composerMedia.altText } : {}),
+        }] : [],
+        ...(selectedAccountId ? { integrationId: selectedAccountId } : {}),
+      };
+      let postId = editingId;
+      if (postId) {
+        await api.patch(`/social-publishing/posts/${postId}`, payload);
+      } else {
+        const created = await api.post('/social-publishing/posts', payload);
+        postId = created.data.post?._id;
+      }
+      if (!postId) throw new Error('The draft could not be saved before publishing.');
+      const result = await api.post(`/social-publishing/posts/${postId}/publish`, {
+        ...(selectedAccountId ? { integrationId: selectedAccountId } : {}),
+      });
+      await refreshPosts();
+      setText('');
+      setComposerMedia(null);
+      setEditingId(null);
+      setPreview(false);
+      setNotice(result.data.post?.linkedinPostUrl
+        ? `LinkedIn confirmed publication: ${result.data.post.linkedinPostUrl}`
+        : 'LinkedIn confirmed publication.');
+    } catch (requestError: unknown) {
+      const message = (requestError as { response?: { data?: { message?: string } } }).response?.data?.message;
+      setError(message || (requestError instanceof Error ? requestError.message : 'LinkedIn could not confirm publication.'));
+      await refreshPosts().catch(() => undefined);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const uploadMedia = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    if (composerMedia) {
+      setError('Remove the current attachment before choosing another file.');
+      return;
+    }
+    const allowed = file.type === 'image/jpeg' || file.type === 'image/png' || file.type === 'video/mp4';
+    const maxBytes = file.type.startsWith('image/') ? 36 * 1024 * 1024 : 50 * 1024 * 1024;
+    if (!allowed || file.size <= 0 || file.size > maxBytes) {
+      setError('Choose one JPEG or PNG image (up to 36 MB) or MP4 video (up to 50 MB).');
+      return;
+    }
+    setBusy(true);
+    setError('');
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const response = await api.post('/files/upload', formData);
+      const storedFile = response.data.file;
+      setComposerMedia({
+        fileId: storedFile._id,
+        mimeType: storedFile.mimeType,
+        name: storedFile.originalName,
+        size: storedFile.size,
+      });
+      setNotice('Media uploaded to your workspace and attached to this draft.');
+    } catch (requestError: unknown) {
+      const message = (requestError as { response?: { data?: { message?: string } } }).response?.data?.message;
+      setError(message || 'The media file could not be uploaded.');
     } finally {
       setBusy(false);
     }
@@ -253,6 +391,7 @@ export function SocialPublishingPanel() {
   const beginEdit = (post: SocialPost) => {
     setEditingId(post._id);
     setText(post.text);
+    setComposerMedia(post.media?.[0] ?? null);
     setPreview(false);
     setError('');
     setNotice('');
@@ -260,10 +399,17 @@ export function SocialPublishingPanel() {
   };
 
   const canPublish = (post: SocialPost) => connection?.canPublishMemberPosts &&
-    (canReview ? post.status === 'draft' || post.status === 'approved' : isManager && post.status === 'approved');
+    (canReview
+      ? post.status === 'draft' || post.status === 'approved' || (post.status === 'failed' && post.failureCode === 'rate_limited')
+      : isManager && post.status === 'approved');
 
   return (
     <div className="space-y-5">
+      <div className="flex justify-end">
+        <button type="button" onClick={() => document.getElementById('social-post-composer')?.scrollIntoView({ behavior: 'smooth' })} className="btn-primary inline-flex min-h-10 items-center gap-2 px-4 text-sm font-semibold">
+          <Plus className="h-4 w-4" />Create Post
+        </button>
+      </div>
       <LinkedInConnectionCard
         onConnectionChange={setConnection}
         returnTo="/social-publishing"
@@ -272,33 +418,39 @@ export function SocialPublishingPanel() {
 
       <section className="surface rounded-2xl border p-4 sm:p-5" aria-labelledby="social-providers-heading">
         <h2 id="social-providers-heading" className="text-sm font-semibold theme-text-primary">Publishing destinations</h2>
-        <p className="mt-1 text-xs theme-text-muted">Capabilities are provider-specific. Only connected, verified destinations can be selected.</p>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {providers.map((provider) => {
-            const enabled = provider.capabilities.publishText;
-            return (
-              <button
-                key={provider.id}
-                type="button"
-                disabled={!enabled}
-                aria-pressed={selectedPlatform === provider.id}
-                onClick={() => setSelectedPlatform(provider.id)}
-                className={`rounded-lg border px-3 py-2 text-xs font-medium ${
-                  selectedPlatform === provider.id ? 'border-[var(--accent)] bg-[var(--bg-active)] theme-text-primary' : 'theme-text-secondary'
-                } disabled:cursor-not-allowed disabled:opacity-60`}
-                title={enabled ? `${provider.name} publishing is available.` : `${provider.name} requires provider setup and approval.`}
-              >
-                {provider.name} · {enabled ? 'Available' : provider.availability === 'setup_required' ? 'Setup required' : 'Coming soon'}
-              </button>
-            );
-          })}
+        <p className="mt-1 text-xs theme-text-muted">Publish to your LinkedIn member profile. More destinations are on the way.</p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {[
+            { id: 'linkedin' as const, name: 'LinkedIn', description: 'Publish text, images, and videos to a member profile.', icon: <span className="flex h-8 w-8 items-center justify-center rounded-md bg-[#0A66C2] text-sm font-bold text-white">in</span>, available: true, accent: '#0A66C2' },
+            { id: 'instagram' as const, name: 'Instagram', description: 'Visual content and Reels publishing.', icon: <Instagram className="h-5 w-5 text-fuchsia-600" />, available: false, accent: '#C13584' },
+            { id: 'facebook' as const, name: 'Facebook Pages', description: 'Publish and manage content for your Pages.', icon: <Facebook className="h-5 w-5 text-blue-700" />, available: false, accent: '#1877F2' },
+            { id: 'youtube' as const, name: 'YouTube', description: 'Video publishing and channel management.', icon: <Youtube className="h-5 w-5 text-red-600" />, available: false, accent: '#FF0000' },
+          ].map((destination) => (
+            <button
+              key={destination.id}
+              type="button"
+              disabled={!destination.available}
+              aria-pressed={selectedPlatform === destination.id}
+              onClick={() => setSelectedPlatform(destination.id)}
+              className={`rounded-xl border p-3 text-left transition-colors ${selectedPlatform === destination.id ? 'border-[var(--accent)] bg-[var(--bg-active)]' : 'theme-border theme-bg-base'} disabled:cursor-default`}
+              style={{ borderTopColor: destination.accent, borderTopWidth: 2 }}
+            >
+              <span className="flex items-center justify-between gap-2">
+                <span className="flex items-center gap-2 text-sm font-semibold theme-text-primary">{destination.icon}{destination.name}</span>
+                <span className={`rounded-full px-2 py-1 text-[10px] font-semibold ${destination.available ? 'bg-emerald-500/10 text-emerald-700' : 'theme-bg-hover theme-text-muted'}`}>
+                  {destination.available ? 'Available' : 'Coming Soon'}
+                </span>
+              </span>
+              <span className="mt-2 block text-xs leading-relaxed theme-text-muted">{destination.description}</span>
+            </button>
+          ))}
         </div>
       </section>
 
-      <section className="surface rounded-2xl border p-4 sm:p-5">
+      <section id="social-post-composer" className="surface rounded-2xl border p-4 sm:p-5">
         <div className="mb-4">
-          <h2 className="text-base font-semibold theme-text-primary">Create a social post</h2>
-          <p className="mt-1 text-xs theme-text-muted">Drafts are private to this workspace. Tavro only writes draft text; it never publishes.</p>
+          <h2 className="text-base font-semibold theme-text-primary">{editingId ? 'Edit post draft' : 'Create a LinkedIn post'}</h2>
+          <p className="mt-1 text-xs theme-text-muted">Save as a draft or publish to the connected LinkedIn member profile. Tavro only writes draft text; it never publishes.</p>
         </div>
 
         <div className="mb-3 grid gap-3 sm:grid-cols-2">
@@ -377,8 +529,37 @@ export function SocialPublishingPanel() {
             </button>
           </div>
           {preview
-            ? <div className="min-h-32 whitespace-pre-wrap rounded-xl border p-3 text-sm theme-text-primary" style={{ borderColor: 'var(--border-color)', background: 'var(--bg-base)' }}>{text || 'Your post preview will appear here.'}</div>
+            ? <div className="min-h-32 rounded-xl border p-4" style={{ borderColor: 'var(--border-color)', background: 'var(--bg-base)' }}>
+                <div className="mb-3 flex items-center gap-2"><span className="flex h-8 w-8 items-center justify-center rounded-md bg-[#0A66C2] text-sm font-bold text-white">in</span><div><p className="text-xs font-semibold theme-text-primary">{connection?.identityName || 'Your LinkedIn profile'}</p><p className="text-[10px] theme-text-muted">Just now · Public</p></div></div>
+                <p className="whitespace-pre-wrap text-sm theme-text-primary">{text || 'Your post preview will appear here.'}</p>
+                {composerMedia && socialMediaFileId(composerMedia) && mediaPreviews[socialMediaFileId(composerMedia)!] && (
+                  <div className="mt-3 overflow-hidden rounded-lg border theme-border">
+                    {composerMedia.mimeType === 'video/mp4'
+                      ? <video controls preload="metadata" src={mediaPreviews[socialMediaFileId(composerMedia)!]} className="max-h-80 w-full bg-black" />
+                      : <img src={mediaPreviews[socialMediaFileId(composerMedia)!]} alt={composerMedia.altText || composerMedia.name || 'Post attachment'} className="max-h-80 w-full object-contain" />}
+                  </div>
+                )}
+              </div>
             : <textarea id="linkedin-post-text" value={text} onChange={(event) => setText(event.target.value)} maxLength={3000} rows={6} placeholder="Write a post or generate a draft with Tavro." className="input-premium w-full resize-y" />}
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <label className={`btn-ghost inline-flex h-9 cursor-pointer items-center gap-2 px-3 text-xs ${busy || composerMedia ? 'pointer-events-none opacity-50' : ''}`}>
+              {busy ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
+              Add image or video
+              <input type="file" accept="image/jpeg,image/png,video/mp4" onChange={(event) => void uploadMedia(event)} disabled={busy || Boolean(composerMedia)} className="sr-only" />
+            </label>
+            <span className="text-[11px] theme-text-muted">JPEG/PNG up to 36 MB · MP4 up to 50 MB</span>
+          </div>
+          {composerMedia && <div className="mt-3 flex flex-col gap-3 rounded-xl border p-3 sm:flex-row sm:items-center" style={{ borderColor: 'var(--border-color)', background: 'var(--bg-base)' }}>
+            <div className="flex h-20 w-28 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-black/5">
+              {mediaPreviews[socialMediaFileId(composerMedia)!]
+                ? composerMedia.mimeType === 'video/mp4'
+                  ? <video src={mediaPreviews[socialMediaFileId(composerMedia)!]} className="h-full w-full object-cover" />
+                  : <img src={mediaPreviews[socialMediaFileId(composerMedia)!]} alt={composerMedia.altText || composerMedia.name || 'Selected post attachment'} className="h-full w-full object-cover" />
+                : composerMedia.mimeType === 'video/mp4' ? <Video className="h-6 w-6 theme-text-muted" /> : <ImagePlus className="h-6 w-6 theme-text-muted" />}
+            </div>
+            <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium theme-text-primary">{composerMedia.name || 'LinkedIn media attachment'}</p><p className="text-xs theme-text-muted">{composerMedia.mimeType} · {composerMedia.size ? `${(composerMedia.size / 1024 / 1024).toFixed(1)} MB` : 'Ready to publish'}</p></div>
+            <button type="button" onClick={() => setComposerMedia(null)} className="btn-ghost inline-flex h-9 items-center gap-1.5 px-3 text-xs text-rose-700"><X className="h-4 w-4" />Remove</button>
+          </div>}
           <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
             <span className={`text-xs ${text.length > 3000 ? 'text-rose-600' : 'theme-text-muted'}`}>{text.length}/3000</span>
             <div className="flex gap-2">
@@ -387,6 +568,10 @@ export function SocialPublishingPanel() {
                 {busy ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
                 {editingId ? 'Save changes' : 'Save draft'}
               </button>
+              {canReview && <button type="button" onClick={() => void publishCurrentNow()} disabled={busy || !text.trim() || !connection?.canPublishMemberPosts} className="btn-primary inline-flex h-9 items-center gap-2 px-3 text-xs disabled:opacity-50">
+                {busy ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                Publish Now
+              </button>}
             </div>
           </div>
         </div>
@@ -411,19 +596,38 @@ export function SocialPublishingPanel() {
                     <span className="rounded-full border px-2 py-1 text-[11px] font-semibold theme-text-secondary" style={{ borderColor: 'var(--border-color)' }}>{statusLabel[post.status]}</span>
                     <span className="text-xs theme-text-muted">By {post.authorId?.fullName || 'Workspace member'}</span>
                     {post.reviewerId && <span className="text-xs theme-text-muted">· Reviewed by {post.reviewerId.fullName}</span>}
+                    <span className="text-xs theme-text-muted">· Created {new Date(post.createdAt).toLocaleString()}</span>
                     {post.publishedAt && <span className="text-xs theme-text-muted">· {new Date(post.publishedAt).toLocaleString()}</span>}
                     {post.scheduledAt && <span className="text-xs theme-text-muted">· Scheduled {new Date(post.scheduledAt).toLocaleString()} ({post.scheduleTimeZone})</span>}
                   </div>
                   {post.status === 'published' && <span className="text-xs font-medium text-emerald-700">{post.platform} confirmed</span>}
                 </div>
                 <p className="mt-3 whitespace-pre-wrap text-sm theme-text-primary">{post.text}</p>
+                {post.media?.map((media) => {
+                  const fileId = socialMediaFileId(media);
+                  const src = fileId ? mediaPreviews[fileId] : '';
+                  if (!src) return null;
+                  return <div key={fileId} className="mt-3 max-w-xl overflow-hidden rounded-xl border theme-border">
+                    {media.mimeType === 'video/mp4'
+                      ? <video controls preload="metadata" src={src} className="max-h-96 w-full bg-black" />
+                      : <img src={src} alt={media.altText || (typeof media.fileId === 'object' ? media.fileId.name : undefined) || 'LinkedIn post attachment'} className="max-h-96 w-full object-contain" />}
+                  </div>;
+                })}
                 {post.rejectionReason && <p className="mt-2 text-xs text-rose-700">Review note: {post.rejectionReason}</p>}
-                {post.failureCode && <p className="mt-2 text-xs text-rose-700">Publishing needs attention: {post.failureCode.replaceAll('_', ' ')}</p>}
+                {post.failureCode && <p className="mt-2 text-xs text-rose-700">Publishing needs attention: {({
+                  authorization_revoked: 'Reconnect LinkedIn and try again.',
+                  permission_or_member_access_denied: 'LinkedIn permission is unavailable. Reconnect the publishing account.',
+                  rate_limited: 'LinkedIn is rate limiting requests. Retry after a short wait.',
+                  post_rejected: 'LinkedIn rejected this post. Edit the draft before retrying.',
+                  media_unavailable: 'The attached media is no longer available. Replace the attachment and retry.',
+                  provider_timeout: 'LinkedIn did not respond in time. Check the post status before trying again.',
+                  provider_unavailable: 'LinkedIn could not confirm publication. Check the post status before taking further action.',
+                } as Record<string, string>)[post.failureCode] || 'Review the post and connection before retrying.'}</p>}
                 {post.linkedinPostUrl && <a href={post.linkedinPostUrl} target="_blank" rel="noreferrer" className="mt-2 inline-block text-xs font-medium text-sky-700 underline">View LinkedIn post</a>}
-                {post.linkedinPostUrn && <p className="mt-2 break-all text-[11px] theme-text-muted">LinkedIn post ID: {post.linkedinPostUrn}</p>}
+                {post.status === 'published' && !post.linkedinPostUrl && <p className="mt-2 text-xs theme-text-muted">LinkedIn confirmed publication; a permalink was not provided.</p>}
                 <div className="mt-3 flex flex-wrap gap-2">
                   {(post.status === 'draft' || post.status === 'rejected' ||
-                    (post.status === 'failed' && ['rate_limited', 'post_rejected'].includes(post.failureCode ?? ''))) && (
+                    (post.status === 'failed' && ['rate_limited', 'post_rejected', 'media_unavailable'].includes(post.failureCode ?? ''))) && (
                     <>
                       {(post.authorId?._id === user?._id || canReview) && (
                         <button type="button" onClick={() => beginEdit(post)} className="btn-ghost h-8 px-2 text-xs">Edit draft</button>
@@ -441,7 +645,7 @@ export function SocialPublishingPanel() {
                   )}
                   {canPublish(post) && (
                     <button type="button" onClick={() => void runPostAction(post, 'publish', true)} disabled={busy} className="btn-primary inline-flex h-8 items-center gap-1.5 px-2 text-xs">
-                      <Send className="h-3.5 w-3.5" /> Publish now
+                      <Send className="h-3.5 w-3.5" /> {post.status === 'failed' ? 'Retry publish' : 'Publish now'}
                     </button>
                   )}
                   {(canReview || isManager) && (post.status === 'draft' || post.status === 'approved') &&

@@ -2,7 +2,7 @@ import {
   LinkedInApiError,
   LINKEDIN_PUBLISHING_SCOPE,
   LINKEDIN_TEXT_POST_MAX_LENGTH,
-  publishLinkedInTextPost,
+  publishLinkedInPost,
 } from './linkedinPublishing';
 
 export type SocialProviderId = 'linkedin' | 'instagram' | 'facebook' | 'youtube';
@@ -36,6 +36,7 @@ export interface SocialProviderAdapter extends SocialProviderDefinition {
     accessToken: string,
     identityId: string,
     text: string,
+    media?: { buffer: Buffer; mimeType: string; title: string },
   ): Promise<SocialPublishResult>;
 }
 
@@ -46,7 +47,7 @@ const linkedin: SocialProviderAdapter = {
   capabilities: {
     connect: true,
     publishText: true,
-    publishMedia: false,
+    publishMedia: true,
     schedule: true,
     analytics: false,
     organizationPublishing: false,
@@ -59,10 +60,10 @@ const linkedin: SocialProviderAdapter = {
       ? null
       : `Post text must contain 1–${LINKEDIN_TEXT_POST_MAX_LENGTH} characters.`;
   },
-  async publishText(accessToken, identityId, text) {
-    const result = await publishLinkedInTextPost(accessToken, identityId, text);
+  async publishText(accessToken, identityId, text, media) {
+    const result = await publishLinkedInPost(accessToken, identityId, text, media);
     return {
-      ...(result.postUrn ? { externalPostId: result.postUrn } : {}),
+      externalPostId: result.postUrn,
       ...(result.postUrl ? { externalPostUrl: result.postUrl } : {}),
     };
   },

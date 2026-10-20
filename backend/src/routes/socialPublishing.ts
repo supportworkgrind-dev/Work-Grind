@@ -12,6 +12,7 @@ import {
   getSocialAccounts,
   getLinkedInConnection,
   getSocialProviders,
+  previewSocialMedia,
   listSocialPosts,
   publishSocialPost,
   requestSocialPostApproval,
@@ -35,6 +36,7 @@ router.use(
 router.get('/providers', asyncHandler(getSocialProviders));
 router.get('/accounts', asyncHandler(getSocialAccounts));
 router.get('/connection', asyncHandler(getLinkedInConnection));
+router.get('/media/:id', validateObjectId('id'), asyncHandler(previewSocialMedia));
 router.delete('/connection', asyncHandler(disconnectLinkedIn));
 router.get('/posts', asyncHandler(listSocialPosts));
 router.post('/posts', rateLimiter(15, 30), asyncHandler(createSocialDraft));

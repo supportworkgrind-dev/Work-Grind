@@ -127,7 +127,7 @@ export function LinkedInConnectionCard({
             LinkedIn publishing
           </h3>
           <p className="mt-1 text-xs theme-text-muted">
-            Publish text posts to the LinkedIn profile you connect. Company-page publishing and media sharing are not available yet.
+            Publish text, image, and MP4 video posts to the LinkedIn profile you connect. Company-page publishing is not available.
           </p>
         </div>
         {loading && <LoaderCircle className="h-4 w-4 animate-spin theme-text-muted" aria-label="Loading LinkedIn status" />}
