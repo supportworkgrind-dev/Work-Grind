@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { createHash, randomBytes } from 'crypto';
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 import User from '../models/User';
@@ -14,10 +15,11 @@ import { CrmDeal }    from '../models/CrmDeal';
 import { CrmCompany } from '../models/CrmCompany';
 import { generateAccessToken, generateMfaChallengeToken, verifyAccessToken } from '../utils/jwt';
 import { AuthRequest } from '../middleware/auth';
-import { getTransporter, sendAdminReplyEmail } from '../utils/email';
+import { getTransporter, sendAdminReplyEmail, sendPasswordResetEmail } from '../utils/email';
 import { getPlatformAiUsage, getUsageSummaryForCompany, getUsageForCompany } from '../services/aiUsageTracker';
 import { getCompanySubscription } from '../services/companySubscription';
 import { getPlanUsage } from '../utils/planLimits';
+import { parsePagination } from '../utils/pagination';
 import {
   encryptSecret,
   decryptSecret,
@@ -28,6 +30,78 @@ import {
   hashRecoveryCode,
   verifyAndConsumeRecoveryCode,
 } from '../utils/mfa';
+
+const ADMIN_USER_LIST_FIELDS = [
+  '_id', 'fullName', 'email', 'avatar', 'role', 'accountType', 'isActive', 'isVerified',
+  'createdAt', 'lastSeen', 'lastLogin', 'subscriptionStatus', 'subscriptionPlan',
+  'trialEndDate',
+] as const;
+
+const ADMIN_USER_DETAIL_FIELDS = [
+  ...ADMIN_USER_LIST_FIELDS,
+  'jobTitle', 'department', 'country', 'trialStartDate', 'subscriptionStartDate',
+  'subscriptionEndDate', 'polarSubscriptionId', 'polarCustomerId', 'cancelAtPeriodEnd',
+] as const;
+
+const ADMIN_USER_COMPANY_FIELDS = [
+  '_id', 'name', 'industry', 'plan', 'subscriptionPlan', 'subscriptionStatus',
+  'trialStartDate', 'trialEndDate', 'subscriptionEndDate', 'accountType', 'country',
+] as const;
+
+const ADMIN_TICKET_FIELDS = [
+  '_id', 'type', 'name', 'email', 'company', 'subject', 'message', 'status', 'priority',
+  'isRead', 'adminNotes', 'createdAt', 'updatedAt',
+] as const;
+
+function plainRecord(value: any): Record<string, any> {
+  return value && typeof value.toObject === 'function' ? value.toObject() : value;
+}
+
+function pickFields(value: any, fields: readonly string[]): Record<string, any> {
+  const record = plainRecord(value);
+  if (!record || typeof record !== 'object') return {};
+  return Object.fromEntries(fields.filter((field) => record[field] !== undefined).map((field) => [field, record[field]]));
+}
+
+function adminCompanyDto(value: any): unknown {
+  if (!value) return value;
+  const company = plainRecord(value);
+  if (company && typeof company === 'object' && typeof company.name === 'string') {
+    return pickFields(company, ADMIN_USER_COMPANY_FIELDS);
+  }
+  return typeof company?.toString === 'function' ? company.toString() : company;
+}
+
+function adminUserDto(user: any, fields: readonly string[]): Record<string, any> {
+  const dto = pickFields(user, fields);
+  dto.companyId = adminCompanyDto(plainRecord(user).companyId);
+  return dto;
+}
+
+function adminTicketDto(ticket: any): Record<string, any> {
+  const dto = pickFields(ticket, ADMIN_TICKET_FIELDS);
+  const record = plainRecord(ticket);
+  if (Array.isArray(record?.replies)) {
+    dto.replies = record.replies.map((reply: any) => pickFields(reply, ['_id', 'replyText', 'sentBy', 'sentAt']));
+  } else {
+    dto.replies = [];
+  }
+  return dto;
+}
+
+async function getSupportTicketCounts() {
+  const [total, unread, demo, contact] = await Promise.all([
+    SupportTicket.countDocuments(),
+    SupportTicket.countDocuments({ isRead: false }),
+    SupportTicket.countDocuments({ type: 'demo' }),
+    SupportTicket.countDocuments({ type: { $ne: 'demo' } }),
+  ]);
+  return { total, unread, demo, contact };
+}
+
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
 // ── 1. SUPER ADMIN AUTHENTICATION ──────────────────────────────────────────
 
@@ -349,9 +423,16 @@ export const getPlatformAnalytics = async (_req: AuthRequest, res: Response): Pr
 
 export const getUsers = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 15;
-    const q = (req.query.q as string || '').trim();
+    const pagination = parsePagination(
+      { page: req.query.page, limit: req.query.limit },
+      { defaultLimit: 15, maxLimit: 100 },
+    );
+    if (!pagination) {
+      res.status(400).json({ success: false, message: 'Invalid pagination parameters.' });
+      return;
+    }
+    const { page, limit, skip } = pagination;
+    const q = (typeof req.query.q === 'string' ? req.query.q : '').trim().slice(0, 100);
     const accountType = req.query.accountType as string;
     const status = req.query.status as string;
     const subscriptionPlan   = req.query.subscriptionPlan   as string;
@@ -364,10 +445,11 @@ export const getUsers = async (req: AuthRequest, res: Response): Promise<void> =
 
     // Search query
     if (q) {
+      const searchPattern = { $regex: escapeRegex(q), $options: 'i' };
       filter.$or = [
-        { fullName: { $regex: q, $options: 'i' } },
-        { email: { $regex: q, $options: 'i' } },
-        { jobTitle: { $regex: q, $options: 'i' } },
+        { fullName: searchPattern },
+        { email: searchPattern },
+        { jobTitle: searchPattern },
       ];
     }
 
@@ -421,22 +503,26 @@ export const getUsers = async (req: AuthRequest, res: Response): Promise<void> =
 
     const total = await User.countDocuments(filter);
     const users = await User.find(filter)
-      .select('-password -phone -refreshTokens -mfaSecretEncrypted -mfaTempSecretEncrypted -recoveryCodesHashed')
-      .populate('companyId', 'name industry plan subscriptionPlan subscriptionStatus trialStartDate trialEndDate subscriptionEndDate accountType country')
+      .select(ADMIN_USER_LIST_FIELDS.join(' '))
+      .populate('companyId', 'name plan subscriptionPlan subscriptionStatus trialStartDate trialEndDate subscriptionEndDate accountType')
       .sort(sortObj)
-      .skip((page - 1) * limit)
-      .limit(limit);
+      .skip(skip)
+      .limit(limit)
+      .lean();
 
     res.json({
       success: true,
-      users,
+      users: users.map((user: any) => adminUserDto(user, ADMIN_USER_LIST_FIELDS)),
       total,
       page,
       limit,
       totalPages: Math.ceil(total / limit) || 1,
     });
-  } catch (err: any) {
-    res.status(500).json({ success: false, message: err.message });
+  } catch (error) {
+    console.error('[SuperAdmin] User listing failed.', {
+      errorName: error instanceof Error ? error.name : 'UnknownError',
+    });
+    res.status(500).json({ success: false, message: 'Unable to load users.' });
   }
 };
 
@@ -444,8 +530,8 @@ export const getUserDetails = async (req: AuthRequest, res: Response): Promise<v
   try {
     const { id } = req.params;
     const user = await User.findById(id)
-      .select('-password -phone -refreshTokens')
-      .populate('companyId');
+      .select(ADMIN_USER_DETAIL_FIELDS.join(' '))
+      .populate('companyId', 'name industry plan country');
 
     if (!user) {
       res.status(404).json({ success: false, message: 'User not found' });
@@ -461,15 +547,18 @@ export const getUserDetails = async (req: AuthRequest, res: Response): Promise<v
 
     res.json({
       success: true,
-      user,
+      user: adminUserDto(user, ADMIN_USER_DETAIL_FIELDS),
       stats: {
         assignedTasks: assignedTasksCount,
         completedTasks: completedTasksCount,
         createdProjects: createdProjectsCount,
       },
     });
-  } catch (err: any) {
-    res.status(500).json({ success: false, message: err.message });
+  } catch (error) {
+    console.error('[SuperAdmin] User detail lookup failed.', {
+      errorName: error instanceof Error ? error.name : 'UnknownError',
+    });
+    res.status(500).json({ success: false, message: 'Unable to load user details.' });
   }
 };
 
@@ -553,7 +642,6 @@ export const deleteUser = async (req: AuthRequest, res: Response): Promise<void>
 export const resetUserPassword = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const { newPassword } = req.body;
 
     const user = await User.findById(id);
     if (!user) {
@@ -561,20 +649,63 @@ export const resetUserPassword = async (req: AuthRequest, res: Response): Promis
       return;
     }
 
-    const passwordToSet = newPassword?.trim() || `WG-${Math.random().toString(36).slice(-8)}!Aa`;
-    user.password = passwordToSet;
-    user.refreshTokens = []; // Force logout
+    const rawToken = randomBytes(32).toString('hex');
+    const hashedToken = createHash('sha256').update(rawToken).digest('hex');
+    user.resetPasswordToken = hashedToken;
+    user.resetPasswordExpiry = new Date(Date.now() + 30 * 60 * 1000);
     await user.save();
 
-    res.json({
-      success: true,
-      message: `Password reset successfully for ${user.fullName}`,
-      temporaryPassword: passwordToSet,
+    try {
+      await AuditLog.create({
+        companyId: user.companyId || new mongoose.Types.ObjectId(),
+        userId: req.user!.userId,
+        action: 'USER_PASSWORD_RESET_REQUESTED_BY_SUPERADMIN',
+        resource: 'User',
+        resourceId: user._id.toString(),
+        details: { resetMethod: 'single_use_email_link' },
+      });
+    } catch (error) {
+      await clearAdminPasswordResetToken(user._id, hashedToken);
+      console.error('[SuperAdmin] Password reset audit write failed.', {
+        errorName: error instanceof Error ? error.name : 'UnknownError',
+      });
+      res.status(503).json({ success: false, message: 'Unable to securely record the password reset action.' });
+      return;
+    }
+
+    let delivery: { success: boolean };
+    try {
+      delivery = await sendPasswordResetEmail(user.email, user.fullName, rawToken);
+    } catch {
+      delivery = { success: false };
+    }
+    if (!delivery.success) {
+      await clearAdminPasswordResetToken(user._id, hashedToken);
+      res.status(503).json({ success: false, message: 'Password reset email could not be delivered. No password was changed.' });
+      return;
+    }
+
+    res.json({ success: true, message: 'A single-use password reset link has been sent to the account email address.' });
+  } catch (error) {
+    console.error('[SuperAdmin] Password reset request failed.', {
+      errorName: error instanceof Error ? error.name : 'UnknownError',
     });
-  } catch (err: any) {
-    res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({ success: false, message: 'Unable to process the password reset request.' });
   }
 };
+
+async function clearAdminPasswordResetToken(userId: mongoose.Types.ObjectId, hashedToken: string): Promise<void> {
+  try {
+    await User.updateOne(
+      { _id: userId, resetPasswordToken: hashedToken },
+      { $unset: { resetPasswordToken: 1, resetPasswordExpiry: 1 } },
+    );
+  } catch (error) {
+    console.error('[SuperAdmin] Pending password reset cleanup failed.', {
+      errorName: error instanceof Error ? error.name : 'UnknownError',
+    });
+  }
+}
 
 export const updateUserPlan = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
