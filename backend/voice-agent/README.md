@@ -9,7 +9,8 @@ engine or access WorkGrind data directly.
 
 ## Required setup
 
-Create a LiveKit Cloud project and configure:
+Create a LiveKit Cloud project. For local development or a self-hosted worker,
+configure:
 
 - `LIVEKIT_URL`: the project's secure WebSocket URL (`wss://...`)
 - `LIVEKIT_API_KEY` and `LIVEKIT_API_SECRET`: project credentials
@@ -17,6 +18,9 @@ Create a LiveKit Cloud project and configure:
   `http://localhost` is supported for local development)
 
 The worker exits during startup if any of these four variables are missing.
+LiveKit Cloud injects `LIVEKIT_URL`, `LIVEKIT_API_KEY`, and
+`LIVEKIT_API_SECRET` into deployed agents; do not upload or override those three
+as LiveKit Cloud secrets.
 `TAVRO_VOICE_AGENT_SECRET` is only required by the backend; the worker receives
 the short-lived room-bound credential through private dispatch metadata and
 forwards it to the backend.
@@ -96,15 +100,44 @@ LiveKit Agents development mode; `npm run build` type-checks and emits the
 production worker, and `npm start` starts that compiled worker in production
 mode.
 
-For production, deploy this directory as a LiveKit Agent named `tavro-voice` and
-configure the variables above as deployment secrets. This worker is separate
-from the Vercel backend deployment and must remain running and registered with
-the same LiveKit project. `WORKGRIND_BACKEND_URL` must be the actual HTTPS
-origin of the deployed WorkGrind API; do not use the frontend origin unless it
-routes `/api/ai/voice/turn` to that backend. The worker exits before registering
-if any required setting is missing or malformed. Configure the backend secrets
-in the backend's runtime separately. A successful backend dispatch response
-does not itself confirm a worker accepted or started the job. Follow LiveKit's
+For production, deploy this directory as a LiveKit Cloud Agent. There is no
+worker deployment configuration, `livekit.toml`, or Dockerfile in this
+repository; the LiveKit CLI creates the initial agent configuration and
+Dockerfile. The backend's [vercel.json](../vercel.json) configures serverless
+API routes and does not deploy or keep this worker running.
+
+From this directory, authenticate/select the same LiveKit Cloud project used by
+the backend and create the initial deployment:
+
+```powershell
+lk cloud auth
+lk project set-default "<your-livekit-project-name>"
+lk agent create
+```
+
+The source registers the dispatch name `tavro-voice`; keep that name unchanged
+because the backend explicitly dispatches to it. Add `WORKGRIND_BACKEND_URL` to
+the LiveKit Agent's encrypted runtime secrets. Its value must be the actual
+HTTPS **backend API origin** configured for this deployment (origin only; the
+worker appends `/api/ai/voice/turn`). Do not substitute the frontend domain or
+guess a backend URL. LiveKit Cloud supplies the three `LIVEKIT_*` variables
+automatically. Keep `TAVRO_VOICE_AGENT_SECRET` and the configured Tavro AI
+provider credentials only in the backend's secret store.
+
+After making code changes or setting the secret, deploy from this directory and
+verify the deployment and logs:
+
+```powershell
+lk agent deploy
+lk agent status
+lk agent logs
+```
+
+For a self-hosted persistent worker, set all four variables shown in the
+worker example and run `npm run build` followed by `npm start`. The worker exits
+before registering if required configuration is missing or malformed. A
+successful backend dispatch response does not itself confirm that a worker
+accepted or started the job. Follow LiveKit's
 [Agent deployment guide](https://docs.livekit.io/deploy/agents/) and
 [Agent dispatch guide](https://docs.livekit.io/agents/server/agent-dispatch/).
 

@@ -97,7 +97,7 @@ function getSafeErrorMessage(error: unknown): string {
 }
 
 function isTavro(participant: Participant): boolean {
-  return participant.isAgent || participant.attributes[AGENT_NAME_ATTRIBUTE] === AGENT_NAME;
+  return participant.attributes[AGENT_NAME_ATTRIBUTE] === AGENT_NAME;
 }
 
 function activeAgentStatus(value: string | undefined): ActiveAgentStatus | null {
