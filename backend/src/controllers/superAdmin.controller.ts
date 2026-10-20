@@ -896,21 +896,41 @@ export const deleteWorkspace = async (req: AuthRequest, res: Response): Promise<
 
 // ── 5. SUPPORT & MODERATION QUEUE / CONTACT INBOX ──────────────────────────
 
+export const getTicketCounts = async (_req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    res.json({ success: true, counts: await getSupportTicketCounts() });
+  } catch (error) {
+    console.error('[SuperAdmin] Support ticket count lookup failed.', {
+      errorName: error instanceof Error ? error.name : 'UnknownError',
+    });
+    res.status(500).json({ success: false, message: 'Unable to load support ticket counts.' });
+  }
+};
+
 export const getTickets = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
+    const pagination = parsePagination(
+      { page: req.query.page, limit: req.query.limit },
+      { defaultLimit: 25, maxLimit: 100 },
+    );
+    if (!pagination) {
+      res.status(400).json({ success: false, message: 'Invalid pagination parameters.' });
+      return;
+    }
+    const { page, limit, skip } = pagination;
     const { status, type, q } = req.query;
     const filter: any = {};
 
-    if (type && type !== 'all') {
+    if (typeof type === 'string' && type !== 'all') {
       filter.type = type;
     }
 
-    if (status && status !== 'all') {
+    if (typeof status === 'string' && status !== 'all') {
       filter.status = status;
     }
 
-    if (q) {
-      const regex = { $regex: q as string, $options: 'i' };
+    if (typeof q === 'string' && q.trim()) {
+      const regex = { $regex: escapeRegex(q.trim().slice(0, 100)), $options: 'i' };
       filter.$or = [
         { name: regex },
         { email: regex },
@@ -920,26 +940,28 @@ export const getTickets = async (req: AuthRequest, res: Response): Promise<void>
       ];
     }
 
-    const [tickets, totalCount, unreadCount, demoCount, contactCount] = await Promise.all([
-      SupportTicket.find(filter).sort({ createdAt: -1 }),
-      SupportTicket.countDocuments(),
-      SupportTicket.countDocuments({ isRead: false }),
-      SupportTicket.countDocuments({ type: 'demo' }),
-      SupportTicket.countDocuments({ type: { $ne: 'demo' } }),
+    const [tickets, total, counts] = await Promise.all([
+      SupportTicket.find(filter)
+        .select(`${ADMIN_TICKET_FIELDS.join(' ')} replies.replyText replies.sentBy replies.sentAt`)
+        .sort({ createdAt: -1, _id: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      SupportTicket.countDocuments(filter),
+      getSupportTicketCounts(),
     ]);
 
     res.json({
       success: true,
-      tickets,
-      counts: {
-        total: totalCount,
-        unread: unreadCount,
-        demo: demoCount,
-        contact: contactCount,
-      },
+      tickets: tickets.map((ticket: any) => adminTicketDto(ticket)),
+      counts,
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) || 1 },
     });
-  } catch (err: any) {
-    res.status(500).json({ success: false, message: err.message });
+  } catch (error) {
+    console.error('[SuperAdmin] Support ticket listing failed.', {
+      errorName: error instanceof Error ? error.name : 'UnknownError',
+    });
+    res.status(500).json({ success: false, message: 'Unable to load support tickets.' });
   }
 };
 
@@ -958,9 +980,12 @@ export const getTicketDetails = async (req: AuthRequest, res: Response): Promise
       await ticket.save();
     }
 
-    res.json({ success: true, ticket });
-  } catch (err: any) {
-    res.status(500).json({ success: false, message: err.message });
+    res.json({ success: true, ticket: adminTicketDto(ticket) });
+  } catch (error) {
+    console.error('[SuperAdmin] Support ticket detail lookup failed.', {
+      errorName: error instanceof Error ? error.name : 'UnknownError',
+    });
+    res.status(500).json({ success: false, message: 'Unable to load support ticket details.' });
   }
 };
 
@@ -980,9 +1005,12 @@ export const markTicketAsRead = async (req: AuthRequest, res: Response): Promise
       return;
     }
 
-    res.json({ success: true, ticket });
-  } catch (err: any) {
-    res.status(500).json({ success: false, message: err.message });
+    res.json({ success: true, ticket: adminTicketDto(ticket) });
+  } catch (error) {
+    console.error('[SuperAdmin] Support ticket read-state update failed.', {
+      errorName: error instanceof Error ? error.name : 'UnknownError',
+    });
+    res.status(500).json({ success: false, message: 'Unable to update support ticket read state.' });
   }
 };
 
@@ -1045,12 +1073,14 @@ export const replyTicket = async (req: AuthRequest, res: Response): Promise<void
     res.json({
       success: true,
       message: `Reply sent successfully to ${ticket.name} (${ticket.email})!`,
-      ticket,
+      ticket: adminTicketDto(ticket),
       emailSent: emailResult.success,
     });
-  } catch (err: any) {
-    console.error('❌ [SuperAdmin Reply] Error:', err);
-    res.status(500).json({ success: false, message: err.message });
+  } catch (error) {
+    console.error('[SuperAdmin] Support ticket reply failed.', {
+      errorName: error instanceof Error ? error.name : 'UnknownError',
+    });
+    res.status(500).json({ success: false, message: 'Unable to send the support ticket reply.' });
   }
 };
 
@@ -1076,9 +1106,12 @@ export const updateTicket = async (req: AuthRequest, res: Response): Promise<voi
       return;
     }
 
-    res.json({ success: true, ticket });
-  } catch (err: any) {
-    res.status(500).json({ success: false, message: err.message });
+    res.json({ success: true, ticket: adminTicketDto(ticket) });
+  } catch (error) {
+    console.error('[SuperAdmin] Support ticket update failed.', {
+      errorName: error instanceof Error ? error.name : 'UnknownError',
+    });
+    res.status(500).json({ success: false, message: 'Unable to update support ticket.' });
   }
 };
 
@@ -1087,8 +1120,11 @@ export const deleteTicket = async (req: AuthRequest, res: Response): Promise<voi
     const { id } = req.params;
     await SupportTicket.findByIdAndDelete(id);
     res.json({ success: true, message: 'Ticket deleted' });
-  } catch (err: any) {
-    res.status(500).json({ success: false, message: err.message });
+  } catch (error) {
+    console.error('[SuperAdmin] Support ticket deletion failed.', {
+      errorName: error instanceof Error ? error.name : 'UnknownError',
+    });
+    res.status(500).json({ success: false, message: 'Unable to delete support ticket.' });
   }
 };
 

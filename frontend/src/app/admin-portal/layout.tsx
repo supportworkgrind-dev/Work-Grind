@@ -50,7 +50,7 @@ export default function AdminPortalLayout({ children }: { children: React.ReactN
 
   const fetchUnreadCount = useCallback(async () => {
     try {
-      const res = await adminApi.get('/tickets?limit=1');
+      const res = await adminApi.get('/tickets/counts');
       if (res.data?.success && res.data.counts) {
         setUnreadInboxCount(res.data.counts.unread || 0);
       }
@@ -100,10 +100,10 @@ export default function AdminPortalLayout({ children }: { children: React.ReactN
 
   // Periodically refresh unread count every 30 seconds
   useEffect(() => {
-    if (isLoginPage) return;
+    if (isLoginPage || !isAuthenticated) return;
     const interval = setInterval(fetchUnreadCount, 30000);
     return () => clearInterval(interval);
-  }, [isLoginPage, fetchUnreadCount]);
+  }, [isLoginPage, isAuthenticated, fetchUnreadCount]);
 
   if (isLoginPage) {
     return <>{children}</>;

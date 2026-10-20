@@ -19,6 +19,7 @@ import {
   updateWorkspacePlan,
   deleteWorkspace,
   getTickets,
+  getTicketCounts,
   getTicketDetails,
   markTicketAsRead,
   replyTicket,
@@ -66,6 +67,7 @@ router.patch('/workspaces/:id/plan', updateWorkspacePlan);
 router.delete('/workspaces/:id', deleteWorkspace);
 
 // Support & Moderation Queue / Contact Inbox
+router.get('/tickets/counts', getTicketCounts);
 router.get('/tickets', getTickets);
 router.get('/tickets/:id', getTicketDetails);
 router.patch('/tickets/:id', updateTicket);

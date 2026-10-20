@@ -21,8 +21,11 @@ import {
 } from 'lucide-react';
 
 export default function AdminPortalInboxPage() {
+  const pageSize = 25;
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [counts, setCounts] = useState({ total: 0, unread: 0, demo: 0, contact: 0 });
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [typeFilter, setTypeFilter] = useState<'all' | 'contact' | 'demo'>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -46,6 +49,8 @@ export default function AdminPortalInboxPage() {
     if (!quiet) setIsLoading(true);
     try {
       const params = new URLSearchParams();
+      params.set('page', String(page));
+      params.set('limit', String(pageSize));
       if (typeFilter !== 'all') params.append('type', typeFilter);
       if (statusFilter !== 'all') params.append('status', statusFilter);
       if (search.trim()) params.append('q', search.trim());
@@ -56,13 +61,16 @@ export default function AdminPortalInboxPage() {
         if (res.data.counts) {
           setCounts(res.data.counts);
         }
+        if (res.data.pagination) {
+          setTotalPages(res.data.pagination.totalPages || 1);
+        }
       }
     } catch (err: any) {
       console.error('Failed to load tickets:', err);
     } finally {
       if (!quiet) setIsLoading(false);
     }
-  }, [typeFilter, statusFilter, search]);
+  }, [typeFilter, statusFilter, search, page]);
 
   useEffect(() => {
     fetchTickets();
@@ -233,7 +241,7 @@ export default function AdminPortalInboxPage() {
               <input
                 type="text"
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => { setSearch(e.target.value); setPage(1); }}
                 placeholder="Search name, email, company, subject..."
                 className="w-full rounded-xl border border-slate-800 bg-slate-950/80 py-2 pl-10 pr-4 text-xs text-slate-100 placeholder:text-slate-500 focus:border-indigo-500 outline-none transition-all"
               />
@@ -242,7 +250,7 @@ export default function AdminPortalInboxPage() {
             {/* Type Tabs */}
             <div className="flex rounded-xl bg-slate-950/80 p-1 border border-slate-800/80">
               <button
-                onClick={() => setTypeFilter('all')}
+                onClick={() => { setTypeFilter('all'); setPage(1); }}
                 className={`flex-1 rounded-lg py-1.5 text-[11px] font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                   typeFilter === 'all'
                     ? 'bg-indigo-600 text-white shadow-sm'
@@ -255,7 +263,7 @@ export default function AdminPortalInboxPage() {
                 </span>
               </button>
               <button
-                onClick={() => setTypeFilter('contact')}
+                onClick={() => { setTypeFilter('contact'); setPage(1); }}
                 className={`flex-1 rounded-lg py-1.5 text-[11px] font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                   typeFilter === 'contact'
                     ? 'bg-indigo-600 text-white shadow-sm'
@@ -268,7 +276,7 @@ export default function AdminPortalInboxPage() {
                 </span>
               </button>
               <button
-                onClick={() => setTypeFilter('demo')}
+                onClick={() => { setTypeFilter('demo'); setPage(1); }}
                 className={`flex-1 rounded-lg py-1.5 text-[11px] font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                   typeFilter === 'demo'
                     ? 'bg-indigo-600 text-white shadow-sm'
@@ -296,7 +304,7 @@ export default function AdminPortalInboxPage() {
               ].map((s) => (
                 <button
                   key={s.id}
-                  onClick={() => setStatusFilter(s.id)}
+                  onClick={() => { setStatusFilter(s.id); setPage(1); }}
                   className={`rounded-lg px-2.5 py-1 font-semibold transition-all cursor-pointer ${
                     statusFilter === s.id
                       ? 'bg-slate-800 text-white border border-slate-700'
@@ -307,6 +315,25 @@ export default function AdminPortalInboxPage() {
                 </button>
               ))}
             </div>
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between border-t border-slate-800 px-4 py-3 text-xs">
+                <button
+                  onClick={() => setPage((current) => Math.max(1, current - 1))}
+                  disabled={page <= 1 || isLoading}
+                  className="rounded-lg border border-slate-700 px-3 py-1.5 font-semibold text-slate-300 disabled:opacity-40"
+                >
+                  Previous
+                </button>
+                <span className="text-slate-400">Page {page} of {totalPages}</span>
+                <button
+                  onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+                  disabled={page >= totalPages || isLoading}
+                  className="rounded-lg border border-slate-700 px-3 py-1.5 font-semibold text-slate-300 disabled:opacity-40"
+                >
+                  Next
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Ticket Items List */}

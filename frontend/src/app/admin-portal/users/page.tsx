@@ -177,7 +177,7 @@ export default function SuperAdminUsersPage() {
   const [loadingDetails, setLoadingDetails] = useState(false);
 
   const [passwordResetUser, setPasswordResetUser] = useState<User | null>(null);
-  const [temporaryPassword, setTemporaryPassword] = useState('');
+  const [resetEmailSent, setResetEmailSent] = useState(false);
   const [isResettingPass, setIsResettingPass] = useState(false);
 
   const [planChangeUser, setPlanChangeUser] = useState<User | null>(null);
@@ -268,8 +268,8 @@ export default function SuperAdminUsersPage() {
     try {
       const res = await adminApi.post(`/users/${passwordResetUser._id}/reset-password`, {});
       if (res.data.success) {
-        setTemporaryPassword(res.data.temporaryPassword);
-        showToast(`Password successfully reset for ${passwordResetUser.fullName}!`);
+        setResetEmailSent(true);
+        showToast(`A password reset link was sent to ${passwordResetUser.email}.`);
       }
     } catch (err: any) {
       showToast(err.response?.data?.message || 'Password reset failed.', 'error');
@@ -850,7 +850,7 @@ export default function SuperAdminUsersPage() {
                 <button
                   onClick={() => {
                     setPasswordResetUser(selectedUser);
-                    setTemporaryPassword('');
+                    setResetEmailSent(false);
                   }}
                   className="w-full py-2.5 rounded-xl border border-slate-800 bg-slate-800/80 text-xs font-bold text-slate-200 hover:bg-slate-700 transition-all"
                 >
@@ -891,16 +891,11 @@ export default function SuperAdminUsersPage() {
               {passwordResetUser.email}). This will terminate all active login sessions for this account.
             </p>
 
-            {temporaryPassword ? (
+            {resetEmailSent ? (
               <div className="rounded-2xl border border-emerald-500/30 bg-emerald-950/40 p-4 space-y-2 text-center">
-                <span className="text-[10px] uppercase font-bold text-emerald-400">New Temporary Password</span>
-                <div className="flex items-center justify-center gap-2">
-                  <code className="text-base font-extrabold text-white tracking-wider font-mono bg-slate-950 px-3 py-1.5 rounded-xl border border-emerald-500/40">
-                    {temporaryPassword}
-                  </code>
-                </div>
+                <span className="text-[10px] uppercase font-bold text-emerald-400">Reset link sent</span>
                 <p className="text-[11px] text-slate-400 mt-1">
-                  Share this password securely with the user. They will be required to change it on next login.
+                  The user can set a new password using the single-use link sent to their account email. The link expires after 30 minutes.
                 </p>
               </div>
             ) : (
@@ -909,7 +904,7 @@ export default function SuperAdminUsersPage() {
                 disabled={isResettingPass}
                 className="w-full rounded-xl bg-indigo-600 py-2.5 text-xs font-bold text-white shadow-md hover:bg-indigo-500 disabled:opacity-50 transition-all"
               >
-                {isResettingPass ? 'Generating New Credentials...' : 'Generate New Password'}
+                {isResettingPass ? 'Sending Reset Link...' : 'Send Password Reset Link'}
               </button>
             )}
 
