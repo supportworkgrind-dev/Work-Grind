@@ -11,6 +11,7 @@ import {
   type JobContext,
 } from '@livekit/agents';
 import { TavroBackendLLM } from './tavroBackendLLM.js';
+import { publishTavroReady } from './readiness.js';
 
 dotenv.config();
 
@@ -165,6 +166,16 @@ export default defineAgent({
         stage: 'session_initialization',
       });
       stage = 'agent_room_connect';
+      const localParticipant = ctx.room.localParticipant;
+      if (!localParticipant) throw new Error('Tavro voice agent did not connect to its assigned room.');
+      stage = 'readiness_signal';
+      await publishTavroReady(localParticipant);
+      console.info('[Tavro Voice Agent] Readiness signal published.', {
+        roomId: roomName,
+        jobId,
+        dispatchId,
+        stage,
+      });
       console.info('[Tavro Voice Agent] Agent joined room.', {
         roomId: roomName,
         jobId,

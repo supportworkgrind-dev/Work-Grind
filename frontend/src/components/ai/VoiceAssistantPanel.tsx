@@ -58,6 +58,7 @@ const ROOM_OPTIONS: RoomOptions = {
   dynacast: true,
 };
 const AGENT_STATE_ATTRIBUTE = 'lk.agent.state';
+const AGENT_READY_ATTRIBUTE = 'workgrind.tavro.ready';
 const AGENT_STATES = new Set(['initializing', 'listening', 'thinking', 'speaking']);
 
 function getSafeErrorMessage(error: unknown): string {
@@ -102,6 +103,11 @@ function isTavro(participant: Participant): boolean {
 function activeAgentStatus(value: string | undefined): ActiveAgentStatus | null {
   if (value === 'listening' || value === 'thinking' || value === 'speaking') return value;
   return null;
+}
+
+function hasAgentReadySignal(participant: Participant): boolean {
+  return participant.attributes[AGENT_READY_ATTRIBUTE] === 'true' &&
+    activeAgentStatus(participant.attributes[AGENT_STATE_ATTRIBUTE]) !== null;
 }
 
 export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProps) {
@@ -301,7 +307,7 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
           participantKind: participant.kind,
         });
         const state = activeAgentStatus(participant.attributes[AGENT_STATE_ATTRIBUTE]);
-        if (!state) {
+        if (!hasAgentReadySignal(participant) || !state) {
           agentReadyRef.current = false;
           setStatus(microphonePublishedRef.current ? 'waiting-for-agent' : 'connecting');
           setIsAgentReady(false);
@@ -354,10 +360,9 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
       const onParticipantAttributesChanged = (_changed: Record<string, string>, participant: Participant) => {
         if (!isTavro(participant)) return;
         const nextState = participant.attributes[AGENT_STATE_ATTRIBUTE];
-        if (!nextState || !AGENT_STATES.has(nextState)) return;
-        setAgentState(nextState);
+        if (nextState && AGENT_STATES.has(nextState)) setAgentState(nextState);
         const activeState = activeAgentStatus(nextState);
-        if (!activeState) {
+        if (!hasAgentReadySignal(participant) || !activeState) {
           agentReadyRef.current = false;
           setIsAgentReady(false);
           setStatus(microphonePublishedRef.current ? 'waiting-for-agent' : 'connecting');
@@ -376,7 +381,9 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
       };
       const onReconnected = () => {
         const currentAgent = Array.from(room?.remoteParticipants.values() ?? []).find(isTavro);
-        const currentState = activeAgentStatus(currentAgent?.attributes[AGENT_STATE_ATTRIBUTE]);
+        const currentState = currentAgent && hasAgentReadySignal(currentAgent)
+          ? activeAgentStatus(currentAgent.attributes[AGENT_STATE_ATTRIBUTE])
+          : null;
         agentReadyRef.current = currentState !== null;
         setIsAgentReady(agentReadyRef.current);
         setStatus(currentState ?? 'waiting-for-agent');
@@ -450,7 +457,9 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
       setRoomName(response.data.roomName);
 
       const agentParticipant = Array.from(room.remoteParticipants.values()).find(isTavro);
-      const currentAgentState = activeAgentStatus(agentParticipant?.attributes[AGENT_STATE_ATTRIBUTE]);
+      const currentAgentState = agentParticipant && hasAgentReadySignal(agentParticipant)
+        ? activeAgentStatus(agentParticipant.attributes[AGENT_STATE_ATTRIBUTE])
+        : null;
       if (currentAgentState) {
         agentReadyRef.current = true;
         clearAgentJoinTimer();

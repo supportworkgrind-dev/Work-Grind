@@ -122,6 +122,9 @@ does not itself confirm a worker accepted or started the job. Follow LiveKit's
 - The worker publishes user and Tavro speech transcriptions through LiveKit room
   transcription events. The browser renders those provider-generated events; it
   does not use browser speech recognition or synthetic transcript content.
+- The worker marks itself ready only after `AgentSession.start()` succeeds and
+  its explicit LiveKit participant-attribute update is acknowledged. A room
+  connection or queued dispatch alone is not treated as Tavro readiness.
 - If the member can join but Tavro does not, confirm the separately deployed
   `tavro-voice` worker is healthy and registered with the same LiveKit project.
   The worker requires LiveKit Inference access for its configured AssemblyAI STT
