@@ -28,10 +28,7 @@ import {
   type VoiceTranscriptMessage,
 } from './voiceTranscript';
 import {
-  AGENT_NAME,
-  AGENT_NAME_ATTRIBUTE,
   AGENT_READY_ATTRIBUTE,
-  AGENT_STATE_ATTRIBUTE,
   inspectTavroReadiness,
   isTavroParticipant,
 } from './voiceReadiness';
@@ -45,7 +42,6 @@ type VoiceStatus =
   | 'speaking'
   | 'reconnecting'
   | 'failed';
-type ActiveAgentStatus = 'listening' | 'thinking' | 'speaking';
 type VoiceSessionResponse = {
   success: boolean;
   serverUrl: string;
@@ -265,17 +261,20 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
         if (agentJoinTimerRef.current !== null) return;
         agentJoinTimerRef.current = window.setTimeout(() => {
           if (agentReadyRef.current || intentionalDisconnectRef.current) return;
-          const agentParticipant = Array.from(room?.remoteParticipants.values() ?? [])
-            .find(isTavroParticipant);
+          const participants = Array.from(room?.remoteParticipants.values() ?? []);
+          const agentParticipant = participants.find(isTavroParticipant);
           const readiness = inspectTavroReadiness(agentParticipant);
+          const hasUnidentifiedAgent = !agentParticipant && participants.some((participant) => participant.isAgent);
+          const readinessFailure = hasUnidentifiedAgent ? 'agent_identity_missing' : readiness.failure;
           console.error('[Tavro Voice] Agent readiness timed out.', {
             voiceSessionId: response.data.roomName,
             timeoutMs: AGENT_JOIN_TIMEOUT_MS,
-            readinessFailure: readiness.failure,
+            readinessFailure,
+            agentParticipantCount: participants.filter((participant) => participant.isAgent).length,
             microphonePublished: microphonePublishedRef.current,
-            remoteParticipantCount: room?.remoteParticipants.size ?? 0,
+            remoteParticipantCount: participants.length,
           });
-          setErrorMessage(readiness.failure === 'participant_not_joined'
+          setErrorMessage(readinessFailure === 'participant_not_joined'
             ? 'Your microphone is ready, but the Tavro voice worker did not join this room. Retry once. If it continues, share the session ID in Diagnostics with WorkGrind support.'
             : 'Tavro joined the room but did not finish its readiness check. Retry once. If it continues, share the session ID in Diagnostics with WorkGrind support.');
           setStatus('failed');
@@ -298,7 +297,16 @@ export default function VoiceAssistantPanel({ onClose }: VoiceAssistantPanelProp
       };
       const onParticipantConnected = (participant: RemoteParticipant) => {
         const readiness = inspectTavroReadiness(participant);
-        if (!readiness.isTavro) return;
+        if (!readiness.isTavro) {
+          if (participant.isAgent) {
+            console.warn('[Tavro Voice] LiveKit agent joined without Tavro identity.', {
+              voiceSessionId: response.data.roomName,
+              readinessFailure: 'agent_identity_missing',
+              participantKind: participant.kind,
+            });
+          }
+          return;
+        }
         console.info('[Tavro Voice] Agent participant joined.', {
           voiceSessionId: response.data.roomName,
           participantKind: participant.kind,
