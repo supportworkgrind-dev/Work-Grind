@@ -108,11 +108,14 @@ export function getWorkspaceExperience(
   organization: OrganizationInfo | null | undefined,
 ): Experience | null {
   if (!organization) return null;
-  if (organization.accountType === 'individual' && organization.organizationType === 'business') return 'solo';
+  const organizationType = organization.organizationType === undefined
+    ? undefined
+    : normalizeOrganizationType(organization.organizationType);
+  if (organization.accountType === 'individual' && organizationType === 'business') return 'solo';
   if (organization.accountType !== 'company') return null;
-  if (organization.organizationType === 'business') return 'company';
-  if (organization.organizationType && EDUCATION_TYPES.has(organization.organizationType)) {
-    return organization.organizationType;
+  if (organizationType === 'business') return 'company';
+  if (organizationType && EDUCATION_TYPES.has(organizationType)) {
+    return organizationType;
   }
   return null;
 }
