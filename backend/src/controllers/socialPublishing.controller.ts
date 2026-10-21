@@ -695,8 +695,9 @@ export const publishSocialPost = async (req: AuthRequest, res: Response): Promis
     res.status(403).json({ success: false, message: 'Your workspace role cannot publish social posts.' });
     return;
   }
-  const target = await SocialPost.findOne({ _id: req.params.id, companyId: companyIdOf(req) }).select('platform');
-  if (target?.platform === 'youtube') {
+  // Each path claims only posts of its own platform atomically, so the hint
+  // cannot publish a post to the wrong destination.
+  if (req.body?.platform === 'youtube') {
     await publishYouTubePost(req, res);
     return;
   }
@@ -1079,15 +1080,6 @@ async function publishYouTubePost(req: AuthRequest, res: Response): Promise<void
 export const scheduleSocialPost = async (req: AuthRequest, res: Response): Promise<void> => {
   if (!canManagePublishing(req)) {
     res.status(403).json({ success: false, message: 'Your workspace role cannot schedule social posts.' });
-    return;
-  }
-  const scheduleTarget = await SocialPost.findOne({ _id: req.params.id, companyId: companyIdOf(req) }).select('platform');
-  if (scheduleTarget?.platform === 'youtube') {
-    res.status(422).json({
-      success: false,
-      code: 'SCHEDULE_UNAVAILABLE',
-      message: 'Scheduled YouTube uploads are not available yet. Publish the video now instead.',
-    });
     return;
   }
   const scheduledAtValue = req.body?.scheduledAt;
