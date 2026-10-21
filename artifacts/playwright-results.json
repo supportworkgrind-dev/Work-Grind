@@ -4,8 +4,8 @@
       "C:\\Program Files\\nodejs\\node.exe",
       "C:\\workgrind\\frontend\\node_modules\\@playwright\\test\\cli.js",
       "test",
-      "tests/auth-routing.spec.ts",
-      "--config=playwright.config.ts"
+      "--config=playwright.config.ts",
+      "tests/workgrind-audit.spec.ts"
     ],
     "configFile": "C:\\workgrind\\frontend\\playwright.config.ts",
     "rootDir": "C:/workgrind/frontend/tests",
@@ -110,13 +110,13 @@
   },
   "suites": [
     {
-      "title": "auth-routing.spec.ts",
-      "file": "auth-routing.spec.ts",
+      "title": "workgrind-audit.spec.ts",
+      "file": "workgrind-audit.spec.ts",
       "column": 0,
       "line": 0,
       "specs": [
         {
-          "title": "Settings reports Google sign-in only from the backend provider status",
+          "title": "responsive layouts on key public pages",
           "ok": true,
           "tags": [],
           "tests": [
@@ -128,97 +128,35 @@
               "projectName": "chromium",
               "results": [
                 {
-                  "workerIndex": 0,
-                  "parallelIndex": 0,
-                  "status": "passed",
-                  "duration": 61,
-                  "errors": [],
-                  "stdout": [],
-                  "stderr": [],
-                  "retry": 0,
-                  "startTime": "2026-10-19T14:31:58.495Z",
-                  "annotations": [],
-                  "attachments": []
-                }
-              ],
-              "status": "expected"
-            }
-          ],
-          "id": "94dd336dc752385ec50a-81be399e261d18b5da16",
-          "file": "auth-routing.spec.ts",
-          "line": 6,
-          "column": 5
-        },
-        {
-          "title": "Google sign-in status does not imply a LinkedIn connection",
-          "ok": true,
-          "tags": [],
-          "tests": [
-            {
-              "timeout": 60000,
-              "annotations": [],
-              "expectedStatus": "passed",
-              "projectId": "chromium",
-              "projectName": "chromium",
-              "results": [
-                {
-                  "workerIndex": 1,
-                  "parallelIndex": 1,
-                  "status": "passed",
-                  "duration": 35,
-                  "errors": [],
-                  "stdout": [],
-                  "stderr": [],
-                  "retry": 0,
-                  "startTime": "2026-10-19T14:31:58.548Z",
-                  "annotations": [],
-                  "attachments": []
-                }
-              ],
-              "status": "expected"
-            }
-          ],
-          "id": "94dd336dc752385ec50a-153d9661e4e56e7aaf42",
-          "file": "auth-routing.spec.ts",
-          "line": 12,
-          "column": 5
-        },
-        {
-          "title": "public signup and OAuth callback routes do not trigger refresh-cookie restoration",
-          "ok": true,
-          "tags": [],
-          "tests": [
-            {
-              "timeout": 60000,
-              "annotations": [],
-              "expectedStatus": "passed",
-              "projectId": "chromium",
-              "projectName": "chromium",
-              "results": [
-                {
-                  "workerIndex": 2,
+                  "workerIndex": 10,
                   "parallelIndex": 2,
                   "status": "passed",
-                  "duration": 71,
+                  "duration": 16490,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-19T14:31:58.540Z",
+                  "startTime": "2026-10-21T13:46:09.289Z",
                   "annotations": [],
-                  "attachments": []
+                  "attachments": [
+                    {
+                      "name": "responsive-audit.json",
+                      "contentType": "application/json",
+                      "body": "ewogICJpc3N1ZXMiOiBbXQp9"
+                    }
+                  ]
                 }
               ],
               "status": "expected"
             }
           ],
-          "id": "94dd336dc752385ec50a-ca6c1d52cc759d58bc0f",
-          "file": "auth-routing.spec.ts",
-          "line": 16,
+          "id": "2aae5247a7454980396a-e7bd1d6a51e69aeedfa4",
+          "file": "workgrind-audit.spec.ts",
+          "line": 265,
           "column": 5
         },
         {
-          "title": "returning business users go to their existing workspace",
+          "title": "login form exposes required email/password fields and blocks empty submission",
           "ok": true,
           "tags": [],
           "tests": [
@@ -230,15 +168,15 @@
               "projectName": "chromium",
               "results": [
                 {
-                  "workerIndex": 3,
+                  "workerIndex": 11,
                   "parallelIndex": 3,
                   "status": "passed",
-                  "duration": 32,
+                  "duration": 4477,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-19T14:31:58.414Z",
+                  "startTime": "2026-10-21T13:46:13.749Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -246,14 +184,14 @@
               "status": "expected"
             }
           ],
-          "id": "94dd336dc752385ec50a-888c43da58d49a1f8e1f",
-          "file": "auth-routing.spec.ts",
-          "line": 25,
+          "id": "2aae5247a7454980396a-a9816071c1c18ba95f54",
+          "file": "workgrind-audit.spec.ts",
+          "line": 296,
           "column": 5
         },
         {
-          "title": "returning education users go to the academic workspace",
-          "ok": true,
+          "title": "protected application routes redirect unauthenticated visitors",
+          "ok": false,
           "tags": [],
           "tests": [
             {
@@ -264,139 +202,871 @@
               "projectName": "chromium",
               "results": [
                 {
-                  "workerIndex": 3,
-                  "parallelIndex": 3,
-                  "status": "passed",
-                  "duration": 9,
-                  "errors": [],
-                  "stdout": [],
-                  "stderr": [],
-                  "retry": 0,
-                  "startTime": "2026-10-19T14:31:58.685Z",
-                  "annotations": [],
-                  "attachments": []
-                }
-              ],
-              "status": "expected"
-            }
-          ],
-          "id": "94dd336dc752385ec50a-91be313bc231cfa5fae7",
-          "file": "auth-routing.spec.ts",
-          "line": 32,
-          "column": 5
-        },
-        {
-          "title": "users with incomplete setup resume onboarding and preserve safe return paths",
-          "ok": true,
-          "tags": [],
-          "tests": [
-            {
-              "timeout": 60000,
-              "annotations": [],
-              "expectedStatus": "passed",
-              "projectId": "chromium",
-              "projectName": "chromium",
-              "results": [
-                {
-                  "workerIndex": 3,
-                  "parallelIndex": 3,
-                  "status": "passed",
-                  "duration": 8,
-                  "errors": [],
-                  "stdout": [],
-                  "stderr": [],
-                  "retry": 0,
-                  "startTime": "2026-10-19T14:31:58.743Z",
-                  "annotations": [],
-                  "attachments": []
-                }
-              ],
-              "status": "expected"
-            }
-          ],
-          "id": "94dd336dc752385ec50a-d78c4c7f1e08c5bca917",
-          "file": "auth-routing.spec.ts",
-          "line": 41,
-          "column": 5
-        },
-        {
-          "title": "users without a workspace continue setup without losing a safe invitation return",
-          "ok": true,
-          "tags": [],
-          "tests": [
-            {
-              "timeout": 60000,
-              "annotations": [],
-              "expectedStatus": "passed",
-              "projectId": "chromium",
-              "projectName": "chromium",
-              "results": [
-                {
-                  "workerIndex": 0,
+                  "workerIndex": 8,
                   "parallelIndex": 0,
-                  "status": "passed",
-                  "duration": 10,
-                  "errors": [],
+                  "status": "timedOut",
+                  "duration": 60387,
+                  "error": {
+                    "message": "\u001b[31mTest timeout of 60000ms exceeded.\u001b[39m",
+                    "stack": "\u001b[31mTest timeout of 60000ms exceeded.\u001b[39m"
+                  },
+                  "errors": [
+                    {
+                      "message": "\u001b[31mTest timeout of 60000ms exceeded.\u001b[39m"
+                    }
+                  ],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-19T14:31:58.762Z",
+                  "startTime": "2026-10-21T13:46:15.241Z",
                   "annotations": [],
-                  "attachments": []
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "C:\\workgrind\\artifacts\\test-results\\workgrind-audit-protected--c8422-ct-unauthenticated-visitors-chromium\\test-failed-1.png"
+                    },
+                    {
+                      "name": "protected-route-audit.json",
+                      "contentType": "application/json",
+                      "body": "ewogICJyZXN1bHRzIjogWwogICAgewogICAgICAicGF0aCI6ICIvZGFzaGJvYXJkIiwKICAgICAgInN0YXR1cyI6IDIwMCwKICAgICAgImxhbmRlZEF0IjogIi9sb2dpbiIKICAgIH0sCiAgICB7CiAgICAgICJwYXRoIjogIi9kYWlseS1mb2N1cyIsCiAgICAgICJzdGF0dXMiOiAyMDAsCiAgICAgICJsYW5kZWRBdCI6ICIvbG9naW4iCiAgICB9LAogICAgewogICAgICAicGF0aCI6ICIvdGFza3MiLAogICAgICAic3RhdHVzIjogMjAwLAogICAgICAibGFuZGVkQXQiOiAiL2xvZ2luIgogICAgfSwKICAgIHsKICAgICAgInBhdGgiOiAiL3Byb2plY3RzIiwKICAgICAgInN0YXR1cyI6IDIwMCwKICAgICAgImxhbmRlZEF0IjogIi9sb2dpbiIKICAgIH0sCiAgICB7CiAgICAgICJwYXRoIjogIi9jYWxlbmRhciIsCiAgICAgICJzdGF0dXMiOiAyMDAsCiAgICAgICJsYW5kZWRBdCI6ICIvbG9naW4iCiAgICB9LAogICAgewogICAgICAicGF0aCI6ICIvY3JtIiwKICAgICAgInN0YXR1cyI6IDIwMCwKICAgICAgImxhbmRlZEF0IjogIi9sb2dpbiIKICAgIH0sCiAgICB7CiAgICAgICJwYXRoIjogIi9jbGllbnQtcG9ydGFsLW1nbXQiLAogICAgICAic3RhdHVzIjogMjAwLAogICAgICAibGFuZGVkQXQiOiAiL2xvZ2luIgogICAgfSwKICAgIHsKICAgICAgInBhdGgiOiAiL2NoYXQiLAogICAgICAic3RhdHVzIjogMjAwLAogICAgICAibGFuZGVkQXQiOiAiL2xvZ2luIgogICAgfSwKICAgIHsKICAgICAgInBhdGgiOiAiL21lZXRpbmdzIiwKICAgICAgInN0YXR1cyI6IDIwMCwKICAgICAgImxhbmRlZEF0IjogIi9sb2dpbiIKICAgIH0sCiAgICB7CiAgICAgICJwYXRoIjogIi93aGl0ZWJvYXJkIiwKICAgICAgInN0YXR1cyI6IDIwMCwKICAgICAgImxhbmRlZEF0IjogIi9sb2dpbiIKICAgIH0sCiAgICB7CiAgICAgICJwYXRoIjogIi9kb2NzIiwKICAgICAgInN0YXR1cyI6IDIwMCwKICAgICAgImxhbmRlZEF0IjogIi9sb2dpbiIKICAgIH0sCiAgICB7CiAgICAgICJwYXRoIjogIi9maWxlcyIsCiAgICAgICJzdGF0dXMiOiAyMDAsCiAgICAgICJsYW5kZWRBdCI6ICIvbG9naW4iCiAgICB9LAogICAgewogICAgICAicGF0aCI6ICIvYW5hbHl0aWNzIiwKICAgICAgInN0YXR1cyI6IDIwMCwKICAgICAgImxhbmRlZEF0IjogIi9sb2dpbiIKICAgIH0sCiAgICB7CiAgICAgICJwYXRoIjogIi93b3JrZmxvd3MiLAogICAgICAic3RhdHVzIjogMjAwLAogICAgICAibGFuZGVkQXQiOiAiL2xvZ2luIgogICAgfSwKICAgIHsKICAgICAgInBhdGgiOiAiL2FpIiwKICAgICAgInN0YXR1cyI6IDIwMCwKICAgICAgImxhbmRlZEF0IjogIi9sb2dpbiIKICAgIH0sCiAgICB7CiAgICAgICJwYXRoIjogIi90ZWFtIiwKICAgICAgInN0YXR1cyI6IDIwMCwKICAgICAgImxhbmRlZEF0IjogIi9sb2dpbiIKICAgIH0sCiAgICB7CiAgICAgICJwYXRoIjogIi9ub3RpZmljYXRpb25zIiwKICAgICAgInN0YXR1cyI6IDIwMCwKICAgICAgImxhbmRlZEF0IjogIi9sb2dpbiIKICAgIH0sCiAgICB7CiAgICAgICJwYXRoIjogIi9iaWxsaW5nIiwKICAgICAgInN0YXR1cyI6IDIwMCwKICAgICAgImxhbmRlZEF0IjogIi9sb2dpbiIKICAgIH0sCiAgICB7CiAgICAgICJwYXRoIjogIi9zZXR0aW5ncyIsCiAgICAgICJzdGF0dXMiOiAyMDAsCiAgICAgICJsYW5kZWRBdCI6ICIvbG9naW4iCiAgICB9LAogICAgewogICAgICAicGF0aCI6ICIvY2FsbGluZyIsCiAgICAgICJzdGF0dXMiOiAyMDAsCiAgICAgICJsYW5kZWRBdCI6ICIvbG9naW4iCiAgICB9LAogICAgewogICAgICAicGF0aCI6ICIvZGV2ZWxvcGVyIiwKICAgICAgInN0YXR1cyI6IDIwMCwKICAgICAgImxhbmRlZEF0IjogIi9sb2dpbiIKICAgIH0sCiAgICB7CiAgICAgICJwYXRoIjogIi9kZXZlbG9wZXIvZG9jcyIsCiAgICAgICJzdGF0dXMiOiAyMDAsCiAgICAgICJsYW5kZWRBdCI6ICIvbG9naW4iCiAgICB9LAogICAgewogICAgICAicGF0aCI6ICIvc2hlZXRzIiwKICAgICAgInN0YXR1cyI6IDIwMCwKICAgICAgImxhbmRlZEF0IjogIi9sb2dpbiIKICAgIH0sCiAgICB7CiAgICAgICJwYXRoIjogIi9tb2RlcmF0aW9uIiwKICAgICAgInN0YXR1cyI6IDIwMCwKICAgICAgImxhbmRlZEF0IjogIi9sb2dpbiIKICAgIH0KICBdLAogICJpc3N1ZXMiOiBbXQp9"
+                    },
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "C:\\workgrind\\artifacts\\test-results\\workgrind-audit-protected--c8422-ct-unauthenticated-visitors-chromium\\error-context.md"
+                    }
+                  ]
                 }
               ],
-              "status": "expected"
+              "status": "unexpected"
             }
           ],
-          "id": "94dd336dc752385ec50a-d21e2809df49f4b7b795",
-          "file": "auth-routing.spec.ts",
-          "line": 48,
+          "id": "2aae5247a7454980396a-a37d8e66239c6eaa7490",
+          "file": "workgrind-audit.spec.ts",
+          "line": 310,
           "column": 5
         },
         {
-          "title": "invitation destinations are preserved for authenticated members",
+          "title": "authenticated routes and read-only feature audit",
           "ok": true,
           "tags": [],
           "tests": [
             {
               "timeout": 60000,
-              "annotations": [],
-              "expectedStatus": "passed",
+              "annotations": [
+                {
+                  "type": "skip",
+                  "description": "Set WORKGRIND_TEST_EMAIL and WORKGRIND_TEST_PASSWORD in the environment to run authenticated checks.",
+                  "location": {
+                    "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
+                    "line": 335,
+                    "column": 8
+                  }
+                }
+              ],
+              "expectedStatus": "skipped",
               "projectId": "chromium",
               "projectName": "chromium",
               "results": [
                 {
-                  "workerIndex": 1,
+                  "workerIndex": 9,
                   "parallelIndex": 1,
-                  "status": "passed",
-                  "duration": 7,
+                  "status": "skipped",
+                  "duration": 759,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-19T14:31:58.785Z",
-                  "annotations": [],
+                  "startTime": "2026-10-21T13:46:18.195Z",
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "description": "Set WORKGRIND_TEST_EMAIL and WORKGRIND_TEST_PASSWORD in the environment to run authenticated checks.",
+                      "location": {
+                        "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
+                        "line": 335,
+                        "column": 8
+                      }
+                    }
+                  ],
                   "attachments": []
                 }
               ],
-              "status": "expected"
+              "status": "skipped"
             }
           ],
-          "id": "94dd336dc752385ec50a-4c62049cc7f7fdd73e46",
-          "file": "auth-routing.spec.ts",
-          "line": 54,
+          "id": "2aae5247a7454980396a-3c9ef85307d5ea494580",
+          "file": "workgrind-audit.spec.ts",
+          "line": 332,
           "column": 5
+        },
+        {
+          "title": "logout returns to the login screen when a logout control is available",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [
+                {
+                  "type": "skip",
+                  "description": "Set WORKGRIND_TEST_EMAIL and WORKGRIND_TEST_PASSWORD in the environment to run authenticated checks.",
+                  "location": {
+                    "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
+                    "line": 431,
+                    "column": 8
+                  }
+                }
+              ],
+              "expectedStatus": "skipped",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 9,
+                  "parallelIndex": 1,
+                  "status": "skipped",
+                  "duration": 798,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-21T13:46:19.719Z",
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "description": "Set WORKGRIND_TEST_EMAIL and WORKGRIND_TEST_PASSWORD in the environment to run authenticated checks.",
+                      "location": {
+                        "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
+                        "line": 431,
+                        "column": 8
+                      }
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "skipped"
+            }
+          ],
+          "id": "2aae5247a7454980396a-ee5c79a9feda4e3bd845",
+          "file": "workgrind-audit.spec.ts",
+          "line": 428,
+          "column": 5
+        }
+      ],
+      "suites": [
+        {
+          "title": "WorkGrind public-site audit",
+          "file": "workgrind-audit.spec.ts",
+          "line": 216,
+          "column": 6,
+          "specs": [
+            {
+              "title": "public page /",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 10285,
+                      "error": {
+                        "message": "Error: / audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 4\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"401 POST https://workgrind.vercel.app/api/auth/refresh\",\u001b[39m\n\u001b[31m+   \"Console error: Failed to load resource: the server responded with a status of 401 ()\",\u001b[39m\n\u001b[31m+ ]\u001b[39m",
+                        "stack": "Error: / audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 4\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"401 POST https://workgrind.vercel.app/api/auth/refresh\",\u001b[39m\n\u001b[31m+   \"Console error: Failed to load resource: the server responded with a status of 401 ()\",\u001b[39m\n\u001b[31m+ ]\u001b[39m\n    at C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts:258:46",
+                        "location": {
+                          "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
+                          "column": 46,
+                          "line": 258
+                        },
+                        "snippet": "\u001b[0m \u001b[90m 256 |\u001b[39m         contentType\u001b[33m:\u001b[39m \u001b[32m'application/json'\u001b[39m\u001b[33m,\u001b[39m\n \u001b[90m 257 |\u001b[39m       })\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 258 |\u001b[39m       expect(issues\u001b[33m,\u001b[39m \u001b[32m`${path} audit issues`\u001b[39m)\u001b[33m.\u001b[39mtoEqual([])\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m                                              \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 259 |\u001b[39m       test\u001b[33m.\u001b[39minfo()\u001b[33m.\u001b[39mannotations\u001b[33m.\u001b[39mpush({ type\u001b[33m:\u001b[39m \u001b[32m'navigation-ms'\u001b[39m\u001b[33m,\u001b[39m description\u001b[33m:\u001b[39m \u001b[33mString\u001b[39m(audit\u001b[33m.\u001b[39melapsedMs) })\u001b[33m;\u001b[39m\n \u001b[90m 260 |\u001b[39m       audit\u001b[33m.\u001b[39mstopTracking()\u001b[33m;\u001b[39m\n \u001b[90m 261 |\u001b[39m     })\u001b[33m;\u001b[39m\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
+                            "column": 46,
+                            "line": 258
+                          },
+                          "message": "Error: / audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 4\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"401 POST https://workgrind.vercel.app/api/auth/refresh\",\u001b[39m\n\u001b[31m+   \"Console error: Failed to load resource: the server responded with a status of 401 ()\",\u001b[39m\n\u001b[31m+ ]\u001b[39m\n\n  256 |         contentType: 'application/json',\n  257 |       });\n> 258 |       expect(issues, `${path} audit issues`).toEqual([]);\n      |                                              ^\n  259 |       test.info().annotations.push({ type: 'navigation-ms', description: String(audit.elapsedMs) });\n  260 |       audit.stopTracking();\n  261 |     });\n    at C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts:258:46"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-21T13:45:44.088Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "page-audit.json",
+                          "contentType": "application/json",
+                          "body": "ewogICJ1cmwiOiAiaHR0cHM6Ly93b3JrZ3JpbmQudmVyY2VsLmFwcC8iLAogICJwYXRoIjogIi8iLAogICJzdGF0dXMiOiAyMDAsCiAgImNvbnRlbnRTZWN1cml0eVBvbGljeSI6IHRydWUsCiAgInN0cmljdFRyYW5zcG9ydFNlY3VyaXR5IjogdHJ1ZSwKICAic2V0Q29va2llQXR0cmlidXRlcyI6IFtdLAogICJ0aXRsZSI6ICJXb3JrR3JpbmQgfCBDb25uZWN0ZWQgV29ya3NwYWNlcyBmb3IgV29yayBhbmQgTGVhcm5pbmciLAogICJlbGFwc2VkTXMiOiA0MjE4LAogICJpc3N1ZXMiOiBbCiAgICAiNDAxIFBPU1QgaHR0cHM6Ly93b3JrZ3JpbmQudmVyY2VsLmFwcC9hcGkvYXV0aC9yZWZyZXNoIiwKICAgICJDb25zb2xlIGVycm9yOiBGYWlsZWQgdG8gbG9hZCByZXNvdXJjZTogdGhlIHNlcnZlciByZXNwb25kZWQgd2l0aCBhIHN0YXR1cyBvZiA0MDEgKCkiCiAgXSwKICAib2xkQnJhbmRNYXRjaGVzIjogW10KfQ=="
+                        },
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "C:\\workgrind\\artifacts\\test-results\\workgrind-audit-WorkGrind-public-site-audit-public-page--chromium\\test-failed-1.png"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "C:\\workgrind\\artifacts\\test-results\\workgrind-audit-WorkGrind-public-site-audit-public-page--chromium\\error-context.md"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
+                        "column": 46,
+                        "line": 258
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "2aae5247a7454980396a-376ff0e51771ab9d5ac0",
+              "file": "workgrind-audit.spec.ts",
+              "line": 218,
+              "column": 9
+            },
+            {
+              "title": "public page /about",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "failed",
+                      "duration": 10088,
+                      "error": {
+                        "message": "Error: /about audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 4\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"401 POST https://workgrind.vercel.app/api/auth/refresh\",\u001b[39m\n\u001b[31m+   \"Console error: Failed to load resource: the server responded with a status of 401 ()\",\u001b[39m\n\u001b[31m+ ]\u001b[39m",
+                        "stack": "Error: /about audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 4\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"401 POST https://workgrind.vercel.app/api/auth/refresh\",\u001b[39m\n\u001b[31m+   \"Console error: Failed to load resource: the server responded with a status of 401 ()\",\u001b[39m\n\u001b[31m+ ]\u001b[39m\n    at C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts:258:46",
+                        "location": {
+                          "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
+                          "column": 46,
+                          "line": 258
+                        },
+                        "snippet": "\u001b[0m \u001b[90m 256 |\u001b[39m         contentType\u001b[33m:\u001b[39m \u001b[32m'application/json'\u001b[39m\u001b[33m,\u001b[39m\n \u001b[90m 257 |\u001b[39m       })\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 258 |\u001b[39m       expect(issues\u001b[33m,\u001b[39m \u001b[32m`${path} audit issues`\u001b[39m)\u001b[33m.\u001b[39mtoEqual([])\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m                                              \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 259 |\u001b[39m       test\u001b[33m.\u001b[39minfo()\u001b[33m.\u001b[39mannotations\u001b[33m.\u001b[39mpush({ type\u001b[33m:\u001b[39m \u001b[32m'navigation-ms'\u001b[39m\u001b[33m,\u001b[39m description\u001b[33m:\u001b[39m \u001b[33mString\u001b[39m(audit\u001b[33m.\u001b[39melapsedMs) })\u001b[33m;\u001b[39m\n \u001b[90m 260 |\u001b[39m       audit\u001b[33m.\u001b[39mstopTracking()\u001b[33m;\u001b[39m\n \u001b[90m 261 |\u001b[39m     })\u001b[33m;\u001b[39m\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
+                            "column": 46,
+                            "line": 258
+                          },
+                          "message": "Error: /about audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 4\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"401 POST https://workgrind.vercel.app/api/auth/refresh\",\u001b[39m\n\u001b[31m+   \"Console error: Failed to load resource: the server responded with a status of 401 ()\",\u001b[39m\n\u001b[31m+ ]\u001b[39m\n\n  256 |         contentType: 'application/json',\n  257 |       });\n> 258 |       expect(issues, `${path} audit issues`).toEqual([]);\n      |                                              ^\n  259 |       test.info().annotations.push({ type: 'navigation-ms', description: String(audit.elapsedMs) });\n  260 |       audit.stopTracking();\n  261 |     });\n    at C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts:258:46"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-21T13:45:44.061Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "page-audit.json",
+                          "contentType": "application/json",
+                          "body": "ewogICJ1cmwiOiAiaHR0cHM6Ly93b3JrZ3JpbmQudmVyY2VsLmFwcC9hYm91dCIsCiAgInBhdGgiOiAiL2Fib3V0IiwKICAic3RhdHVzIjogMjAwLAogICJjb250ZW50U2VjdXJpdHlQb2xpY3kiOiB0cnVlLAogICJzdHJpY3RUcmFuc3BvcnRTZWN1cml0eSI6IHRydWUsCiAgInNldENvb2tpZUF0dHJpYnV0ZXMiOiBbXSwKICAidGl0bGUiOiAiQWJvdXQgV29ya0dyaW5kIHwgV29yayBhbmQgTGVhcm5pbmcgaW4gT25lIFBsYXRmb3JtIiwKICAiZWxhcHNlZE1zIjogNTAwMiwKICAiaXNzdWVzIjogWwogICAgIjQwMSBQT1NUIGh0dHBzOi8vd29ya2dyaW5kLnZlcmNlbC5hcHAvYXBpL2F1dGgvcmVmcmVzaCIsCiAgICAiQ29uc29sZSBlcnJvcjogRmFpbGVkIHRvIGxvYWQgcmVzb3VyY2U6IHRoZSBzZXJ2ZXIgcmVzcG9uZGVkIHdpdGggYSBzdGF0dXMgb2YgNDAxICgpIgogIF0sCiAgIm9sZEJyYW5kTWF0Y2hlcyI6IFtdCn0="
+                        },
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "C:\\workgrind\\artifacts\\test-results\\workgrind-audit-WorkGrind--33d41-ite-audit-public-page-about-chromium\\test-failed-1.png"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "C:\\workgrind\\artifacts\\test-results\\workgrind-audit-WorkGrind--33d41-ite-audit-public-page-about-chromium\\error-context.md"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
+                        "column": 46,
+                        "line": 258
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "2aae5247a7454980396a-84ddd1c4469e897651f5",
+              "file": "workgrind-audit.spec.ts",
+              "line": 218,
+              "column": 9
+            },
+            {
+              "title": "public page /features",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 2,
+                      "status": "failed",
+                      "duration": 10696,
+                      "error": {
+                        "message": "Error: /features audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 4\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"401 POST https://workgrind.vercel.app/api/auth/refresh\",\u001b[39m\n\u001b[31m+   \"Console error: Failed to load resource: the server responded with a status of 401 ()\",\u001b[39m\n\u001b[31m+ ]\u001b[39m",
+                        "stack": "Error: /features audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 4\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"401 POST https://workgrind.vercel.app/api/auth/refresh\",\u001b[39m\n\u001b[31m+   \"Console error: Failed to load resource: the server responded with a status of 401 ()\",\u001b[39m\n\u001b[31m+ ]\u001b[39m\n    at C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts:258:46",
+                        "location": {
+                          "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
+                          "column": 46,
+                          "line": 258
+                        },
+                        "snippet": "\u001b[0m \u001b[90m 256 |\u001b[39m         contentType\u001b[33m:\u001b[39m \u001b[32m'application/json'\u001b[39m\u001b[33m,\u001b[39m\n \u001b[90m 257 |\u001b[39m       })\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 258 |\u001b[39m       expect(issues\u001b[33m,\u001b[39m \u001b[32m`${path} audit issues`\u001b[39m)\u001b[33m.\u001b[39mtoEqual([])\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m                                              \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 259 |\u001b[39m       test\u001b[33m.\u001b[39minfo()\u001b[33m.\u001b[39mannotations\u001b[33m.\u001b[39mpush({ type\u001b[33m:\u001b[39m \u001b[32m'navigation-ms'\u001b[39m\u001b[33m,\u001b[39m description\u001b[33m:\u001b[39m \u001b[33mString\u001b[39m(audit\u001b[33m.\u001b[39melapsedMs) })\u001b[33m;\u001b[39m\n \u001b[90m 260 |\u001b[39m       audit\u001b[33m.\u001b[39mstopTracking()\u001b[33m;\u001b[39m\n \u001b[90m 261 |\u001b[39m     })\u001b[33m;\u001b[39m\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
+                            "column": 46,
+                            "line": 258
+                          },
+                          "message": "Error: /features audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 4\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"401 POST https://workgrind.vercel.app/api/auth/refresh\",\u001b[39m\n\u001b[31m+   \"Console error: Failed to load resource: the server responded with a status of 401 ()\",\u001b[39m\n\u001b[31m+ ]\u001b[39m\n\n  256 |         contentType: 'application/json',\n  257 |       });\n> 258 |       expect(issues, `${path} audit issues`).toEqual([]);\n      |                                              ^\n  259 |       test.info().annotations.push({ type: 'navigation-ms', description: String(audit.elapsedMs) });\n  260 |       audit.stopTracking();\n  261 |     });\n    at C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts:258:46"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-21T13:45:44.048Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "page-audit.json",
+                          "contentType": "application/json",
+                          "body": "ewogICJ1cmwiOiAiaHR0cHM6Ly93b3JrZ3JpbmQudmVyY2VsLmFwcC9mZWF0dXJlcyIsCiAgInBhdGgiOiAiL2ZlYXR1cmVzIiwKICAic3RhdHVzIjogMjAwLAogICJjb250ZW50U2VjdXJpdHlQb2xpY3kiOiB0cnVlLAogICJzdHJpY3RUcmFuc3BvcnRTZWN1cml0eSI6IHRydWUsCiAgInNldENvb2tpZUF0dHJpYnV0ZXMiOiBbXSwKICAidGl0bGUiOiAiV29ya0dyaW5kIEZlYXR1cmVzIHwgUGVyc29uYWwsIEJ1c2luZXNzLCBhbmQgRWR1Y2F0aW9uIFdvcmtzcGFjZXMiLAogICJlbGFwc2VkTXMiOiA2MDI5LAogICJpc3N1ZXMiOiBbCiAgICAiNDAxIFBPU1QgaHR0cHM6Ly93b3JrZ3JpbmQudmVyY2VsLmFwcC9hcGkvYXV0aC9yZWZyZXNoIiwKICAgICJDb25zb2xlIGVycm9yOiBGYWlsZWQgdG8gbG9hZCByZXNvdXJjZTogdGhlIHNlcnZlciByZXNwb25kZWQgd2l0aCBhIHN0YXR1cyBvZiA0MDEgKCkiCiAgXSwKICAib2xkQnJhbmRNYXRjaGVzIjogW10KfQ=="
+                        },
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "C:\\workgrind\\artifacts\\test-results\\workgrind-audit-WorkGrind--08b20--audit-public-page-features-chromium\\test-failed-1.png"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "C:\\workgrind\\artifacts\\test-results\\workgrind-audit-WorkGrind--08b20--audit-public-page-features-chromium\\error-context.md"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
+                        "column": 46,
+                        "line": 258
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "2aae5247a7454980396a-edb4efe8490e1513f0c9",
+              "file": "workgrind-audit.spec.ts",
+              "line": 218,
+              "column": 9
+            },
+            {
+              "title": "public page /demo",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 3,
+                      "status": "failed",
+                      "duration": 10008,
+                      "error": {
+                        "message": "Error: /demo audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 4\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"401 POST https://workgrind.vercel.app/api/auth/refresh\",\u001b[39m\n\u001b[31m+   \"Console error: Failed to load resource: the server responded with a status of 401 ()\",\u001b[39m\n\u001b[31m+ ]\u001b[39m",
+                        "stack": "Error: /demo audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 4\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"401 POST https://workgrind.vercel.app/api/auth/refresh\",\u001b[39m\n\u001b[31m+   \"Console error: Failed to load resource: the server responded with a status of 401 ()\",\u001b[39m\n\u001b[31m+ ]\u001b[39m\n    at C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts:258:46",
+                        "location": {
+                          "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
+                          "column": 46,
+                          "line": 258
+                        },
+                        "snippet": "\u001b[0m \u001b[90m 256 |\u001b[39m         contentType\u001b[33m:\u001b[39m \u001b[32m'application/json'\u001b[39m\u001b[33m,\u001b[39m\n \u001b[90m 257 |\u001b[39m       })\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 258 |\u001b[39m       expect(issues\u001b[33m,\u001b[39m \u001b[32m`${path} audit issues`\u001b[39m)\u001b[33m.\u001b[39mtoEqual([])\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m                                              \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 259 |\u001b[39m       test\u001b[33m.\u001b[39minfo()\u001b[33m.\u001b[39mannotations\u001b[33m.\u001b[39mpush({ type\u001b[33m:\u001b[39m \u001b[32m'navigation-ms'\u001b[39m\u001b[33m,\u001b[39m description\u001b[33m:\u001b[39m \u001b[33mString\u001b[39m(audit\u001b[33m.\u001b[39melapsedMs) })\u001b[33m;\u001b[39m\n \u001b[90m 260 |\u001b[39m       audit\u001b[33m.\u001b[39mstopTracking()\u001b[33m;\u001b[39m\n \u001b[90m 261 |\u001b[39m     })\u001b[33m;\u001b[39m\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
+                            "column": 46,
+                            "line": 258
+                          },
+                          "message": "Error: /demo audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 4\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"401 POST https://workgrind.vercel.app/api/auth/refresh\",\u001b[39m\n\u001b[31m+   \"Console error: Failed to load resource: the server responded with a status of 401 ()\",\u001b[39m\n\u001b[31m+ ]\u001b[39m\n\n  256 |         contentType: 'application/json',\n  257 |       });\n> 258 |       expect(issues, `${path} audit issues`).toEqual([]);\n      |                                              ^\n  259 |       test.info().annotations.push({ type: 'navigation-ms', description: String(audit.elapsedMs) });\n  260 |       audit.stopTracking();\n  261 |     });\n    at C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts:258:46"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-21T13:45:44.047Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "page-audit.json",
+                          "contentType": "application/json",
+                          "body": "ewogICJ1cmwiOiAiaHR0cHM6Ly93b3JrZ3JpbmQudmVyY2VsLmFwcC9kZW1vIiwKICAicGF0aCI6ICIvZGVtbyIsCiAgInN0YXR1cyI6IDIwMCwKICAiY29udGVudFNlY3VyaXR5UG9saWN5IjogdHJ1ZSwKICAic3RyaWN0VHJhbnNwb3J0U2VjdXJpdHkiOiB0cnVlLAogICJzZXRDb29raWVBdHRyaWJ1dGVzIjogW10sCiAgInRpdGxlIjogIlJlcXVlc3QgYSBXb3JrR3JpbmQgV2Fsa3Rocm91Z2giLAogICJlbGFwc2VkTXMiOiA0Nzk1LAogICJpc3N1ZXMiOiBbCiAgICAiNDAxIFBPU1QgaHR0cHM6Ly93b3JrZ3JpbmQudmVyY2VsLmFwcC9hcGkvYXV0aC9yZWZyZXNoIiwKICAgICJDb25zb2xlIGVycm9yOiBGYWlsZWQgdG8gbG9hZCByZXNvdXJjZTogdGhlIHNlcnZlciByZXNwb25kZWQgd2l0aCBhIHN0YXR1cyBvZiA0MDEgKCkiCiAgXSwKICAib2xkQnJhbmRNYXRjaGVzIjogW10KfQ=="
+                        },
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "C:\\workgrind\\artifacts\\test-results\\workgrind-audit-WorkGrind-public-site-audit-public-page-demo-chromium\\test-failed-1.png"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "C:\\workgrind\\artifacts\\test-results\\workgrind-audit-WorkGrind-public-site-audit-public-page-demo-chromium\\error-context.md"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
+                        "column": 46,
+                        "line": 258
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "2aae5247a7454980396a-5db2e059ed12195a70c2",
+              "file": "workgrind-audit.spec.ts",
+              "line": 218,
+              "column": 9
+            },
+            {
+              "title": "public page /contact",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 3,
+                      "status": "failed",
+                      "duration": 9418,
+                      "error": {
+                        "message": "Error: /contact audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 4\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"401 POST https://workgrind.vercel.app/api/auth/refresh\",\u001b[39m\n\u001b[31m+   \"Console error: Failed to load resource: the server responded with a status of 401 ()\",\u001b[39m\n\u001b[31m+ ]\u001b[39m",
+                        "stack": "Error: /contact audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 4\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"401 POST https://workgrind.vercel.app/api/auth/refresh\",\u001b[39m\n\u001b[31m+   \"Console error: Failed to load resource: the server responded with a status of 401 ()\",\u001b[39m\n\u001b[31m+ ]\u001b[39m\n    at C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts:258:46",
+                        "location": {
+                          "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
+                          "column": 46,
+                          "line": 258
+                        },
+                        "snippet": "\u001b[0m \u001b[90m 256 |\u001b[39m         contentType\u001b[33m:\u001b[39m \u001b[32m'application/json'\u001b[39m\u001b[33m,\u001b[39m\n \u001b[90m 257 |\u001b[39m       })\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 258 |\u001b[39m       expect(issues\u001b[33m,\u001b[39m \u001b[32m`${path} audit issues`\u001b[39m)\u001b[33m.\u001b[39mtoEqual([])\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m                                              \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 259 |\u001b[39m       test\u001b[33m.\u001b[39minfo()\u001b[33m.\u001b[39mannotations\u001b[33m.\u001b[39mpush({ type\u001b[33m:\u001b[39m \u001b[32m'navigation-ms'\u001b[39m\u001b[33m,\u001b[39m description\u001b[33m:\u001b[39m \u001b[33mString\u001b[39m(audit\u001b[33m.\u001b[39melapsedMs) })\u001b[33m;\u001b[39m\n \u001b[90m 260 |\u001b[39m       audit\u001b[33m.\u001b[39mstopTracking()\u001b[33m;\u001b[39m\n \u001b[90m 261 |\u001b[39m     })\u001b[33m;\u001b[39m\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
+                            "column": 46,
+                            "line": 258
+                          },
+                          "message": "Error: /contact audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 4\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"401 POST https://workgrind.vercel.app/api/auth/refresh\",\u001b[39m\n\u001b[31m+   \"Console error: Failed to load resource: the server responded with a status of 401 ()\",\u001b[39m\n\u001b[31m+ ]\u001b[39m\n\n  256 |         contentType: 'application/json',\n  257 |       });\n> 258 |       expect(issues, `${path} audit issues`).toEqual([]);\n      |                                              ^\n  259 |       test.info().annotations.push({ type: 'navigation-ms', description: String(audit.elapsedMs) });\n  260 |       audit.stopTracking();\n  261 |     });\n    at C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts:258:46"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-21T13:45:58.050Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "page-audit.json",
+                          "contentType": "application/json",
+                          "body": "ewogICJ1cmwiOiAiaHR0cHM6Ly93b3JrZ3JpbmQudmVyY2VsLmFwcC9jb250YWN0IiwKICAicGF0aCI6ICIvY29udGFjdCIsCiAgInN0YXR1cyI6IDIwMCwKICAiY29udGVudFNlY3VyaXR5UG9saWN5IjogdHJ1ZSwKICAic3RyaWN0VHJhbnNwb3J0U2VjdXJpdHkiOiB0cnVlLAogICJzZXRDb29raWVBdHRyaWJ1dGVzIjogW10sCiAgInRpdGxlIjogIkNvbnRhY3QgV29ya0dyaW5kIiwKICAiZWxhcHNlZE1zIjogNDkzNiwKICAiaXNzdWVzIjogWwogICAgIjQwMSBQT1NUIGh0dHBzOi8vd29ya2dyaW5kLnZlcmNlbC5hcHAvYXBpL2F1dGgvcmVmcmVzaCIsCiAgICAiQ29uc29sZSBlcnJvcjogRmFpbGVkIHRvIGxvYWQgcmVzb3VyY2U6IHRoZSBzZXJ2ZXIgcmVzcG9uZGVkIHdpdGggYSBzdGF0dXMgb2YgNDAxICgpIgogIF0sCiAgIm9sZEJyYW5kTWF0Y2hlcyI6IFtdCn0="
+                        },
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "C:\\workgrind\\artifacts\\test-results\\workgrind-audit-WorkGrind--a4f55-e-audit-public-page-contact-chromium\\test-failed-1.png"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "C:\\workgrind\\artifacts\\test-results\\workgrind-audit-WorkGrind--a4f55-e-audit-public-page-contact-chromium\\error-context.md"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
+                        "column": 46,
+                        "line": 258
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "2aae5247a7454980396a-313eedc694fe00b30ece",
+              "file": "workgrind-audit.spec.ts",
+              "line": 218,
+              "column": 9
+            },
+            {
+              "title": "public page /pricing",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 5,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 5746,
+                      "error": {
+                        "message": "Error: /pricing audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 4\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"401 POST https://workgrind.vercel.app/api/auth/refresh\",\u001b[39m\n\u001b[31m+   \"Console error: Failed to load resource: the server responded with a status of 401 ()\",\u001b[39m\n\u001b[31m+ ]\u001b[39m",
+                        "stack": "Error: /pricing audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 4\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"401 POST https://workgrind.vercel.app/api/auth/refresh\",\u001b[39m\n\u001b[31m+   \"Console error: Failed to load resource: the server responded with a status of 401 ()\",\u001b[39m\n\u001b[31m+ ]\u001b[39m\n    at C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts:258:46",
+                        "location": {
+                          "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
+                          "column": 46,
+                          "line": 258
+                        },
+                        "snippet": "\u001b[0m \u001b[90m 256 |\u001b[39m         contentType\u001b[33m:\u001b[39m \u001b[32m'application/json'\u001b[39m\u001b[33m,\u001b[39m\n \u001b[90m 257 |\u001b[39m       })\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 258 |\u001b[39m       expect(issues\u001b[33m,\u001b[39m \u001b[32m`${path} audit issues`\u001b[39m)\u001b[33m.\u001b[39mtoEqual([])\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m                                              \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 259 |\u001b[39m       test\u001b[33m.\u001b[39minfo()\u001b[33m.\u001b[39mannotations\u001b[33m.\u001b[39mpush({ type\u001b[33m:\u001b[39m \u001b[32m'navigation-ms'\u001b[39m\u001b[33m,\u001b[39m description\u001b[33m:\u001b[39m \u001b[33mString\u001b[39m(audit\u001b[33m.\u001b[39melapsedMs) })\u001b[33m;\u001b[39m\n \u001b[90m 260 |\u001b[39m       audit\u001b[33m.\u001b[39mstopTracking()\u001b[33m;\u001b[39m\n \u001b[90m 261 |\u001b[39m     })\u001b[33m;\u001b[39m\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
+                            "column": 46,
+                            "line": 258
+                          },
+                          "message": "Error: /pricing audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 4\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"401 POST https://workgrind.vercel.app/api/auth/refresh\",\u001b[39m\n\u001b[31m+   \"Console error: Failed to load resource: the server responded with a status of 401 ()\",\u001b[39m\n\u001b[31m+ ]\u001b[39m\n\n  256 |         contentType: 'application/json',\n  257 |       });\n> 258 |       expect(issues, `${path} audit issues`).toEqual([]);\n      |                                              ^\n  259 |       test.info().annotations.push({ type: 'navigation-ms', description: String(audit.elapsedMs) });\n  260 |       audit.stopTracking();\n  261 |     });\n    at C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts:258:46"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-21T13:45:58.030Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "page-audit.json",
+                          "contentType": "application/json",
+                          "body": "ewogICJ1cmwiOiAiaHR0cHM6Ly93b3JrZ3JpbmQudmVyY2VsLmFwcC9wcmljaW5nIiwKICAicGF0aCI6ICIvcHJpY2luZyIsCiAgInN0YXR1cyI6IDIwMCwKICAiY29udGVudFNlY3VyaXR5UG9saWN5IjogdHJ1ZSwKICAic3RyaWN0VHJhbnNwb3J0U2VjdXJpdHkiOiB0cnVlLAogICJzZXRDb29raWVBdHRyaWJ1dGVzIjogW10sCiAgInRpdGxlIjogIldvcmtHcmluZCBQcmljaW5nIHwgUGxhbnMgZm9yIEVhY2ggV29ya3NwYWNlIiwKICAiZWxhcHNlZE1zIjogMjU5NCwKICAiaXNzdWVzIjogWwogICAgIjQwMSBQT1NUIGh0dHBzOi8vd29ya2dyaW5kLnZlcmNlbC5hcHAvYXBpL2F1dGgvcmVmcmVzaCIsCiAgICAiQ29uc29sZSBlcnJvcjogRmFpbGVkIHRvIGxvYWQgcmVzb3VyY2U6IHRoZSBzZXJ2ZXIgcmVzcG9uZGVkIHdpdGggYSBzdGF0dXMgb2YgNDAxICgpIgogIF0sCiAgIm9sZEJyYW5kTWF0Y2hlcyI6IFtdCn0="
+                        },
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "C:\\workgrind\\artifacts\\test-results\\workgrind-audit-WorkGrind--beb9d-e-audit-public-page-pricing-chromium\\test-failed-1.png"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "C:\\workgrind\\artifacts\\test-results\\workgrind-audit-WorkGrind--beb9d-e-audit-public-page-pricing-chromium\\error-context.md"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
+                        "column": 46,
+                        "line": 258
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "2aae5247a7454980396a-e944d0e49a7d12da7e1e",
+              "file": "workgrind-audit.spec.ts",
+              "line": 218,
+              "column": 9
+            },
+            {
+              "title": "public page /privacy",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 6,
+                      "parallelIndex": 1,
+                      "status": "failed",
+                      "duration": 6155,
+                      "error": {
+                        "message": "Error: /privacy audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 4\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"401 POST https://workgrind.vercel.app/api/auth/refresh\",\u001b[39m\n\u001b[31m+   \"Console error: Failed to load resource: the server responded with a status of 401 ()\",\u001b[39m\n\u001b[31m+ ]\u001b[39m",
+                        "stack": "Error: /privacy audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 4\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"401 POST https://workgrind.vercel.app/api/auth/refresh\",\u001b[39m\n\u001b[31m+   \"Console error: Failed to load resource: the server responded with a status of 401 ()\",\u001b[39m\n\u001b[31m+ ]\u001b[39m\n    at C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts:258:46",
+                        "location": {
+                          "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
+                          "column": 46,
+                          "line": 258
+                        },
+                        "snippet": "\u001b[0m \u001b[90m 256 |\u001b[39m         contentType\u001b[33m:\u001b[39m \u001b[32m'application/json'\u001b[39m\u001b[33m,\u001b[39m\n \u001b[90m 257 |\u001b[39m       })\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 258 |\u001b[39m       expect(issues\u001b[33m,\u001b[39m \u001b[32m`${path} audit issues`\u001b[39m)\u001b[33m.\u001b[39mtoEqual([])\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m                                              \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 259 |\u001b[39m       test\u001b[33m.\u001b[39minfo()\u001b[33m.\u001b[39mannotations\u001b[33m.\u001b[39mpush({ type\u001b[33m:\u001b[39m \u001b[32m'navigation-ms'\u001b[39m\u001b[33m,\u001b[39m description\u001b[33m:\u001b[39m \u001b[33mString\u001b[39m(audit\u001b[33m.\u001b[39melapsedMs) })\u001b[33m;\u001b[39m\n \u001b[90m 260 |\u001b[39m       audit\u001b[33m.\u001b[39mstopTracking()\u001b[33m;\u001b[39m\n \u001b[90m 261 |\u001b[39m     })\u001b[33m;\u001b[39m\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
+                            "column": 46,
+                            "line": 258
+                          },
+                          "message": "Error: /privacy audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 4\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"401 POST https://workgrind.vercel.app/api/auth/refresh\",\u001b[39m\n\u001b[31m+   \"Console error: Failed to load resource: the server responded with a status of 401 ()\",\u001b[39m\n\u001b[31m+ ]\u001b[39m\n\n  256 |         contentType: 'application/json',\n  257 |       });\n> 258 |       expect(issues, `${path} audit issues`).toEqual([]);\n      |                                              ^\n  259 |       test.info().annotations.push({ type: 'navigation-ms', description: String(audit.elapsedMs) });\n  260 |       audit.stopTracking();\n  261 |     });\n    at C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts:258:46"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-21T13:45:58.238Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "page-audit.json",
+                          "contentType": "application/json",
+                          "body": "ewogICJ1cmwiOiAiaHR0cHM6Ly93b3JrZ3JpbmQudmVyY2VsLmFwcC9wcml2YWN5IiwKICAicGF0aCI6ICIvcHJpdmFjeSIsCiAgInN0YXR1cyI6IDIwMCwKICAiY29udGVudFNlY3VyaXR5UG9saWN5IjogdHJ1ZSwKICAic3RyaWN0VHJhbnNwb3J0U2VjdXJpdHkiOiB0cnVlLAogICJzZXRDb29raWVBdHRyaWJ1dGVzIjogW10sCiAgInRpdGxlIjogIlByaXZhY3kgUG9saWN5IHwgV29ya0dyaW5kIiwKICAiZWxhcHNlZE1zIjogMjU3MCwKICAiaXNzdWVzIjogWwogICAgIjQwMSBQT1NUIGh0dHBzOi8vd29ya2dyaW5kLnZlcmNlbC5hcHAvYXBpL2F1dGgvcmVmcmVzaCIsCiAgICAiQ29uc29sZSBlcnJvcjogRmFpbGVkIHRvIGxvYWQgcmVzb3VyY2U6IHRoZSBzZXJ2ZXIgcmVzcG9uZGVkIHdpdGggYSBzdGF0dXMgb2YgNDAxICgpIgogIF0sCiAgIm9sZEJyYW5kTWF0Y2hlcyI6IFtdCn0="
+                        },
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "C:\\workgrind\\artifacts\\test-results\\workgrind-audit-WorkGrind--242c7-e-audit-public-page-privacy-chromium\\test-failed-1.png"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "C:\\workgrind\\artifacts\\test-results\\workgrind-audit-WorkGrind--242c7-e-audit-public-page-privacy-chromium\\error-context.md"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
+                        "column": 46,
+                        "line": 258
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "2aae5247a7454980396a-b1d4f7f9614e5af496d1",
+              "file": "workgrind-audit.spec.ts",
+              "line": 218,
+              "column": 9
+            },
+            {
+              "title": "public page /terms",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 7,
+                      "parallelIndex": 2,
+                      "status": "failed",
+                      "duration": 5672,
+                      "error": {
+                        "message": "Error: /terms audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 4\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"401 POST https://workgrind.vercel.app/api/auth/refresh\",\u001b[39m\n\u001b[31m+   \"Console error: Failed to load resource: the server responded with a status of 401 ()\",\u001b[39m\n\u001b[31m+ ]\u001b[39m",
+                        "stack": "Error: /terms audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 4\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"401 POST https://workgrind.vercel.app/api/auth/refresh\",\u001b[39m\n\u001b[31m+   \"Console error: Failed to load resource: the server responded with a status of 401 ()\",\u001b[39m\n\u001b[31m+ ]\u001b[39m\n    at C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts:258:46",
+                        "location": {
+                          "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
+                          "column": 46,
+                          "line": 258
+                        },
+                        "snippet": "\u001b[0m \u001b[90m 256 |\u001b[39m         contentType\u001b[33m:\u001b[39m \u001b[32m'application/json'\u001b[39m\u001b[33m,\u001b[39m\n \u001b[90m 257 |\u001b[39m       })\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 258 |\u001b[39m       expect(issues\u001b[33m,\u001b[39m \u001b[32m`${path} audit issues`\u001b[39m)\u001b[33m.\u001b[39mtoEqual([])\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m                                              \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 259 |\u001b[39m       test\u001b[33m.\u001b[39minfo()\u001b[33m.\u001b[39mannotations\u001b[33m.\u001b[39mpush({ type\u001b[33m:\u001b[39m \u001b[32m'navigation-ms'\u001b[39m\u001b[33m,\u001b[39m description\u001b[33m:\u001b[39m \u001b[33mString\u001b[39m(audit\u001b[33m.\u001b[39melapsedMs) })\u001b[33m;\u001b[39m\n \u001b[90m 260 |\u001b[39m       audit\u001b[33m.\u001b[39mstopTracking()\u001b[33m;\u001b[39m\n \u001b[90m 261 |\u001b[39m     })\u001b[33m;\u001b[39m\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
+                            "column": 46,
+                            "line": 258
+                          },
+                          "message": "Error: /terms audit issues\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 4\u001b[39m\n\n\u001b[32m- Array []\u001b[39m\n\u001b[31m+ Array [\u001b[39m\n\u001b[31m+   \"401 POST https://workgrind.vercel.app/api/auth/refresh\",\u001b[39m\n\u001b[31m+   \"Console error: Failed to load resource: the server responded with a status of 401 ()\",\u001b[39m\n\u001b[31m+ ]\u001b[39m\n\n  256 |         contentType: 'application/json',\n  257 |       });\n> 258 |       expect(issues, `${path} audit issues`).toEqual([]);\n      |                                              ^\n  259 |       test.info().annotations.push({ type: 'navigation-ms', description: String(audit.elapsedMs) });\n  260 |       audit.stopTracking();\n  261 |     });\n    at C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts:258:46"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-21T13:45:58.698Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "page-audit.json",
+                          "contentType": "application/json",
+                          "body": "ewogICJ1cmwiOiAiaHR0cHM6Ly93b3JrZ3JpbmQudmVyY2VsLmFwcC90ZXJtcyIsCiAgInBhdGgiOiAiL3Rlcm1zIiwKICAic3RhdHVzIjogMjAwLAogICJjb250ZW50U2VjdXJpdHlQb2xpY3kiOiB0cnVlLAogICJzdHJpY3RUcmFuc3BvcnRTZWN1cml0eSI6IHRydWUsCiAgInNldENvb2tpZUF0dHJpYnV0ZXMiOiBbXSwKICAidGl0bGUiOiAiVGVybXMgb2YgU2VydmljZSB8IFdvcmtHcmluZCIsCiAgImVsYXBzZWRNcyI6IDI2ODgsCiAgImlzc3VlcyI6IFsKICAgICI0MDEgUE9TVCBodHRwczovL3dvcmtncmluZC52ZXJjZWwuYXBwL2FwaS9hdXRoL3JlZnJlc2giLAogICAgIkNvbnNvbGUgZXJyb3I6IEZhaWxlZCB0byBsb2FkIHJlc291cmNlOiB0aGUgc2VydmVyIHJlc3BvbmRlZCB3aXRoIGEgc3RhdHVzIG9mIDQwMSAoKSIKICBdLAogICJvbGRCcmFuZE1hdGNoZXMiOiBbXQp9"
+                        },
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "C:\\workgrind\\artifacts\\test-results\\workgrind-audit-WorkGrind--d4887-ite-audit-public-page-terms-chromium\\test-failed-1.png"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "C:\\workgrind\\artifacts\\test-results\\workgrind-audit-WorkGrind--d4887-ite-audit-public-page-terms-chromium\\error-context.md"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "C:\\workgrind\\frontend\\tests\\workgrind-audit.spec.ts",
+                        "column": 46,
+                        "line": 258
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "2aae5247a7454980396a-9ca28fcca5fd1c3c141b",
+              "file": "workgrind-audit.spec.ts",
+              "line": 218,
+              "column": 9
+            },
+            {
+              "title": "public page /signup",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [
+                    {
+                      "type": "navigation-ms",
+                      "description": "2822"
+                    }
+                  ],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 8,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 7037,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-21T13:46:07.362Z",
+                      "annotations": [
+                        {
+                          "type": "navigation-ms",
+                          "description": "2822"
+                        }
+                      ],
+                      "attachments": [
+                        {
+                          "name": "page-audit.json",
+                          "contentType": "application/json",
+                          "body": "ewogICJ1cmwiOiAiaHR0cHM6Ly93b3JrZ3JpbmQudmVyY2VsLmFwcC9zaWdudXAiLAogICJwYXRoIjogIi9zaWdudXAiLAogICJzdGF0dXMiOiAyMDAsCiAgImNvbnRlbnRTZWN1cml0eVBvbGljeSI6IHRydWUsCiAgInN0cmljdFRyYW5zcG9ydFNlY3VyaXR5IjogdHJ1ZSwKICAic2V0Q29va2llQXR0cmlidXRlcyI6IFtdLAogICJ0aXRsZSI6ICJXb3JrR3JpbmQgQWNjb3VudCIsCiAgImVsYXBzZWRNcyI6IDI4MjIsCiAgImlzc3VlcyI6IFtdLAogICJvbGRCcmFuZE1hdGNoZXMiOiBbXQp9"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2aae5247a7454980396a-f274e394f137bdf7ad29",
+              "file": "workgrind-audit.spec.ts",
+              "line": 218,
+              "column": 9
+            },
+            {
+              "title": "public page /login",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [
+                    {
+                      "type": "navigation-ms",
+                      "description": "3156"
+                    }
+                  ],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 9,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 8703,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-21T13:46:08.433Z",
+                      "annotations": [
+                        {
+                          "type": "navigation-ms",
+                          "description": "3156"
+                        }
+                      ],
+                      "attachments": [
+                        {
+                          "name": "page-audit.json",
+                          "contentType": "application/json",
+                          "body": "ewogICJ1cmwiOiAiaHR0cHM6Ly93b3JrZ3JpbmQudmVyY2VsLmFwcC9sb2dpbiIsCiAgInBhdGgiOiAiL2xvZ2luIiwKICAic3RhdHVzIjogMjAwLAogICJjb250ZW50U2VjdXJpdHlQb2xpY3kiOiB0cnVlLAogICJzdHJpY3RUcmFuc3BvcnRTZWN1cml0eSI6IHRydWUsCiAgInNldENvb2tpZUF0dHJpYnV0ZXMiOiBbXSwKICAidGl0bGUiOiAiV29ya0dyaW5kIEFjY291bnQiLAogICJlbGFwc2VkTXMiOiAzMTU2LAogICJpc3N1ZXMiOiBbXSwKICAib2xkQnJhbmRNYXRjaGVzIjogW10KfQ=="
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2aae5247a7454980396a-ef429edf7af88c139840",
+              "file": "workgrind-audit.spec.ts",
+              "line": 218,
+              "column": 9
+            }
+          ]
         }
       ]
     }
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-10-19T14:31:56.246Z",
-    "duration": 2713.707,
-    "expected": 8,
-    "skipped": 0,
-    "unexpected": 0,
+    "startTime": "2026-10-21T13:45:41.943Z",
+    "duration": 94123.258,
+    "expected": 4,
+    "skipped": 2,
+    "unexpected": 9,
     "flaky": 0
   }
 }
