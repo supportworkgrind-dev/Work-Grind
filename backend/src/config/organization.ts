@@ -60,6 +60,19 @@ export function isOrganizationType(value: unknown): value is OrganizationType {
     ORGANIZATION_TYPES.includes(value as OrganizationType);
 }
 
+/**
+ * Normalizes a stored organization type (casing/whitespace from legacy records).
+ * A missing value resolves to the schema default `business`; an unrecognized
+ * value returns undefined so billing can refuse it instead of guessing.
+ */
+export function normalizeOrganizationType(value: unknown): OrganizationType | undefined {
+  if (value === undefined || value === null || value === '') return 'business';
+  if (typeof value !== 'string') return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) return 'business';
+  return isOrganizationType(normalized) ? normalized : undefined;
+}
+
 export function isAcademicOrganizationType(value: unknown): value is AcademicOrganizationType {
   return typeof value === 'string' &&
     ACADEMIC_ORGANIZATION_TYPES.includes(value as AcademicOrganizationType);

@@ -516,6 +516,8 @@ export interface SubscriptionInfo {
   organizationType?:    OrganizationType;
   accountType?:         'company' | 'individual';
   subscriptionMismatch?: boolean;
+  /** Paid plans the backend allows this workspace's organization type to purchase. */
+  availablePlanIds?:    SubscriptionPlan[];
   billingInterval?:     'month';
   currency?:            'USD';
   planName:             string;

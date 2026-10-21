@@ -6,18 +6,40 @@ import { ArrowRight, CheckCircle2, Loader2, ShieldCheck } from 'lucide-react';
 import { api } from '@/lib/api';
 import { formatDate } from '@/lib/utils';
 import { useAuthStore } from '@/store/useAuthStore';
-import { PlanConfig } from '@/types';
+import { EducationPlanPricing, PlanConfig } from '@/types';
 import { ThemeAwareLogo } from '@/components/common/ThemeAwareLogo';
+import { getEducationPlanType, normalizeOrganizationType } from '@/lib/organizationAccess';
+
+type DisplayPlan = {
+  id: string;
+  name: string;
+  priceDisplay: string;
+  description: string;
+  highlighted: boolean;
+  badgeLabel?: string;
+  features: string[];
+  checkoutError?: string;
+};
+
+type ApiErrorShape = { response?: { data?: { message?: string } } };
+
+const ORGANIZATION_LABELS = { school: 'School', college: 'College', university: 'University' } as const;
 
 export function ExpiredSubscriptionExperience({ showPlans = false }: { showPlans?: boolean }) {
   const subscription = useAuthStore((state) => state.subscription);
   const company = useAuthStore((state) => state.company);
   const user = useAuthStore((state) => state.user);
   const [plans, setPlans] = useState<PlanConfig[]>([]);
+  const [educationPlans, setEducationPlans] = useState<EducationPlanPricing[]>([]);
   const [plansLoading, setPlansLoading] = useState(showPlans);
   const [checkoutPlan, setCheckoutPlan] = useState<string | null>(null);
   const [error, setError] = useState('');
-  const isOwnerAdmin = user?.role === 'owner' || user?.role === 'admin';
+  const isOwnerAdmin = user?.role === 'owner' || user?.role === 'founder' || user?.role === 'admin';
+
+  // The backend's stored organization type decides which Polar plans apply; never infer it from the name.
+  const rawOrganizationType = subscription?.organizationType ?? company?.organizationType;
+  const organizationType = normalizeOrganizationType(rawOrganizationType);
+  const educationPlanType = getEducationPlanType(rawOrganizationType);
 
   useEffect(() => {
     if (!showPlans) return;
@@ -28,6 +50,7 @@ export function ExpiredSubscriptionExperience({ showPlans = false }: { showPlans
         if (cancelled) return;
         if (response.data.success && Array.isArray(response.data.plans)) {
           setPlans(response.data.plans);
+          setEducationPlans(Array.isArray(response.data.educationPlans) ? response.data.educationPlans : []);
           return;
         }
         setError(response.data.message || 'Could not load available plans. Please refresh and try again.');
@@ -57,15 +80,59 @@ export function ExpiredSubscriptionExperience({ showPlans = false }: { showPlans
       setError(response.data.message || 'Could not start checkout. Please try again.');
     } catch (checkoutError: unknown) {
       console.error('Failed to start subscription checkout:', checkoutError);
-      setError('Could not start checkout. Please try again.');
+      setError((checkoutError as ApiErrorShape).response?.data?.message || 'Could not start checkout. Please try again.');
     } finally {
       setCheckoutPlan(null);
     }
   };
 
+  const allowedPlanIds = subscription?.availablePlanIds;
+  const isAllowed = (planId: string) => !allowedPlanIds || allowedPlanIds.some((id) => id === planId);
+  let planUnavailableMessage = '';
+  let displayPlans: DisplayPlan[] = [];
+  if (!organizationType) {
+    planUnavailableMessage = 'This workspace’s organization type is not recognized, so no plan can be matched. Please contact support.';
+  } else if (educationPlanType) {
+    const plan = educationPlans.find((candidate) => candidate.id === educationPlanType);
+    if (!plan || !isAllowed(plan.id)) {
+      planUnavailableMessage = `${ORGANIZATION_LABELS[educationPlanType]} plan pricing could not be loaded for this workspace. Refresh the page or contact support.`;
+    } else {
+      displayPlans = [{
+        id: plan.id,
+        name: plan.name,
+        priceDisplay: plan.priceDisplay,
+        description: plan.description,
+        highlighted: true,
+        features: [
+          `Up to ${plan.limits.students.toLocaleString()} active students`,
+          `Up to ${plan.limits.members.toLocaleString()} active staff and members`,
+          `Up to ${plan.limits.pendingInvites.toLocaleString()} pending invitations`,
+          'All WorkGrind workspace features',
+        ],
+        checkoutError: plan.checkoutAvailable
+          ? undefined
+          : plan.checkoutError || 'Checkout is not configured for this education plan.',
+      }];
+    }
+  } else {
+    displayPlans = plans
+      .filter((plan) => (plan.id === 'starter' || plan.id === 'pro') && isAllowed(plan.id))
+      .map((plan) => ({
+        id: plan.id,
+        name: plan.name,
+        priceDisplay: plan.priceDisplay,
+        description: plan.description,
+        highlighted: plan.highlighted,
+        badgeLabel: plan.badgeLabel,
+        features: plan.features.filter((feature) => feature.included).slice(0, 4).map((feature) => feature.label),
+      }));
+  }
+
   const plansHref = showPlans ? '#expired-plans' : '/billing#expired-plans';
   const planName = subscription?.planName ||
-    (subscription?.plan === 'free' ? 'Free Trial' : subscription?.plan === 'pro' ? 'Pro' : 'Starter');
+    (educationPlanType
+      ? `WorkGrind ${ORGANIZATION_LABELS[educationPlanType]}`
+      : subscription?.plan === 'free' ? 'Free Trial' : subscription?.plan === 'pro' ? 'Pro' : 'Starter');
   const endDate = subscription?.subscriptionEndDate ?? subscription?.trialEndDate;
 
   return (
@@ -157,9 +224,15 @@ export function ExpiredSubscriptionExperience({ showPlans = false }: { showPlans
               <div className="flex justify-center py-8" aria-label="Loading plans">
                 <Loader2 className="h-6 w-6 animate-spin" style={{ color: 'var(--wg-theme-accent)' }} />
               </div>
-            ) : plans.length > 0 ? (
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                {plans.filter((plan) => plan.id !== 'free').map((plan) => (
+            ) : planUnavailableMessage ? (
+              !error && (
+                <p role="alert" className="mx-auto max-w-2xl rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-center text-sm text-rose-700">
+                  {planUnavailableMessage}
+                </p>
+              )
+            ) : displayPlans.length > 0 ? (
+              <div className={displayPlans.length === 1 ? 'mx-auto grid w-full max-w-md grid-cols-1 gap-4' : 'grid grid-cols-1 gap-4 md:grid-cols-2'}>
+                {displayPlans.map((plan) => (
                   <article key={plan.id} className="flex flex-col rounded-2xl border p-5 shadow-sm sm:p-6"
                     style={{ background: 'var(--wg-surface-elevated, #fff)', borderColor: plan.highlighted ? 'var(--wg-theme-accent)' : 'var(--wg-border)' }}>
                     <div className="flex items-start justify-between gap-3">
@@ -176,14 +249,18 @@ export function ExpiredSubscriptionExperience({ showPlans = false }: { showPlans
                     </div>
                     <p className="mt-2 text-sm leading-5" style={{ color: 'var(--wg-text-secondary)' }}>{plan.description}</p>
                     <ul className="mt-5 flex-1 space-y-2">
-                      {plan.features.filter((feature) => feature.included).slice(0, 4).map((feature) => (
-                        <li key={feature.label} className="flex items-start gap-2 text-sm" style={{ color: 'var(--wg-text-secondary)' }}>
+                      {plan.features.map((feature) => (
+                        <li key={feature} className="flex items-start gap-2 text-sm" style={{ color: 'var(--wg-text-secondary)' }}>
                           <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
-                          {feature.label}
+                          {feature}
                         </li>
                       ))}
                     </ul>
-                    {isOwnerAdmin ? (
+                    {plan.checkoutError ? (
+                      <p role="status" className="mt-6 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-center text-xs text-amber-800">
+                        {plan.checkoutError}
+                      </p>
+                    ) : isOwnerAdmin ? (
                       <button type="button" onClick={() => void selectPlan(plan.id)} disabled={checkoutPlan !== null}
                         className="theme-primary-action mt-6 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60">
                         {checkoutPlan === plan.id && <Loader2 className="h-4 w-4 animate-spin" />}

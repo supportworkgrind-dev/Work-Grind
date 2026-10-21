@@ -16,7 +16,8 @@
 import mongoose from 'mongoose';
 import Company, { CompanySubscriptionStatus, CompanyPlan, ICompany } from '../models/Company';
 import User from '../models/User';
-import { educationPlanForOrganization, getEducationPolarProductId, getPlan, getPolarProductId, hasActiveAccess, PlanId, resolveEffectivePlanId, TRIAL_DAYS } from '../config/subscription';
+import { normalizeOrganizationType } from '../config/organization';
+import { educationPlanForOrganization,getEducationPolarProductId, getPlan, getPolarProductId, hasActiveAccess, PlanId, resolveEffectivePlanId, TRIAL_DAYS } from '../config/subscription';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -329,7 +330,7 @@ export async function getCompanySubscription(
 
   return {
     companyId:            company._id.toString(),
-    organizationType:     company.organizationType,
+    organizationType:     normalizeOrganizationType(company.organizationType) ?? company.organizationType,
     accountType:          company.accountType,
     subscriptionMismatch,
     status,

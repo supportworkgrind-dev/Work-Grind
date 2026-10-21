@@ -8,7 +8,9 @@
  * environment variables are always current.
  */
 
-export type EducationPlanId = 'school' | 'college' | 'university';
+import { normalizeOrganizationType } from './organization';
+
+export type EducationPlanId ='school' | 'college' | 'university';
 export type PlanId = 'free' | 'starter' | 'pro' | EducationPlanId;
 export type BusinessPlanId = 'free' | 'starter' | 'pro';
 export type SubscriptionStatus =
@@ -145,9 +147,18 @@ export function getEducationPolarProductIdEnv(planId: EducationPlanId): string {
 export function educationPlanForOrganization(
   organizationType: string | null | undefined,
 ): EducationPlanId | undefined {
-  return organizationType === 'school' || organizationType === 'college' || organizationType === 'university'
-    ? organizationType
+  const normalized = normalizeOrganizationType(organizationType);
+  return normalized === 'school' || normalized === 'college' || normalized === 'university'
+    ? normalized
     : undefined;
+}
+
+/** Paid plan IDs a workspace of this organization type may purchase. Empty when the type is unrecognized. */
+export function getPurchasablePlanIds(organizationType: string | null | undefined): PlanId[] {
+  const normalized = normalizeOrganizationType(organizationType);
+  if (!normalized) return [];
+  const educationPlanId = educationPlanForOrganization(normalized);
+  return educationPlanId ? [educationPlanId] : ['starter', 'pro'];
 }
 
 export function getEducationPlanConfig(planId: EducationPlanId): PlanConfig {

@@ -7,6 +7,7 @@ import { api } from '@/lib/api';
 import { formatDate } from '@/lib/utils';
 import { SubscriptionInfo, PlanConfig } from '@/types';
 import type { EducationPlanPricing } from '@/types';
+import { getEducationPlanType } from '@/lib/organizationAccess';
 import {
   CreditCard, CheckCircle2, AlertCircle, Clock, Zap,
   RefreshCw, XCircle, Loader2, Star, Infinity, Tag, Lock,
@@ -263,6 +264,7 @@ export default function BillingPage() {
       </div>
     );
   }
+  const educationPlanType = getEducationPlanType(sub?.organizationType ?? company?.organizationType);
   const isTrialing  = sub?.status === 'trialing';
   const isPastDue   = sub?.status === 'past_due' && sub.hasActiveAccess;
   const isCancelledActive = sub?.status === 'cancelled' && sub.hasActiveAccess;
@@ -279,7 +281,7 @@ export default function BillingPage() {
   const displayPlanName = sub?.status === 'no_plan' || sub?.status === 'none' || sub?.status === 'never_subscribed'
       ? 'No subscription'
       : sub?.status === 'trialing'
-        ? (sub.organizationType === 'school' || sub.organizationType === 'college' || sub.organizationType === 'university'
+        ? (educationPlanType
           ? sub.planName
           : 'Free Trial')
         : sub?.planName;
@@ -516,9 +518,9 @@ export default function BillingPage() {
           <h2 className="text-sm font-bold mb-4" style={{ color: 'var(--text-primary)' }}>
             {isActive || isPastDue ? 'Change Plan' : 'Choose a Plan'}
           </h2>
-          {sub?.organizationType === 'school' || sub?.organizationType === 'college' || sub?.organizationType === 'university' ? (
+          {sub && educationPlanType ? (
             (() => {
-              const plan = educationPlans.find((candidate) => candidate.id === sub.organizationType);
+              const plan = educationPlans.find((candidate) => candidate.id === educationPlanType);
               if (!plan) {
                 return <p className="text-sm text-rose-600" role="alert">Education pricing could not be loaded for this workspace. Refresh the page or contact support.</p>;
               }
@@ -587,7 +589,7 @@ export default function BillingPage() {
             ))}
           </div>
           )}
-          {sub?.organizationType !== 'school' && sub?.organizationType !== 'college' && sub?.organizationType !== 'university' && !plans.length && !error && (
+          {!educationPlanType && !plans.length && !error && (
             <p className="mt-4 text-sm text-center" style={{ color: 'var(--text-muted)' }}>
               No subscription plans are currently available.
             </p>

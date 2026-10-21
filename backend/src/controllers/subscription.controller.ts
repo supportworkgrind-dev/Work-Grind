@@ -35,7 +35,9 @@ import {
   validatePolarProductId,
   hasActiveAccess,
   getEducationPlanPricing,
+  getPurchasablePlanIds,
 } from '../config/subscription';
+import { normalizeOrganizationType } from '../config/organization';
 import {
   getCompanySubscription,
   getCouponDefinition,
@@ -109,9 +111,11 @@ function isEducationPlan(planId: PlanId): planId is 'school' | 'college' | 'univ
   return planId === 'school' || planId === 'college' || planId === 'university';
 }
 
-export function isCheckoutPlanAllowedForOrganization(organizationType: string, planId: PlanId): boolean {
-  const educationPlanId = educationPlanForOrganization(organizationType);
-  return educationPlanId ? planId === educationPlanId : !isEducationPlan(planId);
+export function isCheckoutPlanAllowedForOrganization(organizationType: string | null | undefined, planId: PlanId): boolean {
+  const purchasable = getPurchasablePlanIds(organizationType);
+  // The free trial is never checked out, but remains a valid business plan selection.
+  if (planId === 'free') return purchasable.includes('starter');
+  return purchasable.includes(planId);
 }
 
 export function matchesPolarProductPrice(
@@ -136,6 +140,7 @@ export function resolveWebhookPlan(
   productId: string | undefined,
   metadataPlanId: string | undefined,
 ): PlanId | undefined {
+  if (!normalizeOrganizationType(company.organizationType)) return undefined;
   const mappedPlan = productId ? getConfiguredPlanIdForPolarProduct(productId) : undefined;
   const educationPlanId = educationPlanForOrganization(company.organizationType);
 
@@ -233,6 +238,7 @@ export const getSubscriptionStatus = async (
           status:               sub.status,
           plan:                 sub.plan,
           organizationType:     sub.organizationType,
+          availablePlanIds:     getPurchasablePlanIds(sub.organizationType),
           accountType:          sub.accountType,
           subscriptionMismatch: sub.subscriptionMismatch,
           billingInterval:      sub.plan === 'school' || sub.plan === 'college' || sub.plan === 'university' ? 'month' : undefined,
@@ -343,6 +349,33 @@ export const createCheckout = async (
       return;
     }
 
+    // Validate the plan against the workspace's stored organization type before
+    // touching Polar, so a mismatched plan is always refused for that reason.
+    const company = await Company.findById(companyId).select(
+      'name subscriptionStatus subscriptionPlan isLifetime polarCustomerId polarSubscriptionId polarProductId organizationType',
+    );
+    if (!company) { res.status(404).json({ success: false, message: 'Company not found' }); return; }
+
+    const organizationType = normalizeOrganizationType(company.organizationType);
+    if (!organizationType) {
+      console.error(`[Subscription] Unrecognized organization type on company ${companyId}`);
+      res.status(409).json({
+        success: false,
+        message: 'This workspace’s organization type is not recognized, so no plan can be matched. Please contact support.',
+      });
+      return;
+    }
+    const educationPlanId = educationPlanForOrganization(organizationType);
+    if (!isCheckoutPlanAllowedForOrganization(organizationType, planId)) {
+      res.status(403).json({
+        success: false,
+        message: educationPlanId
+          ? `This ${organizationType} workspace can only subscribe to the ${educationPlanId} plan.`
+          : 'Education plans are only available to school, college, and university workspaces.',
+      });
+      return;
+    }
+
     const configError = isEducationPlan(planId) ? (
       getEducationPolarProductId(planId)
         ? null
@@ -386,21 +419,6 @@ export const createCheckout = async (
       }
     }
 
-    const company = await Company.findById(companyId).select(
-      'name subscriptionStatus subscriptionPlan isLifetime polarCustomerId polarSubscriptionId organizationType',
-    );
-    if (!company) { res.status(404).json({ success: false, message: 'Company not found' }); return; }
-
-    const educationPlanId = educationPlanForOrganization(company.organizationType);
-    if (!isCheckoutPlanAllowedForOrganization(company.organizationType, planId)) {
-      res.status(403).json({
-        success: false,
-        message: educationPlanId
-          ? `This ${company.organizationType} workspace can only subscribe to the ${educationPlanId} plan.`
-          : 'Education plans are only available to school, college, and university workspaces.',
-      });
-      return;
-    }
     if (
       educationPlanId &&
       company.polarSubscriptionId &&

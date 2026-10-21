@@ -85,6 +85,25 @@ function canonicalRole(role: UserRole | string | undefined): string {
   return roleAliases[key] ?? key;
 }
 
+const ORGANIZATION_TYPES = new Set<OrganizationType>(['business', 'school', 'college', 'university']);
+
+/**
+ * Normalizes a stored organization type (casing/whitespace from legacy records).
+ * Missing resolves to `business` (the backend default); unrecognized returns null.
+ */
+export function normalizeOrganizationType(value: unknown): OrganizationType | null {
+  if (value === undefined || value === null || value === '') return 'business';
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) return 'business';
+  return ORGANIZATION_TYPES.has(normalized as OrganizationType) ? normalized as OrganizationType : null;
+}
+
+export function getEducationPlanType(value: unknown): 'school' | 'college' | 'university' | null {
+  const normalized = normalizeOrganizationType(value);
+  return normalized && normalized !== 'business' ? normalized : null;
+}
+
 export function getWorkspaceExperience(
   organization: OrganizationInfo | null | undefined,
 ): Experience | null {
