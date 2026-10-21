@@ -363,7 +363,7 @@ test('Google token rejection redirects with a support ID without exposing provid
   await completeOAuthCallback(callbackRequest(randomBytes(32).toString('base64url')), response);
 
   const destination = new URL(response.redirects[0].url);
-  assert.equal(destination.searchParams.get('error'), 'try_again');
+  assert.equal(destination.searchParams.get('error'), 'provider_unavailable');
   assert.equal(destination.searchParams.get('supportId'), correlationId);
   assert.equal(destination.toString().includes('Private provider response detail'), false);
 });

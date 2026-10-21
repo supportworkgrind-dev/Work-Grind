@@ -230,7 +230,9 @@ test('LinkedIn rejects an untrusted issuer and a key declared for encryption', a
   }
 });
 
-test('LinkedIn token-exchange rejection is logged with its correlation ID and no secrets', async (context) => {
+// Production failure dbf9490e-0e66-4d16-b6d3-8cd7cf0feb1b: LinkedIn returned 401
+// invalid_client because the deployed client secret was rejected.
+test('LinkedIn client-credential rejection reports provider_unavailable and logs no secrets', async (context) => {
   configureLinkedIn();
   const logged = captureErrors(context);
   mockLinkedIn(context, { tokenStatus: 401, tokenError: 'invalid_client' });
@@ -240,7 +242,10 @@ test('LinkedIn token-exchange rejection is logged with its correlation ID and no
   await completeOAuthCallback(callbackRequest(), response);
 
   const destination = new URL(response.redirects[0].url);
-  assert.equal(destination.searchParams.get('error'), 'try_again');
+  assert.equal(destination.searchParams.get('error'), 'provider_unavailable');
+  assert.ok(logged.some(([message, details]) =>
+    message.startsWith('[OAuth] Provider rejected the configured client credentials.') &&
+    details.correlationId === '6cad200e-6cc9-4a3d-a2d4-f6c9db5fd946'));
   assert.equal(destination.searchParams.get('supportId'), '6cad200e-6cc9-4a3d-a2d4-f6c9db5fd946');
   const entry = logged.find(([message]) => message === '[OAuth] Callback step failed.');
   assert.deepEqual(entry[1], {
@@ -255,6 +260,21 @@ test('LinkedIn token-exchange rejection is logged with its correlation ID and no
   for (const secret of [CLIENT_SECRET, AUTH_CODE, 'linkedin-verifier', 'server-only-access-token']) {
     assert.equal(serialized.includes(secret), false, `log leaked ${secret}`);
   }
+});
+
+test('LinkedIn expired or reused authorization codes still ask the member to try again', async (context) => {
+  configureLinkedIn();
+  const logged = captureErrors(context);
+  mockLinkedIn(context, { tokenStatus: 400, tokenError: 'invalid_grant' });
+  OAuthTransaction.findOneAndDelete = async () => transaction();
+
+  const response = responseMock();
+  await completeOAuthCallback(callbackRequest(), response);
+
+  assert.equal(new URL(response.redirects[0].url).searchParams.get('error'), 'try_again');
+  const entry = logged.find(([message]) => message === '[OAuth] Callback step failed.');
+  assert.equal(entry[1].httpStatus, 400);
+  assert.equal(entry[1].providerErrorCode, 'invalid_grant');
 });
 
 test('LinkedIn cancellation redirects with the cancelled code', async (context) => {

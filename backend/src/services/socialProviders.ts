@@ -4,6 +4,11 @@ import {
   LINKEDIN_TEXT_POST_MAX_LENGTH,
   publishLinkedInPost,
 } from './linkedinPublishing';
+import {
+  isYouTubePublishingConfigured,
+  YOUTUBE_DESCRIPTION_MAX_LENGTH,
+  YOUTUBE_PUBLISHING_SCOPES,
+} from './youtubePublishing';
 
 export type SocialProviderId = 'linkedin' | 'instagram' | 'facebook' | 'youtube';
 
@@ -99,24 +104,34 @@ const providerCatalog: SocialProviderDefinition[] = [
     },
     requiredScopes: [],
   },
-  {
+];
+
+/**
+ * YouTube uploads videos with a title and description. It becomes available once
+ * the Google OAuth client used for YouTube consent is configured on the server.
+ */
+function youtubeDefinition(): SocialProviderDefinition {
+  const configured = isYouTubePublishingConfigured();
+  return {
     id: 'youtube',
     name: 'YouTube',
-    availability: 'setup_required',
+    availability: configured ? 'available' : 'setup_required',
     capabilities: {
-      connect: false,
+      connect: configured,
       publishText: false,
-      publishMedia: false,
+      publishMedia: configured,
       schedule: false,
       analytics: false,
       organizationPublishing: false,
     },
-    requiredScopes: [],
-  },
-];
+    requiredScopes: [...YOUTUBE_PUBLISHING_SCOPES],
+    maxTextLength: YOUTUBE_DESCRIPTION_MAX_LENGTH,
+  };
+}
 
 export function getSocialProviderCatalog(): SocialProviderDefinition[] {
-  return providerCatalog.map((provider) => ({ ...provider, capabilities: { ...provider.capabilities } }));
+  return [...providerCatalog, youtubeDefinition()]
+    .map((provider) => ({ ...provider, capabilities: { ...provider.capabilities } }));
 }
 
 export function getSocialProviderAdapter(provider: string): SocialProviderAdapter | null {

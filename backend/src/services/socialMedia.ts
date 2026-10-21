@@ -5,6 +5,7 @@ import File from '../models/File';
 import { readPrivateFile } from './r2Storage';
 import { fileContentMatches } from '../middleware/upload';
 import { LINKEDIN_MAX_IMAGE_BYTES, LINKEDIN_MAX_VIDEO_BYTES } from './linkedinPublishing';
+import { YOUTUBE_MAX_VIDEO_BYTES, YOUTUBE_VIDEO_TYPES } from './youtubePublishing';
 import { isAcademicOrganizationType } from '../config/organization';
 
 export class SocialMediaValidationError extends Error {
@@ -23,6 +24,39 @@ export interface LinkedInMediaAsset {
 
 const IMAGE_TYPES = new Set(['image/jpeg', 'image/png']);
 const VIDEO_TYPES = new Set(['video/mp4']);
+
+/** Media rules per publishing destination; `preview` accepts anything a destination accepts. */
+export type SocialMediaRules = 'linkedin' | 'youtube' | 'preview';
+
+const MEDIA_RULES: Record<SocialMediaRules, {
+  imageTypes: Set<string>;
+  videoTypes: Set<string>;
+  maxImageBytes: number;
+  maxVideoBytes: number;
+  message: string;
+}> = {
+  linkedin: {
+    imageTypes: IMAGE_TYPES,
+    videoTypes: VIDEO_TYPES,
+    maxImageBytes: LINKEDIN_MAX_IMAGE_BYTES,
+    maxVideoBytes: LINKEDIN_MAX_VIDEO_BYTES,
+    message: 'LinkedIn supports JPEG or PNG images up to 36 MB and MP4 videos up to 50 MB.',
+  },
+  youtube: {
+    imageTypes: new Set(),
+    videoTypes: YOUTUBE_VIDEO_TYPES,
+    maxImageBytes: 0,
+    maxVideoBytes: YOUTUBE_MAX_VIDEO_BYTES,
+    message: 'YouTube publishing needs one MP4 or WebM video.',
+  },
+  preview: {
+    imageTypes: IMAGE_TYPES,
+    videoTypes: new Set([...VIDEO_TYPES, ...YOUTUBE_VIDEO_TYPES]),
+    maxImageBytes: LINKEDIN_MAX_IMAGE_BYTES,
+    maxVideoBytes: Math.max(LINKEDIN_MAX_VIDEO_BYTES, YOUTUBE_MAX_VIDEO_BYTES),
+    message: 'This media type cannot be previewed.',
+  },
+};
 const UPLOADS_DIR = path.resolve(path.join(__dirname, '../../uploads'));
 
 export async function readLinkedInMediaAsset(
@@ -30,6 +64,16 @@ export async function readLinkedInMediaAsset(
   companyId: mongoose.Types.ObjectId | string,
   access?: { userId: string; role: string; organizationType?: string },
 ): Promise<LinkedInMediaAsset> {
+  return readSocialMediaAsset(fileId, companyId, access, 'linkedin');
+}
+
+export async function readSocialMediaAsset(
+  fileId: mongoose.Types.ObjectId | string,
+  companyId: mongoose.Types.ObjectId | string,
+  access: { userId: string; role: string; organizationType?: string } | undefined,
+  rulesId: SocialMediaRules,
+): Promise<LinkedInMediaAsset> {
+  const rules = MEDIA_RULES[rulesId];
   const query: Record<string, unknown> = {
     _id: fileId,
     companyId,
@@ -45,11 +89,11 @@ export async function readLinkedInMediaAsset(
   const file = await File.findOne(query).select('name originalName mimeType size url storageProvider storageKey');
   if (!file) throw new SocialMediaValidationError('The selected media file is unavailable in this workspace.');
 
-  const isImage = IMAGE_TYPES.has(file.mimeType);
-  const isVideo = VIDEO_TYPES.has(file.mimeType);
-  const maxBytes = isImage ? LINKEDIN_MAX_IMAGE_BYTES : LINKEDIN_MAX_VIDEO_BYTES;
+  const isImage = rules.imageTypes.has(file.mimeType);
+  const isVideo = rules.videoTypes.has(file.mimeType);
+  const maxBytes = isImage ? rules.maxImageBytes : rules.maxVideoBytes;
   if ((!isImage && !isVideo) || file.size <= 0 || file.size > maxBytes) {
-    throw new SocialMediaValidationError('LinkedIn supports JPEG or PNG images up to 36 MB and MP4 videos up to 50 MB.');
+    throw new SocialMediaValidationError(rules.message);
   }
 
   let buffer: Buffer | undefined;

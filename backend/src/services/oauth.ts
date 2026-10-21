@@ -8,6 +8,7 @@ import {
   verify,
 } from 'crypto';
 import { OAuthProvider } from '../models/OAuthTransaction';
+import { YOUTUBE_PUBLISHING_SCOPES } from '../config/youtube';
 
 type OidcClaims = {
   sub: string;
@@ -218,7 +219,9 @@ export function buildAuthorizationUrl(
       ? 'name email'
       : provider === 'linkedin' && publishingConsent
         ? 'openid profile email w_member_social'
-        : 'openid profile email',
+        : provider === 'google' && publishingConsent
+          ? ['openid', 'profile', 'email', ...YOUTUBE_PUBLISHING_SCOPES].join(' ')
+          : 'openid profile email',
   );
   url.searchParams.set('state', state);
   url.searchParams.set('nonce', nonce);
@@ -226,7 +229,12 @@ export function buildAuthorizationUrl(
     url.searchParams.set('code_challenge', base64Url(createHash('sha256').update(verifier).digest()));
     url.searchParams.set('code_challenge_method', 'S256');
   }
-  if (provider === 'google') {
+  if (provider === 'google' && publishingConsent) {
+    // YouTube publishing needs a refresh token; Google only issues one for
+    // offline access and re-issues it reliably when consent is shown again.
+    url.searchParams.set('access_type', 'offline');
+    url.searchParams.set('prompt', 'consent select_account');
+  } else if (provider === 'google') {
     url.searchParams.set('prompt', 'select_account');
   } else if (provider === 'apple') {
     url.searchParams.set('response_mode', 'form_post');

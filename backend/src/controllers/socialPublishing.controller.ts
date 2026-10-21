@@ -30,7 +30,18 @@ import {
   LINKEDIN_TEXT_POST_MAX_LENGTH,
   getLinkedInApiVersion,
 } from '../services/linkedinPublishing';
-import { readLinkedInMediaAsset, SocialMediaValidationError } from '../services/socialMedia';
+import { readLinkedInMediaAsset, readSocialMediaAsset, SocialMediaValidationError } from '../services/socialMedia';
+import {
+  getYouTubeAccessToken,
+  isYouTubePrivacyStatus,
+  isYouTubePublishingConfigured,
+  revokeGoogleToken,
+  uploadYouTubeVideo,
+  validateYouTubeMetadata,
+  YouTubeApiError,
+  YOUTUBE_UPLOAD_SCOPE,
+  type YouTubePrivacyStatus,
+} from '../services/youtubePublishing';
 
 const MAX_SCHEDULE_RETRIES = 2;
 const SCHEDULE_RETRY_DELAY_MS = 5 * 60_000;
@@ -94,7 +105,7 @@ async function markPostFailed(post: {
   _id: mongoose.Types.ObjectId;
   companyId: mongoose.Types.ObjectId;
   authorId: mongoose.Types.ObjectId;
-}, failureCode: string): Promise<void> {
+}, failureCode: string, provider: 'linkedin' | 'youtube' = 'linkedin'): Promise<void> {
   await SocialPost.updateOne(
     { _id: post._id, companyId: post.companyId, status: 'publishing' },
     {
@@ -105,7 +116,7 @@ async function markPostFailed(post: {
         'destinations.$[destination].errorCode': failureCode,
       },
     },
-    { arrayFilters: [{ 'destination.provider': 'linkedin', 'destination.status': 'publishing' }] },
+    { arrayFilters: [{ 'destination.provider': provider, 'destination.status': 'publishing' }] },
   );
   try {
     await createNotification({
@@ -113,7 +124,7 @@ async function markPostFailed(post: {
       userId: post.authorId.toString(),
       type: 'system',
       title: 'Social post needs attention',
-      body: `LinkedIn could not confirm publication (${failureCode.replace(/_/g, ' ')}). Review the post before retrying.`,
+      body: `${provider === 'youtube' ? 'YouTube' : 'LinkedIn'} could not confirm publication (${failureCode.replace(/_/g, ' ')}). Review the post before retrying.`,
       actionUrl: '/social-publishing',
       metadata: { postId: post._id.toString(), failureCode },
     });
@@ -192,6 +203,21 @@ export const getSocialAccounts = async (req: AuthRequest, res: Response): Promis
     const scopes = Array.isArray(integration.config?.grantedScopes)
       ? integration.config.grantedScopes.filter((scope: unknown): scope is string => typeof scope === 'string')
       : [];
+    if (integration.provider === 'youtube') {
+      // YouTube access tokens are short-lived and refreshed on demand, so the
+      // connection stays publishable while its stored grant is intact.
+      return {
+        id: integration._id.toString(),
+        provider: integration.provider,
+        status: integration.status,
+        displayName: integration.config?.identityName ?? null,
+        displayEmail: integration.config?.identityEmail ?? null,
+        expiresAt: null,
+        scopes,
+        canPublish: integration.status === 'connected' && isYouTubePublishingConfigured() &&
+          scopes.includes(YOUTUBE_UPLOAD_SCOPE),
+      };
+    }
     const tokenValid = Boolean(integration.tokenExpiresAt && integration.tokenExpiresAt.getTime() > now);
     return {
       id: integration._id.toString(),
@@ -230,6 +256,62 @@ export const disconnectLinkedIn = async (req: AuthRequest, res: Response): Promi
   res.json({ success: true });
 };
 
+export const getYouTubeConnection = async (req: AuthRequest, res: Response): Promise<void> => {
+  const connection = await Integration.findOne({
+    companyId: companyIdOf(req),
+    provider: 'youtube',
+  }).lean();
+  const scopes = Array.isArray(connection?.config?.grantedScopes)
+    ? connection.config.grantedScopes.filter((scope: unknown): scope is string => typeof scope === 'string')
+    : [];
+  const configured = isYouTubePublishingConfigured();
+  res.json({
+    success: true,
+    connection: {
+      configured,
+      connected: connection?.status === 'connected',
+      status: connection?.status ?? 'disconnected',
+      channelTitle: connection?.config?.identityName ?? null,
+      channelId: connection?.config?.channelId ?? null,
+      identityEmail: connection?.config?.identityEmail ?? null,
+      scopes,
+      canPublishVideos: configured && connection?.status === 'connected' && scopes.includes(YOUTUBE_UPLOAD_SCOPE),
+      errorCode: connection?.errorMessage ?? null,
+    },
+  });
+};
+
+export const disconnectYouTube = async (req: AuthRequest, res: Response): Promise<void> => {
+  if (!canReview(req)) {
+    res.status(403).json({ success: false, message: 'Only a workspace owner or admin can disconnect YouTube.' });
+    return;
+  }
+  const existing = await Integration.findOne({ companyId: companyIdOf(req), provider: 'youtube' })
+    .select('+refreshToken +accessToken');
+  if (!existing) {
+    res.status(404).json({ success: false, message: 'No YouTube publishing connection was found.' });
+    return;
+  }
+  const storedToken = existing.refreshToken || existing.accessToken;
+  let revoked = false;
+  if (storedToken) {
+    try {
+      revoked = await revokeGoogleToken(decryptProviderToken(storedToken));
+    } catch {
+      revoked = false;
+    }
+  }
+  await Integration.updateOne(
+    { _id: existing._id },
+    {
+      $set: { status: 'disconnected', errorMessage: null },
+      $unset: { accessToken: 1, refreshToken: 1, tokenExpiresAt: 1 },
+    },
+  );
+  await audit(req, 'YOUTUBE_PUBLISHING_DISCONNECTED', existing._id.toString(), { revokedAtGoogle: revoked });
+  res.json({ success: true, revokedAtGoogle: revoked });
+};
+
 export const listSocialPosts = async (req: AuthRequest, res: Response): Promise<void> => {
   const posts = await SocialPost.find({ companyId: companyIdOf(req) })
     .sort({ updatedAt: -1 })
@@ -241,10 +323,15 @@ export const listSocialPosts = async (req: AuthRequest, res: Response): Promise<
   res.json({ success: true, posts });
 };
 
-async function getDraftMedia(req: AuthRequest): Promise<Array<{ mimeType: string; fileId: mongoose.Types.ObjectId; altText?: string }> | undefined> {
+async function getDraftMedia(
+  req: AuthRequest,
+  platform: 'linkedin' | 'youtube' = 'linkedin',
+): Promise<Array<{ mimeType: string; fileId: mongoose.Types.ObjectId; altText?: string }> | undefined> {
   if (req.body?.media === undefined) return undefined;
   if (!Array.isArray(req.body.media) || req.body.media.length > 1) {
-    throw new SocialMediaValidationError('Attach one LinkedIn image or video per post.');
+    throw new SocialMediaValidationError(platform === 'youtube'
+      ? 'Attach one video per YouTube upload.'
+      : 'Attach one LinkedIn image or video per post.');
   }
   if (req.body.media.length === 0) return [];
   const item = req.body.media[0];
@@ -253,11 +340,11 @@ async function getDraftMedia(req: AuthRequest): Promise<Array<{ mimeType: string
     throw new SocialMediaValidationError('Choose a valid media file.');
   }
   const fileId = new mongoose.Types.ObjectId(item.fileId);
-  const asset = await readLinkedInMediaAsset(fileId, companyIdOf(req), {
+  const asset = await readSocialMediaAsset(fileId, companyIdOf(req), {
     userId: req.user!.userId,
     role: req.user!.role,
     organizationType: req.user!.organizationType,
-  });
+  }, platform);
   return [{
     fileId,
     mimeType: asset.mimeType,
@@ -267,11 +354,11 @@ async function getDraftMedia(req: AuthRequest): Promise<Array<{ mimeType: string
 
 export const previewSocialMedia = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const asset = await readLinkedInMediaAsset(req.params.id, companyIdOf(req), {
+    const asset = await readSocialMediaAsset(req.params.id, companyIdOf(req), {
       userId: req.user!.userId,
       role: req.user!.role,
       organizationType: req.user!.organizationType,
-    });
+    }, 'preview');
     const filename = asset.title.replace(/[^\w\s.\-()]/g, '_').slice(0, 120);
     res.setHeader('Cache-Control', 'private, no-store');
     res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
@@ -288,8 +375,78 @@ export const previewSocialMedia = async (req: AuthRequest, res: Response): Promi
   }
 };
 
+/** Reads and validates YouTube draft fields; the description is the post text. */
+function parseYouTubeDraft(req: AuthRequest): { title: string; privacyStatus: YouTubePrivacyStatus; text: string } | string {
+  const platformData = req.body?.platformData && typeof req.body.platformData === 'object' ? req.body.platformData : {};
+  const title = typeof platformData.title === 'string' ? platformData.title.trim() : '';
+  const text = typeof req.body?.text === 'string' ? req.body.text.trim() : '';
+  const privacyStatus = platformData.privacyStatus ?? 'private';
+  if (!isYouTubePrivacyStatus(privacyStatus)) return 'Choose private, unlisted, or public visibility.';
+  return validateYouTubeMetadata(title, text) ?? { title, privacyStatus, text };
+}
+
+async function createYouTubeDraft(req: AuthRequest, res: Response): Promise<void> {
+  if (!isYouTubePublishingConfigured()) {
+    res.status(422).json({ success: false, code: 'PROVIDER_UNAVAILABLE', message: 'YouTube publishing is not configured on this server.' });
+    return;
+  }
+  const draft = parseYouTubeDraft(req);
+  if (typeof draft === 'string') {
+    res.status(400).json({ success: false, message: draft });
+    return;
+  }
+  let media: Awaited<ReturnType<typeof getDraftMedia>>;
+  try {
+    media = await getDraftMedia(req, 'youtube');
+  } catch (error) {
+    if (error instanceof SocialMediaValidationError) {
+      res.status(400).json({ success: false, code: 'INVALID_MEDIA', message: error.message });
+      return;
+    }
+    throw error;
+  }
+  if (!media?.length) {
+    res.status(400).json({ success: false, code: 'INVALID_MEDIA', message: 'Attach one MP4 or WebM video for YouTube.' });
+    return;
+  }
+  let integrationId: mongoose.Types.ObjectId | undefined;
+  if (req.body?.integrationId !== undefined) {
+    if (!mongoose.isValidObjectId(req.body.integrationId)) {
+      res.status(400).json({ success: false, message: 'Select a valid connected YouTube channel.' });
+      return;
+    }
+    const integration = await Integration.findOne({
+      _id: req.body.integrationId,
+      companyId: companyIdOf(req),
+      provider: 'youtube',
+      status: 'connected',
+    }).select('_id');
+    if (!integration) {
+      res.status(404).json({ success: false, message: 'The selected YouTube channel is not connected to this workspace.' });
+      return;
+    }
+    integrationId = integration._id;
+  }
+  const post = await SocialPost.create({
+    companyId: companyIdOf(req),
+    authorId: new mongoose.Types.ObjectId(req.user!.userId),
+    text: draft.text,
+    platform: 'youtube',
+    media,
+    platformData: { title: draft.title, privacyStatus: draft.privacyStatus },
+    ...(integrationId ? { integrationId } : {}),
+    status: 'draft',
+  });
+  await audit(req, 'SOCIAL_POST_DRAFT_CREATED', post._id.toString(), { platform: 'youtube' });
+  res.status(201).json({ success: true, post });
+}
+
 export const createSocialDraft = async (req: AuthRequest, res: Response): Promise<void> => {
   const platform = getProviderId(req.body?.platform);
+  if (platform === 'youtube') {
+    await createYouTubeDraft(req, res);
+    return;
+  }
   const adapter = getSocialProviderAdapter(platform);
   if (!adapter) {
     res.status(422).json({ success: false, code: 'PROVIDER_UNAVAILABLE', message: 'This social provider is not configured for publishing.' });
@@ -359,6 +516,45 @@ export const updateSocialDraft = async (req: AuthRequest, res: Response): Promis
   const candidate = await SocialPost.findOne(postQuery).select('platform');
   if (!candidate) {
     res.status(404).json({ success: false, message: 'Editable draft not found.' });
+    return;
+  }
+  if (candidate.platform === 'youtube') {
+    const draft = parseYouTubeDraft(req);
+    if (typeof draft === 'string') {
+      res.status(400).json({ success: false, message: draft });
+      return;
+    }
+    const youtubePost = await SocialPost.findOne(postQuery);
+    if (!youtubePost) {
+      res.status(404).json({ success: false, message: 'Editable draft not found.' });
+      return;
+    }
+    try {
+      const media = await getDraftMedia(req, 'youtube');
+      if (media !== undefined) {
+        if (!media.length) {
+          res.status(400).json({ success: false, code: 'INVALID_MEDIA', message: 'Attach one MP4 or WebM video for YouTube.' });
+          return;
+        }
+        youtubePost.media = media;
+      }
+    } catch (error) {
+      if (error instanceof SocialMediaValidationError) {
+        res.status(400).json({ success: false, code: 'INVALID_MEDIA', message: error.message });
+        return;
+      }
+      throw error;
+    }
+    youtubePost.text = draft.text;
+    youtubePost.platformData = { ...(youtubePost.platformData ?? {}), title: draft.title, privacyStatus: draft.privacyStatus };
+    youtubePost.markModified('platformData');
+    youtubePost.status = 'draft';
+    youtubePost.reviewerId = undefined;
+    youtubePost.rejectionReason = undefined;
+    youtubePost.failureCode = undefined;
+    await youtubePost.save();
+    await audit(req, 'SOCIAL_POST_DRAFT_UPDATED', youtubePost._id.toString(), { platform: 'youtube' });
+    res.json({ success: true, post: youtubePost });
     return;
   }
   const validationError = validateProviderText(candidate.platform, text);
@@ -497,6 +693,11 @@ export const publishSocialPost = async (req: AuthRequest, res: Response): Promis
   const role = req.user!.role;
   if (!canManagePublishing(req)) {
     res.status(403).json({ success: false, message: 'Your workspace role cannot publish social posts.' });
+    return;
+  }
+  const target = await SocialPost.findOne({ _id: req.params.id, companyId: companyIdOf(req) }).select('platform');
+  if (target?.platform === 'youtube') {
+    await publishYouTubePost(req, res);
     return;
   }
   const adapter = getSocialProviderAdapter('linkedin');
@@ -684,9 +885,209 @@ export const publishSocialPost = async (req: AuthRequest, res: Response): Promis
   }
 };
 
+function youtubeFailureCode(error: unknown): string {
+  if (error instanceof SocialMediaValidationError) return 'media_unavailable';
+  if (error instanceof Error && error.name === 'TimeoutError') return 'provider_timeout';
+  if (!(error instanceof YouTubeApiError)) return 'provider_unavailable';
+  if (error.status === 401) return 'authorization_revoked';
+  if (error.reason === 'quotaExceeded' || error.reason === 'uploadLimitExceeded') return 'quota_exceeded';
+  if (error.status === 429 || error.reason === 'rateLimitExceeded' || error.reason === 'userRateLimitExceeded') {
+    return 'rate_limited';
+  }
+  if (error.status === 403) return 'permission_or_member_access_denied';
+  if (error.status >= 400 && error.status < 500) return 'post_rejected';
+  return 'provider_unavailable';
+}
+
+const YOUTUBE_FAILURE_MESSAGES: Record<string, string> = {
+  media_unavailable: 'The attached video is unavailable. Replace it and try again.',
+  provider_timeout: 'YouTube did not respond in time. Check YouTube Studio before trying again.',
+  authorization_revoked: 'YouTube authorization was revoked or expired. Reconnect YouTube and try again.',
+  quota_exceeded: 'The YouTube upload quota for this project or channel is exhausted. Try again after it resets.',
+  rate_limited: 'YouTube is rate limiting uploads. Wait before trying again.',
+  permission_or_member_access_denied: 'YouTube refused the upload for this channel. Reconnect YouTube and confirm the channel can upload videos.',
+  post_rejected: 'YouTube rejected this video or its details. Review the title, description, and file before retrying.',
+  provider_unavailable: 'YouTube could not confirm the upload. Check YouTube Studio before taking further action.',
+};
+
+async function publishYouTubePost(req: AuthRequest, res: Response): Promise<void> {
+  if (!isYouTubePublishingConfigured()) {
+    res.status(422).json({ success: false, code: 'PROVIDER_UNAVAILABLE', message: 'YouTube publishing is not configured on this server.' });
+    return;
+  }
+  const connection = await Integration.findOne({
+    companyId: companyIdOf(req),
+    provider: 'youtube',
+    status: 'connected',
+    ...(req.body?.integrationId
+      ? mongoose.isValidObjectId(req.body.integrationId) ? { _id: req.body.integrationId } : { _id: null }
+      : {}),
+  }).select('+accessToken +refreshToken');
+  if (!connection || !connection.refreshToken ||
+      !Array.isArray(connection.config?.grantedScopes) ||
+      !connection.config.grantedScopes.includes(YOUTUBE_UPLOAD_SCOPE) ||
+      typeof connection.config.channelId !== 'string') {
+    res.status(409).json({
+      success: false,
+      code: 'YOUTUBE_RECONNECT_REQUIRED',
+      message: 'Connect YouTube and grant upload permission before publishing.',
+    });
+    return;
+  }
+  const publishablePostStates: Record<string, unknown>[] = [
+    { status: { $in: canReview(req) ? ['draft', 'approved'] : ['approved'] } },
+  ];
+  if (canReview(req)) publishablePostStates.push({ status: 'failed', failureCode: { $in: ['rate_limited', 'quota_exceeded'] } });
+  const post = await SocialPost.findOneAndUpdate(
+    {
+      _id: req.params.id,
+      companyId: companyIdOf(req),
+      platform: 'youtube',
+      $or: publishablePostStates,
+    },
+    {
+      $set: {
+        status: 'publishing',
+        destinations: [{ provider: 'youtube', integrationId: connection._id, status: 'publishing' }],
+      },
+      $unset: { failureCode: 1 },
+    },
+    { new: true },
+  );
+  if (!post) {
+    res.status(409).json({
+      success: false,
+      message: canReview(req)
+        ? 'This video is not available to publish or is already being processed.'
+        : 'A workspace owner or admin must approve this video before publication.',
+    });
+    return;
+  }
+
+  let youtubeConfirmed = false;
+  try {
+    const title = typeof post.platformData?.title === 'string' ? post.platformData.title : '';
+    const privacyStatus = isYouTubePrivacyStatus(post.platformData?.privacyStatus)
+      ? post.platformData.privacyStatus
+      : 'private';
+    const metadataError = validateYouTubeMetadata(title, post.text);
+    const mediaRecord = post.media?.[0];
+    if (metadataError || !mediaRecord?.fileId) {
+      throw new SocialMediaValidationError(metadataError || 'Attach one MP4 or WebM video for YouTube.');
+    }
+    const video = await readSocialMediaAsset(mediaRecord.fileId, post.companyId, {
+      userId: req.user!.userId,
+      role: req.user!.role,
+      organizationType: req.user!.organizationType,
+    }, 'youtube');
+    const accessToken = await getYouTubeAccessToken(connection);
+    const result = await uploadYouTubeVideo(
+      accessToken,
+      { buffer: video.buffer, mimeType: video.mimeType },
+      { title, description: post.text, privacyStatus },
+    );
+    youtubeConfirmed = true;
+    const publishedAt = new Date();
+    const persisted = await SocialPost.updateOne(
+      { _id: post._id, companyId: post.companyId, status: 'publishing' },
+      {
+        $set: {
+          status: 'published',
+          publishedAt,
+          destinations: [{
+            provider: 'youtube',
+            integrationId: connection._id,
+            status: 'published',
+            externalPostId: result.videoId,
+            externalPostUrl: result.videoUrl,
+            publishedAt,
+          }],
+          platformData: {
+            ...(post.platformData ?? {}),
+            youtubeVideoId: result.videoId,
+            ...(result.privacyStatus ? { youtubePrivacyStatus: result.privacyStatus } : {}),
+          },
+        },
+        $unset: { failureCode: 1 },
+      },
+    );
+    if (persisted.matchedCount !== 1) {
+      throw new Error('YouTube confirmed the upload but the publishing record could not be updated.');
+    }
+    try {
+      await audit(req, 'SOCIAL_POST_PUBLISHED', post._id.toString(), { platform: 'youtube', privacyStatus });
+    } catch (auditError) {
+      console.error('[SocialPublishing] Published YouTube audit write failed.', {
+        errorName: auditError instanceof Error ? auditError.name : 'UnknownError',
+      });
+    }
+    await notifyPublishingUser({
+      companyId: post.companyId.toString(),
+      userId: post.authorId.toString(),
+      type: 'system',
+      title: 'YouTube video uploaded',
+      body: `YouTube accepted the upload (${result.privacyStatus ?? privacyStatus}). Processing may take a few minutes.`,
+      actionUrl: '/social-publishing',
+      metadata: { postId: post._id.toString(), platform: 'youtube' },
+    });
+    res.json({
+      success: true,
+      post: {
+        ...post.toObject(),
+        status: 'published',
+        publishedAt,
+        destinations: [{ provider: 'youtube', status: 'published', externalPostId: result.videoId, externalPostUrl: result.videoUrl }],
+      },
+    });
+  } catch (error) {
+    if (youtubeConfirmed) {
+      console.error('[SocialPublishing] YouTube confirmed the upload but WorkGrind could not persist the result.', {
+        errorName: error instanceof Error ? error.name : 'UnknownError',
+      });
+      res.status(503).json({
+        success: false,
+        code: 'PUBLISH_RESULT_NOT_RECORDED',
+        message: 'YouTube accepted the upload, but WorkGrind could not save the result. Check YouTube Studio and do not upload it again.',
+      });
+      return;
+    }
+    const failureCode = youtubeFailureCode(error);
+    console.error('[SocialPublishing] YouTube upload failed.', {
+      failureCode,
+      ...(error instanceof YouTubeApiError ? { httpStatus: error.status, providerErrorCode: error.reason } : {}),
+      postId: post._id.toString(),
+    });
+    await markPostFailed(post, failureCode, 'youtube');
+    if (failureCode === 'authorization_revoked' || failureCode === 'permission_or_member_access_denied') {
+      await Integration.updateOne({ _id: connection._id }, { $set: { status: 'error', errorMessage: failureCode } });
+    }
+    await audit(req, 'SOCIAL_POST_PUBLISH_FAILED', post._id.toString(), { platform: 'youtube', failureCode });
+    const status = failureCode === 'media_unavailable' ? 400
+      : failureCode === 'rate_limited' || failureCode === 'quota_exceeded' ? 429
+        : failureCode === 'authorization_revoked' || failureCode === 'permission_or_member_access_denied' ? 409
+          : 502;
+    res.status(status).json({
+      success: false,
+      code: failureCode,
+      message: failureCode === 'media_unavailable' && error instanceof Error
+        ? error.message
+        : YOUTUBE_FAILURE_MESSAGES[failureCode],
+    });
+  }
+}
+
 export const scheduleSocialPost = async (req: AuthRequest, res: Response): Promise<void> => {
   if (!canManagePublishing(req)) {
     res.status(403).json({ success: false, message: 'Your workspace role cannot schedule social posts.' });
+    return;
+  }
+  const scheduleTarget = await SocialPost.findOne({ _id: req.params.id, companyId: companyIdOf(req) }).select('platform');
+  if (scheduleTarget?.platform === 'youtube') {
+    res.status(422).json({
+      success: false,
+      code: 'SCHEDULE_UNAVAILABLE',
+      message: 'Scheduled YouTube uploads are not available yet. Publish the video now instead.',
+    });
     return;
   }
   const scheduledAtValue = req.body?.scheduledAt;

@@ -17,6 +17,8 @@ import AuditLog from '../models/AuditLog';
 import Integration, { IIntegration } from '../models/Integration';
 import { encryptProviderToken } from '../utils/providerTokenEncryption';
 import { LINKEDIN_PUBLISHING_SCOPE } from '../services/linkedinPublishing';
+import { YOUTUBE_PUBLISHING_SCOPES } from '../config/youtube';
+import { fetchYouTubeChannel, YouTubeApiError } from '../services/youtubePublishing';
 import {
   buildAuthorizationUrl,
   createOAuthToken,
@@ -60,7 +62,7 @@ function providerPicture(provider: OAuthProvider, picture?: string): string | un
 const safeError = (value: string) =>
   ['cancelled', 'mfa_required', 'provider_unavailable', 'authorization_failed', 'invalid_request', 'attempt_expired', 'account_exists', 'signup_required',
     'identity_in_use', 'link_email_mismatch', 'verified_email_required', 'client_invitation_required', 'publishing_permission_denied',
-    'provider_already_linked', 'try_again'].includes(value)
+    'provider_already_linked', 'youtube_channel_required', 'try_again'].includes(value)
     ? value
     : 'try_again';
 
@@ -93,6 +95,7 @@ const knownOAuthFailures = new Set([
   'provider_already_linked',
   'verified_email_required',
   'publishing_permission_denied',
+  'youtube_channel_required',
   'provider_already_linked',
   'missing_state',
   'invalid_state_format',
@@ -116,6 +119,18 @@ function logOAuthFailure(provider: OAuthProvider | 'oauth', stage: string, error
       reason: error.diagnosticCode,
       ...(error.httpStatus ? { httpStatus: error.httpStatus } : {}),
       ...(error.providerErrorCode ? { providerErrorCode: error.providerErrorCode } : {}),
+      correlationId,
+    });
+    return;
+  }
+
+  if (error instanceof YouTubeApiError) {
+    console.error('[OAuth] Callback step failed.', {
+      provider,
+      stage,
+      reason: 'youtube_api_rejected',
+      httpStatus: error.status,
+      ...(error.reason ? { providerErrorCode: error.reason } : {}),
       correlationId,
     });
     return;
@@ -259,7 +274,7 @@ export const startOAuth = async (req: Request, res: Response): Promise<void> => 
   const requestedOrganizationType = typeof req.query.organizationType === 'string' ? req.query.organizationType : '';
   if ((audience === 'client' && (intent === 'signup' || intent === 'publishing')) ||
       (intent === 'publishing' && (
-        provider !== 'linkedin' ||
+        (provider !== 'linkedin' && provider !== 'google') ||
         !userId ||
         audience !== 'user' ||
         !authRequest.user?.companyId ||
@@ -285,6 +300,11 @@ export const startOAuth = async (req: Request, res: Response): Promise<void> => 
     ? '/create-company'
     : typeof req.query.returnTo === 'string' ? req.query.returnTo : defaultReturnTo;
   const redirect = getClientRedirect(returnTo);
+  // Google publishing consent connects YouTube; tag the return URL so success and
+  // error redirects identify the destination being connected.
+  if (redirect && intent === 'publishing' && provider === 'google') {
+    redirect.searchParams.set('oauth_provider', 'youtube');
+  }
   const configuration = getOAuthConfiguration(provider);
   if ((audience === 'user' && intent === 'link' && !userId) ||
       (audience === 'client' && intent === 'link' && !clientUserId) ||
@@ -546,6 +566,63 @@ async function finishLinkedInPublishingConnection(
   return connection;
 }
 
+async function finishYouTubePublishingConnection(
+  transactionUserId: string,
+  claims: OidcClaims,
+  tokens: { accessToken?: string; refreshToken?: string; scopes: string[]; expiresIn?: number },
+): Promise<IIntegration> {
+  // Google's granular consent lets members untick scopes; both are required.
+  if (!tokens.accessToken || tokens.accessToken.length > 16_384 ||
+      !tokens.refreshToken || tokens.refreshToken.length > 16_384 ||
+      !YOUTUBE_PUBLISHING_SCOPES.every((scope) => tokens.scopes.includes(scope))) {
+    throw new Error('publishing_permission_denied');
+  }
+  const user = await User.findById(transactionUserId);
+  if (!user || !user.isActive || user.isDeleted || !user.isVerified || !user.companyId) {
+    throw new Error('account_unavailable');
+  }
+  const company = await Company.findOne({ _id: user.companyId, isActive: true })
+    .select('_id accountType organizationType');
+  if (!company || !canManageSocialConnection({
+    role: user.role,
+    accountType: company.accountType,
+    organizationType: company.organizationType,
+  })) throw new Error('account_unavailable');
+
+  const channel = await fetchYouTubeChannel(tokens.accessToken);
+  const existingConnection = await Integration.findOne({ companyId: company._id, provider: 'youtube' })
+    .select('status config');
+  if (existingConnection?.status === 'connected' &&
+      existingConnection.config?.channelId !== channel.channelId) {
+    throw new Error('provider_already_linked');
+  }
+
+  const expiresIn = typeof tokens.expiresIn === 'number' && tokens.expiresIn > 0 ? tokens.expiresIn : 3600;
+  const connection = await Integration.findOneAndUpdate(
+    { companyId: company._id, provider: 'youtube' },
+    {
+      $set: {
+        createdBy: user._id,
+        status: 'connected',
+        accessToken: encryptProviderToken(tokens.accessToken),
+        refreshToken: encryptProviderToken(tokens.refreshToken),
+        tokenExpiresAt: new Date(Date.now() + expiresIn * 1000),
+        config: {
+          googleSubject: claims.sub,
+          channelId: channel.channelId,
+          identityName: channel.channelTitle,
+          ...(claims.email ? { identityEmail: claims.email.trim().toLowerCase().slice(0, 254) } : {}),
+          grantedScopes: tokens.scopes.filter((scope) => YOUTUBE_PUBLISHING_SCOPES.includes(scope)),
+        },
+        errorMessage: null,
+      },
+    },
+    { upsert: true, new: true, setDefaultsOnInsert: true, select: '-accessToken -refreshToken' },
+  );
+  if (!connection) throw new Error('provider_connection_failed');
+  return connection;
+}
+
 export const completeOAuthCallback = async (req: Request, res: Response): Promise<void> => {
   res.setHeader('Cache-Control', 'no-store');
   res.setHeader('Referrer-Policy', 'no-referrer');
@@ -652,13 +729,35 @@ export const completeOAuthCallback = async (req: Request, res: Response): Promis
   }
   let stage = 'authorization_code_exchange_and_id_token_validation';
   try {
-    const { claims, accessToken } = await exchangeAuthorizationCode(
+    const { claims, accessToken, refreshToken, scopes, expiresIn } = await exchangeAuthorizationCode(
       provider,
       configuration,
       code,
       transaction.codeVerifier,
       transaction.nonce,
     );
+    if (transaction.intent === 'publishing' && transaction.audience === 'user' && provider === 'google') {
+      stage = 'youtube_channel_connection';
+      const connection = await finishYouTubePublishingConnection(
+        transaction.userId?.toString() || '',
+        claims,
+        { accessToken, refreshToken, scopes, expiresIn },
+      );
+      await AuditLog.create({
+        companyId: connection.companyId,
+        userId: connection.createdBy,
+        action: 'YOUTUBE_PUBLISHING_CONNECTED',
+        resource: 'Integration',
+        resourceId: connection._id.toString(),
+        details: { grantedScopes: connection.config?.grantedScopes ?? [] },
+        ipAddress: req.ip,
+      });
+      const destination = getClientRedirect(transaction.returnTo);
+      if (!destination) throw new Error('invalid_return_to');
+      destination.searchParams.set('oauth', 'connected');
+      res.redirect(303, destination.toString());
+      return;
+    }
     if (transaction.intent === 'publishing' && transaction.audience === 'user') {
       stage = 'linkedin_token_introspection';
       if (!accessToken) throw new Error('publishing_permission_denied');
@@ -753,7 +852,19 @@ export const completeOAuthCallback = async (req: Request, res: Response): Promis
     const destination = transaction.intent === 'link' || transaction.intent === 'publishing'
       ? transaction.returnTo
       : transaction.audience === 'client' ? '/client-portal/oauth/callback' : undefined;
-    const errorCode = error?.message === 'account_exists'
+    // A token endpoint that rejects WorkGrind's client credentials is a server
+    // configuration fault (e.g. a stale client secret); retrying cannot help.
+    const clientCredentialsRejected = error instanceof OAuthServiceError &&
+      error.diagnosticCode === 'token_endpoint_rejected' &&
+      (error.providerErrorCode === 'invalid_client' || error.providerErrorCode === 'unauthorized_client');
+    if (clientCredentialsRejected) {
+      console.error('[OAuth] Provider rejected the configured client credentials. Verify the client ID and secret in the deployment environment.', {
+        provider,
+        correlationId,
+      });
+    }
+    const errorCode = clientCredentialsRejected ? 'provider_unavailable'
+      : error?.message === 'account_exists'
       ? 'account_exists'
       : error?.message === 'client_invitation_required' ? 'client_invitation_required'
       : error?.message === 'signup_required' ? 'signup_required'
@@ -763,6 +874,7 @@ export const completeOAuthCallback = async (req: Request, res: Response): Promis
       : error?.message === 'verified_email_required' ? 'verified_email_required'
       : error?.message === 'publishing_permission_denied' ? 'publishing_permission_denied'
       : error?.message === 'provider_already_linked' ? 'provider_already_linked'
+      : error?.message === 'youtube_channel_required' ? 'youtube_channel_required'
       : error?.message === 'cancelled' ? 'cancelled' : 'try_again';
     errorRedirect(
       res,

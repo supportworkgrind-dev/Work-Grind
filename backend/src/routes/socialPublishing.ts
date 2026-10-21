@@ -8,6 +8,8 @@ import {
   createSocialDraft,
   deleteSocialDraft,
   disconnectLinkedIn,
+  disconnectYouTube,
+  getYouTubeConnection,
   generateSocialDraft,
   getSocialAccounts,
   getLinkedInConnection,
@@ -38,6 +40,8 @@ router.get('/accounts', asyncHandler(getSocialAccounts));
 router.get('/connection', asyncHandler(getLinkedInConnection));
 router.get('/media/:id', validateObjectId('id'), asyncHandler(previewSocialMedia));
 router.delete('/connection', asyncHandler(disconnectLinkedIn));
+router.get('/youtube/connection', asyncHandler(getYouTubeConnection));
+router.delete('/youtube/connection', asyncHandler(disconnectYouTube));
 router.get('/posts', asyncHandler(listSocialPosts));
 router.post('/posts', rateLimiter(15, 30), asyncHandler(createSocialDraft));
 router.post('/draft/generate', rateLimiter(15, 10), requireEntitlement('aiAssistant'), asyncHandler(generateSocialDraft));
