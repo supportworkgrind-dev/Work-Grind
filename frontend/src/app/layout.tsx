@@ -3,6 +3,7 @@ import { headers } from 'next/headers';
 import { Plus_Jakarta_Sans } from 'next/font/google';
 import './globals.css';
 import { RootClientProviders } from '@/components/layout/RootClientProviders';
+import { getSiteUrl } from '@/lib/siteUrl';
 
 const plusJakartaSans = Plus_Jakarta_Sans({
   subsets: ['latin'],
@@ -18,7 +19,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_BASE_URL || 'https://workgrind.app'),
+  metadataBase: new URL(getSiteUrl()),
   title: 'WorkGrind | Connected Workspaces for Work and Learning',
   description: 'WorkGrind is a connected workspace for individuals and freelancers, business and office teams, and schools, colleges, and universities. Features vary by workspace, role, and plan.',
   manifest: '/manifest.json',
@@ -34,7 +35,7 @@ export const metadata: Metadata = {
   openGraph: {
     title:       'WorkGrind | Connected Workspaces for Work and Learning',
     description: 'Bring personal work, team collaboration, business tools, and education administration together. Tavro AI supports work and learning where available.',
-    url:         'https://workgrind.app',
+    url:         '/',
     siteName:    'WorkGrind',
     images: [
       {

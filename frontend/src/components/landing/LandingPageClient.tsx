@@ -29,8 +29,10 @@ export function LandingPageClient({ children }: { children: ReactNode }) {
   return (
     <div className={`${styles.landing} landing-theme theme-scope min-h-screen overflow-x-hidden`}>
       <FloatingNavbar isAuthenticated={isAuthenticated && !!user} />
+      {/* Overlaid rather than inserted above the hero so a failed session
+          restore cannot shift the page layout (measured CLS 0.24 when inline). */}
       {authError && (
-        <div className="flex flex-col items-center justify-center gap-4 px-6 pt-24 text-center" role="alert">
+        <div className="fixed inset-x-4 top-20 z-50 mx-auto flex max-w-md flex-col items-center justify-center gap-4 rounded-2xl border border-white/10 bg-[#0d1117]/95 px-6 py-5 text-center shadow-xl" role="alert">
           <p>{authError}</p>
           <button className="theme-primary-action px-4 py-2" onClick={() => void restoreSession()}>Retry</button>
         </div>

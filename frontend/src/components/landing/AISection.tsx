@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useInView } from 'framer-motion';
 import { Sparkles, ArrowRight, MessageSquare, CheckSquare } from 'lucide-react';
 import Link from 'next/link';
 
@@ -21,8 +21,12 @@ export function AISection() {
   const [activeIdx, setActiveIdx] = useState(0);
   const [showResponse, setShowResponse] = useState(true);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sectionRef = useRef<HTMLElement>(null);
+  // Only cycle the demo while the section is near the viewport.
+  const nearViewport = useInView(sectionRef, { margin: '200px 0px' });
 
   useEffect(() => {
+    if (!nearViewport) return;
     const cycle = () => {
       setShowResponse(false);
       timeoutRef.current = setTimeout(() => {
@@ -35,10 +39,11 @@ export function AISection() {
       clearInterval(id);
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
-  }, []);
+  }, [nearViewport]);
 
   return (
     <section
+      ref={sectionRef}
       id="ai"
       className="landing-section relative py-28 lg:py-36 overflow-hidden"
       aria-labelledby="ai-heading"

@@ -141,11 +141,12 @@ function Bar({
 }: { pct: number; col: string; delay?: number; reduced: boolean }) {
   return (
     <div className="h-[3px] w-full rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.07)' }}>
+      {/* Animate scaleX (compositor-only) rather than width, which relaid out every frame. */}
       <motion.div
-        className="h-full rounded-full"
-        style={{ background: col }}
-        initial={{ width: 0 }}
-        animate={{ width: `${pct}%` }}
+        className="h-full rounded-full origin-left"
+        style={{ background: col, width: `${pct}%` }}
+        initial={{ scaleX: 0 }}
+        animate={{ scaleX: 1 }}
         transition={{ duration: reduced ? 0 : 0.85, delay: reduced ? 0 : delay, ease: 'easeOut' }}
       />
     </div>
@@ -730,15 +731,8 @@ function ProductDemo({ reduced }: { reduced: boolean }) {
 export function HeroSection() {
   const reduced  = !!useReducedMotion();
   const parallaxRef = useMouseParallax(0.015);
-
-  const copyVariants = {
-    hidden:  {},
-    visible: { transition: { staggerChildren: 0.1 } },
-  };
-  const lineVariant = {
-    hidden:  { opacity: 0, y: 20 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.65, ease: [0.16, 1, 0.3, 1] as any } },
-  };
+  // Staggered CSS entrance (0.1s steps), matching the previous motion timing.
+  const enterDelay = (step: number) => ({ '--hero-enter-delay': `${step * 0.1}s` }) as React.CSSProperties;
 
   return (
     <section
@@ -750,45 +744,40 @@ export function HeroSection() {
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.2fr] gap-10 lg:gap-16 items-center">
 
           {/* ══ LEFT: Copy ══ */}
-          <motion.div
-            variants={copyVariants}
-            initial="hidden"
-            animate="visible"
-            className="text-center lg:text-left"
-          >
+          <div className="text-center lg:text-left">
             {/* Eyebrow */}
-            <motion.div variants={lineVariant} className="mb-5">
+            <div className={`${styles.heroEnterFade} mb-5`} style={enterDelay(0)}>
               <span className={`${styles.heroEyebrow} inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-xs font-bold tracking-wide`}>
                 For individuals, business teams, and education.
               </span>
-            </motion.div>
+            </div>
 
-            {/* Headline */}
-            <motion.h1
-              variants={lineVariant}
-              className={`${styles.heroTitle} font-black text-white mb-5`}
+            {/* Headline — LCP candidate: rises in but is never transparent */}
+            <h1
+              className={`${styles.heroEnterRise} ${styles.heroTitle} font-black text-white mb-5`}
+              style={enterDelay(1)}
             >
               One workspace for<br />
               work, business, and<br />
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-blue-400 to-cyan-400">
                 education.
               </span>
-            </motion.h1>
+            </h1>
 
-            {/* Supporting line */}
-            <motion.p
-              variants={lineVariant}
-              className={`${styles.heroDescription} text-slate-400 max-w-[65ch] mx-auto lg:mx-0 mb-7`}
+            {/* Supporting line — mobile LCP candidate */}
+            <p
+              className={`${styles.heroEnterRise} ${styles.heroDescription} text-slate-400 max-w-[65ch] mx-auto lg:mx-0 mb-7`}
+              style={enterDelay(2)}
             >
               Bring personal planning and freelancer work together with business team tools and
               academic administration for schools, colleges, and universities. Tavro AI supports
               both work and learning, with access based on your workspace, role, and plan.
-            </motion.p>
+            </p>
 
             {/* CTAs */}
-            <motion.div
-              variants={lineVariant}
-              className={`${styles.heroActions} flex flex-col gap-3 justify-center lg:justify-start mb-8`}
+            <div
+              className={`${styles.heroEnterFade} ${styles.heroActions} flex flex-col gap-3 justify-center lg:justify-start mb-8`}
+              style={enterDelay(3)}
             >
               <Link
                 href="/signup"
@@ -804,12 +793,12 @@ export function HeroSection() {
                 Explore Features
                 <ChevronRight className="h-4 w-4" />
               </Link>
-            </motion.div>
+            </div>
 
             {/* Workspace choices */}
-            <motion.div
-              variants={lineVariant}
-              className="grid grid-cols-2 gap-2 sm:grid-cols-3"
+            <div
+              className={`${styles.heroEnterFade} grid grid-cols-2 gap-2 sm:grid-cols-3`}
+              style={enterDelay(4)}
             >
               {([
                 { id: 'solo', label: 'Solo', icon: CheckSquare },
@@ -827,19 +816,17 @@ export function HeroSection() {
                   {label}
                 </Link>
               ))}
-            </motion.div>
-          </motion.div>
+            </div>
+          </div>
 
           {/* ══ RIGHT: Animated product demo ══ */}
-          <motion.div
+          <div
             ref={parallaxRef}
-            initial={{ opacity: 0, y: 36 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.9, delay: 0.3, ease: [0.16, 1, 0.3, 1] }}
-            className="relative"
+            className={`${styles.heroEnterFade} ${styles.heroEnterDemo} relative`}
+            style={enterDelay(3)}
           >
             <ProductDemo reduced={reduced} />
-          </motion.div>
+          </div>
         </div>
       </div>
     </section>

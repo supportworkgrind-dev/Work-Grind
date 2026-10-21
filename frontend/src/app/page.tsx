@@ -7,6 +7,11 @@ import { LandingFooter } from '@/components/landing/LandingFooter';
 import { LandingPageClient } from '@/components/landing/LandingPageClient';
 import { ProductShowcase } from '@/components/landing/ProductShowcase';
 import { SecuritySection } from '@/components/landing/SecuritySection';
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  alternates: { canonical: '/' },
+};
 
 export default function LandingPage() {
   return (

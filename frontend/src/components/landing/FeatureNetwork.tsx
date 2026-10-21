@@ -102,9 +102,10 @@ export function FeatureNetwork() {
                     <Search className="h-3 w-3" />
                     Search customers…
                   </div>
-                  <button className="h-7 w-7 rounded-lg bg-indigo-600 flex items-center justify-center hover:bg-indigo-500 transition-colors">
+                  {/* Decorative control in the illustrative preview (no action), so not a focusable button. */}
+                  <span aria-hidden="true" className="h-7 w-7 rounded-lg bg-indigo-600 flex items-center justify-center">
                     <Plus className="h-3.5 w-3.5 text-white" />
-                  </button>
+                  </span>
                 </div>
               </div>
 
@@ -170,9 +171,9 @@ export function FeatureNetwork() {
                           <p className="text-[10px] text-slate-500">{selected.contact}</p>
                         </div>
                       </div>
-                      <button className="text-slate-600 hover:text-slate-400 transition-colors">
+                      <span aria-hidden="true" className="text-slate-600">
                         <MoreHorizontal className="h-4 w-4" />
-                      </button>
+                      </span>
                     </div>
 
                     {/* Status + value */}

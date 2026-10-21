@@ -42,6 +42,43 @@
   outline-offset: 3px;
 }
 
+/* Hero entrance runs in CSS so it starts from server-rendered HTML instead of
+   waiting for hydration. LCP text only rises (never starts transparent), so it
+   is painted immediately. `backwards` fill hands transform back to the demo's
+   mouse parallax once the entrance finishes. */
+@keyframes heroRise {
+  from { transform: translate3d(0, 20px, 0); }
+  to { transform: none; }
+}
+
+@keyframes heroFadeRise {
+  from { opacity: 0; transform: translate3d(0, var(--hero-enter-distance, 20px), 0); }
+  to { opacity: 1; transform: none; }
+}
+
+.landing .heroEnterRise,
+.landing .heroEnterFade {
+  animation-duration: 0.65s;
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  animation-fill-mode: backwards;
+  animation-delay: var(--hero-enter-delay, 0s);
+}
+
+.landing .heroEnterRise { animation-name: heroRise; }
+.landing .heroEnterFade { animation-name: heroFadeRise; }
+
+.landing .heroEnterDemo {
+  --hero-enter-distance: 36px;
+  animation-duration: 0.9s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing .heroEnterRise,
+  .landing .heroEnterFade {
+    animation: none;
+  }
+}
+
 .landing :global([class*="text-[7px]"]),
 .landing :global([class*="text-[8px]"]),
 .landing :global([class*="text-[9px]"]),
@@ -589,6 +626,17 @@
     background-image: none !important;
     color: var(--wg-auth-accent) !important;
     -webkit-text-fill-color: var(--wg-auth-accent);
+  }
+
+  /* --wg-auth-accent is 1.99:1 on --wg-bg; the theme accent is 6.5:1 (WCAG AA large text). */
+  .landing .heroTitle :global([class*="text-transparent"]) {
+    color: var(--wg-theme-accent) !important;
+    -webkit-text-fill-color: var(--wg-theme-accent);
+  }
+
+  /* Keep the CTA's panel text colour; the text-white remap above made it 2:1. */
+  .landing .heroPrimaryCta {
+    color: var(--wg-auth-panel-text) !important;
   }
 
   .landing :global([class*="bg-[#"]),
