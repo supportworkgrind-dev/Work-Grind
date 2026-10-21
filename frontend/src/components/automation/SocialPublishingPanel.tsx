@@ -665,31 +665,31 @@ export function SocialPublishingPanel() {
                 <p className="whitespace-pre-wrap text-sm theme-text-primary">{text || 'Your post preview will appear here.'}</p>
                 {composerMedia && socialMediaFileId(composerMedia) && mediaPreviews[socialMediaFileId(composerMedia)!] && (
                   <div className="mt-3 overflow-hidden rounded-lg border theme-border">
-                    {composerMedia.mimeType === 'video/mp4'
+                    {isVideoType(composerMedia.mimeType)
                       ? <video controls preload="metadata" src={mediaPreviews[socialMediaFileId(composerMedia)!]} className="max-h-80 w-full bg-black" />
                       : <Image unoptimized width={640} height={480} src={mediaPreviews[socialMediaFileId(composerMedia)!]} alt={composerMedia.altText || composerMedia.name || 'Post attachment'} className="max-h-80 w-full object-contain" />}
                   </div>
                 )}
               </div>
-            : <textarea id="linkedin-post-text" value={text} onChange={(event) => setText(event.target.value)} maxLength={3000} rows={6} placeholder="Write a post or generate a draft with Tavro." className="input-premium w-full resize-y" />}
+            : <textarea id="linkedin-post-text" value={text} onChange={(event) => setText(event.target.value)} maxLength={3000} rows={6} placeholder={isYouTube ? 'Describe the video for viewers.' : 'Write a post or generate a draft with Tavro.'} className="input-premium w-full resize-y" />}
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <label className={`btn-ghost inline-flex h-9 cursor-pointer items-center gap-2 px-3 text-xs ${busy || composerMedia ? 'pointer-events-none opacity-50' : ''}`}>
               {busy ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
-              Add image or video
-              <input type="file" accept="image/jpeg,image/png,video/mp4" onChange={(event) => void uploadMedia(event)} disabled={busy || Boolean(composerMedia)} className="sr-only" />
+              {isYouTube ? 'Choose video' : 'Add image or video'}
+              <input type="file" accept={isYouTube ? 'video/mp4,video/webm' : 'image/jpeg,image/png,video/mp4'} onChange={(event) => void uploadMedia(event)} disabled={busy || Boolean(composerMedia)} className="sr-only" />
             </label>
-            <span className="text-[11px] theme-text-muted">JPEG/PNG up to 36 MB · MP4 up to 50 MB</span>
+            <span className="text-[11px] theme-text-muted">{isYouTube ? 'One MP4 or WebM video up to 50 MB' : 'JPEG/PNG up to 36 MB · MP4 up to 50 MB'}</span>
           </div>
           {busy && uploadProgress > 0 && <div className="mt-2" aria-live="polite"><div className="h-1.5 overflow-hidden rounded-full bg-black/10"><div className="h-full bg-[var(--accent)] transition-[width]" style={{ width: `${uploadProgress}%` }} /></div><p className="mt-1 text-[11px] theme-text-muted">Uploading media · {uploadProgress}%</p></div>}
           {composerMedia && <div className="mt-3 flex flex-col gap-3 rounded-xl border p-3 sm:flex-row sm:items-center" style={{ borderColor: 'var(--border-color)', background: 'var(--bg-base)' }}>
             <div className="flex h-20 w-28 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-black/5">
               {mediaPreviews[socialMediaFileId(composerMedia)!]
-                ? composerMedia.mimeType === 'video/mp4'
+                ? isVideoType(composerMedia.mimeType)
                   ? <video src={mediaPreviews[socialMediaFileId(composerMedia)!]} className="h-full w-full object-cover" />
                   : <Image unoptimized width={224} height={160} src={mediaPreviews[socialMediaFileId(composerMedia)!]} alt={composerMedia.altText || composerMedia.name || 'Selected post attachment'} className="h-full w-full object-cover" />
-                : composerMedia.mimeType === 'video/mp4' ? <Video className="h-6 w-6 theme-text-muted" /> : <ImagePlus className="h-6 w-6 theme-text-muted" />}
+                : isVideoType(composerMedia.mimeType) ? <Video className="h-6 w-6 theme-text-muted" /> : <ImagePlus className="h-6 w-6 theme-text-muted" />}
             </div>
-            <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium theme-text-primary">{composerMedia.name || 'LinkedIn media attachment'}</p><p className="text-xs theme-text-muted">{composerMedia.mimeType} · {composerMedia.size ? `${(composerMedia.size / 1024 / 1024).toFixed(1)} MB` : 'Ready to publish'}</p></div>
+            <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium theme-text-primary">{composerMedia.name || (isYouTube ? 'YouTube video' : 'LinkedIn media attachment')}</p><p className="text-xs theme-text-muted">{composerMedia.mimeType} · {composerMedia.size ? `${(composerMedia.size / 1024 / 1024).toFixed(1)} MB` : 'Ready to publish'}</p></div>
             <button type="button" onClick={() => setComposerMedia(null)} className="btn-ghost inline-flex h-9 items-center gap-1.5 px-3 text-xs text-rose-700"><X className="h-4 w-4" />Remove</button>
           </div>}
           <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
@@ -700,9 +700,9 @@ export function SocialPublishingPanel() {
                 {busy ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
                 {editingId ? 'Save changes' : 'Save draft'}
               </button>
-              {canReview && <button type="button" onClick={() => void publishCurrentNow()} disabled={busy || !text.trim() || !connection?.canPublishMemberPosts} className="btn-primary inline-flex h-9 items-center gap-2 px-3 text-xs disabled:opacity-50">
+              {canReview && <button type="button" onClick={() => void publishCurrentNow()} disabled={busy || !text.trim() || !destinationConnected} className="btn-primary inline-flex h-9 items-center gap-2 px-3 text-xs disabled:opacity-50">
                 {busy ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                Publish Now
+                {isYouTube ? 'Upload to YouTube' : 'Publish Now'}
               </button>}
             </div>
           </div>
@@ -732,31 +732,33 @@ export function SocialPublishingPanel() {
                     {post.publishedAt && <span className="text-xs theme-text-muted">· {new Date(post.publishedAt).toLocaleString()}</span>}
                     {post.scheduledAt && <span className="text-xs theme-text-muted">· Scheduled {new Date(post.scheduledAt).toLocaleString()} ({post.scheduleTimeZone})</span>}
                   </div>
-                  {post.status === 'published' && <span className="text-xs font-medium text-emerald-700">{post.platform} confirmed</span>}
+                  <span className="flex items-center gap-2">
+                    <span className="rounded-full px-2 py-1 text-[10px] font-semibold theme-bg-hover theme-text-secondary">{PROVIDER_NAMES[post.platform]}</span>
+                    {post.status === 'published' && <span className="text-xs font-medium text-emerald-700">{PROVIDER_NAMES[post.platform]} confirmed</span>}
+                  </span>
                 </div>
-                <p className="mt-3 whitespace-pre-wrap text-sm theme-text-primary">{post.text}</p>
+                {post.platform === 'youtube' && post.platformData?.title && (
+                  <p className="mt-3 text-sm font-semibold theme-text-primary">
+                    {post.platformData.title}
+                    <span className="ml-2 text-[11px] font-normal theme-text-muted">{post.platformData.privacyStatus || 'private'}</span>
+                  </p>
+                )}
+                <p className={`${post.platform === 'youtube' ? 'mt-1' : 'mt-3'} whitespace-pre-wrap text-sm theme-text-primary`}>{post.text}</p>
                 {post.media?.map((media) => {
                   const fileId = socialMediaFileId(media);
                   const src = fileId ? mediaPreviews[fileId] : '';
                   if (!src) return null;
                   return <div key={fileId} className="mt-3 max-w-xl overflow-hidden rounded-xl border theme-border">
-                    {media.mimeType === 'video/mp4'
+                    {isVideoType(media.mimeType)
                       ? <video controls preload="metadata" src={src} className="max-h-96 w-full bg-black" />
                       : <Image unoptimized width={640} height={480} src={src} alt={media.altText || (typeof media.fileId === 'object' ? media.fileId.name : undefined) || 'LinkedIn post attachment'} className="max-h-96 w-full object-contain" />}
                   </div>;
                 })}
                 {post.rejectionReason && <p className="mt-2 text-xs text-rose-700">Review note: {post.rejectionReason}</p>}
-                {post.failureCode && <p className="mt-2 text-xs text-rose-700">Publishing needs attention: {({
-                  authorization_revoked: 'Reconnect LinkedIn and try again.',
-                  permission_or_member_access_denied: 'LinkedIn permission is unavailable. Reconnect the publishing account.',
-                  rate_limited: 'LinkedIn is rate limiting requests. Retry after a short wait.',
-                  post_rejected: 'LinkedIn rejected this post. Edit the draft before retrying.',
-                  media_unavailable: 'The attached media is no longer available. Replace the attachment and retry.',
-                  provider_timeout: 'LinkedIn did not respond in time. Check the post status before trying again.',
-                  provider_unavailable: 'LinkedIn could not confirm publication. Check the post status before taking further action.',
-                } as Record<string, string>)[post.failureCode] || 'Review the post and connection before retrying.'}</p>}
-                {post.linkedinPostUrl && <a href={post.linkedinPostUrl} target="_blank" rel="noreferrer" className="mt-2 inline-block text-xs font-medium text-sky-700 underline">View LinkedIn post</a>}
-                {post.status === 'published' && !post.linkedinPostUrl && <p className="mt-2 text-xs theme-text-muted">LinkedIn confirmed publication; a permalink was not provided.</p>}
+                {post.failureCode && <p className="mt-2 text-xs text-rose-700">Publishing needs attention: {failureMessage(post)}</p>}
+                {publishedUrl(post) && <a href={publishedUrl(post)} target="_blank" rel="noreferrer" className="mt-2 inline-block text-xs font-medium text-sky-700 underline">View {PROVIDER_NAMES[post.platform]} {post.platform === 'youtube' ? 'video' : 'post'}</a>}
+                {post.status === 'published' && !publishedUrl(post) && <p className="mt-2 text-xs theme-text-muted">{PROVIDER_NAMES[post.platform]} confirmed publication; a permalink was not provided.</p>}
+                {post.status === 'published' && post.platform === 'youtube' && <p className="mt-1 text-[11px] theme-text-muted">YouTube may take a few minutes to finish processing the video.</p>}
                 <div className="mt-3 flex flex-wrap gap-2">
                   {(post.status === 'draft' || post.status === 'rejected' ||
                     (post.status === 'failed' && ['rate_limited', 'post_rejected', 'media_unavailable'].includes(post.failureCode ?? ''))) && (
@@ -780,7 +782,7 @@ export function SocialPublishingPanel() {
                       <Send className="h-3.5 w-3.5" /> {post.status === 'failed' ? 'Retry publish' : 'Publish now'}
                     </button>
                   )}
-                  {(canReview || isManager) && (post.status === 'draft' || post.status === 'approved') &&
+                  {post.platform === 'linkedin' && (canReview || isManager) && (post.status === 'draft' || post.status === 'approved') &&
                     (canReview || post.status === 'approved') && connection?.canPublishMemberPosts && (
                       <div className="flex flex-wrap items-center gap-2">
                         <label className="sr-only" htmlFor={`schedule-${post._id}`}>Schedule date and time</label>
