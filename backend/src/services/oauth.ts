@@ -92,6 +92,11 @@ const providers: Record<OAuthProvider, {
   },
 };
 
+// LinkedIn documents `https://www.linkedin.com` as the ID token issuer, while its
+// discovery document advertises `https://www.linkedin.com/oauth`. Both are LinkedIn's.
+const LINKEDIN_ISSUERS = new Set(['https://www.linkedin.com', 'https://www.linkedin.com/oauth']);
+const LINKEDIN_USERINFO_ENDPOINT = 'https://api.linkedin.com/v2/userinfo';
+
 const base64Url = (value: Buffer | string) =>
   Buffer.from(value).toString('base64').replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
 const sha256 = (value: string) => createHash('sha256').update(value).digest('hex');
@@ -295,12 +300,23 @@ export async function exchangeAuthorizationCode(
   if (!tokenResponse.id_token || tokenResponse.id_token.length > 16_384) {
     throw new Error('Provider did not return an identity token.');
   }
-  const claims = await verifyIdentityToken(provider, configuration.clientId, tokenResponse.id_token);
-  const receivedNonce = Buffer.from(claims.nonce || '');
-  const wantedNonce = Buffer.from(expectedNonce);
-  if (!claims.nonce || receivedNonce.length !== wantedNonce.length ||
-      !timingSafeEqual(receivedNonce, wantedNonce)) {
-    throw new Error('Identity token nonce was invalid.');
+  let claims = await verifyIdentityToken(provider, configuration.clientId, tokenResponse.id_token);
+  // LinkedIn does not echo the authorization-request nonce in its ID token. The token
+  // still arrives over the authenticated back channel for a single-use state, PKCE
+  // verifier, and client secret, so an absent LinkedIn nonce is accepted; a nonce that
+  // is present must always match. Other providers must return the nonce.
+  const nonceOptional = provider === 'linkedin' && claims.nonce === undefined;
+  if (!nonceOptional) {
+    const receivedNonce = Buffer.from(claims.nonce || '');
+    const wantedNonce = Buffer.from(expectedNonce);
+    if (!claims.nonce || receivedNonce.length !== wantedNonce.length ||
+        !timingSafeEqual(receivedNonce, wantedNonce)) {
+      throw new Error('Identity token nonce was invalid.');
+    }
+  }
+  if (provider === 'linkedin' && typeof tokenResponse.access_token === 'string' &&
+      (!claims.email || !identityTokenHasVerifiedEmail(claims))) {
+    claims = await mergeLinkedInUserInfo(claims, tokenResponse.access_token);
   }
   const scopes = typeof tokenResponse.scope === 'string'
     ? tokenResponse.scope.split(/[,\s]+/).filter(Boolean)
@@ -383,9 +399,12 @@ async function getProviderKeys(provider: OAuthProvider, kid: string) {
     cached = { expiresAt: Date.now() + 60 * 60_000, keys: result.keys };
     jwksCache.set(provider, cached);
   }
+  // `use` and `alg` are optional JWK members (RFC 7517 §4.2, §4.4). LinkedIn's JWKS
+  // omits both, so only reject keys that explicitly declare a different purpose.
   const key = cached.keys.find((candidate) =>
-    candidate.kid === kid && candidate.use === 'sig' &&
-    candidate.kty === 'RSA');
+    candidate.kid === kid && candidate.kty === 'RSA' &&
+    (candidate.use === undefined || candidate.use === 'sig') &&
+    (candidate.alg === undefined || candidate.alg === 'RS256'));
   if (!key) throw new Error('Identity token signing key was not recognized.');
   return key;
 }
@@ -422,7 +441,9 @@ async function verifyIdentityToken(
   const audiences = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
   const validIssuer = provider === 'google'
     ? claims.iss === providers.google.issuer || claims.iss === 'accounts.google.com'
-    : claims.iss === providers[provider].issuer;
+    : provider === 'linkedin'
+      ? LINKEDIN_ISSUERS.has(claims.iss ?? '')
+      : claims.iss === providers[provider].issuer;
   if (!verified || !validIssuer || !audiences.includes(clientId) ||
       (audiences.length > 1 && claims.azp !== clientId) ||
       (claims.azp !== undefined && claims.azp !== clientId) ||
@@ -436,6 +457,46 @@ async function verifyIdentityToken(
 
 export function identityTokenHasVerifiedEmail(claims: OidcClaims) {
   return claims.email_verified === true || claims.email_verified === 'true';
+}
+
+/**
+ * Fills a missing or unverified email from LinkedIn's OIDC userinfo endpoint. The
+ * response is only trusted for the same subject as the verified ID token. Failures
+ * are non-fatal: existing linked members can still sign in by subject, and new
+ * accounts are refused later with `verified_email_required`.
+ */
+async function mergeLinkedInUserInfo(claims: OidcClaims, accessToken: string): Promise<OidcClaims> {
+  try {
+    const response = await timedFetch(LINKEDIN_USERINFO_ENDPOINT, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!response.ok) {
+      console.warn('[OAuth] LinkedIn userinfo lookup failed.', { provider: 'linkedin', httpStatus: response.status });
+      return claims;
+    }
+    const info = await response.json() as Partial<OidcClaims>;
+    if (!info || typeof info !== 'object' || info.sub !== claims.sub) {
+      console.warn('[OAuth] LinkedIn userinfo response did not match the identity token subject.', { provider: 'linkedin' });
+      return claims;
+    }
+    const verified = info.email_verified === true || info.email_verified === 'true';
+    if (typeof info.email !== 'string' || !info.email || !verified) return claims;
+    return {
+      ...claims,
+      email: info.email,
+      email_verified: true,
+      ...(!claims.name && typeof info.name === 'string' ? { name: info.name } : {}),
+      ...(!claims.given_name && typeof info.given_name === 'string' ? { given_name: info.given_name } : {}),
+      ...(!claims.family_name && typeof info.family_name === 'string' ? { family_name: info.family_name } : {}),
+      ...(!claims.picture && typeof info.picture === 'string' ? { picture: info.picture } : {}),
+    };
+  } catch (error) {
+    console.warn('[OAuth] LinkedIn userinfo lookup failed.', {
+      provider: 'linkedin',
+      reason: error instanceof Error && error.name === 'AbortError' ? 'provider_timeout' : 'provider_network_error',
+    });
+    return claims;
+  }
 }
 
 export type { OidcClaims };
