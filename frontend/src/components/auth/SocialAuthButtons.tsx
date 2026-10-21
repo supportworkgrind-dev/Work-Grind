@@ -37,6 +37,8 @@ export function SocialAuthButtons({
   useEffect(() => {
     if (intent !== 'link' && intent !== 'publishing') return;
     const url = new URL(window.location.href);
+    // YouTube consent results are handled by the YouTube connection card.
+    if (url.searchParams.get('oauth_provider') === 'youtube') return;
     const result = url.searchParams.get('oauth');
     const issue = url.searchParams.get('oauth_error');
     if (result || issue) {

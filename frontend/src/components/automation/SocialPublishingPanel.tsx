@@ -6,6 +6,7 @@ import { CalendarClock, Camera, Check, Eye, ImagePlus, LoaderCircle, Pencil, Pla
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/store/useAuthStore';
 import { LinkedInConnection, LinkedInConnectionCard } from './LinkedInConnectionCard';
+import { YouTubeConnection, YouTubeConnectionCard } from './YouTubeConnectionCard';
 
 type SocialPost = {
   _id: string;
@@ -25,7 +26,42 @@ type SocialPost = {
   scheduledAt?: string;
   scheduleTimeZone?: string;
   media?: SocialMedia[];
+  platformData?: { title?: string; privacyStatus?: YouTubePrivacy; youtubeVideoId?: string };
+  destinations?: Array<{ provider: string; status: string; externalPostId?: string; externalPostUrl?: string }>;
 };
+
+type YouTubePrivacy = 'private' | 'unlisted' | 'public';
+
+const PROVIDER_NAMES: Record<SocialPost['platform'], string> = {
+  linkedin: 'LinkedIn',
+  instagram: 'Instagram',
+  facebook: 'Facebook',
+  youtube: 'YouTube',
+};
+
+const YOUTUBE_VIDEO_TYPES = ['video/mp4', 'video/webm'];
+const isVideoType = (mimeType: string) => mimeType.startsWith('video/');
+
+function failureMessage(post: SocialPost): string {
+  const provider = PROVIDER_NAMES[post.platform];
+  const messages: Record<string, string> = {
+    authorization_revoked: `Reconnect ${provider} and try again.`,
+    permission_or_member_access_denied: `${provider} permission is unavailable. Reconnect the publishing account.`,
+    rate_limited: `${provider} is rate limiting requests. Retry after a short wait.`,
+    quota_exceeded: 'The YouTube upload quota is exhausted. Retry after it resets.',
+    post_rejected: `${provider} rejected this post. Edit the draft before retrying.`,
+    media_unavailable: 'The attached media is no longer available. Replace the attachment and retry.',
+    provider_timeout: `${provider} did not respond in time. Check the post status before trying again.`,
+    provider_unavailable: `${provider} could not confirm publication. Check the post status before taking further action.`,
+  };
+  return messages[post.failureCode ?? ''] || 'Review the post and connection before retrying.';
+}
+
+function publishedUrl(post: SocialPost): string | undefined {
+  return post.platform === 'youtube'
+    ? post.destinations?.find((destination) => destination.provider === 'youtube')?.externalPostUrl
+    : post.linkedinPostUrl;
+}
 
 type SocialMedia = {
   fileId: string | { _id: string; name?: string; mimeType?: string; size?: number };
@@ -73,6 +109,9 @@ export function SocialPublishingPanel() {
   const canReview = ['owner', 'founder', 'admin', 'principal', 'director', 'office_staff', 'dean', 'hod'].includes(user?.role ?? '');
   const isManager = user?.role === 'manager';
   const [connection, setConnection] = useState<LinkedInConnection | null>(null);
+  const [youtubeConnection, setYouTubeConnection] = useState<YouTubeConnection | null>(null);
+  const [videoTitle, setVideoTitle] = useState('');
+  const [privacyStatus, setPrivacyStatus] = useState<YouTubePrivacy>('private');
   const [providers, setProviders] = useState<SocialProvider[]>([]);
   const [accounts, setAccounts] = useState<SocialAccount[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState('');
@@ -149,23 +188,54 @@ export function SocialPublishingPanel() {
     };
   }, [composerMedia, posts]);
 
-  const saveDraft = async () => {
+  const isYouTube = selectedPlatform === 'youtube';
+  const youtubeAvailable = providers.find((provider) => provider.id === 'youtube')?.availability === 'available';
+  const destinationConnected = isYouTube
+    ? Boolean(youtubeConnection?.canPublishVideos)
+    : Boolean(connection?.canPublishMemberPosts);
+
+  /** Mirrors backend validation so errors appear before any request is sent. */
+  const composerError = (): string | null => {
     if (!text.trim() || text.trim().length > 3000) {
-      setError('Enter post text between 1 and 3000 characters.');
+      return isYouTube ? 'Enter a video description between 1 and 3000 characters.' : 'Enter post text between 1 and 3000 characters.';
+    }
+    if (!isYouTube) return null;
+    if (!videoTitle.trim() || videoTitle.trim().length > 100) return 'Enter a video title between 1 and 100 characters.';
+    if (/[<>]/.test(videoTitle) || /[<>]/.test(text)) return 'YouTube titles and descriptions cannot contain < or > characters.';
+    if (!composerMedia || !YOUTUBE_VIDEO_TYPES.includes(composerMedia.mimeType)) return 'Attach one MP4 or WebM video for YouTube.';
+    return null;
+  };
+
+  const composerPayload = () => ({
+    text: text.trim(),
+    media: composerMedia ? [{
+      fileId: socialMediaFileId(composerMedia),
+      mimeType: composerMedia.mimeType,
+      ...(composerMedia.altText ? { altText: composerMedia.altText } : {}),
+    }] : [],
+    ...(isYouTube ? { platformData: { title: videoTitle.trim(), privacyStatus } } : {}),
+  });
+
+  const resetComposer = () => {
+    setText('');
+    setVideoTitle('');
+    setPrivacyStatus('private');
+    setComposerMedia(null);
+    setEditingId(null);
+    setPreview(false);
+  };
+
+  const saveDraft = async () => {
+    const validationError = composerError();
+    if (validationError) {
+      setError(validationError);
       return;
     }
     setBusy(true);
     setError('');
     setNotice('');
     try {
-      const payload = {
-        text: text.trim(),
-        media: composerMedia ? [{
-          fileId: socialMediaFileId(composerMedia),
-          mimeType: composerMedia.mimeType,
-          ...(composerMedia.altText ? { altText: composerMedia.altText } : {}),
-        }] : [],
-      };
+      const payload = composerPayload();
       if (editingId) await api.patch(`/social-publishing/posts/${editingId}`, payload);
       else await api.post('/social-publishing/posts', {
         ...payload,
@@ -175,10 +245,7 @@ export function SocialPublishingPanel() {
           : {}),
       });
       await refreshPosts();
-      setText('');
-      setComposerMedia(null);
-      setEditingId(null);
-      setPreview(false);
+      resetComposer();
       setNotice('Draft saved.');
     } catch (requestError: unknown) {
       const message = (requestError as { response?: { data?: { message?: string } } }).response?.data?.message;
@@ -189,27 +256,26 @@ export function SocialPublishingPanel() {
   };
 
   const publishCurrentNow = async () => {
-    if (!connection?.canPublishMemberPosts) {
-      setError('Connect LinkedIn publishing before publishing this post.');
+    const providerName = PROVIDER_NAMES[selectedPlatform];
+    if (!destinationConnected) {
+      setError(`Connect ${providerName} publishing before publishing this post.`);
       return;
     }
-    if (!text.trim() || text.trim().length > 3000) {
-      setError('Enter post text between 1 and 3000 characters.');
+    const validationError = composerError();
+    if (validationError) {
+      setError(validationError);
       return;
     }
+    if (isYouTube && !window.confirm(`Upload this video to ${youtubeConnection?.channelTitle || 'the connected YouTube channel'} as ${privacyStatus}?`)) return;
     setBusy(true);
     setError('');
-    setNotice('');
+    setNotice(isYouTube ? 'Uploading to YouTube. Keep this page open; large videos can take a few minutes.' : '');
     try {
+      const accountId = accounts.find((account) => account.id === selectedAccountId && account.provider === selectedPlatform)?.id;
       const payload = {
-        text: text.trim(),
-        platform: 'linkedin',
-        media: composerMedia ? [{
-          fileId: socialMediaFileId(composerMedia),
-          mimeType: composerMedia.mimeType,
-          ...(composerMedia.altText ? { altText: composerMedia.altText } : {}),
-        }] : [],
-        ...(selectedAccountId ? { integrationId: selectedAccountId } : {}),
+        ...composerPayload(),
+        platform: selectedPlatform,
+        ...(accountId ? { integrationId: accountId } : {}),
       };
       let postId = editingId;
       if (postId) {
@@ -220,19 +286,21 @@ export function SocialPublishingPanel() {
       }
       if (!postId) throw new Error('The draft could not be saved before publishing.');
       const result = await api.post(`/social-publishing/posts/${postId}/publish`, {
-        ...(selectedAccountId ? { integrationId: selectedAccountId } : {}),
-      });
+        platform: selectedPlatform,
+        ...(accountId ? { integrationId: accountId } : {}),
+      }, isYouTube ? { timeout: 5 * 60_000 } : undefined);
       await refreshPosts();
-      setText('');
-      setComposerMedia(null);
-      setEditingId(null);
-      setPreview(false);
-      setNotice(result.data.post?.linkedinPostUrl
-        ? `LinkedIn confirmed publication: ${result.data.post.linkedinPostUrl}`
-        : 'LinkedIn confirmed publication.');
+      resetComposer();
+      const url = isYouTube
+        ? result.data.post?.destinations?.[0]?.externalPostUrl
+        : result.data.post?.linkedinPostUrl;
+      setNotice(isYouTube
+        ? `YouTube accepted the upload${url ? `: ${url}` : ''}. Processing may take a few minutes.`
+        : url ? `LinkedIn confirmed publication: ${url}` : 'LinkedIn confirmed publication.');
     } catch (requestError: unknown) {
       const message = (requestError as { response?: { data?: { message?: string } } }).response?.data?.message;
-      setError(message || (requestError instanceof Error ? requestError.message : 'LinkedIn could not confirm publication.'));
+      setNotice('');
+      setError(message || (requestError instanceof Error ? requestError.message : `${providerName} could not confirm publication.`));
       await refreshPosts().catch(() => undefined);
     } finally {
       setBusy(false);
@@ -247,10 +315,14 @@ export function SocialPublishingPanel() {
       setError('Remove the current attachment before choosing another file.');
       return;
     }
-    const allowed = file.type === 'image/jpeg' || file.type === 'image/png' || file.type === 'video/mp4';
+    const allowed = isYouTube
+      ? YOUTUBE_VIDEO_TYPES.includes(file.type)
+      : file.type === 'image/jpeg' || file.type === 'image/png' || file.type === 'video/mp4';
     const maxBytes = file.type.startsWith('image/') ? 36 * 1024 * 1024 : 50 * 1024 * 1024;
     if (!allowed || file.size <= 0 || file.size > maxBytes) {
-      setError('Choose one JPEG or PNG image (up to 36 MB) or MP4 video (up to 50 MB).');
+      setError(isYouTube
+        ? 'Choose one MP4 or WebM video up to 50 MB.'
+        : 'Choose one JPEG or PNG image (up to 36 MB) or MP4 video (up to 50 MB).');
       return;
     }
     setBusy(true);
@@ -372,23 +444,29 @@ export function SocialPublishingPanel() {
   };
 
   const runPostAction = async (post: SocialPost, action: string, confirmPublish = false) => {
-    if (confirmPublish && !window.confirm('Publish this text post to the connected LinkedIn member profile now?')) return;
+    const youtubePost = post.platform === 'youtube';
+    if (confirmPublish && !window.confirm(youtubePost
+      ? `Upload "${post.platformData?.title || 'this video'}" to ${youtubeConnection?.channelTitle || 'the connected YouTube channel'} as ${post.platformData?.privacyStatus || 'private'}?`
+      : 'Publish this text post to the connected LinkedIn member profile now?')) return;
     setBusy(true);
     setError('');
-    setNotice('');
+    setNotice(action === 'publish' && youtubePost ? 'Uploading to YouTube. Keep this page open; large videos can take a few minutes.' : '');
     try {
       const response = await api.post(`/social-publishing/posts/${post._id}/${action}`, {
+        ...(action === 'publish' ? { platform: post.platform } : {}),
         ...(post.integrationId ? { integrationId: post.integrationId } : {}),
-      });
+      }, action === 'publish' && youtubePost ? { timeout: 5 * 60_000 } : undefined);
       await refreshPosts();
       setNotice(action === 'publish'
-        ? 'LinkedIn confirmed the post was published.'
+        ? youtubePost ? 'YouTube accepted the upload. Processing may take a few minutes.' : 'LinkedIn confirmed the post was published.'
         : action === 'request-approval'
           ? 'Draft submitted for approval.'
           : `Post ${action === 'approve' ? 'approved' : 'rejected'}.`);
-      if (response.data.post?.linkedinPostUrl) setNotice(`Published: ${response.data.post.linkedinPostUrl}`);
+      const url = youtubePost ? response.data.post?.destinations?.[0]?.externalPostUrl : response.data.post?.linkedinPostUrl;
+      if (url) setNotice(`Published: ${url}`);
     } catch (requestError: unknown) {
       const message = (requestError as { response?: { data?: { message?: string } } }).response?.data?.message;
+      setNotice('');
       setError(message || 'That action could not be completed.');
       await refreshPosts().catch(() => undefined);
     } finally {
@@ -398,6 +476,9 @@ export function SocialPublishingPanel() {
 
   const beginEdit = (post: SocialPost) => {
     setEditingId(post._id);
+    setSelectedPlatform(post.platform);
+    setVideoTitle(post.platformData?.title ?? '');
+    setPrivacyStatus(post.platformData?.privacyStatus ?? 'private');
     setText(post.text);
     setComposerMedia(post.media?.[0] ?? null);
     setPreview(false);
@@ -406,9 +487,12 @@ export function SocialPublishingPanel() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const canPublish = (post: SocialPost) => connection?.canPublishMemberPosts &&
+  const canPublish = (post: SocialPost) => (post.platform === 'youtube'
+    ? youtubeConnection?.canPublishVideos
+    : connection?.canPublishMemberPosts) &&
     (canReview
-      ? post.status === 'draft' || post.status === 'approved' || (post.status === 'failed' && post.failureCode === 'rate_limited')
+      ? post.status === 'draft' || post.status === 'approved' ||
+        (post.status === 'failed' && (post.failureCode === 'rate_limited' || (post.platform === 'youtube' && post.failureCode === 'quota_exceeded')))
       : isManager && post.status === 'approved');
 
   return (
@@ -423,30 +507,43 @@ export function SocialPublishingPanel() {
         returnTo="/social-publishing"
         canDisconnect={canReview}
       />
+      <YouTubeConnectionCard
+        onConnectionChange={setYouTubeConnection}
+        returnTo="/social-publishing"
+        canDisconnect={canReview}
+        canConnect={canReview || isManager}
+      />
 
       <section className="surface rounded-2xl border p-4 sm:p-5" aria-labelledby="social-providers-heading">
         <h2 id="social-providers-heading" className="text-sm font-semibold theme-text-primary">Publishing destinations</h2>
-        <p className="mt-1 text-xs theme-text-muted">Publish to your LinkedIn member profile. More destinations are on the way.</p>
+        <p className="mt-1 text-xs theme-text-muted">Publish posts to your LinkedIn member profile and upload videos to your YouTube channel.</p>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {[
             { id: 'linkedin' as const, name: 'LinkedIn', description: 'Publish text, images, and videos to a member profile.', icon: <span className="flex h-8 w-8 items-center justify-center rounded-md bg-[#0A66C2] text-sm font-bold text-white">in</span>, available: true, accent: '#0A66C2' },
             { id: 'instagram' as const, name: 'Instagram', description: 'Visual content and Reels publishing.', icon: <Camera className="h-5 w-5 text-fuchsia-600" />, available: false, accent: '#C13584' },
             { id: 'facebook' as const, name: 'Facebook Pages', description: 'Publish and manage content for your Pages.', icon: <span className="flex h-6 w-6 items-end justify-center text-2xl font-black leading-none text-blue-700">f</span>, available: false, accent: '#1877F2' },
-            { id: 'youtube' as const, name: 'YouTube', description: 'Video publishing and channel management.', icon: <span className="flex h-5 w-7 items-center justify-center rounded bg-red-600 text-white"><Play className="h-3 w-3 fill-current" /></span>, available: false, accent: '#FF0000' },
+            { id: 'youtube' as const, name: 'YouTube', description: 'Upload videos with a title and description to your channel.', icon: <span className="flex h-5 w-7 items-center justify-center rounded bg-red-600 text-white"><Play className="h-3 w-3 fill-current" /></span>, available: youtubeAvailable, setupRequired: !youtubeAvailable, accent: '#FF0000' },
           ].map((destination) => (
             <button
               key={destination.id}
               type="button"
-              disabled={!destination.available}
+              disabled={!destination.available || Boolean(editingId)}
               aria-pressed={selectedPlatform === destination.id}
-              onClick={() => setSelectedPlatform(destination.id)}
+              onClick={() => {
+                if (destination.id !== selectedPlatform) {
+                  setSelectedPlatform(destination.id);
+                  setComposerMedia(null);
+                  setPreview(false);
+                  setError('');
+                }
+              }}
               className={`rounded-xl border p-3 text-left transition-colors ${selectedPlatform === destination.id ? 'border-[var(--accent)] bg-[var(--bg-active)]' : 'theme-border theme-bg-base'} disabled:cursor-default`}
               style={{ borderTopColor: destination.accent, borderTopWidth: 2 }}
             >
               <span className="flex items-center justify-between gap-2">
                 <span className="flex items-center gap-2 text-sm font-semibold theme-text-primary">{destination.icon}{destination.name}</span>
                 <span className={`rounded-full px-2 py-1 text-[10px] font-semibold ${destination.available ? 'bg-emerald-500/10 text-emerald-700' : 'theme-bg-hover theme-text-muted'}`}>
-                  {destination.available ? 'Available' : 'Coming Soon'}
+                  {destination.available ? 'Available' : 'setupRequired' in destination && destination.setupRequired ? 'Setup required' : 'Coming Soon'}
                 </span>
               </span>
               <span className="mt-2 block text-xs leading-relaxed theme-text-muted">{destination.description}</span>
@@ -457,8 +554,14 @@ export function SocialPublishingPanel() {
 
       <section id="social-post-composer" className="surface rounded-2xl border p-4 sm:p-5">
         <div className="mb-4">
-          <h2 className="text-base font-semibold theme-text-primary">{editingId ? 'Edit post draft' : 'Create a LinkedIn post'}</h2>
-          <p className="mt-1 text-xs theme-text-muted">Save as a draft or publish to the connected LinkedIn member profile. Tavro only writes draft text; it never publishes.</p>
+          <h2 className="text-base font-semibold theme-text-primary">
+            {editingId ? 'Edit post draft' : isYouTube ? 'Upload a YouTube video' : 'Create a LinkedIn post'}
+          </h2>
+          <p className="mt-1 text-xs theme-text-muted">
+            {isYouTube
+              ? 'Save as a draft or upload to the connected YouTube channel. Videos are private by default.'
+              : 'Save as a draft or publish to the connected LinkedIn member profile. Tavro only writes draft text; it never publishes.'}
+          </p>
         </div>
 
         <div className="mb-3 grid gap-3 sm:grid-cols-2">
@@ -473,7 +576,7 @@ export function SocialPublishingPanel() {
               <option value="">Save as draft without a connected account</option>
               {accounts.filter((account) => account.provider === selectedPlatform).map((account) => (
                 <option key={account.id} value={account.id}>
-                  {account.displayName || 'LinkedIn member'} {account.canPublish ? '· Connected' : '· Reconnect required'}
+                  {account.displayName || (account.provider === 'youtube' ? 'YouTube channel' : 'LinkedIn member')} {account.canPublish ? '· Connected' : '· Reconnect required'}
                 </option>
               ))}
             </select>
@@ -488,6 +591,23 @@ export function SocialPublishingPanel() {
         {error && <p role="alert" className="mb-3 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{error}</p>}
         {notice && <p role="status" className="mb-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">{notice}</p>}
 
+        {isYouTube ? (
+          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_190px]">
+            <label className="text-xs font-medium theme-text-secondary">
+              Video title
+              <input value={videoTitle} onChange={(event) => setVideoTitle(event.target.value)} maxLength={100} placeholder="What is this video called?" className="input-premium mt-1 w-full" />
+              <span className={`mt-1 block text-[11px] ${videoTitle.length > 100 ? 'text-rose-600' : 'theme-text-muted'}`}>{videoTitle.length}/100</span>
+            </label>
+            <label className="text-xs font-medium theme-text-secondary">
+              Visibility
+              <select value={privacyStatus} onChange={(event) => setPrivacyStatus(event.target.value as YouTubePrivacy)} className="input-premium mt-1 w-full">
+                <option value="private">Private</option>
+                <option value="unlisted">Unlisted</option>
+                <option value="public">Public</option>
+              </select>
+            </label>
+          </div>
+        ) : (<>
         <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_190px]">
           <label className="text-xs font-medium theme-text-secondary">
             Topic
@@ -527,10 +647,11 @@ export function SocialPublishingPanel() {
             </button>
           ))}
         </div>
+        </>)}
 
         <div className="mt-4 border-t pt-4" style={{ borderColor: 'var(--border-color)' }}>
           <div className="mb-2 flex items-center justify-between gap-2">
-            <label htmlFor="linkedin-post-text" className="text-xs font-semibold theme-text-secondary">Post text</label>
+            <label htmlFor="linkedin-post-text" className="text-xs font-semibold theme-text-secondary">{isYouTube ? 'Video description' : 'Post text'}</label>
             <button type="button" onClick={() => setPreview(!preview)} className="btn-ghost inline-flex h-8 items-center gap-1.5 px-2 text-xs">
               {preview ? <Pencil className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
               {preview ? 'Edit' : 'Preview'}
@@ -538,7 +659,9 @@ export function SocialPublishingPanel() {
           </div>
           {preview
             ? <div className="min-h-32 rounded-xl border p-4" style={{ borderColor: 'var(--border-color)', background: 'var(--bg-base)' }}>
-                <div className="mb-3 flex items-center gap-2"><span className="flex h-8 w-8 items-center justify-center rounded-md bg-[#0A66C2] text-sm font-bold text-white">in</span><div><p className="text-xs font-semibold theme-text-primary">{connection?.identityName || 'Your LinkedIn profile'}</p><p className="text-[10px] theme-text-muted">Just now · Public</p></div></div>
+                {isYouTube
+                  ? <div className="mb-3 flex items-center gap-2"><span className="flex h-8 w-8 items-center justify-center rounded-md bg-red-600 text-white"><Play className="h-4 w-4 fill-current" /></span><div><p className="text-xs font-semibold theme-text-primary">{videoTitle || 'Untitled video'}</p><p className="text-[10px] theme-text-muted">{youtubeConnection?.channelTitle || 'Your YouTube channel'} · {privacyStatus}</p></div></div>
+                  : <div className="mb-3 flex items-center gap-2"><span className="flex h-8 w-8 items-center justify-center rounded-md bg-[#0A66C2] text-sm font-bold text-white">in</span><div><p className="text-xs font-semibold theme-text-primary">{connection?.identityName || 'Your LinkedIn profile'}</p><p className="text-[10px] theme-text-muted">Just now · Public</p></div></div>}
                 <p className="whitespace-pre-wrap text-sm theme-text-primary">{text || 'Your post preview will appear here.'}</p>
                 {composerMedia && socialMediaFileId(composerMedia) && mediaPreviews[socialMediaFileId(composerMedia)!] && (
                   <div className="mt-3 overflow-hidden rounded-lg border theme-border">

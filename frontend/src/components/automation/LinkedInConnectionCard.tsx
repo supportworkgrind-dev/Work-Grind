@@ -68,6 +68,8 @@ export function LinkedInConnectionCard({
         if (active) setLoading(false);
       });
     const url = new URL(window.location.href);
+    // YouTube consent results are handled by the YouTube connection card.
+    if (url.searchParams.get('oauth_provider') === 'youtube') return () => { active = false; };
     let message = '';
     if (url.searchParams.get('oauth') === 'connected') {
       message = 'LinkedIn publishing permission connected.';
