@@ -30,11 +30,12 @@ export function LangSelector({ dark = false }: { dark?: boolean }) {
         className={`public-nav-language flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[12px] font-medium transition-colors ${textCls}`}
         aria-expanded={open}
         aria-haspopup="listbox"
-        aria-label={`${current.label} (${String(current.code).toUpperCase()}): select language`}
       >
-        <Globe className="h-3.5 w-3.5 shrink-0" />
+        {/* Accessible name comes from the visible text plus a hidden hint, so it always contains what is shown (WCAG 2.5.3). */}
+        <Globe className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
         <span className="hidden sm:inline">{current.label}</span>
         <span className="inline sm:hidden">{String(current.code).toUpperCase()}</span>
+        <span className="sr-only">, select language</span>
         <ChevronDown className={`h-3 w-3 transition-transform duration-150 ${open ? 'rotate-180' : ''}`} />
       </button>
 

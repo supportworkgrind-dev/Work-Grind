@@ -634,8 +634,10 @@
     -webkit-text-fill-color: var(--wg-theme-accent);
   }
 
-  /* Keep the CTA's panel text colour; the text-white remap above made it 2:1. */
-  .landing .heroPrimaryCta {
+  /* Primary buttons sit on --wg-auth-panel; keep their panel text colour, which
+     the text-white remap above had turned to --wg-text (2:1). */
+  .landing .heroPrimaryCta,
+  .landing :global(.landing-button-primary) {
     color: var(--wg-auth-panel-text) !important;
   }
 
