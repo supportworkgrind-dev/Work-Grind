@@ -6,6 +6,7 @@ import { api } from '@/lib/api';
 import { fetchAllProjects } from '@/lib/projects';
 import type { CrmCompany, CrmContact, Project } from '@/types';
 import { X, Video, UserPlus } from 'lucide-react';
+import { useShallow } from 'zustand/react/shallow';
 
 interface MeetingInvitee {
   _id: string;
@@ -14,7 +15,7 @@ interface MeetingInvitee {
 }
 
 export function ScheduleMeetingModal({ onCreated }: { onCreated?: () => void }) {
-  const { isCreateModalOpen, createModalType, closeCreateModal } = useAppStore();
+  const { isCreateModalOpen, createModalType, closeCreateModal } = useAppStore(useShallow((s) => ({ isCreateModalOpen: s.isCreateModalOpen, createModalType: s.createModalType, closeCreateModal: s.closeCreateModal })));
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');

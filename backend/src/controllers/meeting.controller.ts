@@ -83,6 +83,9 @@ const getMeetingSafeView = async (meeting: IMeeting, userId: string) => {
   });
 };
 
+// A user is only ever in a handful of live meetings; this bounds a stale backlog.
+const ACTIVE_MEETINGS_LIMIT = 25;
+
 const getMeetingReferenceId = (reference: unknown): string | undefined => {
   if (reference instanceof mongoose.Types.ObjectId) return reference.toString();
   if (typeof reference === 'string') return reference;
@@ -176,11 +179,15 @@ export const getMeetings = async (req: AuthRequest, res: Response): Promise<void
 
 export const getActiveMeetings = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
+    // Scoped to the current workspace so the {companyId, status} index bounds the
+    // scan to its active meetings instead of every meeting the user ever joined.
     const meetings = await Meeting.find({
+      companyId: req.user!.companyId,
       status: 'active',
       $or: [{ hostId: req.user!.userId }, { 'participants.userId': req.user!.userId }],
     })
       .sort({ startedAt: -1, createdAt: -1 })
+      .limit(ACTIVE_MEETINGS_LIMIT)
       .populate([
         { path: 'hostId', select: 'fullName avatar avatarStorageKey' },
         { path: 'participants.userId', select: 'fullName avatar avatarStorageKey' },

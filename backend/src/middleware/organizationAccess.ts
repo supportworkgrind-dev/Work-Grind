@@ -9,6 +9,7 @@ import {
 } from '../config/organization';
 import { AuthRequest } from './auth';
 import { getCompanySubscription } from '../services/companySubscription';
+import { getRequestSubscription, getVerifiedMembership } from './requestContext';
 import type { EntitlementId } from '../config/subscription';
 
 export type OrganizationFeature =
@@ -147,6 +148,49 @@ export function isOrganizationAdminRole(role: string, organizationType: string):
   return roleMatches(role, ['owner', 'admin', 'manager'], organizationType);
 }
 
+type OrganizationMembership = {
+  role: string;
+  companyId: string;
+  organizationType?: string;
+  accountType?: string;
+};
+
+async function loadOrganizationMembership(
+  req: AuthRequest,
+  userId: string,
+  expectedCompanyId: string | undefined,
+): Promise<OrganizationMembership | 'no_membership' | 'no_organization'> {
+  const verified = getVerifiedMembership(req, userId);
+  if (verified) {
+    if (!verified.companyId || verified.companyId !== expectedCompanyId) return 'no_membership';
+    return verified;
+  }
+
+  const user = await User.findById(userId)
+    .select('companyId role isActive isVerified isDeleted')
+    .lean();
+  if (
+    !user ||
+    !user.isActive ||
+    !user.isVerified ||
+    user.isDeleted ||
+    !user.companyId ||
+    user.companyId.toString() !== expectedCompanyId
+  ) {
+    return 'no_membership';
+  }
+  const company = await Company.findOne({ _id: user.companyId, isActive: true })
+    .select('organizationType accountType')
+    .lean();
+  if (!company) return 'no_organization';
+  return {
+    role: user.role || '',
+    companyId: company._id.toString(),
+    organizationType: company.organizationType,
+    accountType: company.accountType,
+  };
+}
+
 export function requireOrganizationFeature(feature: OrganizationFeature) {
   return async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
     if (!req.user?.userId) {
@@ -155,36 +199,30 @@ export function requireOrganizationFeature(feature: OrganizationFeature) {
     }
 
     try {
-      const user = await User.findById(req.user.userId)
-        .select('companyId role isActive isVerified isDeleted');
-      if (
-        !user ||
-        !user.isActive ||
-        !user.isVerified ||
-        user.isDeleted ||
-        !user.companyId ||
-        user.companyId.toString() !== req.user.companyId
-      ) {
+      const membership = await loadOrganizationMembership(req, req.user.userId, req.user.companyId);
+      if (membership === 'no_membership') {
         res.status(403).json({ success: false, message: 'Active organization membership is required.' });
         return;
       }
-
-      const company = await Company.findOne({ _id: user.companyId, isActive: true })
-        .select('organizationType accountType');
-      if (!company) {
+      if (membership === 'no_organization') {
         res.status(403).json({ success: false, message: 'An active organization is required.' });
         return;
       }
 
-      const role = user.role || '';
+      const { role, companyId } = membership;
       const organization = {
-        organizationType: company.organizationType,
-        accountType: company.accountType,
+        organizationType: membership.organizationType as OrganizationType,
+        accountType: membership.accountType as AccountType,
       };
       let allowed = isOrganizationFeatureAllowed(organization, role, feature);
       const policy = ORGANIZATION_FEATURE_POLICIES[feature];
       if (allowed && policy.entitlement) {
-        const subscription = await getCompanySubscription(company._id.toString());
+        // A company member's effective subscription is the company's, so the
+        // one authenticate already resolved for this request is reused.
+        const effective = await getRequestSubscription(req, req.user.userId);
+        const subscription = effective.companyId === companyId
+          ? effective
+          : await getCompanySubscription(companyId);
         allowed = subscription.hasActiveAccess && subscription.planConfig.entitlements[policy.entitlement];
       }
 

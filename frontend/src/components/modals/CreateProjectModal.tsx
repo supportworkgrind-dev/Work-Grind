@@ -22,11 +22,12 @@ import {
   Flag,
 } from 'lucide-react';
 import { getInitials } from '@/lib/utils';
+import { useShallow } from 'zustand/react/shallow';
 
 export function CreateProjectModal({ onCreated }: { onCreated?: () => void }) {
   const router = useRouter();
-  const { user } = useAuthStore();
-  const { isCreateModalOpen, createModalType, closeCreateModal } = useAppStore();
+  const user = useAuthStore((s) => s.user);
+  const { isCreateModalOpen, createModalType, closeCreateModal } = useAppStore(useShallow((s) => ({ isCreateModalOpen: s.isCreateModalOpen, createModalType: s.createModalType, closeCreateModal: s.closeCreateModal })));
 
   // Form Fields
   const [name, setName] = useState('');

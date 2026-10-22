@@ -4,9 +4,10 @@ import React, { useEffect, useState } from 'react';
 import { useSyncStore } from '@/store/useSyncStore';
 import { syncPendingActionsToServer, getPendingCount } from '@/lib/offlineSync';
 import { WifiOff, RotateCw, CheckCircle2, CloudUpload, Sparkles } from 'lucide-react';
+import { useShallow } from 'zustand/react/shallow';
 
 export function OfflineBanner() {
-  const { isOnline, pendingCount, isSyncing, setIsOnline, setPendingCount } = useSyncStore();
+  const { isOnline, pendingCount, isSyncing, setIsOnline, setPendingCount } = useSyncStore(useShallow((s) => ({ isOnline: s.isOnline, pendingCount: s.pendingCount, isSyncing: s.isSyncing, setIsOnline: s.setIsOnline, setPendingCount: s.setPendingCount })));
   const [showSyncedToast, setShowSyncedToast] = useState(false);
   const [syncedCount, setSyncedCount] = useState(0);
 

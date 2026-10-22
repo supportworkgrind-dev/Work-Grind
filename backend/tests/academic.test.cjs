@@ -77,6 +77,7 @@ test('current-user organization projection includes education navigation setting
     },
   };
   User.findById = () => ({
+    select() { return this; },
     populate: async (path, fields) => {
       assert.equal(path, 'companyId');
       selectedFields = fields;
@@ -112,12 +113,17 @@ test('current-user response exposes provider connection booleans without provide
       };
     },
   };
+  let excludedFields;
   User.findById = () => ({
+    select(fields) { excludedFields = fields; return this; },
     populate: async () => user,
   });
   try {
     const res = makeResponse();
     await authController.getMe({ user: { userId: recordId.toString(), companyId: '' } }, res);
+    for (const field of ['refreshTokens', 'resetPasswordToken', 'verificationToken']) {
+      assert.match(excludedFields, new RegExp(`-${field}\\b`));
+    }
     assert.deepEqual(res.body.user.authProviders, {
       google: true,
       apple: false,

@@ -174,7 +174,8 @@ export async function getPlanUsage(userId: string): Promise<PlanUsage> {
   const companyId = user.companyId;
   const [company, activeMembers] = await Promise.all([
     Company.findById(companyId).select('organizationType pendingInvites storage'),
-    User.find({ companyId, isActive: true }).select('role'),
+    // Plain objects: this runs on every status check and scans every member.
+    User.find({ companyId, isActive: true }).select('role').lean(),
   ]);
   const pendingInvites = (company?.pendingInvites ?? []).filter(
     (invite) => new Date(invite.expiresAt).getTime() > Date.now(),
@@ -192,10 +193,10 @@ export async function getPlanUsage(userId: string): Promise<PlanUsage> {
     ]);
     const linkedStudentIds = new Set(linkedStudentUserIds.map((id) => id.toString()));
     const students = activeStudents + activeMembers.filter(
-      (member) => member.role.toLowerCase() === 'student' && !linkedStudentIds.has(member._id.toString()),
+      (member) => (member.role || '').toLowerCase() === 'student' && !linkedStudentIds.has(member._id.toString()),
     ).length;
     const staffAccounts = activeMembers.filter(
-      (member) => !['student', 'parent', 'guardian'].includes(member.role.toLowerCase()),
+      (member) => !['student', 'parent', 'guardian'].includes((member.role || '').toLowerCase()),
     ).length;
     const unlinkedTeachers = await AcademicPerson.countDocuments({
       companyId,

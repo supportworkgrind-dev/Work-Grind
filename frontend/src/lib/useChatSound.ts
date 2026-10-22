@@ -55,6 +55,8 @@ export function useChatSound() {
       gain2.connect(ctx.destination);
       osc2.start(now + 0.08);
       osc2.stop(now + 0.35);
+      // Browsers cap live AudioContexts; release this one once the chime has played.
+      osc2.onended = () => { void ctx.close().catch(() => undefined); };
     } catch (e) {
       // AudioContext play prevented if no interaction
     }

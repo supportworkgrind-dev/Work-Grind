@@ -15,7 +15,7 @@
 
 import React, {
   createContext, useContext, useState, useEffect,
-  useCallback, type ReactNode,
+  useCallback, useMemo, type ReactNode,
 } from 'react';
 import { en, type Translations } from './translations';
 import { ar } from './translations/ar';
@@ -151,9 +151,12 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   );
 
   const dir: 'ltr' | 'rtl' = translations.dir;
+  // Stable unless the language changes, so a provider re-render (every route
+  // change) does not re-render every useI18n consumer.
+  const value = useMemo(() => ({ lang, dir, setLang, t, translations }), [lang, dir, setLang, t, translations]);
 
   return (
-    <I18nContext.Provider value={{ lang, dir, setLang, t, translations }}>
+    <I18nContext.Provider value={value}>
       {children}
     </I18nContext.Provider>
   );

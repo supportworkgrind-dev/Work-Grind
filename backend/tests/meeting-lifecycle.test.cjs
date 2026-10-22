@@ -262,17 +262,22 @@ test('active meeting counts require a live room and count users rather than sock
     lastActivityAt: new Date(Date.now() - MEETING_DISCONNECT_GRACE_MS - 1),
   });
   let updateCalls = 0;
+  let activeFilter;
   const restore = [
     replace(socket, 'getIO', () => ({ to: () => ({ emit() {} }) })),
     replace(socket, 'getMeetingParticipants', async (link) =>
       link === live.meetingLink
         ? [{ userId: hostId.toString() }, { userId: hostId.toString() }]
         : []),
-    replace(Meeting, 'find', () => ({
+    replace(Meeting, 'find', (filter) => {
+      activeFilter = filter;
+      return {
       sort() { return this; },
+      limit() { return this; },
       populate() { return this; },
       exec: async () => [live, stale],
-    })),
+      };
+    }),
     replace(Meeting, 'findOneAndUpdate', async (filter, update) => {
       updateCalls += 1;
       stale.status = update.$set.status;
@@ -289,6 +294,7 @@ test('active meeting counts require a live room and count users rather than sock
     assert.equal(res.body.meetings.length, 1);
     assert.equal(res.body.meetings[0]._id.toString(), live._id.toString());
     assert.equal(res.body.meetings[0].activeParticipantCount, 1);
+    assert.equal(activeFilter.companyId, companyId.toString());
     assert.equal(stale.status, 'ended');
     assert.equal(updateCalls, 1);
   } finally {
@@ -305,6 +311,7 @@ test('stale active meetings are reconciled even when no Socket.IO instance is av
     replace(socket, 'getMeetingParticipants', async () => []),
     replace(Meeting, 'find', () => ({
       sort() { return this; },
+      limit() { return this; },
       populate() { return this; },
       exec: async () => [stale],
     })),

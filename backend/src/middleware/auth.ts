@@ -3,7 +3,9 @@ import { getBearerToken, verifyAccessToken } from '../utils/jwt';
 import User from '../models/User';
 import Company from '../models/Company';
 import { EntitlementId, PlanId } from '../config/subscription';
+import mongoose from 'mongoose';
 import { getEffectiveSubscription } from '../services/companySubscription';
+import { getRequestSubscription, rememberVerifiedMembership } from './requestContext';
 import { roleMatches } from '../config/organization';
 import type { AcademicDepartmentScope } from './academicDepartmentAccess';
 
@@ -76,8 +78,21 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
       return;
     }
     failureStage = 'user_lookup';
-    const user = await User.findById(payload.userId)
-      .select('isVerified isActive isDeleted companyId role accountType');
+    // The workspace in the token must equal the user's (checked below), so the
+    // company can be fetched alongside the user instead of after it.
+    const tokenCompanyId = payload.companyId && mongoose.isValidObjectId(payload.companyId)
+      ? payload.companyId
+      : undefined;
+    const [user, tokenCompany] = await Promise.all([
+      User.findById(payload.userId)
+        .select('isVerified isActive isDeleted companyId role accountType')
+        .lean(),
+      tokenCompanyId
+        ? Company.findOne({ _id: tokenCompanyId, isActive: true })
+          .select('organizationType accountType')
+          .lean()
+        : Promise.resolve(null),
+    ]);
     if (!user || !user.isVerified || !user.isActive || user.isDeleted) {
       res.status(403).json({ success: false, message: 'Account verification is required.' });
       return;
@@ -90,8 +105,7 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
     let organizationType: string | undefined;
     let accountType = user.accountType;
     if (user.companyId) {
-      const company = await Company.findOne({ _id: user.companyId, isActive: true })
-        .select('organizationType accountType');
+      const company = tokenCompany;
       if (!company) {
         res.status(403).json({ success: false, message: 'Your workspace is unavailable.' });
         return;
@@ -106,6 +120,13 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
       organizationType,
       accountType,
     };
+    rememberVerifiedMembership(req, {
+      userId: payload.userId,
+      companyId,
+      role: user.role || '',
+      organizationType,
+      accountType,
+    });
   } catch (err) {
     console.warn('[Auth] Request rejected because the access token is invalid.', {
       method: req.method,
@@ -120,7 +141,7 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
 
   if (!isSubscriptionExempt(req)) {
     try {
-      const sub = await getEffectiveSubscription(req.user!.userId);
+      const sub = await getRequestSubscription(req, req.user!.userId);
       if (!sub.hasActiveAccess) {
         sendSubscriptionRequired(res, sub);
         return;
@@ -201,7 +222,7 @@ export const requireSubscription = async (
     return;
   }
   try {
-    const sub = await getEffectiveSubscription(req.user.userId);
+    const sub = await getRequestSubscription(req, req.user.userId);
 
     if (!sub.hasActiveAccess) {
       sendSubscriptionRequired(res, sub);
@@ -227,7 +248,7 @@ export const requirePlan = (...plans: PlanId[]) =>
       return;
     }
     try {
-      const sub = await getEffectiveSubscription(req.user.userId);
+      const sub = await getRequestSubscription(req, req.user.userId);
 
       if (!sub.hasActiveAccess) {
         sendSubscriptionRequired(res, sub);
@@ -261,7 +282,7 @@ export const requireEntitlement = (entitlement: EntitlementId) =>
       return;
     }
     try {
-      const sub = await getEffectiveSubscription(req.user.userId);
+      const sub = await getRequestSubscription(req, req.user.userId);
       if (!sub.planConfig.entitlements[entitlement]) {
         res.status(403).json({
           success: false,

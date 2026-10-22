@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { clearAuthValues, getAuthValue } from './authSession';
-import { disconnectSocket, refreshSocketAuth } from './socket';
+import { disconnectSocketLazily, refreshSocketAuthLazily } from './socketLoader';
 import { getApiBaseUrl } from './apiConfig';
 import { refreshAuthTokens } from './tokenRefresh';
 
@@ -9,7 +9,7 @@ const API_BASE_URL = getApiBaseUrl();
 export const clearAuthSession = () => {
   if (typeof window === 'undefined') return;
   clearAuthValues();
-  disconnectSocket();
+  disconnectSocketLazily();
   window.dispatchEvent(new Event('workgrind:auth-session-expired'));
 };
 
@@ -89,7 +89,7 @@ api.interceptors.response.use(
       responseData?.code === 'SUBSCRIPTION_REQUIRED' &&
       responseData?.source !== 'client_portal'
     ) {
-      disconnectSocket();
+      disconnectSocketLazily();
       window.dispatchEvent(new CustomEvent('workgrind:subscription-required', {
         detail: responseData,
       }));
@@ -141,7 +141,7 @@ api.interceptors.response.use(
         if (getAuthValue('workgrind_access_token') !== accessToken) {
           return Promise.reject(error);
         }
-        refreshSocketAuth(accessToken);
+        refreshSocketAuthLazily(accessToken);
         originalRequest.headers.Authorization = `Bearer ${accessToken}`;
         if (failedPath.endsWith('/auth/me')) {
           console.info('[Auth] Access token refreshed; retrying current-user request.', {

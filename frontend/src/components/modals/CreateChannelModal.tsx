@@ -4,9 +4,10 @@ import { useState } from 'react';
 import { useAppStore } from '@/store/useAppStore';
 import { api } from '@/lib/api';
 import { X, Hash, Lock } from 'lucide-react';
+import { useShallow } from 'zustand/react/shallow';
 
 export function CreateChannelModal({ onCreated }: { onCreated?: () => void }) {
-  const { isCreateModalOpen, createModalType, closeCreateModal } = useAppStore();
+  const { isCreateModalOpen, createModalType, closeCreateModal } = useAppStore(useShallow((s) => ({ isCreateModalOpen: s.isCreateModalOpen, createModalType: s.createModalType, closeCreateModal: s.closeCreateModal })));
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');

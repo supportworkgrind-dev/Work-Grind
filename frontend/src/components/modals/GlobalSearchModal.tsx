@@ -23,7 +23,8 @@ import {
 
 export function GlobalSearchModal() {
   const router = useRouter();
-  const { isSearchOpen, setSearchOpen } = useAppStore();
+  const isSearchOpen = useAppStore((s) => s.isSearchOpen);
+  const setSearchOpen = useAppStore((s) => s.setSearchOpen);
   const user = useAuthStore((state) => state.user);
   const company = useAuthStore((state) => state.company);
   const canSeeCrm = canAccessRoute(company, user?.role, '/crm');

@@ -44,8 +44,15 @@ const notifIcons: Record<string, React.ReactNode> = {
 export const Navbar = memo(function Navbar() {
   const user           = useAuthStore((s) => s.user);
   const company        = useAuthStore((s) => s.company);
-  const { toggleSidebar, setSearchOpen, openCreateModal } = useAppStore();
-  const { isOnline, pendingCount, isSyncing } = useSyncStore();
+  // Selectors rather than whole-store reads: memo() is only useful if unrelated
+  // store updates (search open/close, active chat channel) do not re-render.
+  const toggleSidebar   = useAppStore((s) => s.toggleSidebar);
+  const setSearchOpen   = useAppStore((s) => s.setSearchOpen);
+  const openCreateModal = useAppStore((s) => s.openCreateModal);
+  const isOnline        = useSyncStore((s) => s.isOnline);
+  const pendingCount    = useSyncStore((s) => s.pendingCount);
+  const isSyncing       = useSyncStore((s) => s.isSyncing);
+  const userId          = user?._id;
 
   const [showCreate,       setShowCreate]       = useState(false);
   const [showNotifs,       setShowNotifs]       = useState(false);
@@ -58,11 +65,11 @@ export const Navbar = memo(function Navbar() {
 
   /* ── Data fetching ── */
   useEffect(() => {
-    if (!user) return;
+    if (!userId) return;
 
     const fetchNotifications = async () => {
       try {
-        const res = await api.get('/notifications');
+        const res = await api.get('/notifications', { params: { limit: 12 } });
         if (res.data.success) {
           setNotifications(res.data.notifications.slice(0, 12));
           setUnreadCount(res.data.unreadCount ?? 0);
@@ -102,7 +109,8 @@ export const Navbar = memo(function Navbar() {
       socket.off('meeting:started',  onMeetingStart);
       socket.off('meeting:ended',    onMeetingEnd);
     };
-  }, [user]);
+    // Keyed on the id: profile/status edits replace the user object and must not refetch.
+  }, [userId]);
 
   /* ── Close popups on outside click ── */
   useEffect(() => {

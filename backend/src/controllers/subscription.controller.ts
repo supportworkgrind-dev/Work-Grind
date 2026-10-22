@@ -218,11 +218,15 @@ export const getSubscriptionStatus = async (
   try {
     const user = await User.findById(req.user!.userId).select('companyId subscriptionStatus subscriptionPlan trialEndDate trialStartDate');
     if (!user) { res.status(404).json({ success: false, message: 'User not found' }); return; }
-    const usage = await getPlanUsage(req.user!.userId);
+    // Usage and the company subscription are independent reads.
+    const [usage, companySub] = await Promise.all([
+      getPlanUsage(req.user!.userId),
+      user.companyId ? getCompanySubscription(user.companyId.toString()) : Promise.resolve(null),
+    ]);
 
     // If the user belongs to a company → return company subscription
-    if (user.companyId) {
-      const sub = await getCompanySubscription(user.companyId.toString());
+    if (user.companyId && companySub) {
+      const sub = companySub;
       const plan = sub.planConfig;
 
       let trialDaysRemaining: number | null = null;

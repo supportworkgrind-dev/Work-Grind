@@ -6,6 +6,7 @@ import { api } from '@/lib/api';
 import { fetchAllProjects } from '@/lib/projects';
 import { User, Project, Task, TaskRecurrence, TaskCustomField } from '@/types';
 import { X, CheckSquare, Calendar, User as UserIcon, Flag, Briefcase, Clock3, Repeat2 } from 'lucide-react';
+import { useShallow } from 'zustand/react/shallow';
 
 const TASK_TEMPLATES = [
   { id: 'bug', label: 'Bug fix', title: 'Fix reported issue', description: 'Record reproduction steps, expected behavior, and actual behavior.', priority: 'high', estimatedMinutes: 90 },
@@ -14,7 +15,7 @@ const TASK_TEMPLATES = [
 ] as const;
 
 export function CreateTaskModal({ onCreated }: { onCreated?: () => void }) {
-  const { isCreateModalOpen, createModalType, closeCreateModal } = useAppStore();
+  const { isCreateModalOpen, createModalType, closeCreateModal } = useAppStore(useShallow((s) => ({ isCreateModalOpen: s.isCreateModalOpen, createModalType: s.createModalType, closeCreateModal: s.closeCreateModal })));
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');

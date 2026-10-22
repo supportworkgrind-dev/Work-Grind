@@ -5,6 +5,9 @@ import { AuthRequest } from '../middleware/auth';
 export const getNotifications = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { unreadOnly } = req.query;
+    // The navbar bell shows 12; the notifications page keeps the default of 50.
+    const requestedLimit = Number.parseInt(String(req.query.limit ?? ''), 10);
+    const limit = Number.isFinite(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 50) : 50;
     const filter: any = {
       userId: req.user!.userId,
       companyId: req.user!.companyId,
@@ -17,7 +20,7 @@ export const getNotifications = async (req: AuthRequest, res: Response): Promise
     const [notifications, unreadCount] = await Promise.all([
       Notification.find(filter)
         .sort({ createdAt: -1 })
-        .limit(50)
+        .limit(limit)
         .lean(),
       Notification.countDocuments({
         userId: req.user!.userId,

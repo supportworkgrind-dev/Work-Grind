@@ -1408,7 +1408,11 @@ export const joinCompany = async (req: AuthRequest, res: Response): Promise<void
 export const getMe = async (req: AuthRequest, res: Response): Promise<void> => {
   let failureStage = 'user_lookup';
   try {
-    const user = await User.findById(req.user!.userId).populate(
+    // Credential material never leaves the server; it also kept every
+    // hashed refresh token in the response of the most-called endpoint.
+    const user = await User.findById(req.user!.userId).select(
+      '-refreshTokens -resetPasswordToken -resetPasswordExpiry -verificationToken -verificationTokenExpiry -verificationCodeExpiry -verificationCodeSentAt'
+    ).populate(
       'companyId',
       'name logo plan inviteCode accountType organizationType organizationDetails industry size country timeZone currency settings academicSettings'
     );

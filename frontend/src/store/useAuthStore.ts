@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { User, Company, SubscriptionInfo, EntitlementId } from '../types';
 import { api } from '../lib/api';
-import { getSocket, disconnectSocket } from '../lib/socket';
+import { connectSocketLazily, disconnectSocketLazily } from '../lib/socketLoader';
 import { clearAuthValues, getAuthValue, removeAuthValue, setAuthSession, setAuthValue } from '../lib/authSession';
 import { refreshAuthTokens } from '../lib/tokenRefresh';
 import { useCallingStore } from './useCallingStore';
@@ -82,7 +82,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
     refreshSubscription: () => {
       const token = getAuthValue('workgrind_access_token');
       if (!token) {
-        disconnectSocket();
+        disconnectSocketLazily();
         set({ subscription: null, subscriptionLoading: false, subscriptionError: null, trialDaysRemaining: null });
         return Promise.resolve();
       }
@@ -101,15 +101,15 @@ export const useAuthStore = create<AuthState>((set, get) => {
             }
             setAuthValue('workgrind_subscription', JSON.stringify(subscription));
             set({ subscription, subscriptionLoading: false, subscriptionError: null, trialDaysRemaining: subscription.trialDaysRemaining });
-            if (subscription.hasActiveAccess) getSocket();
-            else disconnectSocket();
+            if (subscription.hasActiveAccess) connectSocketLazily();
+            else disconnectSocketLazily();
           } else if (getAuthValue('workgrind_access_token') === token) {
             throw new Error('Subscription status response was invalid.');
           }
         } catch (err) {
           if (getAuthValue('workgrind_access_token') !== token) return;
           console.error('Failed to refresh subscription:', err);
-          if (!get().subscription) disconnectSocket();
+          if (!get().subscription) disconnectSocketLazily();
           set({
             subscription: get().subscription,
             subscriptionLoading: false,
@@ -143,7 +143,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
       const previousToken = getAuthValue('workgrind_access_token');
       const previousUserId = get().user?._id;
       if ((previousToken && previousToken !== accessToken) || (previousUserId && previousUserId !== userData._id)) {
-        disconnectSocket();
+        disconnectSocketLazily();
         useCallingStore.getState().setActiveCall(null);
         useCallingStore.getState().setIncomingCall(null);
       }
@@ -173,7 +173,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
       } finally {
         if (authGeneration !== logoutGeneration) return;
         clearAuthValues();
-        disconnectSocket();
+        disconnectSocketLazily();
         useCallingStore.getState().setActiveCall(null);
         useCallingStore.getState().setIncomingCall(null);
         set({ user: null, company: null, subscription: null, subscriptionLoading: false, subscriptionError: null, isAuthenticated: false, isLoading: false, authError: null });
@@ -183,7 +183,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
     expireSession: () => {
       authGeneration += 1;
       clearAuthValues();
-      disconnectSocket();
+      disconnectSocketLazily();
       useCallingStore.getState().setActiveCall(null);
       useCallingStore.getState().setIncomingCall(null);
       set({ user: null, company: null, subscription: null, subscriptionLoading: false, subscriptionError: null, isAuthenticated: false, isLoading: false, authError: null });
@@ -265,6 +265,9 @@ export const useAuthStore = create<AuthState>((set, get) => {
       const generation = authGeneration;
 
       const request = (async () => {
+        // The subscription check only needs the token, so it no longer waits
+        // for /auth/me; it drops its own result if the token is cleared meanwhile.
+        const subscriptionRefresh = get().refreshSubscription();
         try {
           const res = await api.get('/auth/me', {
             headers: {
@@ -293,7 +296,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
             authError: null,
             trialDaysRemaining: res.data.trialDaysRemaining ?? null,
           });
-          await get().refreshSubscription();
+          await subscriptionRefresh;
         } catch (err: any) {
           if (generation !== authGeneration) return;
           const latestToken = getAuthValue('workgrind_access_token');
@@ -317,7 +320,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
           }
           // If offline, preserve cached user credentials instead of forcing logout
           if (typeof window !== 'undefined' && !navigator.onLine && get().user) {
-            disconnectSocket();
+            disconnectSocketLazily();
             set({
               isLoading: false,
               isAuthenticated: true,
