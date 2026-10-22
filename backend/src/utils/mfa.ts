@@ -68,9 +68,9 @@ export const generateTotpSecret = (): string => {
  */
 export const generateTotpProvisioning = async (
   email: string,
-  secret: string
+  secret: string,
+  issuer = 'WorkGrind Admin',
 ): Promise<{ otpauthUrl: string; qrCodeDataUrl: string }> => {
-  const issuer = 'WorkGrind Admin';
   const otpauthUrl = authenticator.keyuri(email, issuer, secret);
 
   const qrCodeDataUrl = await QRCode.toDataURL(otpauthUrl, {

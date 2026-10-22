@@ -8,6 +8,7 @@ export interface TokenPayload {
   isSuperAdmin?: boolean;
   mfaPending?: boolean;
   mfaAuthenticated?: boolean;
+  purpose?: 'user_mfa_login';
 }
 
 export const getJwtSecret = () => {
@@ -39,6 +40,18 @@ export const generateAccessToken = (p: TokenPayload) =>
 export const generateMfaChallengeToken = (userId: string, companyId: string) =>
   jwt.sign(
     { userId, companyId, role: 'super_admin', isSuperAdmin: true, mfaPending: true },
+    getJwtSecret(),
+    { expiresIn: '5m' },
+  );
+
+/**
+ * Short-lived proof that a regular user passed the first sign-in factor.
+ * mfaPending makes authenticate refuse it as an access token, and the purpose
+ * keeps it from being accepted by the super-admin MFA verifier (and vice versa).
+ */
+export const generateUserMfaChallengeToken = (userId: string, companyId: string) =>
+  jwt.sign(
+    { userId, companyId, role: '', mfaPending: true, purpose: 'user_mfa_login' },
     getJwtSecret(),
     { expiresIn: '5m' },
   );

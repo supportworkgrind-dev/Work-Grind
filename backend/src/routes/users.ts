@@ -22,6 +22,8 @@ import {
   resolveCallingId,
 } from '../controllers/callingId.controller';
 
+import { exportMyData } from '../controllers/accountSecurity.controller';
+
 const router = Router();
 
 router.use(authenticate);
@@ -31,6 +33,7 @@ router.get('/me', (req, res, next) => {
   // handled in auth or updateMe
   next();
 });
+router.get('/me/export', rateLimiter(60, 5), exportMyData);
 router.get('/me/calling-id', asyncHandler(getMyCallingId));
 router.post('/me/calling-id/generate', asyncHandler(generateMyCallingId));
 router.get('/calling-id/availability/:callingId', requireRole('owner', 'admin'), rateLimiter(15, 60), asyncHandler(checkCallingIdAvailability));

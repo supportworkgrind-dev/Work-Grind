@@ -24,6 +24,17 @@ import {
   startOAuth,
 } from '../controllers/oauth.controller';
 import { authenticate } from '../middleware/auth';
+import {
+  disableUserMfa,
+  enableUserMfa,
+  getSecurityEvents,
+  getSecurityOverview,
+  regenerateUserRecoveryCodes,
+  revokeOtherSessions,
+  startUserMfaSetup,
+  unlinkSignInProvider,
+  verifyUserMfaLogin,
+} from '../controllers/accountSecurity.controller';
 import { rateLimiter } from '../middleware/rateLimiter';
 import { authenticateClient, ClientRequest } from '../controllers/clientPortal.controller';
 
@@ -77,5 +88,16 @@ router.patch('/onboarding/progress', authenticate, saveOnboardingProgress);
 router.post('/onboarding/complete', authenticate, completeOnboarding);
 router.post('/join-company', authenticate, joinCompany);
 router.get('/me', authenticate, getMe);
+
+// Account security (Settings > Authentication & Security).
+router.post('/mfa/verify-login', rateLimiter(15, 10), verifyUserMfaLogin);
+router.get('/security', authenticate, getSecurityOverview);
+router.get('/security/events', authenticate, getSecurityEvents);
+router.post('/mfa/setup', authenticate, rateLimiter(15, 10), startUserMfaSetup);
+router.post('/mfa/enable', authenticate, rateLimiter(15, 10), enableUserMfa);
+router.post('/mfa/disable', authenticate, rateLimiter(15, 5), disableUserMfa);
+router.post('/mfa/recovery-codes', authenticate, rateLimiter(15, 5), regenerateUserRecoveryCodes);
+router.post('/sessions/revoke-others', authenticate, rateLimiter(15, 10), revokeOtherSessions);
+router.delete('/oauth/:provider/link', authenticate, rateLimiter(15, 5), unlinkSignInProvider);
 
 export default router;

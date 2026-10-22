@@ -11,4 +11,6 @@ const S = new Schema<IAuditLog>({
   resourceId: String, details: Schema.Types.Mixed, ipAddress: String,
 }, { timestamps: true });
 S.index({ companyId: 1, createdAt: -1 });
+// A member's own security history (Settings > Security).
+S.index({ companyId: 1, userId: 1, createdAt: -1 });
 export default mongoose.model<IAuditLog>('AuditLog', S);
