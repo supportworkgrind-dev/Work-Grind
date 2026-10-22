@@ -138,6 +138,23 @@ export function roleMatches(role: unknown, requestedRoles: readonly string[], or
   return false;
 }
 
+/**
+ * Roles that administer the workspace itself: its settings, invite credentials,
+ * member role/status changes, removals and the audit trail. Unlike roleMatches,
+ * "admin" is not widened to managers or (in universities) deans and HoDs, who
+ * keep their member-directory and academic-department powers only.
+ */
+export function isWorkspaceAdministrator(role: unknown, organizationType: unknown): boolean {
+  if (typeof role !== 'string') return false;
+  const type = normalizeOrganizationType(organizationType);
+  if (!type || !isOrganizationRoleEligible(role, type)) return false;
+  const key = keyForRole(role);
+  const normalized = ROLE_ALIASES[key] ?? key;
+  return isAcademicOrganizationType(type)
+    ? ['owner', 'principal', 'admin'].includes(normalized)
+    : ['owner', 'admin'].includes(normalized);
+}
+
 export function canAssignOrganizationRole(
   actorRole: unknown,
   targetRole: unknown,

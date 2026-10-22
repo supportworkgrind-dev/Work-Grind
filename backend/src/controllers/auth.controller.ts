@@ -1414,7 +1414,7 @@ export const getMe = async (req: AuthRequest, res: Response): Promise<void> => {
       '-refreshTokens -resetPasswordToken -resetPasswordExpiry -verificationToken -verificationTokenExpiry -verificationCodeExpiry -verificationCodeSentAt'
     ).populate(
       'companyId',
-      'name logo plan inviteCode accountType organizationType organizationDetails industry size country timeZone currency settings academicSettings'
+      'name logo plan accountType organizationType organizationDetails industry size country timeZone currency settings academicSettings'
     );
     if (!user) { res.status(404).json({ success: false, message: 'User not found' }); return; }
     if (!user.callingId) {

@@ -137,12 +137,63 @@ export const getUserByPublicId = async (req: AuthRequest, res: Response): Promis
   } catch (e: any) { res.status(500).json({ success: false, message: e.message }); }
 };
 
+const PROFILE_TEXT_MAX_LENGTH = 100;
+const PROFILE_BIO_MAX_LENGTH = 500;
+const PROFILE_SKILLS_MAX = 30;
+const PROFILE_SKILL_MAX_LENGTH = 50;
+const PROFILE_FIELD_LABELS = { jobTitle: 'Job title', department: 'Department', country: 'Country' } as const;
+
+function isValidTimeZone(timeZone: string): boolean {
+  try {
+    new Intl.DateTimeFormat('en', { timeZone });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export const updateMe = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const allowed = ['fullName', 'avatar', 'jobTitle', 'department', 'phone', 'country', 'timeZone', 'bio', 'skills', 'notificationPreferences', 'preferredLanguage', 'theme', 'workspaceProfile', 'incomingCallPrivacy'];
     const updates: any = {};
     allowed.forEach(f => { if (req.body[f] !== undefined) updates[f] = req.body[f]; });
-    if (updates.avatar !== undefined) updates.avatarStorageKey = undefined;
+    // Photos are set only through PATCH /me/avatar, which validates and stores
+    // the file. Here an empty value removes the photo; any other value is
+    // ignored so a client cannot point other members at an arbitrary URL.
+    if (updates.avatar !== undefined) {
+      if (updates.avatar === '') updates.avatarStorageKey = undefined;
+      else delete updates.avatar;
+    }
+
+    for (const field of ['jobTitle', 'department', 'country'] as const) {
+      if (updates[field] === undefined) continue;
+      if (typeof updates[field] !== 'string' || updates[field].trim().length > PROFILE_TEXT_MAX_LENGTH) {
+        res.status(400).json({ success: false, message: `${PROFILE_FIELD_LABELS[field]} must be text of at most ${PROFILE_TEXT_MAX_LENGTH} characters.` });
+        return;
+      }
+      updates[field] = updates[field].trim();
+    }
+    if (updates.bio !== undefined) {
+      if (typeof updates.bio !== 'string' || updates.bio.length > PROFILE_BIO_MAX_LENGTH) {
+        res.status(400).json({ success: false, message: `Bio must be at most ${PROFILE_BIO_MAX_LENGTH} characters.` });
+        return;
+      }
+    }
+    if (updates.skills !== undefined) {
+      const skills = Array.isArray(updates.skills) ? updates.skills : null;
+      if (!skills || skills.length > PROFILE_SKILLS_MAX ||
+        skills.some((skill: unknown) => typeof skill !== 'string' || !skill.trim() || skill.trim().length > PROFILE_SKILL_MAX_LENGTH)) {
+        res.status(400).json({ success: false, message: `List up to ${PROFILE_SKILLS_MAX} skills of at most ${PROFILE_SKILL_MAX_LENGTH} characters each.` });
+        return;
+      }
+      updates.skills = [...new Set(skills.map((skill: string) => skill.trim()))];
+    }
+    if (updates.timeZone !== undefined) {
+      if (typeof updates.timeZone !== 'string' || (updates.timeZone && !isValidTimeZone(updates.timeZone))) {
+        res.status(400).json({ success: false, message: 'Choose a valid IANA time zone, such as Asia/Karachi.' });
+        return;
+      }
+    }
 
     if (updates.fullName !== undefined) {
       if (typeof updates.fullName !== 'string' || !updates.fullName.trim()) {
@@ -213,7 +264,12 @@ export const updateMe = async (req: AuthRequest, res: Response): Promise<void> =
       res.status(409).json({ success: false, message: 'That mobile number is already linked to an account.' });
       return;
     }
-    res.status(500).json({ success: false, message: e.message });
+    if (e?.name === 'ValidationError') {
+      res.status(400).json({ success: false, message: 'Some profile fields are invalid. Check them and try again.' });
+      return;
+    }
+    console.error('[Users] Profile update failed.', { errorName: e?.name });
+    res.status(500).json({ success: false, message: 'Your profile could not be saved. Please try again.' });
   }
 };
 
@@ -240,6 +296,20 @@ export const deactivateMe = async (req: AuthRequest, res: Response): Promise<voi
     if (!isMatch) {
       res.status(400).json({ success: false, message: 'Password is incorrect.' });
       return;
+    }
+
+    // There is no ownership transfer yet, so deactivating the owner would leave
+    // the workspace with nobody able to administer or bill it.
+    if (user.companyId) {
+      const ownsWorkspace = await Company.exists({ _id: user.companyId, ownerId: user._id });
+      if (ownsWorkspace) {
+        res.status(409).json({
+          success: false,
+          code: 'WORKSPACE_OWNER_CANNOT_DEACTIVATE',
+          message: 'Workspace owners cannot deactivate their account while they own the workspace.',
+        });
+        return;
+      }
     }
 
     user.isActive = false;

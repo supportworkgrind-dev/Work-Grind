@@ -42,7 +42,7 @@ router.patch('/me/deactivate', deactivateMe);
 router.patch('/me/avatar', avatarUpload.single('avatar'), validateUploadedContent, uploadAvatar);
 router.patch('/me/status', updateStatus);
 // Role guard: only owners, admins, and managers can invite members
-router.post('/invite', requireRole('owner', 'admin', 'manager'), inviteMember);
+router.post('/invite', requireRole('owner', 'admin', 'manager'), requireOrganizationFeature('memberDirectory'), inviteMember);
 router.get('/:id', requireOrganizationFeature('memberDirectory'), getUserById);
 
 export default router;

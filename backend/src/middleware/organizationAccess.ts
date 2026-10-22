@@ -5,6 +5,7 @@ import {
   AccountType,
   OrganizationType,
   isOrganizationRoleEligible,
+  isWorkspaceAdministrator,
   roleMatches,
 } from '../config/organization';
 import { AuthRequest } from './auth';
@@ -189,6 +190,27 @@ async function loadOrganizationMembership(
     organizationType: company.organizationType,
     accountType: company.accountType,
   };
+}
+
+/**
+ * Workspace administration (settings, invite credentials, member status and
+ * roles, removals, audit trail). Uses the role and organization authenticate
+ * just read from the database, never values supplied by the client.
+ */
+export function requireWorkspaceAdministrator(req: AuthRequest, res: Response, next: NextFunction): void {
+  if (!req.user?.userId) {
+    res.status(401).json({ success: false, message: 'Authentication required.' });
+    return;
+  }
+  if (!isWorkspaceAdministrator(req.user.role, req.user.organizationType)) {
+    res.status(403).json({
+      success: false,
+      code: 'WORKSPACE_ADMIN_REQUIRED',
+      message: 'Only workspace owners and administrators can make this change.',
+    });
+    return;
+  }
+  next();
 }
 
 export function requireOrganizationFeature(feature: OrganizationFeature) {

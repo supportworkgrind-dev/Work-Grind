@@ -7,6 +7,7 @@ import { AuthRequest } from '../middleware/auth';
 import { sendInviteEmail } from '../utils/email';
 import { v4 as uuidv4 } from 'uuid';
 import {
+  canAssignOrganizationRole,
   isOrganizationRoleEligible,
   isOrganizationType,
   roleMatches,
@@ -295,6 +296,13 @@ export const resendInvite = async (req: AuthRequest, res: Response): Promise<voi
     const invite = company.pendingInvites.find((i) => i.token === token);
     if (!invite) {
       res.status(404).json({ success: false, message: 'Invite not found' });
+      return;
+    }
+    // Resending re-issues the invitation, so it needs the same authority as sending it:
+    // a manager cannot renew an elevated-role invite that an administrator created.
+    const isOwner = company.ownerId?.toString() === req.user!.userId;
+    if (!canAssignOrganizationRole(req.user!.role, invite.role, company.organizationType, isOwner)) {
+      res.status(403).json({ success: false, message: 'Your role cannot resend an invitation for this role.' });
       return;
     }
     // Refresh expiration to 7 days from now
