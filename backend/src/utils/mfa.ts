@@ -1,8 +1,11 @@
 import crypto from 'crypto';
-import { authenticator, totp } from 'otplib';
+import { authenticator } from 'otplib';
 import QRCode from 'qrcode';
 
-const driftTolerantTotp = totp.clone({ window: 1 });
+// Secrets are base32 (what authenticator apps scan), so codes must be checked
+// with the base32-aware authenticator; plain totp treats the secret as raw text
+// and never matches an app-generated code.
+const driftTolerantAuthenticator = authenticator.clone({ window: 1 });
 
 // Derive 32-byte AES key from environment secret
 const getEncryptionKey = (): Buffer => {
@@ -94,7 +97,7 @@ export const verifyTotp = (token: string, secret: string): boolean => {
     return false;
   }
   try {
-    return driftTolerantTotp.check(cleaned, secret);
+    return driftTolerantAuthenticator.check(cleaned, secret);
   } catch {
     return false;
   }

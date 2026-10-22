@@ -24,6 +24,7 @@ const original = {
   companyExists: Company.exists,
   auditFind: AuditLog.find,
   auditCount: AuditLog.countDocuments,
+  auditDistinct: AuditLog.distinct,
   sendInviteEmail: email.sendInviteEmail,
 };
 
@@ -35,6 +36,7 @@ test.afterEach(() => {
   Company.exists = original.companyExists;
   AuditLog.find = original.auditFind;
   AuditLog.countDocuments = original.auditCount;
+  AuditLog.distinct = original.auditDistinct;
   email.sendInviteEmail = original.sendInviteEmail;
 });
 
@@ -283,6 +285,7 @@ test('audit logs are read only from the authenticated workspace, ignoring a requ
     return chain;
   };
   AuditLog.countDocuments = async (filter) => { filters.push(filter); return 0; };
+  AuditLog.distinct = async (field, filter) => { filters.push(filter); return ['MEMBER_ROLE_CHANGED']; };
   const res = makeResponse();
   await getAuditLogs({
     query: { companyId: new mongoose.Types.ObjectId().toString() },
@@ -290,7 +293,8 @@ test('audit logs are read only from the authenticated workspace, ignoring a requ
   }, res);
   assert.equal(res.statusCode, 200);
   assert.deepEqual(res.body.logs, []);
-  assert.ok(filters.length === 2 && filters.every((filter) => filter.companyId === companyId.toString()));
+  assert.ok(filters.length === 3 && filters.every((filter) => filter.companyId === companyId.toString()));
+  assert.deepEqual(res.body.actions, ['MEMBER_ROLE_CHANGED']);
 });
 
 test('the current-user response no longer carries the workspace invite code', async () => {
