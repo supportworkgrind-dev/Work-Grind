@@ -165,21 +165,45 @@ export const getAuditLogs = async (req: AuthRequest, res: Response): Promise<voi
       return;
     }
 
-    const filter = { companyId: req.user!.companyId };
-    const [pageLogs, total] = await Promise.all([
+    const filter: Record<string, unknown> = { companyId: req.user!.companyId };
+    const action = typeof req.query.action === 'string' ? req.query.action.trim() : '';
+    if (action) {
+      if (!/^[A-Z0-9_.:-]{1,64}$/i.test(action)) {
+        res.status(400).json({ success: false, message: 'Invalid event type filter.' });
+        return;
+      }
+      filter.action = action;
+    }
+    const createdAt: Record<string, Date> = {};
+    for (const [param, operator] of [['from', '$gte'], ['to', '$lte']] as const) {
+      const raw = typeof req.query[param] === 'string' ? (req.query[param] as string) : '';
+      if (!raw) continue;
+      const date = new Date(raw);
+      if (Number.isNaN(date.getTime())) {
+        res.status(400).json({ success: false, message: 'Invalid date filter.' });
+        return;
+      }
+      createdAt[operator] = date;
+    }
+    if (Object.keys(createdAt).length) filter.createdAt = createdAt;
+
+    const [pageLogs, total, actions] = await Promise.all([
       AuditLog.find(filter)
         .populate('userId', 'fullName avatar email')
         .sort({ createdAt: -1, _id: -1 })
         .skip(pagination.skip)
         .limit(pagination.limit + 1),
       AuditLog.countDocuments(filter),
+      // Event types recorded in this workspace, for the filter menu.
+      AuditLog.distinct('action', { companyId: req.user!.companyId }),
     ]);
     const hasMore = pageLogs.length > pagination.limit;
     const logs = hasMore ? pageLogs.slice(0, pagination.limit) : pageLogs;
 
-    res.json({ success: true, logs, total, page: pagination.page, hasMore });
+    res.json({ success: true, logs, total, page: pagination.page, hasMore, actions: (actions as string[]).sort() });
   } catch (err: any) {
-    res.status(500).json({ success: false, message: err.message });
+    console.error('[Admin] Audit log query failed.', { errorName: err?.name });
+    res.status(500).json({ success: false, message: 'Audit records could not be loaded.' });
   }
 };
 

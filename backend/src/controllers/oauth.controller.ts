@@ -13,6 +13,8 @@ import { isOrganizationFeatureAllowed } from '../middleware/organizationAccess';
 import { sendWelcomeEmail } from '../utils/email';
 import { restoreWorkspaceCreatorRole, sessionForUser } from './auth.controller';
 import { setRefreshCookie } from '../utils/authCookie';
+import { generateUserMfaChallengeToken } from '../utils/jwt';
+import { recordSecurityEvent } from '../services/securityEvents';
 import { issueClientToken } from '../utils/clientPortalAuth';
 import AuditLog from '../models/AuditLog';
 import Integration, { IIntegration } from '../models/Integration';
@@ -985,7 +987,7 @@ export const exchangeOAuthSession = async (req: Request, res: Response): Promise
     stage = 'workgrind_session_creation';
     const session = await sessionForUser(user);
     setRefreshCookie(res, session.refreshToken);
-    await recordSecurityEvent(user, 'LOGIN_SUCCEEDED', req, { method: exchange.provider || 'oauth' });
+    await recordSecurityEvent(user, 'LOGIN_SUCCEEDED', req, { method: 'oauth' });
     res.json({
       success: true,
       accessToken: session.accessToken,
