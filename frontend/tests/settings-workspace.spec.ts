@@ -123,6 +123,7 @@ async function openSettings(page: Page, workspace: Workspace, overrides: Overrid
   return requests;
 }
 
+// Next.js renders its own empty role="alert" route announcer, so alerts are matched by text.
 const tab = (page: Page, name: string) => page.getByRole('button', { name, exact: true });
 
 async function expectTabs(page: Page, visible: string[], hidden: string[]) {
@@ -225,7 +226,7 @@ test('a failed theme save restores the previous theme and shows the error', asyn
   const initiallySelected = await page.locator('button[aria-pressed="true"]').getAttribute('aria-label');
   const target = themeButtons.filter({ has: page.locator('span') }).and(page.locator('button[aria-pressed="false"]')).first();
   await target.click();
-  await expect(page.getByRole('alert')).toContainText('Your profile could not be saved.');
+  await expect(page.getByRole('alert').filter({ hasText: 'Your profile could not be saved.' })).toBeVisible();
   await expect(page.locator('button[aria-pressed="true"]')).toHaveAttribute('aria-label', initiallySelected ?? '');
 });
 
@@ -253,7 +254,7 @@ test('a rejected workspace save shows the server error and no success message', 
   });
   await tab(page, 'Workspace Config').click();
   await page.getByRole('button', { name: 'Update Workspace' }).click();
-  await expect(page.getByRole('alert')).toContainText('Only workspace owners and administrators can make this change.');
+  await expect(page.getByRole('alert').filter({ hasText: 'Only workspace owners and administrators can make this change.' })).toBeVisible();
   await expect(page.getByText('Workspace settings saved.')).toHaveCount(0);
   await expect(page.getByLabel('Workspace / Organization Name')).toHaveValue('Fixture Workspace');
 });
@@ -263,7 +264,7 @@ test('an invalid time zone is rejected before anything is sent', async ({ page }
   await tab(page, 'Workspace Config').click();
   await page.getByLabel('Default time zone (IANA)').fill('Mars/Olympus');
   await page.getByRole('button', { name: 'Update Workspace' }).click();
-  await expect(page.getByRole('alert')).toContainText('valid IANA time zone');
+  await expect(page.getByRole('alert').filter({ hasText: 'valid IANA time zone' })).toBeVisible();
   expect(requests.some((r) => r.method === 'PATCH' && r.path === '/companies')).toBe(false);
 });
 
@@ -291,7 +292,7 @@ test('a failed role change keeps the stored role and explains the failure', asyn
   await tab(page, 'Members & Roles').click();
   const roleSelect = page.getByLabel('Role for Second Member');
   await roleSelect.selectOption('manager');
-  await expect(page.getByRole('alert')).toContainText('Elevated roles can only be assigned by the workspace owner.');
+  await expect(page.getByRole('alert').filter({ hasText: 'Elevated roles can only be assigned by the workspace owner.' })).toBeVisible();
   await expect(roleSelect).toHaveValue('employee');
 });
 
@@ -320,7 +321,7 @@ test('a failed audit-log request is shown as an error, not as an empty history',
     }),
   });
   await tab(page, 'Audit Logs').click();
-  await expect(page.getByRole('alert')).toContainText('Audit records could not be loaded.');
+  await expect(page.getByRole('alert').filter({ hasText: 'Audit records could not be loaded.' })).toBeVisible();
   await expect(page.getByText('No audit records logged yet.')).toHaveCount(0);
 });
 
@@ -329,4 +330,17 @@ test('workspace owners are told why they cannot deactivate their account', async
   await tab(page, 'Security & Password').click();
   await expect(page.getByText("Workspace owners can't deactivate their account while they own the workspace.")).toBeVisible();
   await expect(page.getByRole('button', { name: 'Deactivate Account' })).toHaveCount(0);
+});
+
+test('settings tabs fit a phone-width viewport without horizontal page scroll', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openSettings(page, { organizationType: 'business', accountType: 'company', role: 'owner', owner: true });
+  // The app shell opens its mobile sidebar on first load; close it like a user would.
+  const closeSidebar = page.getByRole('button', { name: 'Close sidebar' });
+  if (await closeSidebar.isVisible()) await closeSidebar.click();
+  for (const name of ['My Profile', 'Preferences', 'Security & Password', 'Workspace Config', 'Members & Roles', 'Audit Logs']) {
+    await tab(page, name).click();
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    expect(overflow, `${name} has no horizontal page overflow`).toBeLessThanOrEqual(1);
+  }
 });
