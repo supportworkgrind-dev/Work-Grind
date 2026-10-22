@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/useAuthStore';
 import { api } from '@/lib/api';
 import { LANGUAGES, useI18n, type LangCode } from '@/lib/i18n';
@@ -14,11 +13,9 @@ import {
   Building2,
   Users,
   Shield,
-  CreditCard,
   FileText,
   Save,
   Check,
-  HardDrive,
   AlertCircle,
   Copy,
   RefreshCw,
@@ -30,8 +27,6 @@ import {
   CheckCircle2,
   X,
   Search,
-  Filter,
-  Clock,
   Sparkles,
   Palette,
   Bell,
@@ -39,10 +34,16 @@ import {
   CheckCheck,
   PhoneCall,
 } from 'lucide-react';
-import { formatBytes, formatDate, getInitials } from '@/lib/utils';
+import { formatDate, getInitials } from '@/lib/utils';
 import { CountrySelect } from '@/components/common/CountrySelect';
 import { SocialAuthButtons } from '@/components/auth/SocialAuthButtons';
-import { canAccessOrganizationFeature } from '@/lib/organizationAccess';
+import {
+  canAccessOrganizationFeature,
+  canAccessRoute,
+  getAssignableRoles,
+  getWorkspaceExperience,
+  isWorkspaceOwnerRole,
+} from '@/lib/organizationAccess';
 import { LinkedInConnectionCard } from '@/components/automation/LinkedInConnectionCard';
 
 const NOTIFICATION_DEFAULTS = {
@@ -52,9 +53,57 @@ const NOTIFICATION_DEFAULTS = {
   dealUpdate: true,
 };
 
+type NotificationKey = keyof typeof NOTIFICATION_DEFAULTS;
+
+// Each toggle maps to the in-app notification type the backend checks before
+// delivering (utils/notificationPreferences.ts). A toggle is shown only when the
+// user can reach the feature that produces it.
+const NOTIFICATION_OPTIONS: { key: NotificationKey; label: string; description: string; route: string }[] = [
+  { key: 'taskAssigned', label: 'Tasks assigned to me', description: 'When a teammate assigns you a task.', route: '/tasks' },
+  { key: 'meetingReminder', label: 'Meeting invitations', description: 'When you are invited to a meeting.', route: '/meetings' },
+  { key: 'newMessage', label: 'Direct messages', description: 'When someone sends you a direct message.', route: '/chat' },
+  { key: 'dealUpdate', label: 'CRM deal updates', description: 'When a deal you own is updated.', route: '/crm' },
+];
+
+const COMPANY_SIZES = ['1-10', '11-50', '51-200', '201-500', '500+'];
+const INDUSTRY_OPTIONS = ['Technology', 'Design & Creative', 'Marketing & Media', 'Finance & Fintech', 'Other'];
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+type Notice = { tone: 'success' | 'error'; text: string } | null;
+type PendingAction =
+  | { kind: 'regenerate' }
+  | { kind: 'upgrade' }
+  | { kind: 'revoke'; token: string; email: string }
+  | { kind: 'toggle'; userId: string; name: string; isActive: boolean }
+  | { kind: 'remove'; userId: string; name: string };
+
+type AuditLogEntry = {
+  _id: string;
+  action: string;
+  createdAt: string;
+  userId?: { fullName?: string } | null;
+};
+
+function errorMessage(error: unknown, fallback: string): string {
+  const message = (error as { response?: { data?: { message?: unknown } } })?.response?.data?.message;
+  return typeof message === 'string' && message ? message : fallback;
+}
+
+function isValidTimeZone(value: string): boolean {
+  try {
+    new Intl.DateTimeFormat('en', { timeZone: value });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function formatRole(role: string): string {
+  return role.charAt(0).toUpperCase() + role.slice(1);
+}
+
 export default function SettingsPage() {
-  const router = useRouter();
-  const { user, company, subscription, fetchCurrentUser, setUser, setCompany, logout, isAtLimit, refreshSubscription } = useAuthStore();
+  const { user, company, fetchCurrentUser, setUser, setCompany, logout, isAtLimit, refreshSubscription } = useAuthStore();
   const memberLimitReached = isAtLimit('members');
   const { lang, setLang } = useI18n();
   const storeTheme = useThemeStore((state) => state.theme);
@@ -82,31 +131,39 @@ export default function SettingsPage() {
   const [avatarError, setAvatarError] = useState('');
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Workspace Form State
+  // Workspace Form State — initialized only from the saved workspace; fields the
+  // workspace has never set stay empty instead of being filled with guesses.
   const [companyName, setCompanyName] = useState(company?.name || '');
-  const [industry, setIndustry] = useState(company?.industry || 'Technology');
-  const [size, setSize] = useState(company?.size || '11-50');
-  const [timeZone, setTimeZone] = useState(company?.timeZone || 'UTC');
-  const [country, setCountry] = useState(company?.country || 'United States');
-  const [currency, setCurrency] = useState(company?.currency || 'USD');
-  const [organizationType, setOrganizationType] = useState<NonNullable<Company['organizationType']>>(company?.organizationType || 'business');
+  const [industry, setIndustry] = useState(company?.industry || '');
+  const [size, setSize] = useState(company?.size || '');
+  const [timeZone, setTimeZone] = useState(company?.timeZone || '');
+  const [country, setCountry] = useState(company?.country || '');
+  const [currency, setCurrency] = useState(company?.currency || '');
   const [academicYearStartMonth, setAcademicYearStartMonth] = useState(company?.academicSettings?.academicYearStartMonth || 8);
   const [gradingScale, setGradingScale] = useState<NonNullable<Company['academicSettings']>['gradingScale']>(company?.academicSettings?.gradingScale || 'percentage');
-  const [allowGuestAccess, setAllowGuestAccess] = useState(company?.settings?.allowGuestAccess || false);
   const [defaultRole, setDefaultRole] = useState(company?.settings?.defaultRole || 'employee');
   const [companySaving, setCompanySaving] = useState(false);
   const [companySaved, setCompanySaved] = useState(false);
   const [companyError, setCompanyError] = useState('');
-  const [inviteCode, setInviteCode] = useState(company?.inviteCode || '');
+  const [inviteCode, setInviteCode] = useState('');
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
   const [regeneratingCode, setRegeneratingCode] = useState(false);
+  const [upgrading, setUpgrading] = useState(false);
+  const [workspaceNotice, setWorkspaceNotice] = useState<Notice>(null);
+
+  // Inline confirmation replaces window.confirm for destructive actions.
+  const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
 
   // Members Management State
   const [members, setMembers] = useState<User[]>([]);
   const [membersLoading, setMembersLoading] = useState(false);
+  const [membersError, setMembersError] = useState('');
   const [memberSearch, setMemberSearch] = useState('');
   const [memberRoleFilter, setMemberRoleFilter] = useState('all');
+  const [memberNotice, setMemberNotice] = useState<Notice>(null);
+  const [busyMemberId, setBusyMemberId] = useState<string | null>(null);
+  const [busyInviteToken, setBusyInviteToken] = useState<string | null>(null);
 
   // Pending Invites State
   const [pendingInvites, setPendingInvites] = useState<{
@@ -116,6 +173,7 @@ export default function SettingsPage() {
     role: string;
   }[]>([]);
   const [invitesLoading, setInvitesLoading] = useState(false);
+  const [invitesError, setInvitesError] = useState('');
 
   // Invite Modal State
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
@@ -126,7 +184,11 @@ export default function SettingsPage() {
   const [inviteError, setInviteError] = useState('');
 
   // Audit Logs State
-  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditError, setAuditError] = useState('');
+  const [auditPage, setAuditPage] = useState(1);
+  const [auditHasMore, setAuditHasMore] = useState(false);
 
   // Password Change Form State
   const [currentPassword, setCurrentPassword] = useState('');
@@ -142,6 +204,9 @@ export default function SettingsPage() {
   const [preferencesSaving, setPreferencesSaving] = useState(false);
   const [preferencesSaved, setPreferencesSaved] = useState(false);
   const [preferencesError, setPreferencesError] = useState('');
+  const [appearanceSaving, setAppearanceSaving] = useState(false);
+  const [appearanceSaved, setAppearanceSaved] = useState('');
+  const appearanceRequest = useRef(0);
   const [callingId, setCallingId] = useState('');
   const [callingIdLoading, setCallingIdLoading] = useState(true);
   const [callingIdError, setCallingIdError] = useState('');
@@ -172,36 +237,45 @@ export default function SettingsPage() {
     }
   };
 
+  const applyProfileFields = (source: User) => {
+    setFullName(source.fullName || '');
+    setJobTitle(source.jobTitle || '');
+    setDepartment(source.department || '');
+    setPhone(source.phone || '');
+    setBio(source.bio || '');
+    setAvatar(source.avatar || '');
+    setSkills(source.skills?.join(', ') || '');
+  };
+
+  const applyWorkspaceFields = (source: Company) => {
+    setCompanyName(source.name || '');
+    setIndustry(source.industry || '');
+    setSize(source.size || '');
+    setTimeZone(source.timeZone || '');
+    setCountry(source.country || '');
+    setCurrency(source.currency || '');
+    setAcademicYearStartMonth(source.academicSettings?.academicYearStartMonth || 8);
+    setGradingScale(source.academicSettings?.gradingScale || 'percentage');
+    setDefaultRole(source.settings?.defaultRole || 'employee');
+  };
+
+  // Seed the forms when the signed-in user or workspace changes, not on every
+  // store update: saving one section must not wipe unsaved edits in another.
+  const userId = user?._id;
+  const companyId = company?._id;
   useEffect(() => {
-    if (user) {
-      setFullName(user.fullName || '');
-      setJobTitle(user.jobTitle || '');
-      setDepartment(user.department || '');
-      setPhone(user.phone || '');
-      setBio(user.bio || '');
-      setAvatar(user.avatar || '');
-      setSkills(user.skills?.join(', ') || '');
-      setNotificationPrefs({ ...NOTIFICATION_DEFAULTS, ...user.notificationPreferences });
-      setPreferredLanguage(user.preferredLanguage ?? lang);
-      setAppearanceTheme(normalizeTheme(user.theme ?? storeTheme));
-    }
-    if (company) {
-      setCompanyName(company.name || '');
-      setIndustry(company.industry || 'Technology');
-      setSize(company.size || '11-50');
-      setTimeZone(company.timeZone || 'UTC');
-      setCountry(company.country || 'United States');
-      setCurrency(company.currency || 'USD');
-      setOrganizationType(company.organizationType || 'business');
-      setAcademicYearStartMonth(company.academicSettings?.academicYearStartMonth || 8);
-      setGradingScale(company.academicSettings?.gradingScale || 'percentage');
-      setInviteCode(company.inviteCode || '');
-      if (company.settings) {
-        setAllowGuestAccess(company.settings.allowGuestAccess || false);
-        setDefaultRole(company.settings.defaultRole || 'employee');
-      }
-    }
-  }, [user, company, storeTheme]);
+    const current = useAuthStore.getState().user;
+    if (!current) return;
+    applyProfileFields(current);
+    setNotificationPrefs({ ...NOTIFICATION_DEFAULTS, ...current.notificationPreferences });
+    if (current.preferredLanguage) setPreferredLanguage(current.preferredLanguage);
+    setAppearanceTheme(normalizeTheme(current.theme ?? useThemeStore.getState().theme));
+  }, [userId]);
+
+  useEffect(() => {
+    const current = useAuthStore.getState().company;
+    if (current) applyWorkspaceFields(current);
+  }, [companyId]);
 
   useEffect(() => {
     setAppearanceTheme(storeTheme);
@@ -212,52 +286,74 @@ export default function SettingsPage() {
     setPreferencesSaved(false);
     setPreferencesError('');
     try {
-      const res = await api.patch('/users/me', {
-        notificationPreferences: notificationPrefs,
-        preferredLanguage,
-        theme: appearanceTheme,
-        ...(getWorkspaceProfileForTheme(appearanceTheme)
-          ? { workspaceProfile: getWorkspaceProfileForTheme(appearanceTheme) }
-          : {}),
-      });
-
-      if (res.data.success) {
-        setTheme(appearanceTheme);
-        setLang(preferredLanguage);
-        if (res.data.user) setUser(res.data.user);
-        else await fetchCurrentUser();
-        setPreferencesSaved(true);
-        setTimeout(() => setPreferencesSaved(false), 2000);
-      } else {
-        setPreferencesError(res.data.message || 'Unable to save preferences.');
+      // Theme and language are saved when they are picked; this saves notifications.
+      const res = await api.patch('/users/me', { notificationPreferences: notificationPrefs });
+      if (!res.data.success || !res.data.user) {
+        setPreferencesError(res.data.message || 'Unable to save notification preferences.');
+        return;
       }
-    } catch (err: any) {
-      setPreferencesError(err.response?.data?.message || 'Unable to save preferences. Please try again.');
+      setUser(res.data.user);
+      setNotificationPrefs({ ...NOTIFICATION_DEFAULTS, ...res.data.user.notificationPreferences });
+      setPreferencesSaved(true);
+      setTimeout(() => setPreferencesSaved(false), 2000);
+    } catch (err) {
+      setPreferencesError(errorMessage(err, 'Unable to save notification preferences. Please try again.'));
     } finally {
       setPreferencesSaving(false);
     }
   };
 
-  const handleThemeSelect = (theme: Theme) => {
-    setAppearanceTheme(theme);
-    setTheme(theme);
-    if (user) {
-      const workspaceProfile = getWorkspaceProfileForTheme(theme);
-      setUser({
-        ...user,
-        theme,
-        ...(workspaceProfile ? { workspaceProfile } : {}),
-      });
-    }
-    setPreferencesSaved(false);
+  /**
+   * Theme and language apply immediately, so they are persisted immediately too;
+   * a failed save restores the previous value instead of leaving the UI showing
+   * a choice the account does not have. Only the latest pick may settle state.
+   */
+  const persistAppearance = async (
+    body: Record<string, unknown>,
+    apply: () => void,
+    restore: () => void,
+    savedText: string,
+  ) => {
+    const request = ++appearanceRequest.current;
+    apply();
+    setAppearanceSaving(true);
+    setAppearanceSaved('');
     setPreferencesError('');
+    try {
+      const res = await api.patch('/users/me', body);
+      if (request !== appearanceRequest.current) return;
+      if (!res.data.success || !res.data.user) throw new Error(res.data.message);
+      setUser(res.data.user);
+      setAppearanceSaved(savedText);
+      window.setTimeout(() => setAppearanceSaved((current) => (current === savedText ? '' : current)), 2500);
+    } catch (err) {
+      if (request !== appearanceRequest.current) return;
+      restore();
+      setPreferencesError(errorMessage(err, 'That change could not be saved, so your previous setting was restored.'));
+    } finally {
+      if (request === appearanceRequest.current) setAppearanceSaving(false);
+    }
+  };
+
+  const handleThemeSelect = (theme: Theme) => {
+    const previous = appearanceTheme;
+    const workspaceProfile = getWorkspaceProfileForTheme(theme);
+    void persistAppearance(
+      { theme, ...(workspaceProfile ? { workspaceProfile } : {}) },
+      () => { setAppearanceTheme(theme); setTheme(theme); },
+      () => { setAppearanceTheme(previous); setTheme(previous); },
+      'Theme saved to your account.',
+    );
   };
 
   const handleLanguageSelect = (language: LangCode) => {
-    setPreferredLanguage(language);
-    setLang(language);
-    setPreferencesSaved(false);
-    setPreferencesError('');
+    const previous = preferredLanguage;
+    void persistAppearance(
+      { preferredLanguage: language },
+      () => { setPreferredLanguage(language); setLang(language); },
+      () => { setPreferredLanguage(previous); setLang(previous); },
+      'Language saved to your account.',
+    );
   };
 
   const handleDeleteAccount = async () => {

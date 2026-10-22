@@ -42,6 +42,7 @@ const EDUCATION_ROLES = new Set([
 ]);
 const INSTITUTION_ADMINS = new Set(['owner', 'principal', 'admin', 'dean', 'hod']);
 const DEPARTMENT_ROLES = new Set(['dean', 'hod']);
+const WORKSPACE_ADMINS_EDUCATION = new Set(['owner', 'principal', 'admin']);
 const EDUCATION_TYPES = new Set<OrganizationType>(['school', 'college', 'university']);
 
 const FEATURE_POLICIES: Record<OrganizationFeature, (experience: Experience, role: string) => boolean> = {
@@ -74,10 +75,12 @@ const FEATURE_POLICIES: Record<OrganizationFeature, (experience: Experience, rol
   memberDirectory: (experience, role) =>
     experience === 'company' ? ['owner', 'admin', 'manager'].includes(role) :
       experience !== 'solo' && INSTITUTION_ADMINS.has(role),
+  // Mirrors the backend's isWorkspaceAdministrator: deans and HoDs administer
+  // their departments, not the workspace itself.
   workspaceSettings: (experience, role) =>
     experience === 'solo' ? role === 'owner' :
       experience === 'company' ? ['owner', 'admin'].includes(role) :
-        INSTITUTION_ADMINS.has(role),
+        WORKSPACE_ADMINS_EDUCATION.has(role),
 };
 
 function canonicalRole(role: UserRole | string | undefined): string {
@@ -133,6 +136,35 @@ export function canAccessOrganizationFeature(
   const experience = getWorkspaceExperience(organization);
   if (!experience) return false;
   return FEATURE_POLICIES[feature](experience, canonicalRole(role));
+}
+
+/**
+ * Roles the actor may assign when inviting or changing a member, matching the
+ * backend's canAssignOrganizationRole: the workspace owner may assign any
+ * non-owner role; other member managers only non-elevated ones.
+ */
+export function getAssignableRoles(
+  organization: OrganizationInfo | null | undefined,
+  role: UserRole | string | undefined,
+  ownsWorkspace: boolean,
+): string[] {
+  const experience = getWorkspaceExperience(organization);
+  if (!experience || experience === 'solo') return [];
+  if (!canAccessOrganizationFeature(organization, role, 'memberDirectory')) return [];
+  if (experience === 'company') {
+    return [...(ownsWorkspace ? ['admin', 'manager'] : []), 'employee', 'guest'];
+  }
+  return [
+    ...(ownsWorkspace ? ['principal', 'admin'] : []),
+    'teacher',
+    'student',
+    'parent',
+    ...(experience === 'university' && ownsWorkspace ? ['dean', 'hod'] : []),
+  ];
+}
+
+export function isWorkspaceOwnerRole(role: UserRole | string | undefined): boolean {
+  return canonicalRole(role) === 'owner';
 }
 
 export function getRouteOrganizationFeature(pathname: string): OrganizationFeature | null {
