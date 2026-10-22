@@ -49,9 +49,6 @@ const ALL_EDUCATION_ROLES = [
 const ACADEMIC_ADMIN_ROLES = ['owner', 'principal', 'admin', 'dean', 'hod'] as const;
 const BUSINESS_ADMIN_ROLES = ['owner', 'admin', 'manager'] as const;
 const SOCIAL_PUBLISHING_BUSINESS_ROLES = ['owner', 'admin', 'manager', 'employee'] as const;
-const SOCIAL_PUBLISHING_EDUCATION_ROLES = [
-  'owner', 'principal', 'admin', 'office_staff', 'teacher', 'dean', 'hod',
-] as const;
 const BUSINESS_TYPES = ['business'] as const;
 const EDUCATION_TYPES = ['school', 'college', 'university'] as const;
 const COMPANY_ACCOUNTS = ['company'] as const;
@@ -68,8 +65,10 @@ export const ORGANIZATION_FEATURE_POLICIES: Record<OrganizationFeature, FeatureP
   businessAnalytics: { organizationTypes: BUSINESS_TYPES, accountTypes: COMPANY_ACCOUNTS, roles: BUSINESS_ADMIN_ROLES, entitlement: 'advancedAnalytics' },
   businessIntegrations: { organizationTypes: BUSINESS_TYPES, accountTypes: COMPANY_ACCOUNTS, roles: BUSINESS_ADMIN_ROLES },
   businessAutomation: { organizationTypes: BUSINESS_TYPES, accountTypes: COMPANY_ACCOUNTS, roles: BUSINESS_ADMIN_ROLES },
+  // Business team and Solo workspaces only; schools, colleges and universities
+  // do not get Social Publishing.
   socialPublishing: {
-    organizationTypes: [...BUSINESS_TYPES, ...EDUCATION_TYPES],
+    organizationTypes: BUSINESS_TYPES,
     accountTypes: [...COMPANY_ACCOUNTS, ...INDIVIDUAL_ACCOUNTS],
     roles: SOCIAL_PUBLISHING_BUSINESS_ROLES,
   },
@@ -131,12 +130,8 @@ export function isOrganizationFeatureAllowed(
   feature: OrganizationFeature,
 ): boolean {
   const policy = ORGANIZATION_FEATURE_POLICIES[feature];
-  const roles = feature === 'socialPublishing'
-    ? organization.organizationType === 'business' && organization.accountType === 'individual'
-      ? ['owner']
-      : organization.organizationType === 'business'
-        ? SOCIAL_PUBLISHING_BUSINESS_ROLES
-        : SOCIAL_PUBLISHING_EDUCATION_ROLES
+  const roles = feature === 'socialPublishing' && organization.accountType === 'individual'
+    ? ['owner']
     : policy.roles;
   return policy.organizationTypes.includes(organization.organizationType) &&
     policy.accountTypes.includes(organization.accountType) &&
