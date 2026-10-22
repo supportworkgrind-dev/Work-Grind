@@ -191,6 +191,8 @@ S.index({ companyId: 1, isActive: 1 });
 S.index({ companyId: 1, role: 1 });
 S.index({ companyId: 1, department: 1 });
 S.index({ isSuperAdmin: 1 });
+// cleanupExpiredVerificationCodes runs on every cold start; without this it scans all users.
+S.index({ verificationCodeExpiry: 1 }, { sparse: true });
 S.index({ callingId: 1 }, { unique: true, sparse: true, name: 'callingId_unique' });
 S.index({ phone: 1 }, {
   unique: true,

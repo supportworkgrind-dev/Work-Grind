@@ -19,4 +19,6 @@ S.index({ companyId: 1, participants: 1 });
 S.index({ companyId: 1, updatedAt: -1 });
 S.index({ companyId: 1, participants: 1, updatedAt: -1 });
 S.index({ isGroup: 1, participants: 1 });
+// DM list: participants filter + {updatedAt, _id} sort without an in-memory sort.
+S.index({ participants: 1, updatedAt: -1, _id: -1 });
 export default mongoose.model<IConversation>('Conversation', S);
