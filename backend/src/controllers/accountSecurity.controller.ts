@@ -2,8 +2,9 @@ import { Request, Response } from 'express';
 import mongoose from 'mongoose';
 import User, { IUser } from '../models/User';
 import AuditLog from '../models/AuditLog';
+import { recordSecurityEvent, SECURITY_EVENT_ACTIONS } from '../services/securityEvents';
 import { AuthRequest } from '../middleware/auth';
-import { generateUserMfaChallengeToken, verifyAccessToken } from '../utils/jwt';
+import { verifyAccessToken } from '../utils/jwt';
 import {
   decryptSecret,
   encryptSecret,
@@ -24,19 +25,6 @@ import { sessionForUser } from './auth.controller';
  * history, and a personal data export. Super admins keep their own MFA flow.
  */
 
-export const SECURITY_EVENT_ACTIONS = [
-  'LOGIN_SUCCEEDED',
-  'LOGIN_MFA_FAILED',
-  'PASSWORD_CHANGED',
-  'MFA_ENABLED',
-  'MFA_DISABLED',
-  'MFA_RECOVERY_CODES_REGENERATED',
-  'SESSIONS_REVOKED',
-  'SIGN_IN_PROVIDER_UNLINKED',
-  'DATA_EXPORTED',
-] as const;
-type SecurityEventAction = (typeof SECURITY_EVENT_ACTIONS)[number];
-
 const LINKABLE_PROVIDERS = ['google', 'linkedin'] as const;
 type LinkableProvider = (typeof LINKABLE_PROVIDERS)[number];
 const PROVIDER_ID_FIELD: Record<LinkableProvider, 'googleId' | 'linkedinId'> = {
@@ -46,32 +34,6 @@ const PROVIDER_ID_FIELD: Record<LinkableProvider, 'googleId' | 'linkedinId'> = {
 
 const MFA_LOCKOUT_ATTEMPTS = 5;
 const MFA_LOCKOUT_MS = 15 * 60_000;
-
-/** Records an event in the workspace audit trail; never blocks the action itself. */
-export async function recordSecurityEvent(
-  user: Pick<IUser, '_id' | 'companyId'>,
-  action: SecurityEventAction,
-  req: Request,
-  details?: Record<string, unknown>,
-): Promise<void> {
-  if (!user.companyId) return; // audit records are workspace-scoped
-  try {
-    await AuditLog.create({
-      companyId: user.companyId,
-      userId: user._id,
-      action,
-      resource: 'User',
-      resourceId: user._id.toString(),
-      ...(details ? { details } : {}),
-      ipAddress: req.ip,
-    });
-  } catch (error) {
-    console.error('[AccountSecurity] Security event could not be recorded.', {
-      action,
-      errorName: error instanceof Error ? error.name : 'UnknownError',
-    });
-  }
-}
 
 function signInMethods(user: Pick<IUser, 'password' | 'googleId' | 'linkedinId' | 'appleId'>) {
   return {
@@ -289,11 +251,6 @@ export const regenerateUserRecoveryCodes = async (req: AuthRequest, res: Respons
     res.status(500).json({ success: false, message: 'New recovery codes could not be generated.' });
   }
 };
-
-/** Issued by password and OAuth sign-in when the account has MFA enabled. */
-export function createMfaChallenge(user: Pick<IUser, '_id' | 'companyId'>): string {
-  return generateUserMfaChallengeToken(user._id.toString(), user.companyId?.toString() || '');
-}
 
 export const verifyUserMfaLogin = async (req: Request, res: Response): Promise<void> => {
   const invalid = () => res.status(401).json({ success: false, message: 'Your sign-in session expired. Sign in again.' });

@@ -22,7 +22,8 @@ import Channel from '../models/Channel';
 import Project from '../models/Project';
 import Task from '../models/Task';
 import Message from '../models/Message';
-import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from '../utils/jwt';
+import { generateAccessToken, generateRefreshToken, generateUserMfaChallengeToken, verifyRefreshToken } from '../utils/jwt';
+import { recordSecurityEvent } from '../services/securityEvents';
 import { sendVerificationEmail, sendVerificationCodeEmail, sendPasswordResetEmail, sendPasswordChangedNotificationEmail, sendWelcomeEmail } from '../utils/email';
 import { AuthRequest } from '../middleware/auth';
 import { refreshAvatarUrls } from '../services/avatarUrls';
@@ -277,6 +278,16 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       const company = await Company.findById(user.companyId).select('ownerId accountType');
       if (company) await restoreWorkspaceCreatorRole(user, company, req.ip);
     }
+    // The password was correct; with MFA enabled no session is issued until the
+    // authenticator or recovery code is verified at /auth/mfa/verify-login.
+    if (user.mfaEnabled) {
+      res.json({
+        success: true,
+        mfaRequired: true,
+        mfaToken: generateUserMfaChallengeToken(user._id.toString(), user.companyId?.toString() || ''),
+      });
+      return;
+    }
     const cid = user.companyId?.toString() || '';
     const tokens = issue(user._id.toString(), cid, user.role);
     user.refreshTokens = [...normalizeRefreshTokenStore(user.refreshTokens), hashRefreshToken(tokens.refreshToken)];
@@ -289,6 +300,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       avatarStorageKey: user.avatarStorageKey,
     });
     setRefreshCookie(res, tokens.refreshToken);
+    await recordSecurityEvent(user, 'LOGIN_SUCCEEDED', req, { method: 'password' });
     res.json({ success: true, accessToken: tokens.accessToken, user: {
       _id: user._id,
       callingId: user.callingId,
@@ -797,6 +809,7 @@ export const changePassword = async (req: AuthRequest, res: Response): Promise<v
 
     await user.save();
     setRefreshCookie(res, tokens.refreshToken);
+    await recordSecurityEvent(user, 'PASSWORD_CHANGED', req);
 
     // EMAIL ALERT NOTIFICATION
     await sendPasswordChangedNotificationEmail(user.email, user.fullName);

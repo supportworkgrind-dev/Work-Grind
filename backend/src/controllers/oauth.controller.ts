@@ -967,14 +967,25 @@ export const exchangeOAuthSession = async (req: Request, res: Response): Promise
       return;
     }
     const user = await User.findById(exchange.userId);
-    if (!user || !user.isActive || user.isDeleted || !user.isVerified || user.isSuperAdmin || user.mfaEnabled) {
+    if (!user || !user.isActive || user.isDeleted || !user.isVerified || user.isSuperAdmin) {
       logOAuthFailure('oauth', stage, new Error('account_unavailable'), correlationId);
       res.status(403).json({ success: false, code: 'OAUTH_ACCOUNT_UNAVAILABLE', message: 'This account cannot sign in right now.' });
+      return;
+    }
+    // Provider sign-in is only the first factor when the account has MFA enabled.
+    if (user.mfaEnabled) {
+      res.json({
+        success: true,
+        mfaRequired: true,
+        mfaToken: generateUserMfaChallengeToken(user._id.toString(), user.companyId?.toString() || ''),
+        returnTo: exchange.returnTo,
+      });
       return;
     }
     stage = 'workgrind_session_creation';
     const session = await sessionForUser(user);
     setRefreshCookie(res, session.refreshToken);
+    await recordSecurityEvent(user, 'LOGIN_SUCCEEDED', req, { method: exchange.provider || 'oauth' });
     res.json({
       success: true,
       accessToken: session.accessToken,
