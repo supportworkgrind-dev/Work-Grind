@@ -790,15 +790,21 @@ test('organization settings persist validated localization and academic preferen
   let filter;
   let updates;
   let options;
+  let projection;
   Company.findById = async () => ({
     _id: companyId,
     organizationType: 'business',
     accountType: 'company',
     ownerId: { toString: () => recordId.toString() },
   });
-  Company.findByIdAndUpdate = async (...args) => {
+  Company.findByIdAndUpdate = (...args) => {
     [filter, updates, options] = args;
-    return { _id: companyId, currency: 'GBP', timeZone: 'Europe/London' };
+    return {
+      select: async (fields) => {
+        projection = fields;
+        return { _id: companyId, currency: 'GBP', timeZone: 'Europe/London' };
+      },
+    };
   };
   try {
     const res = makeResponse();
@@ -817,6 +823,9 @@ test('organization settings persist validated localization and academic preferen
     assert.equal(updates['academicSettings.academicYearStartMonth'], 9);
     assert.equal(updates['academicSettings.gradingScale'], 'letter');
     assert.equal(options.runValidators, true);
+    for (const field of ['inviteCode', 'pendingInvites', 'polarCustomerId', 'polarSubscriptionId']) {
+      assert.match(projection, new RegExp(`-${field}\\b`));
+    }
   } finally {
     Company.findById = originalFindById;
     Company.findByIdAndUpdate = originalFindByIdAndUpdate;

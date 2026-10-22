@@ -14,29 +14,35 @@ import {
 } from '../config/organization';
 import { parsePagination } from '../utils/pagination';
 
+// Invite credentials and billing identifiers never leave the dedicated endpoints.
+const COMPANY_PROFILE_PROJECTION = [
+  '-inviteCode',
+  '-pendingInvites',
+  '-plan',
+  '-subscriptionStatus',
+  '-subscriptionPlan',
+  '-subscriptionStartDate',
+  '-subscriptionEndDate',
+  '-pendingSubscriptionPlan',
+  '-pendingSubscriptionPlanEffectiveDate',
+  '-trialStartDate',
+  '-trialEndDate',
+  '-cancelAtPeriodEnd',
+  '-polarCustomerId',
+  '-polarSubscriptionId',
+  '-polarProductId',
+  '-polarOrderId',
+  '-coupon',
+  '-isLifetime',
+].join(' ');
+
+const COMPANY_TEXT_MAX_LENGTH = 120;
+const COMPANY_SIZES = ['1-10', '11-50', '51-200', '201-500', '500+'];
+
 export const getCompany = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const company = await Company.findById(req.user!.companyId)
-      .select([
-        '-inviteCode',
-        '-pendingInvites',
-        '-plan',
-        '-subscriptionStatus',
-        '-subscriptionPlan',
-        '-subscriptionStartDate',
-        '-subscriptionEndDate',
-        '-pendingSubscriptionPlan',
-        '-pendingSubscriptionPlanEffectiveDate',
-        '-trialStartDate',
-        '-trialEndDate',
-        '-cancelAtPeriodEnd',
-        '-polarCustomerId',
-        '-polarSubscriptionId',
-        '-polarProductId',
-        '-polarOrderId',
-        '-coupon',
-        '-isLifetime',
-      ].join(' '));
+      .select(COMPANY_PROFILE_PROJECTION);
     if (!company) {
       res.status(404).json({ success: false, message: 'Company not found' });
       return;
@@ -133,10 +139,37 @@ export const updateCompany = async (req: AuthRequest, res: Response): Promise<vo
       }
     }
 
+    if (req.body.name !== undefined &&
+      (typeof req.body.name !== 'string' || !req.body.name.trim() || req.body.name.trim().length > COMPANY_TEXT_MAX_LENGTH)) {
+      res.status(400).json({ success: false, message: `Workspace name is required and must be at most ${COMPANY_TEXT_MAX_LENGTH} characters.` });
+      return;
+    }
+    for (const field of ['industry', 'country'] as const) {
+      if (req.body[field] !== undefined &&
+        (typeof req.body[field] !== 'string' || req.body[field].trim().length > COMPANY_TEXT_MAX_LENGTH)) {
+        res.status(400).json({ success: false, message: `${field === 'industry' ? 'Industry' : 'Country'} must be text of at most ${COMPANY_TEXT_MAX_LENGTH} characters.` });
+        return;
+      }
+    }
+    if (req.body.size !== undefined && !COMPANY_SIZES.includes(req.body.size)) {
+      res.status(400).json({ success: false, message: 'Choose a listed organization size.' });
+      return;
+    }
+    // There is no logo upload endpoint; accept only an https image URL so the
+    // workspace logo shown to every member cannot carry script or data URLs.
+    if (req.body.logo !== undefined && req.body.logo !== '') {
+      let logoUrl: URL | null = null;
+      try { logoUrl = typeof req.body.logo === 'string' && req.body.logo.length <= 2048 ? new URL(req.body.logo) : null; } catch { logoUrl = null; }
+      if (!logoUrl || logoUrl.protocol !== 'https:') {
+        res.status(400).json({ success: false, message: 'Workspace logo must be an https URL.' });
+        return;
+      }
+    }
+
     const allowed = ['name', 'logo', 'industry', 'size', 'country', 'timeZone', 'currency', 'accountType', 'organizationType'];
     const updates: any = {};
     allowed.forEach((field) => {
-      if (req.body[field] !== undefined) updates[field] = req.body[field];
+      if (req.body[field] !== undefined) updates[field] = typeof req.body[field] === 'string' ? req.body[field].trim() : req.body[field];
     });
     if (req.body.settings !== undefined) {
       if (req.body.settings.allowGuestAccess !== undefined) updates['settings.allowGuestAccess'] = req.body.settings.allowGuestAccess;
@@ -148,13 +181,19 @@ export const updateCompany = async (req: AuthRequest, res: Response): Promise<vo
       });
     }
 
-    const updatedCompany = await Company.findByIdAndUpdate(req.user!.companyId, updates, { new: true, runValidators: true });
+    const updatedCompany = await Company.findByIdAndUpdate(req.user!.companyId, updates, { new: true, runValidators: true })
+      .select(COMPANY_PROFILE_PROJECTION);
     if (classificationChanged) {
       await User.updateMany({ companyId: company!._id }, { accountType: requestedAccountType });
     }
     res.json({ success: true, company: updatedCompany });
   } catch (err: any) {
-    res.status(500).json({ success: false, message: err.message });
+    if (err?.name === 'ValidationError' || err?.name === 'CastError') {
+      res.status(400).json({ success: false, message: 'Some workspace settings are invalid. Check them and try again.' });
+      return;
+    }
+    console.error('[Companies] Workspace update failed.', { errorName: err?.name });
+    res.status(500).json({ success: false, message: 'Workspace settings could not be saved. Please try again.' });
   }
 };
 
