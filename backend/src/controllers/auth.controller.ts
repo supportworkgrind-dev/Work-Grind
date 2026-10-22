@@ -790,10 +790,13 @@ export const changePassword = async (req: AuthRequest, res: Response): Promise<v
     // Update password (triggers Mongoose pre-save bcrypt hash)
     user.password = newPassword;
 
-    // SESSION INVALIDATION: Revoke all existing refresh tokens across all devices
-    user.refreshTokens = [];
+    // SESSION INVALIDATION: revoke every existing refresh token, then issue a
+    // fresh session for this device so only the other sessions are signed out.
+    const tokens = issue(user._id.toString(), user.companyId?.toString() || '', user.role);
+    user.refreshTokens = [hashRefreshToken(tokens.refreshToken)];
 
     await user.save();
+    setRefreshCookie(res, tokens.refreshToken);
 
     // EMAIL ALERT NOTIFICATION
     await sendPasswordChangedNotificationEmail(user.email, user.fullName);
@@ -801,6 +804,7 @@ export const changePassword = async (req: AuthRequest, res: Response): Promise<v
     res.json({
       success: true,
       message: 'Password updated successfully. Other active sessions have been invalidated.',
+      accessToken: tokens.accessToken,
     });
   } catch (e: any) {
     res.status(500).json({ success: false, message: e.message });

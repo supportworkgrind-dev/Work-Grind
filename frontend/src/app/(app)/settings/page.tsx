@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
 import { useAuthStore } from '@/store/useAuthStore';
 import { api } from '@/lib/api';
 import { LANGUAGES, useI18n, type LangCode } from '@/lib/i18n';
@@ -45,6 +46,8 @@ import {
   isWorkspaceOwnerRole,
 } from '@/lib/organizationAccess';
 import { LinkedInConnectionCard } from '@/components/automation/LinkedInConnectionCard';
+import { getAuthValue, updateAuthTokens } from '@/lib/authSession';
+import { refreshSocketAuthLazily } from '@/lib/socketLoader';
 
 const NOTIFICATION_DEFAULTS = {
   taskAssigned: true,
@@ -356,9 +359,42 @@ export default function SettingsPage() {
     );
   };
 
+  // ── Workspace context: from the authenticated session (/auth/me), which the
+  // server derives from the database. Controls are hidden here for clarity, but
+  // every action is authorized again by the API.
+  const organization = company ?? (
+    user?.companyId && typeof user.companyId === 'object' ? user.companyId : null
+  );
+  const experience = getWorkspaceExperience(organization);
+  const isSolo = experience === 'solo';
+  const isEducation = experience === 'school' || experience === 'college' || experience === 'university';
+  const ownsWorkspace = Boolean(user && organization && 'ownerId' in organization && organization.ownerId === user._id) ||
+    isWorkspaceOwnerRole(user?.role);
+  const canManageWorkspace = canAccessOrganizationFeature(organization, user?.role, 'workspaceSettings');
+  // Workspace administration (roles, suspension, removal, invite code, audit) is
+  // limited to owners/admins (and principals in education) on the server.
+  const canAdministerWorkspace = canManageWorkspace && !isSolo;
+  const canManageMembers = canAccessOrganizationFeature(organization, user?.role, 'memberDirectory');
+  const canViewAudit = canAdministerWorkspace;
+  const assignableRoles = getAssignableRoles(organization, user?.role, ownsWorkspace);
+  const visibleNotificationOptions = NOTIFICATION_OPTIONS.filter((option) =>
+    canAccessRoute(organization, user?.role, option.route));
+  const isOwnerAccount = ownsWorkspace;
+
+  const closeDeleteModal = () => {
+    setDeleteModalOpen(false);
+    setDeleteConfirm('');
+    setDeletePassword('');
+    setDeleteError('');
+  };
+
   const handleDeleteAccount = async () => {
     if (deleteConfirm.trim().toLowerCase() !== user?.email?.trim().toLowerCase()) {
       setDeleteError('Please type your exact email to confirm deactivation.');
+      return;
+    }
+    if (!deletePassword) {
+      setDeleteError('Enter your current password to confirm.');
       return;
     }
     setDeleteLoading(true);
@@ -370,11 +406,13 @@ export default function SettingsPage() {
       });
 
       if (res.data.success) {
-        setDeleteModalOpen(false);
+        closeDeleteModal();
         await logout();
+      } else {
+        setDeleteError(res.data.message || 'Unable to deactivate account.');
       }
-    } catch (err: any) {
-      setDeleteError(err.response?.data?.message || 'Unable to deactivate account.');
+    } catch (err) {
+      setDeleteError(errorMessage(err, 'Unable to deactivate account.'));
     } finally {
       setDeleteLoading(false);
     }
@@ -382,6 +420,7 @@ export default function SettingsPage() {
 
   const fetchMembers = async () => {
     setMembersLoading(true);
+    setMembersError('');
     const fetchAllMembers = async (endpoint: string): Promise<User[]> => {
       const allMembers: User[] = [];
       for (let page = 1; page <= 501; page += 1) {
@@ -394,14 +433,12 @@ export default function SettingsPage() {
     };
 
     try {
-      setMembers(await fetchAllMembers('/admin/members'));
+      // Administrators also see suspended members; other member managers see the
+      // active directory they are allowed to read.
+      setMembers(await fetchAllMembers(canAdministerWorkspace ? '/admin/members' : '/companies/members'));
     } catch (err) {
-      // If non-admin, fallback to company members list
-      try {
-        setMembers(await fetchAllMembers('/companies/members'));
-      } catch (e) {
-        console.error(e);
-      }
+      setMembers([]);
+      setMembersError(errorMessage(err, 'Workspace members could not be loaded.'));
     } finally {
       setMembersLoading(false);
     }
@@ -409,33 +446,49 @@ export default function SettingsPage() {
 
   const fetchInvites = async () => {
     setInvitesLoading(true);
+    setInvitesError('');
     try {
       const res = await api.get('/companies/invites');
-      if (res.data.success) {
-        setPendingInvites(res.data.invites || []);
-        if (res.data.inviteCode) {
-          setInviteCode(res.data.inviteCode);
-        }
-      }
+      if (!res.data.success) throw new Error('Invitations could not be loaded.');
+      setPendingInvites(res.data.invites || []);
+      setInviteCode(res.data.inviteCode || '');
     } catch (err) {
-      console.error(err);
+      setInvitesError(errorMessage(err, 'Invitations could not be loaded.'));
     } finally {
       setInvitesLoading(false);
     }
   };
 
-  useEffect(() => {
-    if (activeTab === 'members') {
-      fetchMembers();
-      fetchInvites();
-    } else if (activeTab === 'workspace') {
-      fetchInvites();
-    } else if (activeTab === 'audit') {
-      api.get('/admin/audit-logs').then((res) => {
-        if (res.data.success) setAuditLogs(res.data.logs);
-      });
+  const auditRequest = useRef(0);
+  const fetchAuditLogs = async (page: number) => {
+    const request = ++auditRequest.current;
+    setAuditLoading(true);
+    setAuditError('');
+    try {
+      const res = await api.get('/admin/audit-logs', { params: { page, limit: 50 } });
+      if (request !== auditRequest.current) return;
+      if (!res.data.success) throw new Error('Audit records could not be loaded.');
+      setAuditLogs((previous) => (page === 1 ? res.data.logs : [...previous, ...res.data.logs]));
+      setAuditPage(page);
+      setAuditHasMore(Boolean(res.data.hasMore));
+    } catch (err) {
+      if (request !== auditRequest.current) return;
+      setAuditError(errorMessage(err, 'Audit records could not be loaded.'));
+    } finally {
+      if (request === auditRequest.current) setAuditLoading(false);
     }
-  }, [activeTab]);
+  };
+
+  useEffect(() => {
+    if (activeTab === 'members' && canManageMembers) {
+      void fetchMembers();
+      void fetchInvites();
+    } else if (activeTab === 'workspace' && canAdministerWorkspace) {
+      void fetchInvites();
+    } else if (activeTab === 'audit' && canViewAudit) {
+      void fetchAuditLogs(1);
+    }
+  }, [activeTab, canManageMembers, canAdministerWorkspace, canViewAudit]);
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -445,30 +498,33 @@ export default function SettingsPage() {
       setProfileError('Enter your name before saving your profile.');
       return;
     }
+    const skillList = [...new Set(skills.split(',').map((s) => s.trim()).filter(Boolean))];
+    if (skillList.length > 30 || skillList.some((skill) => skill.length > 50)) {
+      setProfileError('List up to 30 skills of at most 50 characters each.');
+      return;
+    }
     setProfileSaving(true);
     try {
+      // The photo is managed by the upload control and is not resent here.
       const res = await api.patch('/users/me', {
         fullName,
         jobTitle,
         department,
         phone,
         bio,
-        avatar,
-        skills: skills.split(',').map((s) => s.trim()).filter(Boolean),
+        skills: skillList,
       });
 
-      if (res.data.success) {
-        if (res.data.user) {
-          setUser(res.data.user);
-        }
+      if (res.data.success && res.data.user) {
+        setUser(res.data.user);
+        applyProfileFields(res.data.user);
         setProfileSaved(true);
-        if (!res.data.user) await fetchCurrentUser();
         setTimeout(() => setProfileSaved(false), 2000);
       } else {
         setProfileError(res.data.message || 'Unable to save your profile.');
       }
-    } catch (err: any) {
-      setProfileError(err.response?.data?.message || 'Unable to save your profile. Please try again.');
+    } catch (err) {
+      setProfileError(errorMessage(err, 'Unable to save your profile. Please try again.'));
     } finally {
       setProfileSaving(false);
     }
@@ -508,10 +564,11 @@ export default function SettingsPage() {
         await fetchCurrentUser();
         setProfileSaved(true);
         setTimeout(() => setProfileSaved(false), 2000);
+      } else {
+        setAvatarError(res.data.message || 'Failed to upload profile photo.');
       }
-    } catch (err: any) {
-      console.error(err);
-      setAvatarError(err?.response?.data?.message || 'Failed to upload profile photo.');
+    } catch (err) {
+      setAvatarError(errorMessage(err, 'Failed to upload profile photo.'));
     } finally {
       setAvatarUploading(false);
       if (avatarInputRef.current) avatarInputRef.current.value = '';
@@ -520,168 +577,284 @@ export default function SettingsPage() {
 
   const handleSaveWorkspace = async (e: React.FormEvent) => {
     e.preventDefault();
-    setCompanySaving(true);
     setCompanySaved(false);
     setCompanyError('');
+    if (!companyName.trim()) {
+      setCompanyError('Enter a workspace name.');
+      return;
+    }
+    if (timeZone && !isValidTimeZone(timeZone)) {
+      setCompanyError('Enter a valid IANA time zone, such as Asia/Karachi.');
+      return;
+    }
+    setCompanySaving(true);
     try {
+      // Organization and account type are not sent: changing them affects plans
+      // and member roles, so they are not editable from this form.
       const res = await api.patch('/companies', {
-        name: companyName,
-        industry,
-        size,
+        name: companyName.trim(),
         country,
-        timeZone,
         currency,
-        organizationType,
-        academicSettings: {
-          academicYearStartMonth,
-          gradingScale,
-        },
-        settings: {
-          allowGuestAccess,
-          defaultRole,
-        },
+        ...(timeZone ? { timeZone } : {}),
+        ...(!isEducation ? { industry } : {}),
+        ...(size ? { size } : {}),
+        ...(isEducation ? { academicSettings: { academicYearStartMonth, gradingScale } } : {}),
+        ...(!isSolo ? { settings: { defaultRole } } : {}),
       });
 
-      if (res.data.success) {
+      if (res.data.success && res.data.company) {
         setCompany(res.data.company);
+        applyWorkspaceFields(res.data.company);
         setCompanySaved(true);
         setTimeout(() => setCompanySaved(false), 2000);
       } else {
         setCompanyError(res.data.message || 'Unable to save workspace settings.');
       }
-    } catch (err: any) {
-      setCompanyError(err.response?.data?.message || 'Unable to save workspace settings. Please try again.');
+    } catch (err) {
+      setCompanyError(errorMessage(err, 'Unable to save workspace settings. Please try again.'));
     } finally {
       setCompanySaving(false);
     }
   };
 
-  const handleRegenerateInviteCode = async () => {
-    if (!confirm('Regenerating will invalidate the previous invite code and link. Any unsent links with the old code will no longer work. Continue?')) {
-      return;
+  const handleUpgradeWorkspace = async () => {
+    setPendingAction(null);
+    setUpgrading(true);
+    setWorkspaceNotice(null);
+    try {
+      const res = await api.patch('/companies', { accountType: 'company' });
+      if (!res.data.success || !res.data.company) throw new Error(res.data.message);
+      setCompany(res.data.company);
+      setWorkspaceNotice({ tone: 'success', text: 'This workspace is now a team workspace. You can invite members from Members & Roles.' });
+    } catch (err) {
+      setWorkspaceNotice({ tone: 'error', text: errorMessage(err, 'The workspace could not be converted. Nothing was changed.') });
+    } finally {
+      setUpgrading(false);
     }
+  };
+
+  const handleRegenerateInviteCode = async () => {
+    setPendingAction(null);
     setRegeneratingCode(true);
+    setWorkspaceNotice(null);
     try {
       const res = await api.post('/companies/regenerate-invite-code');
-      if (res.data.success) {
-        setInviteCode(res.data.inviteCode);
-      }
+      if (!res.data.success || !res.data.inviteCode) throw new Error(res.data.message);
+      setInviteCode(res.data.inviteCode);
+      setWorkspaceNotice({ tone: 'success', text: 'A new invite code was issued. The previous code and link no longer work.' });
     } catch (err) {
-      console.error(err);
+      setWorkspaceNotice({ tone: 'error', text: errorMessage(err, 'The invite code could not be reset. The current code still works.') });
     } finally {
       setRegeneratingCode(false);
     }
   };
 
+  const copyText = async (text: string, onCopied: () => void) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      onCopied();
+    } catch {
+      setWorkspaceNotice({ tone: 'error', text: 'Clipboard access was denied. Select and copy the text manually.' });
+    }
+  };
+
+  const inviteLink = inviteCode && typeof window !== 'undefined' ? `${window.location.origin}/join?code=${inviteCode}` : '';
+
   const copyShareableLink = () => {
-    const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
-    const link = `${origin}/join?code=${inviteCode}`;
-    navigator.clipboard.writeText(link);
-    setCopiedLink(true);
-    setTimeout(() => setCopiedLink(false), 2500);
+    if (!inviteLink) return;
+    void copyText(inviteLink, () => {
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2500);
+    });
   };
 
   const copyCode = () => {
-    navigator.clipboard.writeText(inviteCode);
-    setCopiedCode(true);
-    setTimeout(() => setCopiedCode(false), 2500);
+    if (!inviteCode) return;
+    void copyText(inviteCode, () => {
+      setCopiedCode(true);
+      setTimeout(() => setCopiedCode(false), 2500);
+    });
+  };
+
+  const closeInviteModal = () => {
+    setIsInviteModalOpen(false);
+    setInviteError('');
+    setInviteSuccess('');
   };
 
   const handleSendInvite = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inviteEmail.trim()) return;
+    const email = inviteEmail.trim();
+    if (!email) return;
 
     setInviteSending(true);
     setInviteError('');
     setInviteSuccess('');
 
     try {
-      const res = await api.post('/companies/invite', {
-        email: inviteEmail.trim(),
-        role: inviteRole,
-      });
+      const res = await api.post('/companies/invite', { email, role: inviteRole });
 
       if (res.data.success) {
-        setInviteSuccess(`Invitation sent to ${inviteEmail}!`);
+        setInviteSuccess(`Invitation sent to ${email}.`);
         setInviteEmail('');
-        fetchInvites();
+        void fetchInvites();
         void refreshSubscription();
         setTimeout(() => {
           setIsInviteModalOpen(false);
           setInviteSuccess('');
         }, 1500);
+      } else {
+        setInviteError(res.data.message || 'Failed to send invite email.');
       }
-    } catch (err: any) {
-      setInviteError(err.response?.data?.message || 'Failed to send invite email.');
+    } catch (err) {
+      setInviteError(errorMessage(err, 'Failed to send invite email.'));
     } finally {
       setInviteSending(false);
     }
   };
 
   const handleRevokeInvite = async (token: string) => {
-    if (!confirm('Are you sure you want to revoke this invitation? The recipient will no longer be able to use it.')) {
-      return;
-    }
+    setPendingAction(null);
+    setBusyInviteToken(token);
+    setMemberNotice(null);
     try {
       const res = await api.delete(`/companies/invites/${token}`);
-      if (res.data.success) {
-        setPendingInvites((prev) => prev.filter((i) => i.token !== token));
-      }
+      if (!res.data.success) throw new Error(res.data.message);
+      setPendingInvites((prev) => prev.filter((i) => i.token !== token));
+      void refreshSubscription();
+      setMemberNotice({ tone: 'success', text: 'Invitation revoked.' });
     } catch (err) {
-      console.error(err);
+      setMemberNotice({ tone: 'error', text: errorMessage(err, 'The invitation could not be revoked.') });
+    } finally {
+      setBusyInviteToken(null);
     }
   };
 
-  const handleResendInvite = async (token: string) => {
+  const handleResendInvite = async (token: string, email: string) => {
+    setBusyInviteToken(token);
+    setMemberNotice(null);
     try {
       const res = await api.post(`/companies/invites/${token}/resend`);
-      if (res.data.success) {
-        alert('Invitation resent successfully with renewed 7-day expiration!');
-        fetchInvites();
-      }
+      if (!res.data.success) throw new Error(res.data.message);
+      setMemberNotice({ tone: 'success', text: `Invitation resent to ${email}. It now expires in 7 days.` });
+      void fetchInvites();
     } catch (err) {
-      console.error(err);
+      setMemberNotice({ tone: 'error', text: errorMessage(err, 'The invitation could not be resent.') });
+    } finally {
+      setBusyInviteToken(null);
     }
   };
 
   const handleChangeRole = async (userId: string, newRole: string) => {
+    setBusyMemberId(userId);
+    setMemberNotice(null);
     try {
       const res = await api.patch(`/admin/members/${userId}/role`, { role: newRole });
-      if (res.data.success) {
-        setMembers((prev) => prev.map((m) => (m._id === userId ? res.data.member : m)));
-      }
+      if (!res.data.success || !res.data.member) throw new Error(res.data.message);
+      setMembers((prev) => prev.map((m) => (m._id === userId ? res.data.member : m)));
+      setMemberNotice({ tone: 'success', text: `${res.data.member.fullName}'s role is now ${formatRole(res.data.member.role)}.` });
     } catch (err) {
-      console.error(err);
+      // The select is controlled by the stored role, so it stays on the old value.
+      setMemberNotice({ tone: 'error', text: errorMessage(err, 'The role could not be changed.') });
+    } finally {
+      setBusyMemberId(null);
     }
   };
 
   const handleToggleActive = async (userId: string, currentActive: boolean) => {
-    const action = currentActive ? 'suspend' : 'activate';
-    if (!confirm(`Are you sure you want to ${action} this member's access to the workspace?`)) {
-      return;
-    }
+    setPendingAction(null);
+    setBusyMemberId(userId);
+    setMemberNotice(null);
     try {
       const res = await api.patch(`/admin/members/${userId}/status`, { isActive: !currentActive });
-      if (res.data.success) {
-        setMembers((prev) => prev.map((m) => (m._id === userId ? res.data.member : m)));
-      }
+      if (!res.data.success || !res.data.member) throw new Error(res.data.message);
+      setMembers((prev) => prev.map((m) => (m._id === userId ? res.data.member : m)));
+      setMemberNotice({ tone: 'success', text: `${res.data.member.fullName} was ${currentActive ? 'suspended' : 'reactivated'}.` });
     } catch (err) {
-      console.error(err);
+      setMemberNotice({ tone: 'error', text: errorMessage(err, 'The member status could not be changed.') });
+    } finally {
+      setBusyMemberId(null);
     }
   };
 
   const handleRemoveMember = async (userId: string, name: string) => {
-    if (!confirm(`Are you sure you want to completely remove ${name} from this workspace? They will lose access to all channels, files, and projects.`)) {
-      return;
-    }
+    setPendingAction(null);
+    setBusyMemberId(userId);
+    setMemberNotice(null);
     try {
       const res = await api.delete(`/companies/members/${userId}`);
-      if (res.data.success) {
-        setMembers((prev) => prev.filter((m) => m._id !== userId));
-      }
+      if (!res.data.success) throw new Error(res.data.message);
+      setMembers((prev) => prev.filter((m) => m._id !== userId));
+      void refreshSubscription();
+      setMemberNotice({ tone: 'success', text: `${name} was removed from this workspace.` });
     } catch (err) {
-      console.error(err);
+      setMemberNotice({ tone: 'error', text: errorMessage(err, 'The member could not be removed.') });
+    } finally {
+      setBusyMemberId(null);
     }
+  };
+
+  const confirmPendingAction = () => {
+    if (!pendingAction) return;
+    switch (pendingAction.kind) {
+      case 'regenerate': void handleRegenerateInviteCode(); break;
+      case 'upgrade': void handleUpgradeWorkspace(); break;
+      case 'revoke': void handleRevokeInvite(pendingAction.token); break;
+      case 'toggle': void handleToggleActive(pendingAction.userId, pendingAction.isActive); break;
+      case 'remove': void handleRemoveMember(pendingAction.userId, pendingAction.name); break;
+    }
+  };
+
+  const pendingActionText = (action: PendingAction): { title: string; body: string; confirm: string } => {
+    switch (action.kind) {
+      case 'regenerate':
+        return { title: 'Reset the invite code?', body: 'The current code and join link stop working immediately.', confirm: 'Reset code' };
+      case 'upgrade':
+        return { title: 'Convert to a team workspace?', body: 'This switches the workspace from Solo to Team mode so you can invite members. Solo-only pages such as Daily Focus are replaced by the team workspace.', confirm: 'Convert workspace' };
+      case 'revoke':
+        return { title: `Revoke the invitation for ${action.email}?`, body: 'The invitation link will stop working.', confirm: 'Revoke invitation' };
+      case 'toggle':
+        return action.isActive
+          ? { title: `Suspend ${action.name}?`, body: 'They will lose access to this workspace until reactivated.', confirm: 'Suspend member' }
+          : { title: `Reactivate ${action.name}?`, body: 'They will regain access to this workspace.', confirm: 'Reactivate member' };
+      case 'remove':
+        return { title: `Remove ${action.name} from this workspace?`, body: 'They will lose access to its channels, files, and projects.', confirm: 'Remove member' };
+    }
+  };
+
+  const renderNotice = (notice: Notice) => notice && (
+    notice.tone === 'error' ? (
+      <div role="alert" className="flex items-center gap-2 rounded-xl border border-rose-300/60 bg-rose-50 px-3 py-2.5 text-xs font-medium text-rose-700">
+        <AlertCircle className="h-4 w-4 shrink-0" />
+        <span>{notice.text}</span>
+      </div>
+    ) : (
+      <div role="status" className="flex items-center gap-2 rounded-xl border border-emerald-300/60 bg-emerald-50 px-3 py-2.5 text-xs font-medium text-emerald-700">
+        <Check className="h-4 w-4 shrink-0" />
+        <span>{notice.text}</span>
+      </div>
+    )
+  );
+
+  const renderPendingAction = (kinds: PendingAction['kind'][]) => {
+    if (!pendingAction || !kinds.includes(pendingAction.kind)) return null;
+    const text = pendingActionText(pendingAction);
+    return (
+      <div role="alertdialog" aria-labelledby="settings-confirm-title" className="flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p id="settings-confirm-title" className="font-bold text-slate-900">{text.title}</p>
+          <p className="mt-0.5 text-slate-600">{text.body}</p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <button type="button" onClick={() => setPendingAction(null)} className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 font-semibold text-slate-600 hover:bg-slate-50">
+            Cancel
+          </button>
+          <button type="button" onClick={confirmPendingAction} className="rounded-xl bg-rose-600 px-3 py-1.5 font-semibold text-white hover:bg-rose-500">
+            {text.confirm}
+          </button>
+        </div>
+      </div>
+    );
   };
 
   const filteredMembers = members.filter((m) => {
@@ -694,31 +867,8 @@ export default function SettingsPage() {
     return matchesSearch && matchesRole;
   });
 
-  const organization = company ?? (
-    user?.companyId && typeof user.companyId === 'object' ? user.companyId : null
-  );
-  const canManageMembers = canAccessOrganizationFeature(organization, user?.role, 'memberDirectory');
-  const canManageWorkspace = canAccessOrganizationFeature(organization, user?.role, 'academicAdmin') ||
-    (!!organization && organization.organizationType === 'business' &&
-      ['owner', 'admin'].includes(user?.role ?? ''));
-  const canViewAudit = canManageMembers;
-  const isAcademicOrganization = ['school', 'college', 'university'].includes(
-    organization?.organizationType ?? '',
-  );
-  const isOrganizationOwner = user?.role === 'owner';
-  const assignableRoles = isAcademicOrganization
-    ? [
-        ...(isOrganizationOwner ? ['principal', 'admin'] : []),
-        'teacher',
-        'student',
-        'parent',
-        ...(organization?.organizationType === 'university' && isOrganizationOwner ? ['dean', 'hod'] : []),
-      ]
-    : [
-        ...(isOrganizationOwner ? ['admin', 'manager'] : []),
-        'employee',
-        'guest',
-      ];
+  const activeMemberCount = members.filter((m) => m.isActive).length;
+  const suspendedMemberCount = members.length - activeMemberCount;
 
   const allNavTabs = [
     { id: 'profile', label: 'My Profile', icon: UserIcon, adminOnly: false },
@@ -726,7 +876,6 @@ export default function SettingsPage() {
     { id: 'security', label: 'Security & Password', icon: Shield, adminOnly: false },
     { id: 'workspace', label: 'Workspace Config', icon: Building2, adminOnly: true },
     { id: 'members', label: 'Members & Roles', icon: Users, adminOnly: true },
-    // { id: 'billing', label: 'Billing & Plan', icon: CreditCard, adminOnly: true },
     { id: 'audit', label: 'Audit Logs', icon: FileText, adminOnly: true },
   ];
 
@@ -771,7 +920,10 @@ export default function SettingsPage() {
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
+                onClick={() => {
+                  setActiveTab(tab.id as typeof activeTab);
+                  setPendingAction(null);
+                }}
                 className={`min-w-max md:w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${
                   isActive ? 'sidebar-active-premium' : 'theme-nav-inactive hover:theme-bg-hover'
                 }`}
@@ -810,7 +962,7 @@ export default function SettingsPage() {
           {activeTab === 'profile' && (
             <form onSubmit={handleSaveProfile} className="space-y-4">
               <h3 className="text-sm font-bold text-slate-900 pb-2 border-b border-slate-100">
-                Personal Employee Profile
+                Personal Profile
               </h3>
 
               {profileError && (
@@ -881,9 +1033,10 @@ export default function SettingsPage() {
                   </label>
                   <input
                     type="text"
+                    maxLength={100}
                     value={jobTitle}
                     onChange={(e) => setJobTitle(e.target.value)}
-                    placeholder="e.g. Senior Frontend Architect"
+                    placeholder={isEducation ? 'e.g. Mathematics Teacher' : 'e.g. Senior Frontend Architect'}
                     className="mt-1.5 block w-full rounded-xl border border-slate-200 py-2.5 px-3 text-xs text-slate-900 focus:ring-2 focus:ring-indigo-600"
                   />
                 </div>
@@ -896,9 +1049,10 @@ export default function SettingsPage() {
                   </label>
                   <input
                     type="text"
+                    maxLength={100}
                     value={department}
                     onChange={(e) => setDepartment(e.target.value)}
-                    placeholder="e.g. Product Engineering"
+                    placeholder={isEducation ? 'e.g. Science' : 'e.g. Product Engineering'}
                     className="mt-1.5 block w-full rounded-xl border border-slate-200 py-2.5 px-3 text-xs text-slate-900 focus:ring-2 focus:ring-indigo-600"
                   />
                 </div>
@@ -936,9 +1090,10 @@ export default function SettingsPage() {
                 </label>
                 <textarea
                   rows={3}
+                  maxLength={500}
                   value={bio}
                   onChange={(e) => setBio(e.target.value)}
-                  placeholder="Tell your team about your role, background, and focus..."
+                  placeholder={isSolo ? 'A short note about you and your work...' : 'Tell your team about your role, background, and focus...'}
                   className="mt-1.5 block w-full rounded-xl border border-slate-200 p-3 text-xs text-slate-900 focus:ring-2 focus:ring-indigo-600"
                 />
               </div>
@@ -966,7 +1121,7 @@ export default function SettingsPage() {
                   </h3>
                   <p className="mt-1 text-[11px] theme-text-muted">Choose a workspace theme, language, and notification preferences.</p>
                 </div>
-                <button
+                {visibleNotificationOptions.length > 0 && <button
                   type="button"
                   onClick={handleSavePreferences}
                   disabled={preferencesSaving}
@@ -974,8 +1129,8 @@ export default function SettingsPage() {
                   style={{ background: 'var(--accent)', boxShadow: 'var(--shadow-sm)' }}
                 >
                   {preferencesSaved ? <CheckCheck className="h-4 w-4" /> : <Save className="h-4 w-4" />}
-                  {preferencesSaved ? 'Preferences saved' : preferencesSaving ? 'Saving…' : 'Save preferences'}
-                </button>
+                  {preferencesSaved ? 'Notifications saved' : preferencesSaving ? 'Saving…' : 'Save notifications'}
+                </button>}
               </div>
 
               {preferencesError && (
@@ -988,7 +1143,14 @@ export default function SettingsPage() {
               {preferencesSaved && (
                 <div role="status" className="flex items-center gap-2 rounded-xl border border-emerald-300/60 bg-emerald-50 px-3 py-2.5 text-xs font-medium text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300">
                   <Check className="h-4 w-4 shrink-0" />
-                  <span>Theme, language, and notification preferences are synced to your account.</span>
+                  <span>Notification preferences saved to your account.</span>
+                </div>
+              )}
+
+              {appearanceSaved && (
+                <div role="status" className="flex items-center gap-2 rounded-xl border border-emerald-300/60 bg-emerald-50 px-3 py-2.5 text-xs font-medium text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300">
+                  <Check className="h-4 w-4 shrink-0" />
+                  <span>{appearanceSaved}</span>
                 </div>
               )}
 
@@ -1016,7 +1178,9 @@ export default function SettingsPage() {
                   <Palette className="h-4 w-4" style={{ color: 'var(--accent)' }} />
                   <div>
                     <h4 id="appearance-heading" className="text-xs font-bold theme-text-primary">Appearance</h4>
-                    <p className="text-[10px] theme-text-muted">Changes apply throughout WorkGrind immediately.</p>
+                    <p className="text-[10px] theme-text-muted" aria-live="polite">
+                      {appearanceSaving ? 'Saving…' : 'Changes apply immediately and are saved to your account.'}
+                    </p>
                   </div>
                 </div>
 
@@ -1101,34 +1265,39 @@ export default function SettingsPage() {
                   >
                     {LANGUAGES.map((language) => <option key={language.code} value={language.code}>{language.label} · {language.native}</option>)}
                   </select>
-                  <p className="mt-1.5 text-[10px] theme-text-muted">The interface language updates immediately and syncs when you save.</p>
+                  <p className="mt-1.5 text-[10px] theme-text-muted">The interface language updates immediately and is saved to your account.</p>
                 </div>
 
                 <div>
                   <h4 className="mb-2 flex items-center gap-2 text-xs font-bold theme-text-primary">
                     <Bell className="h-4 w-4" style={{ color: 'var(--accent)' }} />Notifications
                   </h4>
+                  <p className="mb-2 text-[10px] theme-text-muted">In-app notifications in WorkGrind. Email and push delivery are not controlled here.</p>
                   <div className="space-y-1.5">
-                    {Object.entries(notificationPrefs).map(([key, enabled]) => {
-                      const label = key.replace(/([A-Z])/g, ' $1').trim();
-                      return (
-                        <label key={key} className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-xs theme-text-secondary transition-colors hover:theme-bg-hover" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-subtle)' }}>
-                          <span className="capitalize">{label}</span>
-                          <input
-                            type="checkbox"
-                            role="switch"
-                            aria-label={label}
-                            checked={enabled}
-                            onChange={(event) => {
-                              setNotificationPrefs((previous) => ({ ...previous, [key]: event.target.checked }));
-                              setPreferencesSaved(false);
-                              setPreferencesError('');
-                            }}
-                            className="h-4 w-4 shrink-0 rounded accent-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]"
-                          />
-                        </label>
-                      );
-                    })}
+                    {visibleNotificationOptions.length === 0 ? (
+                      <p className="rounded-xl border px-3 py-2.5 text-xs theme-text-muted" style={{ borderColor: 'var(--border-subtle)' }}>
+                        No configurable notification types apply to your workspace.
+                      </p>
+                    ) : visibleNotificationOptions.map(({ key, label, description }) => (
+                      <label key={key} className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-xs theme-text-secondary transition-colors hover:theme-bg-hover" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-subtle)' }}>
+                        <span>
+                          <span className="block font-semibold theme-text-primary">{label}</span>
+                          <span className="block text-[10px] theme-text-muted">{description}</span>
+                        </span>
+                        <input
+                          type="checkbox"
+                          role="switch"
+                          aria-label={label}
+                          checked={notificationPrefs[key]}
+                          onChange={(event) => {
+                            setNotificationPrefs((previous) => ({ ...previous, [key]: event.target.checked }));
+                            setPreferencesSaved(false);
+                            setPreferencesError('');
+                          }}
+                          className="h-4 w-4 shrink-0 rounded accent-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]"
+                        />
+                      </label>
+                    ))}
                   </div>
                 </div>
               </section>
@@ -1136,7 +1305,7 @@ export default function SettingsPage() {
           )}
 
           {/* WORKSPACE SETTINGS */}
-          {activeTab === 'workspace' && (
+          {activeTab === 'workspace' && canManageWorkspace && (
             <div className="space-y-6">
               {companyError && (
                 <div role="alert" className="flex items-center gap-2 rounded-xl border border-rose-300/60 bg-rose-50 px-3 py-2.5 text-xs font-medium text-rose-700">
@@ -1150,7 +1319,9 @@ export default function SettingsPage() {
                   <span>Workspace settings saved.</span>
                 </div>
               )}
-              {company?.accountType === 'individual' && isOrganizationOwner && (
+              {renderNotice(workspaceNotice)}
+              {renderPendingAction(['upgrade', 'regenerate'])}
+              {isSolo && ownsWorkspace && (
                 <div className="rounded-2xl border border-emerald-200 bg-gradient-to-r from-emerald-50 to-teal-50/40 p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="flex items-start gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-600 text-white shrink-0 shadow-xs">
@@ -1170,21 +1341,12 @@ export default function SettingsPage() {
                   </div>
                   <button
                     type="button"
-                    onClick={async () => {
-                      try {
-                        const res = await api.patch('/companies', { accountType: 'company' });
-                        if (res.data.success) {
-                          setCompany(res.data.company);
-                          alert('Workspace upgraded to Company / Team mode! You can now invite members.');
-                        }
-                      } catch (e) {
-                        console.error(e);
-                      }
-                    }}
-                    className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-emerald-500 transition-all shrink-0"
+                    onClick={() => setPendingAction({ kind: 'upgrade' })}
+                    disabled={upgrading}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-emerald-500 transition-all shrink-0 disabled:opacity-60"
                   >
                     <Sparkles className="h-3.5 w-3.5" />
-                    <span>Upgrade to Team Workspace</span>
+                    <span>{upgrading ? 'Converting…' : 'Upgrade to Team Workspace'}</span>
                   </button>
                 </div>
               )}
@@ -1206,12 +1368,14 @@ export default function SettingsPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700">
-                    Workspace / Organization Name
+                  <label htmlFor="settings-workspace-name" className="block text-xs font-semibold uppercase tracking-wider text-slate-700">
+                    {isEducation ? 'Institution Name' : 'Workspace / Organization Name'}
                   </label>
                   <input
+                    id="settings-workspace-name"
                     type="text"
                     required
+                    maxLength={120}
                     value={companyName}
                     onChange={(e) => setCompanyName(e.target.value)}
                     className="mt-1.5 block w-full rounded-xl border border-slate-200 py-2.5 px-3 text-xs text-slate-900 focus:ring-2 focus:ring-indigo-600"
@@ -1219,38 +1383,42 @@ export default function SettingsPage() {
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700">
-                      Industry
-                    </label>
-                    <select
-                      value={industry}
-                      onChange={(e) => setIndustry(e.target.value)}
-                      className="mt-1.5 block w-full rounded-xl border border-slate-200 py-2.5 px-3 text-xs text-slate-900 focus:ring-2 focus:ring-indigo-600"
-                    >
-                      <option value="Technology">Technology</option>
-                      <option value="Design & Creative">Design & Creative</option>
-                      <option value="Marketing & Media">Marketing & Media</option>
-                      <option value="Finance & Fintech">Finance & Fintech</option>
-                      <option value="Other">Other</option>
-                    </select>
-                  </div>
+                  {!isEducation && (
+                    <div>
+                      <label htmlFor="settings-industry" className="block text-xs font-semibold uppercase tracking-wider text-slate-700">
+                        Industry
+                      </label>
+                      <select
+                        id="settings-industry"
+                        value={industry}
+                        onChange={(e) => setIndustry(e.target.value)}
+                        className="mt-1.5 block w-full rounded-xl border border-slate-200 py-2.5 px-3 text-xs text-slate-900 focus:ring-2 focus:ring-indigo-600"
+                      >
+                        <option value="">Not set</option>
+                        {industry && !INDUSTRY_OPTIONS.includes(industry) && <option value={industry}>{industry}</option>}
+                        {INDUSTRY_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+                      </select>
+                    </div>
+                  )}
 
-                  <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700">
-                      Company Size
-                    </label>
-                    <select
-                      value={size}
-                      onChange={(e) => setSize(e.target.value)}
-                      className="mt-1.5 block w-full rounded-xl border border-slate-200 py-2.5 px-3 text-xs text-slate-900 focus:ring-2 focus:ring-indigo-600"
-                    >
-                      <option value="1-10">1-10 Employees</option>
-                      <option value="11-50">11-50 Employees</option>
-                      <option value="51-200">51-200 Employees</option>
-                      <option value="500+">500+ Employees</option>
-                    </select>
-                  </div>
+                  {!isSolo && (
+                    <div>
+                      <label htmlFor="settings-size" className="block text-xs font-semibold uppercase tracking-wider text-slate-700">
+                        {isEducation ? 'Institution Size' : 'Company Size'}
+                      </label>
+                      <select
+                        id="settings-size"
+                        value={size}
+                        onChange={(e) => setSize(e.target.value)}
+                        className="mt-1.5 block w-full rounded-xl border border-slate-200 py-2.5 px-3 text-xs text-slate-900 focus:ring-2 focus:ring-indigo-600"
+                      >
+                        {!size && <option value="">Not set</option>}
+                        {COMPANY_SIZES.map((option) => (
+                          <option key={option} value={option}>{option} {isEducation ? 'people' : 'Employees'}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1266,10 +1434,11 @@ export default function SettingsPage() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700">
+                    <label htmlFor="settings-time-zone" className="block text-xs font-semibold uppercase tracking-wider text-slate-700">
                       Default time zone (IANA)
                     </label>
                     <input
+                      id="settings-time-zone"
                       type="text"
                       maxLength={64}
                       value={timeZone}
@@ -1282,35 +1451,29 @@ export default function SettingsPage() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700">Organization type</label>
-                    <select value={organizationType} onChange={(e) => {
-                      const nextType = e.target.value as NonNullable<Company['organizationType']>;
-                      setOrganizationType(nextType);
-                      setDefaultRole(nextType === 'business' ? 'employee' : 'student');
-                    }} className="mt-1.5 block w-full rounded-xl border border-slate-200 py-2.5 px-3 text-xs text-slate-900 focus:ring-2 focus:ring-indigo-600">
-                      <option value="business">Business</option>
-                      <option value="school">School</option>
-                      <option value="college">College</option>
-                      <option value="university">University</option>
-                    </select>
+                    <span className="block text-xs font-semibold uppercase tracking-wider text-slate-700">Organization type</span>
+                    <p className="mt-1.5 rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3 text-xs font-semibold text-slate-700">
+                      {isSolo ? 'Solo workspace' : formatRole(organization?.organizationType || 'business')}
+                    </p>
+                    <p className="mt-1 text-[10px] text-slate-400">Set when the workspace was created; it determines plans and available roles.</p>
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700">Workspace currency</label>
-                    <input required pattern="[A-Za-z]{3}" minLength={3} maxLength={3} value={currency} onChange={(e) => setCurrency(e.target.value.toUpperCase())} className="mt-1.5 block w-full rounded-xl border border-slate-200 py-2.5 px-3 text-xs text-slate-900 focus:ring-2 focus:ring-indigo-600" />
+                    <label htmlFor="settings-currency" className="block text-xs font-semibold uppercase tracking-wider text-slate-700">Workspace currency</label>
+                    <input id="settings-currency" required pattern="[A-Za-z]{3}" minLength={3} maxLength={3} value={currency} onChange={(e) => setCurrency(e.target.value.toUpperCase())} placeholder="e.g. USD" className="mt-1.5 block w-full rounded-xl border border-slate-200 py-2.5 px-3 text-xs text-slate-900 focus:ring-2 focus:ring-indigo-600" />
                   </div>
                 </div>
 
-                {organizationType !== 'business' && (
+                {isEducation && (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700">Academic year starts</label>
-                      <select value={academicYearStartMonth} onChange={(e) => setAcademicYearStartMonth(Number(e.target.value))} className="mt-1.5 block w-full rounded-xl border border-slate-200 py-2.5 px-3 text-xs text-slate-900 focus:ring-2 focus:ring-indigo-600">
-                        {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].map((month, index) => <option key={month} value={index + 1}>{month}</option>)}
+                      <label htmlFor="settings-academic-year" className="block text-xs font-semibold uppercase tracking-wider text-slate-700">Academic year starts</label>
+                      <select id="settings-academic-year" value={academicYearStartMonth} onChange={(e) => setAcademicYearStartMonth(Number(e.target.value))} className="mt-1.5 block w-full rounded-xl border border-slate-200 py-2.5 px-3 text-xs text-slate-900 focus:ring-2 focus:ring-indigo-600">
+                        {MONTHS.map((month, index) => <option key={month} value={index + 1}>{month}</option>)}
                       </select>
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700">Default grading scale</label>
-                      <select value={gradingScale} onChange={(e) => setGradingScale(e.target.value as typeof gradingScale)} className="mt-1.5 block w-full rounded-xl border border-slate-200 py-2.5 px-3 text-xs text-slate-900 focus:ring-2 focus:ring-indigo-600">
+                      <label htmlFor="settings-grading-scale" className="block text-xs font-semibold uppercase tracking-wider text-slate-700">Default grading scale</label>
+                      <select id="settings-grading-scale" value={gradingScale} onChange={(e) => setGradingScale(e.target.value as typeof gradingScale)} className="mt-1.5 block w-full rounded-xl border border-slate-200 py-2.5 px-3 text-xs text-slate-900 focus:ring-2 focus:ring-indigo-600">
                         <option value="percentage">Percentage</option>
                         <option value="letter">Letter grade</option>
                         <option value="points">Points</option>
@@ -1320,107 +1483,123 @@ export default function SettingsPage() {
                   </div>
                 )}
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700">
-                      Default Member Role
-                    </label>
-                    <select
-                      value={defaultRole}
-                      onChange={(e) => setDefaultRole(e.target.value)}
-                      className="mt-1.5 block w-full rounded-xl border border-slate-200 py-2.5 px-3 text-xs text-slate-900 focus:ring-2 focus:ring-indigo-600"
-                    >
-                      {organizationType === 'business' ? (
-                        <>
-                          <option value="employee">Employee (Standard Member)</option>
-                          <option value="guest">Guest (Restricted Access)</option>
-                        </>
-                      ) : (
-                        <>
-                          <option value="student">Student</option>
-                          <option value="employee">Employee / Staff</option>
-                          <option value="guest">Guest (Restricted Access)</option>
-                        </>
-                      )}
-                    </select>
+                {!isSolo && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label htmlFor="settings-default-role" className="block text-xs font-semibold uppercase tracking-wider text-slate-700">
+                        Default Member Role
+                      </label>
+                      <select
+                        id="settings-default-role"
+                        value={defaultRole}
+                        onChange={(e) => setDefaultRole(e.target.value)}
+                        className="mt-1.5 block w-full rounded-xl border border-slate-200 py-2.5 px-3 text-xs text-slate-900 focus:ring-2 focus:ring-indigo-600"
+                      >
+                        {isEducation ? (
+                          <>
+                            <option value="student">Student</option>
+                            <option value="employee">Employee / Staff</option>
+                            <option value="guest">Guest (Restricted Access)</option>
+                          </>
+                        ) : (
+                          <>
+                            <option value="employee">Employee (Standard Member)</option>
+                            <option value="guest">Guest (Restricted Access)</option>
+                          </>
+                        )}
+                      </select>
+                      <p className="mt-1 text-[10px] text-slate-400">Given to people who join with the workspace invite code.</p>
+                    </div>
                   </div>
-                </div>
-
-                <div className="pt-2">
-                  <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-slate-700">
-                    <input
-                      type="checkbox"
-                      checked={allowGuestAccess}
-                      onChange={(e) => setAllowGuestAccess(e.target.checked)}
-                      className="rounded text-indigo-600 focus:ring-indigo-500 h-4 w-4"
-                    />
-                    <span>Allow external guest collaborators to join selected channels and projects</span>
-                  </label>
-                </div>
+                )}
               </form>
 
+              {canAccessOrganizationFeature(organization, user?.role, 'billingAdmin') && (
+                <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-xs sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h4 className="font-bold text-slate-900">Billing &amp; plan</h4>
+                    <p className="mt-0.5 text-slate-500">Plans, payments, and subscription status are managed on the Billing page.</p>
+                  </div>
+                  <Link href="/billing" className="inline-flex shrink-0 items-center justify-center rounded-xl border border-slate-200 px-3.5 py-2 font-semibold text-slate-700 hover:bg-slate-50">
+                    Open billing
+                  </Link>
+                </div>
+              )}
+
               {/* Shareable Invite Code & Link Card */}
-              <div className="rounded-2xl border border-indigo-100 bg-indigo-50/50 p-5 space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="rounded-lg bg-indigo-600 p-1.5 text-white">
-                      <LinkIcon className="h-4 w-4" />
+              {canAdministerWorkspace && (
+                <div className="rounded-2xl border border-indigo-100 bg-indigo-50/50 p-5 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="rounded-lg bg-indigo-600 p-1.5 text-white">
+                        <LinkIcon className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-slate-900">Workspace Invitation Link & Code</h4>
+                        <p className="text-[11px] text-slate-500">Anyone with this link or code can join this workspace</p>
+                      </div>
                     </div>
-                    <div>
-                      <h4 className="text-xs font-bold text-slate-900">Workspace Invitation Link & Code</h4>
-                      <p className="text-[11px] text-slate-500">Anyone with this link or code can join this workspace</p>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleRegenerateInviteCode}
-                    disabled={regeneratingCode}
-                    className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 transition-all"
-                  >
-                    <RefreshCw className={`h-3 w-3 ${regeneratingCode ? 'animate-spin' : ''}`} />
-                    <span>Reset Code</span>
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div className="sm:col-span-1 rounded-xl border border-slate-200 bg-white p-3">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Workspace Code</span>
-                    <div className="mt-1 flex items-center justify-between">
-                      <code className="text-base font-extrabold tracking-wider text-indigo-600">{inviteCode || 'N/A'}</code>
-                      <button
-                        type="button"
-                        onClick={copyCode}
-                        className="rounded p-1 text-slate-400 hover:text-slate-600 transition-colors"
-                        title="Copy Code"
-                      >
-                        {copiedCode ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setPendingAction({ kind: 'regenerate' })}
+                      disabled={regeneratingCode || !inviteCode}
+                      className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 transition-all disabled:opacity-50"
+                    >
+                      <RefreshCw className={`h-3 w-3 ${regeneratingCode ? 'animate-spin' : ''}`} />
+                      <span>Reset Code</span>
+                    </button>
                   </div>
 
-                  <div className="sm:col-span-2 rounded-xl border border-slate-200 bg-white p-3">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Instant Join URL</span>
-                    <div className="mt-1 flex items-center justify-between gap-2">
-                      <span className="text-xs font-medium text-slate-600 truncate">
-                        {typeof window !== 'undefined' ? `${window.location.origin}/join?code=${inviteCode}` : `/join?code=${inviteCode}`}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={copyShareableLink}
-                        className="flex items-center gap-1 rounded-lg bg-indigo-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-indigo-500 transition-all shrink-0"
-                      >
-                        {copiedLink ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                        <span>{copiedLink ? 'Copied!' : 'Copy Link'}</span>
-                      </button>
+                  {invitesError ? (
+                    <div role="alert" className="flex items-center justify-between gap-2 rounded-xl border border-rose-300/60 bg-rose-50 px-3 py-2.5 text-xs font-medium text-rose-700">
+                      <span className="flex items-center gap-2"><AlertCircle className="h-4 w-4 shrink-0" />{invitesError}</span>
+                      <button type="button" onClick={() => void fetchInvites()} className="font-semibold underline">Retry</button>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="sm:col-span-1 rounded-xl border border-slate-200 bg-white p-3">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Workspace Code</span>
+                        <div className="mt-1 flex items-center justify-between">
+                          <code className="text-base font-extrabold tracking-wider text-indigo-600">{invitesLoading ? 'Loading…' : inviteCode || 'Unavailable'}</code>
+                          <button
+                            type="button"
+                            onClick={copyCode}
+                            disabled={!inviteCode}
+                            className="rounded p-1 text-slate-400 hover:text-slate-600 transition-colors disabled:opacity-40"
+                            title="Copy Code"
+                            aria-label="Copy workspace code"
+                          >
+                            {copiedCode ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="sm:col-span-2 rounded-xl border border-slate-200 bg-white p-3">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Instant Join URL</span>
+                        <div className="mt-1 flex items-center justify-between gap-2">
+                          <span className="text-xs font-medium text-slate-600 truncate">
+                            {inviteLink || (invitesLoading ? 'Loading…' : 'Unavailable')}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={copyShareableLink}
+                            disabled={!inviteLink}
+                            className="flex items-center gap-1 rounded-lg bg-indigo-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-indigo-500 transition-all shrink-0 disabled:opacity-50"
+                          >
+                            {copiedLink ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                            <span>{copiedLink ? 'Copied!' : 'Copy Link'}</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </div>
+              )}
             </div>
           )}
 
           {/* MEMBERS & ROLES */}
-          {activeTab === 'members' && (
+          {activeTab === 'members' && canManageMembers && (
             <div className="space-y-6">
               {/* Header with Invite Button */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
@@ -1429,16 +1608,20 @@ export default function SettingsPage() {
                     Workspace Members & Role Permissions
                   </h3>
                   <p className="text-xs text-slate-500">
-                    Total {members.length} active members • Manage access levels and invitations
+                    {membersLoading || membersError
+                      ? 'Manage access levels and invitations'
+                      : `${activeMemberCount} active${suspendedMemberCount ? ` · ${suspendedMemberCount} suspended` : ''} • Manage access levels and invitations`}
                   </p>
                 </div>
 
-                {canManageMembers && (memberLimitReached ? (
+                {assignableRoles.length > 0 && (memberLimitReached ? (
                   <a href="/billing" className="shrink-0 text-xs font-semibold text-indigo-600 underline">Member limit reached · Upgrade</a>
                 ) : (
                   <button
                     onClick={() => {
-                      setInviteRole(assignableRoles[0] ?? 'employee');
+                      setInviteRole(assignableRoles[0]);
+                      setInviteError('');
+                      setInviteSuccess('');
                       setIsInviteModalOpen(true);
                     }}
                     className="flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3.5 py-2 text-xs font-semibold text-white shadow-xs hover:bg-indigo-500 transition-all shrink-0"
@@ -1449,6 +1632,9 @@ export default function SettingsPage() {
                 ))}
               </div>
 
+              {renderNotice(memberNotice)}
+              {renderPendingAction(['toggle', 'remove', 'revoke'])}
+
               {/* Filters Bar */}
               <div className="flex flex-wrap items-center gap-3">
                 <div className="relative flex-1 min-w-[200px]">
@@ -1458,6 +1644,7 @@ export default function SettingsPage() {
                     value={memberSearch}
                     onChange={(e) => setMemberSearch(e.target.value)}
                     placeholder="Search by name, email, or department..."
+                    aria-label="Search members"
                     className="w-full rounded-xl border border-slate-200 pl-8 pr-3 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:ring-1 focus:ring-indigo-600"
                   />
                 </div>
@@ -1465,12 +1652,13 @@ export default function SettingsPage() {
                 <select
                   value={memberRoleFilter}
                   onChange={(e) => setMemberRoleFilter(e.target.value)}
+                  aria-label="Filter by role"
                   className="rounded-xl border border-slate-200 bg-white py-1.5 px-3 text-xs text-slate-700 shadow-2xs"
                 >
                   <option value="all">All Roles</option>
                   {[...new Set(members.map((member) => member.role))].map((role) => (
                     <option key={role} value={role}>
-                      {role.charAt(0).toUpperCase() + role.slice(1)}
+                      {formatRole(role)}
                     </option>
                   ))}
                 </select>
@@ -1496,10 +1684,19 @@ export default function SettingsPage() {
                             Loading workspace members...
                           </td>
                         </tr>
+                      ) : membersError ? (
+                        <tr>
+                          <td colSpan={5} className="py-8 text-center">
+                            <p role="alert" className="text-rose-600">{membersError}</p>
+                            <button type="button" onClick={() => void fetchMembers()} className="mt-2 text-xs font-semibold text-indigo-600 underline">
+                              Try again
+                            </button>
+                          </td>
+                        </tr>
                       ) : filteredMembers.length === 0 ? (
                         <tr>
                           <td colSpan={5} className="py-8 text-center text-slate-400">
-                            No members found matching your search.
+                            {members.length === 0 ? 'No members found in this workspace.' : 'No members found matching your search.'}
                           </td>
                         </tr>
                       ) : (
@@ -1509,8 +1706,9 @@ export default function SettingsPage() {
                           const isTargetElevated = [
                             'admin', 'manager', 'principal', 'director', 'dean', 'hod',
                           ].includes(m.role);
-                          const canEditThisMember = canManageMembers && !isTargetOwner && !isSelf &&
-                            (isOrganizationOwner || !isTargetElevated);
+                          const canEditThisMember = canAdministerWorkspace && !isTargetOwner && !isSelf &&
+                            (ownsWorkspace || !isTargetElevated);
+                          const isBusy = busyMemberId === m._id;
 
                           return (
                             <tr key={m._id} className="hover:bg-slate-50 transition-colors">
@@ -1534,22 +1732,24 @@ export default function SettingsPage() {
                               </td>
 
                               <td className="py-3 px-4 text-slate-600">
-                                {m.department || m.jobTitle || 'General'}
+                                {m.department || m.jobTitle || '—'}
                               </td>
 
                               <td className="py-3 px-4">
-                                {canEditThisMember ? (
+                                {canEditThisMember && assignableRoles.length > 0 ? (
                                   <select
                                     value={m.role}
-                                    onChange={(e) => handleChangeRole(m._id, e.target.value)}
-                                    className="rounded-lg border border-slate-200 bg-white py-1 px-2 text-xs font-semibold text-slate-800 shadow-2xs focus:ring-1 focus:ring-indigo-600"
+                                    disabled={isBusy}
+                                    aria-label={`Role for ${m.fullName}`}
+                                    onChange={(e) => void handleChangeRole(m._id, e.target.value)}
+                                    className="rounded-lg border border-slate-200 bg-white py-1 px-2 text-xs font-semibold text-slate-800 shadow-2xs focus:ring-1 focus:ring-indigo-600 disabled:opacity-60"
                                   >
                                     {!assignableRoles.includes(m.role) && (
                                       <option value={m.role} disabled>{m.role}</option>
                                     )}
                                     {assignableRoles.map((role) => (
                                       <option key={role} value={role}>
-                                        {role.charAt(0).toUpperCase() + role.slice(1)}
+                                        {formatRole(role)}
                                       </option>
                                     ))}
                                   </select>
@@ -1567,8 +1767,11 @@ export default function SettingsPage() {
                               <td className="py-3 px-4">
                                 {canEditThisMember ? (
                                   <button
-                                    onClick={() => handleToggleActive(m._id, m.isActive)}
-                                    className={`rounded-lg px-2 py-0.5 text-[11px] font-bold transition-colors ${
+                                    type="button"
+                                    disabled={isBusy}
+                                    aria-label={`${m.isActive ? 'Suspend' : 'Reactivate'} ${m.fullName}`}
+                                    onClick={() => setPendingAction({ kind: 'toggle', userId: m._id, name: m.fullName, isActive: m.isActive })}
+                                    className={`rounded-lg px-2 py-0.5 text-[11px] font-bold transition-colors disabled:opacity-60 ${
                                       m.isActive
                                         ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
                                         : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
@@ -1590,9 +1793,12 @@ export default function SettingsPage() {
                               <td className="py-3 px-4 text-right">
                                 {canEditThisMember && (
                                   <button
-                                    onClick={() => handleRemoveMember(m._id, m.fullName)}
-                                    className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"
+                                    type="button"
+                                    disabled={isBusy}
+                                    onClick={() => setPendingAction({ kind: 'remove', userId: m._id, name: m.fullName })}
+                                    className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors disabled:opacity-60"
                                     title="Remove from Workspace"
+                                    aria-label={`Remove ${m.fullName} from workspace`}
                                   >
                                     <Trash2 className="h-3.5 w-3.5" />
                                   </button>
@@ -1612,99 +1818,93 @@ export default function SettingsPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                      Pending Email Invitations ({pendingInvites.length})
+                      Pending Email Invitations{invitesLoading || invitesError ? '' : ` (${pendingInvites.length})`}
                     </h4>
                     <p className="text-[11px] text-slate-400">
                       Invited users who have not yet accepted their invitation link
                     </p>
                   </div>
                   <button
-                    onClick={fetchInvites}
-                    className="p-1 rounded text-slate-400 hover:text-slate-600"
+                    type="button"
+                    onClick={() => void fetchInvites()}
+                    disabled={invitesLoading}
+                    className="p-1 rounded text-slate-400 hover:text-slate-600 disabled:opacity-50"
                     title="Refresh Invites"
+                    aria-label="Refresh invitations"
                   >
-                    <RefreshCw className="h-3.5 w-3.5" />
+                    <RefreshCw className={`h-3.5 w-3.5 ${invitesLoading ? 'animate-spin' : ''}`} />
                   </button>
                 </div>
 
                 {invitesLoading ? (
                   <p className="text-xs text-slate-400 py-3">Loading pending invitations...</p>
+                ) : invitesError ? (
+                  <div role="alert" className="flex items-center justify-between gap-2 rounded-xl border border-rose-300/60 bg-rose-50 px-3 py-2.5 text-xs font-medium text-rose-700">
+                    <span className="flex items-center gap-2"><AlertCircle className="h-4 w-4 shrink-0" />{invitesError}</span>
+                    <button type="button" onClick={() => void fetchInvites()} className="font-semibold underline">Retry</button>
+                  </div>
                 ) : pendingInvites.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center text-xs text-slate-400">
-                    No pending invitations. Click "Invite Member" to bring teammates into this workspace.
+                    {assignableRoles.length > 0
+                      ? 'No pending invitations. Click "Invite Member" to bring people into this workspace.'
+                      : 'No pending invitations.'}
                   </div>
                 ) : (
                   <div className="rounded-xl border border-slate-200 overflow-hidden divide-y divide-slate-100">
-                    {pendingInvites.map((invite) => (
-                      <div
-                        key={invite.token}
-                        className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs bg-white hover:bg-slate-50"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-50 text-amber-600">
-                            <Mail className="h-3.5 w-3.5" />
-                          </div>
-                          <div>
-                            <span className="font-bold text-slate-900">{invite.email}</span>
-                            <div className="flex items-center gap-2 mt-0.5 text-[11px] text-slate-400">
-                              <span className="capitalize font-semibold text-slate-600">{invite.role}</span>
-                              <span>•</span>
-                              <span>Expires {formatDate(invite.expiresAt)}</span>
+                    {pendingInvites.map((invite) => {
+                      const canResend = ownsWorkspace || assignableRoles.includes(invite.role);
+                      const isBusy = busyInviteToken === invite.token;
+                      return (
+                        <div
+                          key={invite.token}
+                          className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs bg-white hover:bg-slate-50"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-50 text-amber-600">
+                              <Mail className="h-3.5 w-3.5" />
+                            </div>
+                            <div>
+                              <span className="font-bold text-slate-900">{invite.email}</span>
+                              <div className="flex items-center gap-2 mt-0.5 text-[11px] text-slate-400">
+                                <span className="capitalize font-semibold text-slate-600">{invite.role}</span>
+                                <span>•</span>
+                                <span>Expires {formatDate(invite.expiresAt)}</span>
+                              </div>
                             </div>
                           </div>
-                        </div>
 
-                        <div className="flex items-center gap-2 self-end sm:self-auto">
-                          <button
-                            onClick={() => handleResendInvite(invite.token)}
-                            className="rounded-lg border border-slate-200 px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
-                          >
-                            Resend Email
-                          </button>
-                          <button
-                            onClick={() => handleRevokeInvite(invite.token)}
-                            className="rounded-lg px-2 py-1 text-[11px] font-semibold text-rose-600 hover:bg-rose-50 transition-colors"
-                          >
-                            Revoke
-                          </button>
+                          {(canResend || canAdministerWorkspace) && (
+                            <div className="flex items-center gap-2 self-end sm:self-auto">
+                              {canResend && (
+                                <button
+                                  type="button"
+                                  disabled={isBusy}
+                                  onClick={() => void handleResendInvite(invite.token, invite.email)}
+                                  className="rounded-lg border border-slate-200 px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-60"
+                                >
+                                  {isBusy ? 'Working…' : 'Resend Email'}
+                                </button>
+                              )}
+                              {canAdministerWorkspace && (
+                                <button
+                                  type="button"
+                                  disabled={isBusy}
+                                  onClick={() => setPendingAction({ kind: 'revoke', token: invite.token, email: invite.email })}
+                                  className="rounded-lg px-2 py-1 text-[11px] font-semibold text-rose-600 hover:bg-rose-50 transition-colors disabled:opacity-60"
+                                >
+                                  Revoke
+                                </button>
+                              )}
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
             </div>
           )}
-
-          {/* BILLING & PLAN (Temporarily Disabled) */}
-          {/* (activeTab as any) === 'billing' && (
-            <div className="space-y-5">
-              <h3 className="text-sm font-bold text-slate-900 pb-2 border-b border-slate-100">
-                Subscription & Storage Usage
-              </h3>
-
-              <div className="rounded-2xl border border-indigo-200 bg-indigo-50/40 p-5 flex items-center justify-between">
-                <div>
-                  <span className="text-xs font-bold uppercase tracking-wider text-indigo-700">Active Plan</span>
-                  <h4 className="text-xl font-extrabold text-slate-900 mt-0.5">WorkGrind Pro Workspace</h4>
-                  <p className="text-xs text-slate-500 mt-1">Up to 5 members, 1 GB storage, 50 AI requests per month, meetings, and priority support</p>
-                </div>
-                <span className="rounded-xl bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white shadow-2xs">
-                  Active
-                </span>
-              </div>
-
-              <div>
-                <div className="flex justify-between text-xs font-semibold text-slate-700">
-                  <span>Drive Storage Consumption</span>
-                  <span>{formatBytes(subscription?.usage.storageBytes ?? company?.storage?.used ?? 0)} / {formatBytes(subscription?.limits.storage ?? 1_073_741_824)}</span>
-                </div>
-                <div className="mt-2 h-2.5 w-full rounded-full bg-slate-100 overflow-hidden">
-                  <div className="h-full rounded-full bg-indigo-600 w-1/12" />
-                </div>
-              </div>
-            </div>
-          ) */}
 
           {/* SECURITY */}
           {activeTab === 'security' && (
@@ -1737,15 +1937,21 @@ export default function SettingsPage() {
                   });
 
                   if (res.data.success) {
-                    setPassSuccess(res.data.message || 'Password updated successfully!');
+                    // The server revoked every session and issued a new one for this device.
+                    const previousToken = getAuthValue('workgrind_access_token');
+                    if (typeof res.data.accessToken === 'string' && previousToken) {
+                      updateAuthTokens(res.data.accessToken, previousToken);
+                      refreshSocketAuthLazily(res.data.accessToken);
+                    }
+                    setPassSuccess(res.data.message || 'Password updated successfully.');
                     setCurrentPassword('');
                     setNewPassword('');
                     setConfirmNewPassword('');
                   } else {
                     setPassError(res.data.message || 'Unable to update your password.');
                   }
-                } catch (err: any) {
-                  setPassError(err.response?.data?.message || 'Failed to update password. Please check your credentials.');
+                } catch (err) {
+                  setPassError(errorMessage(err, 'Failed to update password. Please check your credentials.'));
                 } finally {
                   setPassSaving(false);
                 }
@@ -1846,40 +2052,68 @@ export default function SettingsPage() {
                   {passSaving ? 'Verifying & Updating...' : 'Update Password'}
                 </button>
 
-                <button
-                  type="button"
-                  onClick={() => setDeleteModalOpen(true)}
-                  className="inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-100"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  Deactivate Account
-                </button>
+                {isOwnerAccount ? (
+                  <p className="max-w-xs text-[11px] leading-relaxed text-slate-500">
+                    Workspace owners can&apos;t deactivate their account while they own the workspace.
+                  </p>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setDeleteModalOpen(true)}
+                    className="inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-100"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Deactivate Account
+                  </button>
+                )}
               </div>
             </form>
           )}
 
           {/* AUDIT LOGS */}
-          {activeTab === 'audit' && (
+          {activeTab === 'audit' && canViewAudit && (
             <div className="space-y-4">
               <h3 className="text-sm font-bold text-slate-900 pb-2 border-b border-slate-100">
                 Administrative Audit Trail
               </h3>
 
+              {auditError && (
+                <div role="alert" className="flex items-center justify-between gap-2 rounded-xl border border-rose-300/60 bg-rose-50 px-3 py-2.5 text-xs font-medium text-rose-700">
+                  <span className="flex items-center gap-2"><AlertCircle className="h-4 w-4 shrink-0" />{auditError}</span>
+                  <button type="button" onClick={() => void fetchAuditLogs(auditLogs.length ? auditPage + 1 : 1)} className="font-semibold underline">Retry</button>
+                </div>
+              )}
+
               <div className="divide-y divide-slate-100 text-xs">
-                {auditLogs.length === 0 ? (
-                  <p className="py-6 text-center text-slate-400">No audit records logged yet.</p>
+                {auditLoading && auditLogs.length === 0 ? (
+                  <p className="py-6 text-center text-slate-400">Loading audit records…</p>
+                ) : auditLogs.length === 0 ? (
+                  !auditError && <p className="py-6 text-center text-slate-400">No audit records logged yet.</p>
                 ) : (
                   auditLogs.map((log) => (
-                    <div key={log._id} className="py-2.5 flex items-center justify-between">
+                    <div key={log._id} className="py-2.5 flex items-center justify-between gap-3">
                       <div>
                         <span className="font-bold text-slate-900">{log.action}</span>
-                        <span className="text-slate-500 ml-2">by {log.userId?.fullName || 'Admin'}</span>
+                        <span className="text-slate-500 ml-2">by {log.userId?.fullName || 'a removed user'}</span>
                       </div>
-                      <span className="text-[11px] text-slate-400">{formatDate(log.createdAt)}</span>
+                      <span className="shrink-0 text-[11px] text-slate-400">{formatDate(log.createdAt)}</span>
                     </div>
                   ))
                 )}
               </div>
+
+              {auditHasMore && !auditError && (
+                <div className="flex justify-center">
+                  <button
+                    type="button"
+                    onClick={() => void fetchAuditLogs(auditPage + 1)}
+                    disabled={auditLoading}
+                    className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-60"
+                  >
+                    {auditLoading ? 'Loading…' : 'Load older records'}
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -1893,7 +2127,7 @@ export default function SettingsPage() {
                 <h3 className="text-sm font-bold text-slate-900">Deactivate account</h3>
                 <p className="text-[11px] text-slate-500 mt-1">This disables your login and signs you out immediately.</p>
               </div>
-              <button type="button" onClick={() => setDeleteModalOpen(false)} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100">
+              <button type="button" onClick={closeDeleteModal} aria-label="Close" className="rounded-lg p-1 text-slate-400 hover:bg-slate-100">
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -1928,7 +2162,7 @@ export default function SettingsPage() {
               </div>
 
               <div className="flex justify-end gap-2 pt-2">
-                <button type="button" onClick={() => setDeleteModalOpen(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50">
+                <button type="button" onClick={closeDeleteModal} className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50">
                   Cancel
                 </button>
                 <button type="button" onClick={handleDeleteAccount} disabled={deleteLoading} className="rounded-xl bg-rose-600 px-4 py-2 text-xs font-semibold text-white hover:bg-rose-500 disabled:opacity-60">
@@ -1949,14 +2183,12 @@ export default function SettingsPage() {
                 <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
                   <UserPlus className="h-4 w-4" />
                 </div>
-                <h3 className="text-sm font-bold text-slate-900">Invite Team Member</h3>
+                <h3 className="text-sm font-bold text-slate-900">Invite Member</h3>
               </div>
               <button
-                onClick={() => {
-                  setIsInviteModalOpen(false);
-                  setInviteError('');
-                  setInviteSuccess('');
-                }}
+                type="button"
+                onClick={closeInviteModal}
+                aria-label="Close"
                 className="rounded-lg p-1 text-slate-400 hover:bg-slate-100"
               >
                 <X className="h-4 w-4" />
@@ -1980,24 +2212,26 @@ export default function SettingsPage() {
             <form onSubmit={handleSendInvite} className="space-y-4">
               {memberLimitReached && <p className="text-xs text-amber-700">This workspace has reached its member limit. <a href="/billing" className="font-semibold underline">Upgrade your plan</a>.</p>}
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700">
-                  Colleague's Email Address <span className="text-rose-500">*</span>
+                <label htmlFor="settings-invite-email" className="block text-xs font-semibold uppercase tracking-wider text-slate-700">
+                  Email Address <span className="text-rose-500">*</span>
                 </label>
                 <input
+                  id="settings-invite-email"
                   type="email"
                   required
                   value={inviteEmail}
                   onChange={(e) => setInviteEmail(e.target.value)}
-                  placeholder="colleague@company.com"
+                  placeholder="name@example.com"
                   className="mt-1.5 block w-full rounded-xl border border-slate-200 py-2.5 px-3 text-xs text-slate-900 focus:ring-2 focus:ring-indigo-600"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700">
+                <label htmlFor="settings-invite-role" className="block text-xs font-semibold uppercase tracking-wider text-slate-700">
                   Role & Access Level
                 </label>
                 <select
+                  id="settings-invite-role"
                   value={inviteRole}
                   onChange={(e) => setInviteRole(e.target.value)}
                   className="mt-1.5 block w-full rounded-xl border border-slate-200 py-2.5 px-3 text-xs text-slate-900 font-semibold focus:ring-2 focus:ring-indigo-600"
@@ -2013,7 +2247,7 @@ export default function SettingsPage() {
               <div className="pt-2 flex justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => setIsInviteModalOpen(false)}
+                  onClick={closeInviteModal}
                   className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
                 >
                   Cancel

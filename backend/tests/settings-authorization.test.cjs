@@ -307,3 +307,45 @@ test('the current-user response no longer carries the workspace invite code', as
   assert.doesNotMatch(populatedFields, /\binviteCode\b/);
   assert.match(populatedFields, /\borganizationType\b/);
 });
+
+test('changing the password revokes other sessions and issues a new one for this device', async () => {
+  const { randomBytes } = require('node:crypto');
+  process.env.JWT_SECRET ||= randomBytes(48).toString('base64url');
+  process.env.JWT_REFRESH_SECRET ||= randomBytes(48).toString('base64url');
+  const { changePassword } = require('../dist/controllers/auth.controller');
+  const { hashRefreshToken } = require('../dist/services/pendingRegistration');
+
+  const user = {
+    _id: actorId,
+    companyId,
+    role: 'employee',
+    email: 'member@example.invalid',
+    fullName: 'Member',
+    password: 'stored-hash',
+    refreshTokens: ['old-device-a', 'old-device-b'],
+    comparePassword: async (candidate) => candidate === 'Current#Pass1',
+    save: async () => undefined,
+  };
+  User.findById = () => ({ select: async () => user });
+  const originalNotify = email.sendPasswordChangedNotificationEmail;
+  email.sendPasswordChangedNotificationEmail = async () => ({ sent: true });
+  const cookies = [];
+  const res = { ...makeResponse(), cookie(...args) { cookies.push(args); return this; } };
+  try {
+    await changePassword({
+      user: { userId: actorId.toString(), companyId: companyId.toString(), role: 'employee' },
+      body: { currentPassword: 'Current#Pass1', newPassword: 'Next#Pass2' },
+    }, res);
+  } finally {
+    email.sendPasswordChangedNotificationEmail = originalNotify;
+  }
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(typeof res.body.accessToken, 'string');
+  assert.equal(user.refreshTokens.length, 1, 'only the new session remains');
+  assert.ok(!user.refreshTokens.includes('old-device-a'));
+  const refreshCookie = cookies.find(([name]) => /refresh/i.test(name));
+  assert.ok(refreshCookie, 'a refresh cookie is set for this device');
+  assert.equal(user.refreshTokens[0], hashRefreshToken(refreshCookie[1]));
+  assert.equal(user.password, 'Next#Pass2', 'the new password is handed to the hashing pre-save hook');
+});
