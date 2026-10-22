@@ -1969,10 +1969,12 @@ export default function SettingsPage() {
                 </p>
                 <SocialAuthButtons intent="link" connectedProviders={user?.authProviders} />
               </section>
-              {company?.accountType === 'company' &&
-                company.organizationType === 'business' &&
-                ['owner', 'admin', 'manager'].includes(user?.role ?? '') && (
-                  <LinkedInConnectionCard canDisconnect={user?.role === 'owner' || user?.role === 'admin'} />
+              {/* Publishing connections follow Social Publishing (Business and Solo only) and
+                  the roles the backend lets manage them: the Solo owner, or business owners,
+                  admins, and managers. */}
+              {canAccessOrganizationFeature(organization, user?.role, 'socialPublishing') &&
+                (isSolo ? isOwnerAccount : canAccessOrganizationFeature(organization, user?.role, 'businessAutomation')) && (
+                  <LinkedInConnectionCard canDisconnect={isOwnerAccount || user?.role === 'admin'} />
                 )}
 
               {passError && (

@@ -66,3 +66,47 @@ test('concurrent publish requests cannot claim an already-processing post', asyn
   assert.equal(update.$set.status, 'publishing');
   assert.equal(update.$set.destinations[0].status, 'publishing');
 });
+
+test('scheduled posts from an education workspace are failed instead of published', async (context) => {
+  const Company = require('../dist/models/Company').default;
+  const User = require('../dist/models/User').default;
+  const Notification = require('../dist/models/Notification').default;
+  const { dispatchScheduledSocialPosts } = require('../dist/controllers/socialPublishing.controller');
+  const saved = {
+    secret: process.env.CRON_SECRET,
+    find: SocialPost.find,
+    updateOne: SocialPost.updateOne,
+    companyFindOne: Company.findOne,
+    userFindOne: User.findOne,
+    notificationCreate: Notification.create,
+  };
+  context.after(() => {
+    if (saved.secret === undefined) delete process.env.CRON_SECRET; else process.env.CRON_SECRET = saved.secret;
+    SocialPost.find = saved.find;
+    SocialPost.updateOne = saved.updateOne;
+    Company.findOne = saved.companyFindOne;
+    User.findOne = saved.userFindOne;
+    Notification.create = saved.notificationCreate;
+  });
+  process.env.CRON_SECRET = 'test-cron-secret';
+  const postId = new mongoose.Types.ObjectId();
+  const post = { _id: postId, companyId: new mongoose.Types.ObjectId(), authorId: new mongoose.Types.ObjectId() };
+  SocialPost.find = () => ({ sort() { return this; }, limit() { return this; }, select() { return this; }, lean: async () => [{ _id: postId }] });
+  SocialPost.findOneAndUpdate = async () => post;
+  Company.findOne = () => ({ select: async () => ({ organizationType: 'school', accountType: 'company' }) });
+  User.findOne = () => ({ select: async () => ({ _id: post.authorId, role: 'principal' }) });
+  Notification.create = async (data) => data;
+  let failure;
+  SocialPost.updateOne = async (filter, update) => { failure = update.$set; return { modifiedCount: 1 }; };
+  let integrationLookups = 0;
+  Integration.findOne = () => { integrationLookups += 1; throw new Error('provider must not be reached'); };
+
+  const res = response();
+  await dispatchScheduledSocialPosts({ get: (name) => (name === 'authorization' ? 'Bearer test-cron-secret' : undefined) }, res);
+
+  assert.equal(res.body.failed, 1);
+  assert.equal(res.body.published, 0);
+  assert.equal(failure.status, 'failed');
+  assert.equal(failure.failureCode, 'workspace_or_publisher_unavailable');
+  assert.equal(integrationLookups, 0);
+});

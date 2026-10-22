@@ -7,7 +7,8 @@ import Integration from '../models/Integration';
 import SocialPost from '../models/SocialPost';
 import User from '../models/User';
 import { AuthRequest } from '../middleware/auth';
-import { roleMatches } from '../config/organization';
+import { isOrganizationType, roleMatches } from '../config/organization';
+import { isOrganizationFeatureAllowed } from '../middleware/organizationAccess';
 import { getCompanySubscription } from '../services/companySubscription';
 import { createNotification } from './channel.controller';
 import { runAgentTurn } from '../ai/agentRuntime';
@@ -1207,7 +1208,15 @@ async function publishScheduledPost(postId: mongoose.Types.ObjectId): Promise<'p
       isDeleted: { $ne: true },
     }).select('_id role'),
   ]);
+  // Re-check eligibility at publish time: a post scheduled before the workspace
+  // lost Social Publishing (or the publisher lost the role) must not go out.
   if (!company || !publisher ||
+      !isOrganizationType(company.organizationType) ||
+      !isOrganizationFeatureAllowed(
+        { organizationType: company.organizationType, accountType: company.accountType },
+        publisher.role,
+        'socialPublishing',
+      ) ||
       !roleMatches(publisher.role, ['owner', 'admin', 'manager'], company.organizationType)) {
     await markPostFailed(post, 'workspace_or_publisher_unavailable');
     return 'failed';

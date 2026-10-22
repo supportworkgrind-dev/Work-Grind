@@ -9,6 +9,7 @@ import { AuthRequest } from '../middleware/auth';
 import { createWorkGrindUser } from '../services/callingId';
 import { TRIAL_DAYS } from '../config/subscription';
 import { isOrganizationType, roleMatches } from '../config/organization';
+import { isOrganizationFeatureAllowed } from '../middleware/organizationAccess';
 import { sendWelcomeEmail } from '../utils/email';
 import { restoreWorkspaceCreatorRole, sessionForUser } from './auth.controller';
 import { setRefreshCookie } from '../utils/authCookie';
@@ -71,7 +72,16 @@ function canManageSocialConnection(user: {
   accountType?: 'company' | 'individual';
   organizationType?: string;
 }): boolean {
-  if (!user.organizationType) return false;
+  // Publishing connections exist only where Social Publishing does (Business and
+  // Solo workspaces); the role checks below decide who may manage them there.
+  if (!isOrganizationType(user.organizationType) || !user.accountType ||
+      !isOrganizationFeatureAllowed(
+        { organizationType: user.organizationType, accountType: user.accountType },
+        user.role,
+        'socialPublishing',
+      )) {
+    return false;
+  }
   if (user.accountType === 'individual') {
     return roleMatches(user.role, ['owner'], user.organizationType);
   }

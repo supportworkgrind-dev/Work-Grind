@@ -79,7 +79,8 @@ const providerCatalog: SocialProviderDefinition[] = [
   {
     id: 'instagram',
     name: 'Instagram',
-    availability: 'setup_required',
+    // No publishing adapter exists yet, so this is not a configuration gap.
+    availability: 'coming_soon',
     capabilities: {
       connect: false,
       publishText: false,
@@ -93,7 +94,8 @@ const providerCatalog: SocialProviderDefinition[] = [
   {
     id: 'facebook',
     name: 'Facebook Pages',
-    availability: 'setup_required',
+    // No publishing adapter exists yet, so this is not a configuration gap.
+    availability: 'coming_soon',
     capabilities: {
       connect: false,
       publishText: false,

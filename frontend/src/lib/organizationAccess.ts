@@ -64,11 +64,10 @@ const FEATURE_POLICIES: Record<OrganizationFeature, (experience: Experience, rol
   clientPortal: (experience, role) => experience === 'company' && ['owner', 'admin', 'manager'].includes(role),
   businessAnalytics: (experience, role) => experience === 'company' && ['owner', 'admin', 'manager'].includes(role),
   businessAutomation: (experience, role) => experience === 'company' && ['owner', 'admin', 'manager'].includes(role),
+  // Business team and Solo workspaces only (mirrors the backend policy).
   socialPublishing: (experience, role) =>
     experience === 'solo' ? role === 'owner' :
-      experience === 'company'
-        ? ['owner', 'admin', 'manager', 'employee'].includes(role)
-        : ['owner', 'principal', 'admin', 'teacher', 'dean', 'hod'].includes(role),
+      experience === 'company' && ['owner', 'admin', 'manager', 'employee'].includes(role),
   billingAdmin: (experience, role) =>
     experience === 'solo' ? role === 'owner' :
       experience === 'company' ? ['owner', 'admin'].includes(role) : role === 'owner',

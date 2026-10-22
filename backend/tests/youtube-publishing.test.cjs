@@ -201,6 +201,31 @@ test('YouTube connect start tags the return URL and is limited to publishing man
   assert.equal(denied.statusCode, 400);
 });
 
+test('publishing connections cannot be started from education workspaces, even by their administrators', async (context) => {
+  configureGoogle();
+  context.after(restore);
+  let created = 0;
+  OAuthTransaction.create = async (transaction) => { created += 1; return transaction; };
+  const request = (role, organizationType, accountType = 'company') => ({
+    params: { provider: 'google' },
+    query: { intent: 'publishing', returnTo: '/social-publishing' },
+    headers: {},
+    accepts: () => false,
+    user: { userId: new mongoose.Types.ObjectId().toString(), companyId: 'company-id', role, accountType, organizationType },
+  });
+
+  for (const [role, organizationType] of [['owner', 'school'], ['principal', 'college'], ['admin', 'university'], ['dean', 'university']]) {
+    const denied = responseMock();
+    await startOAuth(request(role, organizationType), denied);
+    assert.equal(denied.statusCode, 400, `${organizationType} ${role}`);
+  }
+  assert.equal(created, 0);
+
+  const solo = responseMock();
+  await startOAuth(request('owner', 'business', 'individual'), solo);
+  assert.equal(solo.body.success, true);
+});
+
 test('YouTube consent callback stores encrypted tokens and the channel identity', async (context) => {
   configureGoogle();
   const calls = mockGoogle(context);

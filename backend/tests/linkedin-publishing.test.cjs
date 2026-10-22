@@ -186,11 +186,11 @@ test('provider catalog exposes only verified capabilities and leaves unconfigure
     organizationPublishing: false,
   });
   const unavailable = getSocialProviderCatalog().filter((provider) => provider.id !== 'linkedin');
-  assert.deepEqual(unavailable.map((provider) => provider.availability), [
-    'setup_required',
-    'setup_required',
-    'setup_required',
-  ]);
+  // Instagram and Facebook have no adapter (coming soon); YouTube needs its Google client configured.
+  assert.deepEqual(
+    Object.fromEntries(unavailable.map((provider) => [provider.id, provider.availability])),
+    { instagram: 'coming_soon', facebook: 'coming_soon', youtube: 'setup_required' },
+  );
   assert.ok(unavailable.every((provider) =>
     Object.values(provider.capabilities).every((supported) => supported === false)));
 
