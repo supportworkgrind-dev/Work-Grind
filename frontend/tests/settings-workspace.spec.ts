@@ -337,7 +337,7 @@ test('settings tabs fit a phone-width viewport without horizontal page scroll', 
   await openSettings(page, { organizationType: 'business', accountType: 'company', role: 'owner', owner: true });
   // The app shell opens its mobile sidebar on first load; close it like a user would.
   const closeSidebar = page.getByRole('button', { name: 'Close sidebar' });
-  if (await closeSidebar.isVisible()) await closeSidebar.click();
+  if (await closeSidebar.isVisible()) await closeSidebar.click({ position: { x: 375, y: 420 } });
   for (const name of ['My Profile', 'Preferences', 'Security & Password', 'Workspace Config', 'Members & Roles', 'Audit Logs']) {
     await tab(page, name).click();
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);

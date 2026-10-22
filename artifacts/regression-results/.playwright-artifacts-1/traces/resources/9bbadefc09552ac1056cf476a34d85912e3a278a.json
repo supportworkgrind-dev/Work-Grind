@@ -1,0 +1,1 @@
+{"success":true,"user":{"_id":"billing-user","fullName":"Billing Owner","email":"owner@example.invalid","role":"owner","companyId":{"_id":"billing-company","name":"testinguni","organizationType":"University","accountType":"company"},"theme":"light","preferredLanguage":"en"}}

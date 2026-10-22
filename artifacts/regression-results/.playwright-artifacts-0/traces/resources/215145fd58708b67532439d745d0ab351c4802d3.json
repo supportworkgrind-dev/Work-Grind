@@ -1,0 +1,1 @@
+{"success":true,"user":{"_id":"playwright-user","fullName":"Regression User","email":"regression@example.invalid","role":"owner","companyId":{"_id":"playwright-company","name":"Regression Workspace","organizationType":"business","accountType":"company"},"theme":"light","preferredLanguage":"en"}}
