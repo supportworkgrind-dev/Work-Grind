@@ -23,7 +23,7 @@ const allEntitlements = {
   fileStorage: true, aiAssistant: true, prioritySupport: true, advancedAnalytics: true,
 };
 
-async function openSettings(page: Page, workspace: Workspace, overrides: Overrides = {}) {
+async function openSettings(page: Page, workspace: Workspace, overrides: Overrides = {}, userPatch: Record<string, unknown> = {}) {
   const requests: Recorded[] = [];
   await page.addInitScript(() => {
     sessionStorage.setItem('workgrind_access_token', 'playwright-settings-access');
@@ -55,6 +55,7 @@ async function openSettings(page: Page, workspace: Workspace, overrides: Overrid
     theme: 'light',
     preferredLanguage: 'en',
     notificationPreferences: { taskAssigned: true, meetingReminder: true, newMessage: true, dealUpdate: true },
+    ...userPatch,
   };
   const members = [
     user,
@@ -283,13 +284,94 @@ test('a rejected workspace save shows the server error and no success message', 
   await expect(page.getByLabel('Workspace / Organization Name')).toHaveValue('Fixture Workspace');
 });
 
-test('an invalid time zone is rejected before anything is sent', async ({ page }) => {
+test('the time zone picker searches IANA zones and saves the canonical identifier', async ({ page }) => {
   const requests = await openSettings(page, { organizationType: 'business', accountType: 'company', role: 'owner', owner: true });
   await tab(page, 'Workspace Settings').click();
-  await page.getByLabel('Default time zone (IANA)').fill('Mars/Olympus');
+  const trigger = page.getByLabel('Default time zone (IANA)');
+  await expect(trigger).toContainText('Karachi');
+  await trigger.click();
+  await page.getByRole('combobox', { name: 'Search city, region, or UTC offset' }).fill('new york');
+  await page.getByRole('option', { name: /New York \(America\)/ }).click();
+  await expect(trigger).toContainText('New York');
   await page.getByRole('button', { name: 'Update Workspace' }).click();
-  await expect(page.getByRole('alert').filter({ hasText: 'valid IANA time zone' })).toBeVisible();
-  expect(requests.some((r) => r.method === 'PATCH' && r.path === '/companies')).toBe(false);
+  await expect(page.getByText('Workspace settings saved.')).toBeVisible();
+  const saved = requests.find((r) => r.method === 'PATCH' && r.path === '/companies');
+  expect((saved?.body as { timeZone?: string }).timeZone).toBe('America/New_York');
+});
+
+test('the currency picker is keyboard-searchable and saves the ISO code', async ({ page }) => {
+  const requests = await openSettings(page, { organizationType: 'business', accountType: 'company', role: 'owner', owner: true });
+  await tab(page, 'Workspace Settings').click();
+  const trigger = page.getByLabel('Workspace currency');
+  await expect(trigger).toContainText('PKR');
+  await trigger.focus();
+  await page.keyboard.press('ArrowDown');
+  const search = page.getByRole('combobox', { name: 'Search name, code, or symbol' });
+  await expect(search).toBeFocused();
+  await search.fill('british pound');
+  await page.keyboard.press('Enter');
+  await expect(trigger).toContainText('GBP');
+  await expect(trigger).toBeFocused();
+  await page.getByRole('button', { name: 'Update Workspace' }).click();
+  await expect(page.getByText('Workspace settings saved.')).toBeVisible();
+  const saved = requests.find((r) => r.method === 'PATCH' && r.path === '/companies');
+  expect((saved?.body as { currency?: string }).currency).toBe('GBP');
+});
+
+test('the phone field loads a saved number into country code and national number, and saves E.164', async ({ page }) => {
+  const requests = await openSettings(page, { organizationType: 'business', accountType: 'company', role: 'employee' }, {}, { phone: '+923001234567' });
+  const codeTrigger = page.getByRole('button', { name: 'Country calling code' });
+  await expect(codeTrigger).toContainText('+92');
+  await expect(page.getByLabel('Phone', { exact: true })).toHaveValue('0300 1234567');
+
+  await codeTrigger.click();
+  await page.getByRole('combobox', { name: 'Search country or code (e.g. +92)' }).fill('+44');
+  await page.getByRole('option', { name: /United Kingdom \(\+44\)/ }).click();
+  await page.getByLabel('Phone', { exact: true }).fill('7911 123456');
+  await page.getByRole('button', { name: 'Save Profile' }).click();
+  await expect(page.getByText('Profile changes saved.')).toBeVisible();
+  const saved = requests.find((r) => r.method === 'PATCH' && r.path === '/users/me');
+  expect((saved?.body as { phone?: string }).phone).toBe('+447911123456');
+});
+
+test('an invalid phone number for the chosen country is caught before saving', async ({ page }) => {
+  const requests = await openSettings(page, { organizationType: 'business', accountType: 'company', role: 'employee' }, {}, { phone: '+923001234567' });
+  await page.getByLabel('Phone', { exact: true }).fill('12');
+  await expect(page.getByText('This number is not valid for the selected country code.')).toBeVisible();
+  await page.getByRole('button', { name: 'Save Profile' }).click();
+  await expect(page.getByRole('alert').filter({ hasText: 'Enter a valid phone number' })).toBeVisible();
+  expect(requests.some((r) => r.method === 'PATCH' && r.path === '/users/me')).toBe(false);
+});
+
+test('a refused member and invitation load explains the refusal without offering Retry', async ({ page }) => {
+  const refusal = { success: false, code: 'ORGANIZATION_FEATURE_FORBIDDEN', message: 'This feature is not available for your organization or role.' };
+  await openSettings(page, { organizationType: 'business', accountType: 'company', role: 'owner', owner: true }, {
+    'GET /admin/members': (route) => corsJson(route, 403, refusal),
+    'GET /companies/invites': (route) => corsJson(route, 403, refusal),
+  });
+  await tab(page, 'Members & Roles').click();
+  await expect(page.getByRole('alert').filter({ hasText: 'not available for your organization or role' }).first()).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Try again' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Retry' })).toHaveCount(0);
+  await expect(page.getByText('No members found in this workspace.')).toHaveCount(0);
+});
+
+test('a server failure loading invitations offers Retry and shows the code only after it loads', async ({ page }) => {
+  let attempts = 0;
+  await openSettings(page, { organizationType: 'business', accountType: 'company', role: 'owner', owner: true }, {
+    'GET /companies/invites': (route) => {
+      attempts += 1;
+      return attempts === 1
+        ? corsJson(route, 503, { success: false, message: 'Invitations are temporarily unavailable.' })
+        : corsJson(route, 200, { success: true, inviteCode: 'FIXT1234', invites: [] });
+    },
+  });
+  await tab(page, 'Workspace Settings').click();
+  await expect(page.getByRole('alert').filter({ hasText: 'Invitations are temporarily unavailable.' })).toBeVisible();
+  await expect(page.getByText('FIXT1234')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Retry' }).click();
+  await expect(page.getByText('FIXT1234', { exact: true })).toBeVisible();
+  await expect(page.getByText(/\/join\?code=FIXT1234$/)).toBeVisible();
 });
 
 test('a manager can list members but cannot change roles, suspend, remove, or revoke', async ({ page }) => {

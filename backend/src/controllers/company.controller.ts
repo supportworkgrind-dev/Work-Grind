@@ -37,6 +37,17 @@ const COMPANY_PROFILE_PROJECTION = [
 ].join(' ');
 
 const COMPANY_TEXT_MAX_LENGTH = 120;
+
+let supportedCurrencies: Set<string> | null = null;
+/** ISO 4217 codes known to the runtime's ICU data (the same source the Settings picker uses). */
+function isSupportedCurrency(code: string): boolean {
+  if (!supportedCurrencies) {
+    const intl = Intl as typeof Intl & { supportedValuesOf?: (key: 'currency') => string[] };
+    supportedCurrencies = new Set(typeof intl.supportedValuesOf === 'function' ? intl.supportedValuesOf('currency') : []);
+  }
+  // Without the Intl list, fall back to the format check alone.
+  return supportedCurrencies.size === 0 || supportedCurrencies.has(code);
+}
 const COMPANY_SIZES = ['1-10', '11-50', '51-200', '201-500', '500+'];
 
 export const getCompany = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -91,9 +102,15 @@ export const updateCompany = async (req: AuthRequest, res: Response): Promise<vo
         return;
       }
     }
-    if (req.body.currency !== undefined && (typeof req.body.currency !== 'string' || !/^[A-Za-z]{3}$/.test(req.body.currency))) {
-      res.status(400).json({ success: false, message: 'Currency must be a three-letter ISO currency code.' });
-      return;
+    if (req.body.currency !== undefined) {
+      const currency = typeof req.body.currency === 'string' ? req.body.currency.trim().toUpperCase() : '';
+      // A current ISO 4217 code; the workspace's existing value is accepted
+      // unchanged so a legacy setting never blocks saving other fields.
+      if (!/^[A-Z]{3}$/.test(currency) || (!isSupportedCurrency(currency) && currency !== company.currency)) {
+        res.status(400).json({ success: false, message: 'Choose a valid ISO 4217 currency, such as USD or PKR.' });
+        return;
+      }
+      req.body.currency = currency;
     }
     if (req.body.timeZone !== undefined) {
       try {

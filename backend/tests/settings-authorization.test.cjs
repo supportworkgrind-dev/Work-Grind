@@ -353,3 +353,32 @@ test('changing the password revokes other sessions and issues a new one for this
   assert.equal(user.refreshTokens[0], hashRefreshToken(refreshCookie[1]));
   assert.equal(user.password, 'Next#Pass2', 'the new password is handed to the hashing pre-save hook');
 });
+
+test('workspace currency must be a real ISO 4217 code, normalized to upper case', async () => {
+  const { updateCompany } = require('../dist/controllers/company.controller');
+  const stored = { _id: companyId, organizationType: 'business', accountType: 'company', ownerId, currency: 'XYZ' };
+  Company.findById = async () => stored;
+  let written;
+  const originalUpdate = Company.findByIdAndUpdate;
+  Company.findByIdAndUpdate = (id, updates) => { written = updates; return { select: async () => ({ ...stored, ...updates }) }; };
+  try {
+    const request = (body) => ({ user: { userId: ownerId.toString(), companyId: companyId.toString(), role: 'owner' }, body });
+
+    const invalid = makeResponse();
+    await updateCompany(request({ currency: 'ABC' }), invalid);
+    assert.equal(invalid.statusCode, 400);
+
+    const lower = makeResponse();
+    await updateCompany(request({ currency: 'pkr' }), lower);
+    assert.equal(lower.statusCode, 200);
+    assert.equal(written.currency, 'PKR');
+
+    // A legacy saved value that is not a current code can be resent unchanged.
+    const unchanged = makeResponse();
+    await updateCompany(request({ currency: 'XYZ', name: 'North Co' }), unchanged);
+    assert.equal(unchanged.statusCode, 200);
+    assert.equal(written.currency, 'XYZ');
+  } finally {
+    Company.findByIdAndUpdate = originalUpdate;
+  }
+});

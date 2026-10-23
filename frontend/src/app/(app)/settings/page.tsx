@@ -40,6 +40,9 @@ import {
 } from 'lucide-react';
 import { formatDate, getInitials } from '@/lib/utils';
 import { CountrySelect } from '@/components/common/CountrySelect';
+import { SearchableSelect } from '@/components/common/SearchableSelect';
+import { PhoneNumberField } from '@/components/common/PhoneNumberField';
+import { getCurrencyOptions, getTimeZoneOptions, regionCodeForCountryName, type LocaleOption } from '@/lib/localeOptions';
 import {
   canAccessOrganizationFeature,
   canAccessRoute,
@@ -54,6 +57,7 @@ import { BillingSummary } from '@/components/settings/BillingSummary';
 import { DataExportCard } from '@/components/settings/DataExportCard';
 import { PasswordStrength } from '@/components/settings/PasswordStrength';
 import { getAuthValue, updateAuthTokens } from '@/lib/authSession';
+import { describeApiError, type ApiErrorInfo } from '@/lib/apiError';
 import { refreshSocketAuthLazily } from '@/lib/socketLoader';
 
 const NOTIFICATION_DEFAULTS = {
@@ -111,6 +115,13 @@ function isValidTimeZone(value: string): boolean {
   }
 }
 
+/** Keeps a previously saved value selectable even if this browser does not list it. */
+function withSavedOption(options: LocaleOption[], saved: string): LocaleOption[] {
+  return !saved || options.some((option) => option.value === saved)
+    ? options
+    : [{ value: saved, label: `${saved} (current setting)` }, ...options];
+}
+
 function formatRole(role: string): string {
   return role.charAt(0).toUpperCase() + role.slice(1);
 }
@@ -137,6 +148,8 @@ export default function SettingsPage() {
   const [jobTitle, setJobTitle] = useState(user?.jobTitle || '');
   const [department, setDepartment] = useState(user?.department || '');
   const [phone, setPhone] = useState(user?.phone || '');
+  const [phoneValid, setPhoneValid] = useState(true);
+  const [phoneFieldKey, setPhoneFieldKey] = useState(0);
   const [bio, setBio] = useState(user?.bio || '');
   const [avatar, setAvatar] = useState(user?.avatar || '');
   const [skills, setSkills] = useState(user?.skills?.join(', ') || '');
@@ -174,7 +187,8 @@ export default function SettingsPage() {
   // Members Management State
   const [members, setMembers] = useState<User[]>([]);
   const [membersLoading, setMembersLoading] = useState(false);
-  const [membersError, setMembersError] = useState('');
+  // Failures are classified so access refusals are not offered a pointless Retry.
+  const [membersError, setMembersError] = useState<ApiErrorInfo | null>(null);
   const [memberSearch, setMemberSearch] = useState('');
   const [memberRoleFilter, setMemberRoleFilter] = useState('all');
   const [memberNotice, setMemberNotice] = useState<Notice>(null);
@@ -189,7 +203,7 @@ export default function SettingsPage() {
     role: string;
   }[]>([]);
   const [invitesLoading, setInvitesLoading] = useState(false);
-  const [invitesError, setInvitesError] = useState('');
+  const [invitesError, setInvitesError] = useState<ApiErrorInfo | null>(null);
 
   // Invite Modal State
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
@@ -202,7 +216,7 @@ export default function SettingsPage() {
   // Audit Logs State
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
   const [auditLoading, setAuditLoading] = useState(false);
-  const [auditError, setAuditError] = useState('');
+  const [auditError, setAuditError] = useState<ApiErrorInfo | null>(null);
   const [auditPage, setAuditPage] = useState(1);
   const [auditHasMore, setAuditHasMore] = useState(false);
   const [auditAction, setAuditAction] = useState('');
@@ -263,6 +277,8 @@ export default function SettingsPage() {
     setJobTitle(source.jobTitle || '');
     setDepartment(source.department || '');
     setPhone(source.phone || '');
+    setPhoneValid(true);
+    setPhoneFieldKey((key) => key + 1);
     setBio(source.bio || '');
     setAvatar(source.avatar || '');
     setSkills(source.skills?.join(', ') || '');
@@ -443,7 +459,7 @@ export default function SettingsPage() {
 
   const fetchMembers = async () => {
     setMembersLoading(true);
-    setMembersError('');
+    setMembersError(null);
     const fetchAllMembers = async (endpoint: string): Promise<User[]> => {
       const allMembers: User[] = [];
       for (let page = 1; page <= 501; page += 1) {
@@ -461,7 +477,7 @@ export default function SettingsPage() {
       setMembers(await fetchAllMembers(canAdministerWorkspace ? '/admin/members' : '/companies/members'));
     } catch (err) {
       setMembers([]);
-      setMembersError(errorMessage(err, 'Workspace members could not be loaded.'));
+      setMembersError(describeApiError(err, 'Workspace members could not be loaded.'));
     } finally {
       setMembersLoading(false);
     }
@@ -469,14 +485,14 @@ export default function SettingsPage() {
 
   const fetchInvites = async () => {
     setInvitesLoading(true);
-    setInvitesError('');
+    setInvitesError(null);
     try {
       const res = await api.get('/companies/invites');
       if (!res.data.success) throw new Error('Invitations could not be loaded.');
       setPendingInvites(res.data.invites || []);
       setInviteCode(res.data.inviteCode || '');
     } catch (err) {
-      setInvitesError(errorMessage(err, 'Invitations could not be loaded.'));
+      setInvitesError(describeApiError(err, 'Invitations could not be loaded.'));
     } finally {
       setInvitesLoading(false);
     }
@@ -486,7 +502,7 @@ export default function SettingsPage() {
   const fetchAuditLogs = async (page: number) => {
     const request = ++auditRequest.current;
     setAuditLoading(true);
-    setAuditError('');
+    setAuditError(null);
     try {
       // Dates are whole local days: from the start of "from" to the end of "to".
       const params: Record<string, string | number> = { page, limit: 50 };
@@ -502,7 +518,7 @@ export default function SettingsPage() {
       if (Array.isArray(res.data.actions)) setAuditActions(res.data.actions);
     } catch (err) {
       if (request !== auditRequest.current) return;
-      setAuditError(errorMessage(err, 'Audit records could not be loaded.'));
+      setAuditError(describeApiError(err, 'Audit records could not be loaded.'));
     } finally {
       if (request === auditRequest.current) setAuditLoading(false);
     }
@@ -525,6 +541,10 @@ export default function SettingsPage() {
     setProfileSaved(false);
     if (!fullName.trim()) {
       setProfileError('Enter your name before saving your profile.');
+      return;
+    }
+    if (phone && !phoneValid) {
+      setProfileError('Enter a valid phone number for the selected country code, or clear the field.');
       return;
     }
     const skillList = [...new Set(skills.split(',').map((s) => s.trim()).filter(Boolean))];
@@ -610,6 +630,10 @@ export default function SettingsPage() {
     setCompanyError('');
     if (!companyName.trim()) {
       setCompanyError('Enter a workspace name.');
+      return;
+    }
+    if (!/^[A-Z]{3}$/.test(currency)) {
+      setCompanyError('Choose a workspace currency.');
       return;
     }
     if (timeZone && !isValidTimeZone(timeZone)) {
@@ -896,6 +920,9 @@ export default function SettingsPage() {
     return matchesSearch && matchesRole;
   });
 
+  const currencyOptions = getCurrencyOptions();
+  const timeZoneOptions = getTimeZoneOptions();
+
   const activeMemberCount = members.filter((m) => m.isActive).length;
   const suspendedMemberCount = members.length - activeMemberCount;
 
@@ -1096,16 +1123,22 @@ export default function SettingsPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700">
+                  <label htmlFor="settings-phone" className="block text-xs font-semibold uppercase tracking-wider text-slate-700">
                     Phone
                   </label>
-                  <input
-                    type="text"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="+1 (555) 000-0000"
-                    className="mt-1.5 block w-full rounded-xl border border-slate-200 py-2.5 px-3 text-xs text-slate-900 focus:ring-2 focus:ring-indigo-600"
+                  <PhoneNumberField
+                    key={phoneFieldKey}
+                    id="settings-phone"
+                    defaultValue={phone}
+                    defaultCountry={regionCodeForCountryName(organization?.country)}
+                    invalid={Boolean(phone) && !phoneValid}
+                    onChange={({ value, valid }) => {
+                      setPhone(value);
+                      setPhoneValid(valid);
+                      setProfileError('');
+                    }}
                   />
+                  {phone && !phoneValid && <p className="mt-1 text-[11px] text-rose-600">This number is not valid for the selected country code.</p>}
                 </div>
               </div>
 
@@ -1493,15 +1526,28 @@ export default function SettingsPage() {
                     <label htmlFor="settings-time-zone" className="block text-xs font-semibold uppercase tracking-wider text-slate-700">
                       Default time zone (IANA)
                     </label>
-                    <input
-                      id="settings-time-zone"
-                      type="text"
-                      maxLength={64}
-                      value={timeZone}
-                      onChange={(e) => setTimeZone(e.target.value)}
-                      placeholder="e.g. Asia/Karachi"
-                      className="mt-1.5 block w-full rounded-xl border border-slate-200 py-2.5 px-3 text-xs text-slate-900 focus:ring-2 focus:ring-indigo-600"
-                    />
+                    {timeZoneOptions ? (
+                      <SearchableSelect
+                        id="settings-time-zone"
+                        className="mt-1.5"
+                        value={timeZone}
+                        onChange={setTimeZone}
+                        options={withSavedOption(timeZoneOptions, timeZone)}
+                        placeholder="Select a time zone"
+                        searchPlaceholder="Search city, region, or UTC offset"
+                      />
+                    ) : (
+                      <input
+                        id="settings-time-zone"
+                        type="text"
+                        maxLength={64}
+                        value={timeZone}
+                        onChange={(e) => setTimeZone(e.target.value)}
+                        placeholder="e.g. Asia/Karachi"
+                        className="mt-1.5 block w-full rounded-xl border border-slate-200 py-2.5 px-3 text-xs text-slate-900 focus:ring-2 focus:ring-indigo-600"
+                      />
+                    )}
+                    <p className="mt-1 text-[10px] text-slate-400">Stored as an IANA identifier (for example Asia/Karachi); offsets follow daylight saving.</p>
                   </div>
                 </div>
 
@@ -1515,7 +1561,20 @@ export default function SettingsPage() {
                   </div>
                   <div>
                     <label htmlFor="settings-currency" className="block text-xs font-semibold uppercase tracking-wider text-slate-700">Workspace currency</label>
-                    <input id="settings-currency" required pattern="[A-Za-z]{3}" minLength={3} maxLength={3} value={currency} onChange={(e) => setCurrency(e.target.value.toUpperCase())} placeholder="e.g. USD" className="mt-1.5 block w-full rounded-xl border border-slate-200 py-2.5 px-3 text-xs text-slate-900 focus:ring-2 focus:ring-indigo-600" />
+                    {currencyOptions ? (
+                      <SearchableSelect
+                        id="settings-currency"
+                        className="mt-1.5"
+                        value={currency}
+                        onChange={setCurrency}
+                        options={withSavedOption(currencyOptions, currency)}
+                        placeholder="Select a currency"
+                        searchPlaceholder="Search name, code, or symbol"
+                      />
+                    ) : (
+                      <input id="settings-currency" required pattern="[A-Za-z]{3}" minLength={3} maxLength={3} value={currency} onChange={(e) => setCurrency(e.target.value.toUpperCase())} placeholder="e.g. USD" className="mt-1.5 block w-full rounded-xl border border-slate-200 py-2.5 px-3 text-xs text-slate-900 focus:ring-2 focus:ring-indigo-600" />
+                    )}
+                    <p className="mt-1 text-[10px] text-slate-400">The default for new records. Existing amounts keep their own currency.</p>
                   </div>
                 </div>
 
@@ -1596,8 +1655,8 @@ export default function SettingsPage() {
 
                   {invitesError ? (
                     <div role="alert" className="flex items-center justify-between gap-2 rounded-xl border border-rose-300/60 bg-rose-50 px-3 py-2.5 text-xs font-medium text-rose-700">
-                      <span className="flex items-center gap-2"><AlertCircle className="h-4 w-4 shrink-0" />{invitesError}</span>
-                      <button type="button" onClick={() => void fetchInvites()} className="font-semibold underline">Retry</button>
+                      <span className="flex items-center gap-2"><AlertCircle className="h-4 w-4 shrink-0" />{invitesError.message}</span>
+                      {invitesError.retryable && <button type="button" onClick={() => void fetchInvites()} className="font-semibold underline">Retry</button>}
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -1731,10 +1790,12 @@ export default function SettingsPage() {
                       ) : membersError ? (
                         <tr>
                           <td colSpan={5} className="py-8 text-center">
-                            <p role="alert" className="text-rose-600">{membersError}</p>
-                            <button type="button" onClick={() => void fetchMembers()} className="mt-2 text-xs font-semibold text-indigo-600 underline">
-                              Try again
-                            </button>
+                            <p role="alert" className="text-rose-600">{membersError.message}</p>
+                            {membersError.retryable && (
+                              <button type="button" onClick={() => void fetchMembers()} className="mt-2 text-xs font-semibold text-indigo-600 underline">
+                                Try again
+                              </button>
+                            )}
                           </td>
                         </tr>
                       ) : filteredMembers.length === 0 ? (
@@ -1884,8 +1945,8 @@ export default function SettingsPage() {
                   <p className="text-xs text-slate-400 py-3">Loading pending invitations...</p>
                 ) : invitesError ? (
                   <div role="alert" className="flex items-center justify-between gap-2 rounded-xl border border-rose-300/60 bg-rose-50 px-3 py-2.5 text-xs font-medium text-rose-700">
-                    <span className="flex items-center gap-2"><AlertCircle className="h-4 w-4 shrink-0" />{invitesError}</span>
-                    <button type="button" onClick={() => void fetchInvites()} className="font-semibold underline">Retry</button>
+                    <span className="flex items-center gap-2"><AlertCircle className="h-4 w-4 shrink-0" />{invitesError.message}</span>
+                    {invitesError.retryable && <button type="button" onClick={() => void fetchInvites()} className="font-semibold underline">Retry</button>}
                   </div>
                 ) : pendingInvites.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center text-xs text-slate-400">
@@ -2160,7 +2221,7 @@ export default function SettingsPage() {
                 onSubmit={(event) => {
                   event.preventDefault();
                   if (auditFrom && auditTo && auditFrom > auditTo) {
-                    setAuditError('The start date must be on or before the end date.');
+                    setAuditError({ kind: 'invalid', message: 'The start date must be on or before the end date.', retryable: false });
                     return;
                   }
                   void fetchAuditLogs(1);
@@ -2195,8 +2256,8 @@ export default function SettingsPage() {
 
               {auditError && (
                 <div role="alert" className="flex items-center justify-between gap-2 rounded-xl border border-rose-300/60 bg-rose-50 px-3 py-2.5 text-xs font-medium text-rose-700">
-                  <span className="flex items-center gap-2"><AlertCircle className="h-4 w-4 shrink-0" />{auditError}</span>
-                  <button type="button" onClick={() => void fetchAuditLogs(auditLogs.length ? auditPage + 1 : 1)} className="font-semibold underline">Retry</button>
+                  <span className="flex items-center gap-2"><AlertCircle className="h-4 w-4 shrink-0" />{auditError.message}</span>
+                  {auditError.retryable && <button type="button" onClick={() => void fetchAuditLogs(auditLogs.length ? auditPage + 1 : 1)} className="font-semibold underline">Retry</button>}
                 </div>
               )}
 
