@@ -34,10 +34,12 @@ import {
   Globe2,
   CheckCheck,
   PhoneCall,
+  Plug,
+  CreditCard,
+  Lock,
 } from 'lucide-react';
 import { formatDate, getInitials } from '@/lib/utils';
 import { CountrySelect } from '@/components/common/CountrySelect';
-import { SocialAuthButtons } from '@/components/auth/SocialAuthButtons';
 import {
   canAccessOrganizationFeature,
   canAccessRoute,
@@ -46,6 +48,11 @@ import {
   isWorkspaceOwnerRole,
 } from '@/lib/organizationAccess';
 import { LinkedInConnectionCard } from '@/components/automation/LinkedInConnectionCard';
+import { YouTubeConnectionCard } from '@/components/automation/YouTubeConnectionCard';
+import { SecurityCenter } from '@/components/settings/SecurityCenter';
+import { BillingSummary } from '@/components/settings/BillingSummary';
+import { DataExportCard } from '@/components/settings/DataExportCard';
+import { PasswordStrength } from '@/components/settings/PasswordStrength';
 import { getAuthValue, updateAuthTokens } from '@/lib/authSession';
 import { refreshSocketAuthLazily } from '@/lib/socketLoader';
 
@@ -73,6 +80,9 @@ const INDUSTRY_OPTIONS = ['Technology', 'Design & Creative', 'Marketing & Media'
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 type Notice = { tone: 'success' | 'error'; text: string } | null;
+
+const SETTINGS_TABS = ['profile', 'preferences', 'security', 'notifications', 'workspace', 'members', 'integrations', 'billing', 'privacy', 'audit'] as const;
+type SettingsTab = (typeof SETTINGS_TABS)[number];
 type PendingAction =
   | { kind: 'regenerate' }
   | { kind: 'upgrade' }
@@ -111,11 +121,14 @@ export default function SettingsPage() {
   const { lang, setLang } = useI18n();
   const storeTheme = useThemeStore((state) => state.theme);
   const setTheme = useThemeStore((state) => state.setTheme);
-  const [activeTab, setActiveTab] = useState<'profile' | 'preferences' | 'workspace' | 'members' | 'security' | 'audit'>('profile');
+  const [activeTab, setActiveTab] = useState<SettingsTab>('profile');
 
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get('tab') !== 'security') return;
-    const timer = window.setTimeout(() => setActiveTab('security'), 0);
+    // ?tab= deep links (OAuth returns, notifications). Tabs the user may not
+    // open still render the "privileges required" panel rather than content.
+    const requested = new URLSearchParams(window.location.search).get('tab');
+    if (!requested || !(SETTINGS_TABS as readonly string[]).includes(requested)) return;
+    const timer = window.setTimeout(() => setActiveTab(requested as SettingsTab), 0);
     return () => window.clearTimeout(timer);
   }, []);
 
@@ -192,6 +205,11 @@ export default function SettingsPage() {
   const [auditError, setAuditError] = useState('');
   const [auditPage, setAuditPage] = useState(1);
   const [auditHasMore, setAuditHasMore] = useState(false);
+  const [auditAction, setAuditAction] = useState('');
+  const [auditFrom, setAuditFrom] = useState('');
+  const [auditTo, setAuditTo] = useState('');
+  const [auditActions, setAuditActions] = useState<string[]>([]);
+  const [auditFiltersCleared, setAuditFiltersCleared] = useState(0);
 
   // Password Change Form State
   const [currentPassword, setCurrentPassword] = useState('');
@@ -376,6 +394,11 @@ export default function SettingsPage() {
   const canAdministerWorkspace = canManageWorkspace && !isSolo;
   const canManageMembers = canAccessOrganizationFeature(organization, user?.role, 'memberDirectory');
   const canViewAudit = canAdministerWorkspace;
+  // Publishing connections: Business and Solo workspaces only, for the roles the
+  // backend lets manage them (the Solo owner; business owners, admins, managers).
+  const canManagePublishingConnections = canAccessOrganizationFeature(organization, user?.role, 'socialPublishing') &&
+    (isSolo ? ownsWorkspace : canAccessOrganizationFeature(organization, user?.role, 'businessAutomation'));
+  const canViewBilling = canAccessOrganizationFeature(organization, user?.role, 'billingAdmin');
   const assignableRoles = getAssignableRoles(organization, user?.role, ownsWorkspace);
   const visibleNotificationOptions = NOTIFICATION_OPTIONS.filter((option) =>
     canAccessRoute(organization, user?.role, option.route));
@@ -465,12 +488,18 @@ export default function SettingsPage() {
     setAuditLoading(true);
     setAuditError('');
     try {
-      const res = await api.get('/admin/audit-logs', { params: { page, limit: 50 } });
+      // Dates are whole local days: from the start of "from" to the end of "to".
+      const params: Record<string, string | number> = { page, limit: 50 };
+      if (auditAction) params.action = auditAction;
+      if (auditFrom) params.from = new Date(`${auditFrom}T00:00:00`).toISOString();
+      if (auditTo) params.to = new Date(`${auditTo}T23:59:59.999`).toISOString();
+      const res = await api.get('/admin/audit-logs', { params });
       if (request !== auditRequest.current) return;
       if (!res.data.success) throw new Error('Audit records could not be loaded.');
       setAuditLogs((previous) => (page === 1 ? res.data.logs : [...previous, ...res.data.logs]));
       setAuditPage(page);
       setAuditHasMore(Boolean(res.data.hasMore));
+      if (Array.isArray(res.data.actions)) setAuditActions(res.data.actions);
     } catch (err) {
       if (request !== auditRequest.current) return;
       setAuditError(errorMessage(err, 'Audit records could not be loaded.'));
@@ -488,7 +517,7 @@ export default function SettingsPage() {
     } else if (activeTab === 'audit' && canViewAudit) {
       void fetchAuditLogs(1);
     }
-  }, [activeTab, canManageMembers, canAdministerWorkspace, canViewAudit]);
+  }, [activeTab, canManageMembers, canAdministerWorkspace, canViewAudit, auditFiltersCleared]);
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -870,21 +899,32 @@ export default function SettingsPage() {
   const activeMemberCount = members.filter((m) => m.isActive).length;
   const suspendedMemberCount = members.length - activeMemberCount;
 
-  const allNavTabs = [
-    { id: 'profile', label: 'My Profile', icon: UserIcon, adminOnly: false },
-    { id: 'preferences', label: 'Preferences', icon: Palette, adminOnly: false },
-    { id: 'security', label: 'Security & Password', icon: Shield, adminOnly: false },
-    { id: 'workspace', label: 'Workspace Config', icon: Building2, adminOnly: true },
-    { id: 'members', label: 'Members & Roles', icon: Users, adminOnly: true },
-    { id: 'audit', label: 'Audit Logs', icon: FileText, adminOnly: true },
+  const allNavTabs: { id: SettingsTab; label: string; icon: typeof UserIcon }[] = [
+    { id: 'profile', label: 'My Profile', icon: UserIcon },
+    { id: 'preferences', label: 'Preferences & Appearance', icon: Palette },
+    { id: 'security', label: 'Authentication & Security', icon: Shield },
+    { id: 'notifications', label: 'Notifications', icon: Bell },
+    { id: 'workspace', label: 'Workspace Settings', icon: Building2 },
+    { id: 'members', label: 'Members & Roles', icon: Users },
+    { id: 'integrations', label: 'Integrations', icon: Plug },
+    { id: 'billing', label: 'Billing & Subscription', icon: CreditCard },
+    { id: 'privacy', label: 'Data & Privacy', icon: Lock },
+    { id: 'audit', label: 'Audit Logs', icon: FileText },
   ];
 
-  const navTabs = allNavTabs.filter((tab) => {
-    if (tab.id === 'workspace') return canManageWorkspace;
-    if (tab.id === 'members') return canManageMembers;
-    if (tab.id === 'audit') return canViewAudit;
-    return true;
-  });
+  const tabAllowed: Record<SettingsTab, boolean> = {
+    profile: true,
+    preferences: true,
+    security: true,
+    notifications: true,
+    workspace: canManageWorkspace,
+    members: canManageMembers,
+    integrations: canManagePublishingConnections,
+    billing: canViewBilling,
+    privacy: true,
+    audit: canViewAudit,
+  };
+  const navTabs = allNavTabs.filter((tab) => tabAllowed[tab.id]);
 
   const getRoleBadgeStyle = (role: string) => {
     switch (role) {
@@ -912,7 +952,7 @@ export default function SettingsPage() {
 
       <div className="flex flex-col md:flex-row gap-5 lg:gap-6">
         {/* Settings Navigation Tabs */}
-        <div className="w-full md:w-56 shrink-0 flex gap-1.5 overflow-x-auto pb-1 md:block md:space-y-1 md:overflow-visible md:pb-0">
+        <nav aria-label="Settings sections" className="w-full md:w-56 shrink-0 flex gap-1.5 overflow-x-auto pb-1 md:block md:space-y-1 md:overflow-visible md:pb-0">
           {navTabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -933,14 +973,12 @@ export default function SettingsPage() {
               </button>
             );
           })}
-        </div>
+        </nav>
 
         {/* Content Panel */}
         <div className="flex-1 min-w-0 theme-card rounded-2xl border p-4 sm:p-6 shadow-[var(--shadow-card)] transition-colors">
           {/* PERMISSION DENIED FOR EMPLOYEES ON ADMIN TABS */}
-          {((activeTab === 'workspace' && !canManageWorkspace) ||
-            (activeTab === 'members' && !canManageMembers) ||
-            (activeTab === 'audit' && !canViewAudit)) && (
+          {!tabAllowed[activeTab] && (
             <div className="flex flex-col items-center justify-center py-16 text-center space-y-3">
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50 text-amber-600 border border-amber-200">
                 <Shield className="h-7 w-7" />
@@ -1119,31 +1157,14 @@ export default function SettingsPage() {
                     <Palette className="h-4 w-4" style={{ color: 'var(--accent)' }} />
                     Appearance &amp; Preferences
                   </h3>
-                  <p className="mt-1 text-[11px] theme-text-muted">Choose a workspace theme, language, and notification preferences.</p>
+                  <p className="mt-1 text-[11px] theme-text-muted">Choose a workspace theme and language. Changes are saved as you make them.</p>
                 </div>
-                {visibleNotificationOptions.length > 0 && <button
-                  type="button"
-                  onClick={handleSavePreferences}
-                  disabled={preferencesSaving}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold text-[var(--text-on-accent)] transition-all hover:brightness-110 disabled:cursor-wait disabled:opacity-60"
-                  style={{ background: 'var(--accent)', boxShadow: 'var(--shadow-sm)' }}
-                >
-                  {preferencesSaved ? <CheckCheck className="h-4 w-4" /> : <Save className="h-4 w-4" />}
-                  {preferencesSaved ? 'Notifications saved' : preferencesSaving ? 'Saving…' : 'Save notifications'}
-                </button>}
               </div>
 
               {preferencesError && (
                 <div role="alert" className="flex items-center gap-2 rounded-xl border border-rose-300/60 bg-rose-50 px-3 py-2.5 text-xs font-medium text-rose-700 dark:bg-rose-950/30 dark:text-rose-300">
                   <AlertCircle className="h-4 w-4 shrink-0" />
                   <span>{preferencesError}</span>
-                </div>
-              )}
-
-              {preferencesSaved && (
-                <div role="status" className="flex items-center gap-2 rounded-xl border border-emerald-300/60 bg-emerald-50 px-3 py-2.5 text-xs font-medium text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300">
-                  <Check className="h-4 w-4 shrink-0" />
-                  <span>Notification preferences saved to your account.</span>
                 </div>
               )}
 
@@ -1252,7 +1273,7 @@ export default function SettingsPage() {
                 </div>
               </section>
 
-              <section className="grid gap-5 border-t pt-5 md:grid-cols-2" style={{ borderColor: 'var(--border-subtle)' }}>
+              <section className="grid gap-5 border-t pt-5 md:grid-cols-2" style={{ borderColor: 'var(--border-subtle)' }} aria-label="Language">
                 <div>
                   <label htmlFor="settings-language" className="mb-2 flex items-center gap-2 text-xs font-bold theme-text-primary">
                     <Globe2 className="h-4 w-4" style={{ color: 'var(--accent)' }} />Language
@@ -1267,38 +1288,73 @@ export default function SettingsPage() {
                   </select>
                   <p className="mt-1.5 text-[10px] theme-text-muted">The interface language updates immediately and is saved to your account.</p>
                 </div>
+              </section>
+            </div>
+          )}
 
+          {activeTab === 'notifications' && (
+            <div className="space-y-5">
+              <div className="flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: 'var(--border-subtle)' }}>
                 <div>
-                  <h4 className="mb-2 flex items-center gap-2 text-xs font-bold theme-text-primary">
-                    <Bell className="h-4 w-4" style={{ color: 'var(--accent)' }} />Notifications
-                  </h4>
-                  <p className="mb-2 text-[10px] theme-text-muted">In-app notifications in WorkGrind. Email and push delivery are not controlled here.</p>
-                  <div className="space-y-1.5">
-                    {visibleNotificationOptions.length === 0 ? (
-                      <p className="rounded-xl border px-3 py-2.5 text-xs theme-text-muted" style={{ borderColor: 'var(--border-subtle)' }}>
-                        No configurable notification types apply to your workspace.
-                      </p>
-                    ) : visibleNotificationOptions.map(({ key, label, description }) => (
-                      <label key={key} className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-xs theme-text-secondary transition-colors hover:theme-bg-hover" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-subtle)' }}>
-                        <span>
-                          <span className="block font-semibold theme-text-primary">{label}</span>
-                          <span className="block text-[10px] theme-text-muted">{description}</span>
-                        </span>
-                        <input
-                          type="checkbox"
-                          role="switch"
-                          aria-label={label}
-                          checked={notificationPrefs[key]}
-                          onChange={(event) => {
-                            setNotificationPrefs((previous) => ({ ...previous, [key]: event.target.checked }));
-                            setPreferencesSaved(false);
-                            setPreferencesError('');
-                          }}
-                          className="h-4 w-4 shrink-0 rounded accent-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]"
-                        />
-                      </label>
-                    ))}
-                  </div>
+                  <h3 className="flex items-center gap-2 text-sm font-bold theme-text-primary">
+                    <Bell className="h-4 w-4" style={{ color: 'var(--accent)' }} />
+                    Notifications
+                  </h3>
+                  <p className="mt-1 text-[11px] theme-text-muted">Choose which in-app notifications you receive.</p>
+                </div>
+                {visibleNotificationOptions.length > 0 && <button
+                  type="button"
+                  onClick={handleSavePreferences}
+                  disabled={preferencesSaving}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold text-[var(--text-on-accent)] transition-all hover:brightness-110 disabled:cursor-wait disabled:opacity-60"
+                  style={{ background: 'var(--accent)', boxShadow: 'var(--shadow-sm)' }}
+                >
+                  {preferencesSaved ? <CheckCheck className="h-4 w-4" /> : <Save className="h-4 w-4" />}
+                  {preferencesSaved ? 'Notifications saved' : preferencesSaving ? 'Saving…' : 'Save notifications'}
+                </button>}
+              </div>
+
+              {preferencesError && (
+                <div role="alert" className="flex items-center gap-2 rounded-xl border border-rose-300/60 bg-rose-50 px-3 py-2.5 text-xs font-medium text-rose-700 dark:bg-rose-950/30 dark:text-rose-300">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  <span>{preferencesError}</span>
+                </div>
+              )}
+
+              {preferencesSaved && (
+                <div role="status" className="flex items-center gap-2 rounded-xl border border-emerald-300/60 bg-emerald-50 px-3 py-2.5 text-xs font-medium text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300">
+                  <Check className="h-4 w-4 shrink-0" />
+                  <span>Notification preferences saved to your account.</span>
+                </div>
+              )}
+
+              <section aria-label="In-app notifications">
+                <p className="mb-2 text-[10px] theme-text-muted">In-app notifications in WorkGrind. Email and push delivery are not controlled here.</p>
+                <div className="space-y-1.5">
+                  {visibleNotificationOptions.length === 0 ? (
+                    <p className="rounded-xl border px-3 py-2.5 text-xs theme-text-muted" style={{ borderColor: 'var(--border-subtle)' }}>
+                      No configurable notification types apply to your workspace.
+                    </p>
+                  ) : visibleNotificationOptions.map(({ key, label, description }) => (
+                    <label key={key} className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-xs theme-text-secondary transition-colors hover:theme-bg-hover" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-subtle)' }}>
+                      <span>
+                        <span className="block font-semibold theme-text-primary">{label}</span>
+                        <span className="block text-[10px] theme-text-muted">{description}</span>
+                      </span>
+                      <input
+                        type="checkbox"
+                        role="switch"
+                        aria-label={label}
+                        checked={notificationPrefs[key]}
+                        onChange={(event) => {
+                          setNotificationPrefs((previous) => ({ ...previous, [key]: event.target.checked }));
+                          setPreferencesSaved(false);
+                          setPreferencesError('');
+                        }}
+                        className="h-4 w-4 shrink-0 rounded accent-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]"
+                      />
+                    </label>
+                  ))}
                 </div>
               </section>
             </div>
@@ -1513,18 +1569,6 @@ export default function SettingsPage() {
                   </div>
                 )}
               </form>
-
-              {canAccessOrganizationFeature(organization, user?.role, 'billingAdmin') && (
-                <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-xs sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <h4 className="font-bold text-slate-900">Billing &amp; plan</h4>
-                    <p className="mt-0.5 text-slate-500">Plans, payments, and subscription status are managed on the Billing page.</p>
-                  </div>
-                  <Link href="/billing" className="inline-flex shrink-0 items-center justify-center rounded-xl border border-slate-200 px-3.5 py-2 font-semibold text-slate-700 hover:bg-slate-50">
-                    Open billing
-                  </Link>
-                </div>
-              )}
 
               {/* Shareable Invite Code & Link Card */}
               {canAdministerWorkspace && (
@@ -1908,6 +1952,10 @@ export default function SettingsPage() {
 
           {/* SECURITY */}
           {activeTab === 'security' && (
+            <div className="space-y-6">
+              <h3 className="text-sm font-bold text-slate-900 pb-2 border-b border-slate-100">
+                Authentication &amp; Security
+              </h3>
             <form
               onSubmit={async (e) => {
                 e.preventDefault();
@@ -1956,26 +2004,10 @@ export default function SettingsPage() {
                   setPassSaving(false);
                 }
               }}
-              className="space-y-4"
+              className="space-y-4 rounded-xl border border-slate-200 bg-white p-4"
+              aria-labelledby="change-password-heading"
             >
-              <h3 className="text-sm font-bold text-slate-900 pb-2 border-b border-slate-100">
-                Security & Authentication
-              </h3>
-
-              <section className="rounded-xl border border-slate-200 bg-white p-4">
-                <h4 className="text-xs font-bold text-slate-900">Sign-in providers</h4>
-                <p className="mb-3 mt-1 text-xs leading-relaxed text-slate-500">
-                  Connect a provider for WorkGrind sign-in. This does not connect Google Drive, Calendar, or other Google services.
-                </p>
-                <SocialAuthButtons intent="link" connectedProviders={user?.authProviders} />
-              </section>
-              {/* Publishing connections follow Social Publishing (Business and Solo only) and
-                  the roles the backend lets manage them: the Solo owner, or business owners,
-                  admins, and managers. */}
-              {canAccessOrganizationFeature(organization, user?.role, 'socialPublishing') &&
-                (isSolo ? isOwnerAccount : canAccessOrganizationFeature(organization, user?.role, 'businessAutomation')) && (
-                  <LinkedInConnectionCard canDisconnect={isOwnerAccount || user?.role === 'admin'} />
-                )}
+              <h4 id="change-password-heading" className="text-xs font-bold text-slate-900">Change password</h4>
 
               {passError && (
                 <div className="flex items-center gap-2 rounded-xl bg-rose-50 p-3 text-xs text-rose-700 border border-rose-200">
@@ -2026,6 +2058,7 @@ export default function SettingsPage() {
                 <p className="mt-1 text-[11px] text-slate-400">
                   Must be at least 8 characters long and contain uppercase, lowercase, number, and special character (!@#$).
                 </p>
+                {newPassword && <PasswordStrength password={newPassword} />}
               </div>
 
               <div>
@@ -2053,23 +2086,66 @@ export default function SettingsPage() {
                 >
                   {passSaving ? 'Verifying & Updating...' : 'Update Password'}
                 </button>
-
-                {isOwnerAccount ? (
-                  <p className="max-w-xs text-[11px] leading-relaxed text-slate-500">
-                    Workspace owners can&apos;t deactivate their account while they own the workspace.
-                  </p>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setDeleteModalOpen(true)}
-                    className="inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-100"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                    Deactivate Account
-                  </button>
-                )}
               </div>
             </form>
+            <SecurityCenter />
+            </div>
+          )}
+
+          {activeTab === 'integrations' && canManagePublishingConnections && (
+            <div className="space-y-4">
+              <h3 className="text-sm font-bold text-slate-900 pb-2 border-b border-slate-100">
+                Integrations &amp; Connected Accounts
+              </h3>
+              <p className="text-xs text-slate-500">
+                Publishing accounts used by <Link href="/social-publishing" className="font-semibold text-indigo-600 underline">Social Publishing</Link>.
+                Status comes from the server; nothing is shown as connected until the provider has authorized it.
+              </p>
+              <LinkedInConnectionCard returnTo="/settings?tab=integrations" canDisconnect={isOwnerAccount || user?.role === 'admin'} />
+              <YouTubeConnectionCard returnTo="/settings?tab=integrations" canConnect canDisconnect={isOwnerAccount || user?.role === 'admin'} />
+            </div>
+          )}
+
+          {activeTab === 'billing' && canViewBilling && (
+            <div className="space-y-4">
+              <h3 className="text-sm font-bold text-slate-900 pb-2 border-b border-slate-100">
+                Billing &amp; Subscription
+              </h3>
+              <BillingSummary />
+            </div>
+          )}
+
+          {activeTab === 'privacy' && (
+            <div className="space-y-4">
+              <h3 className="text-sm font-bold text-slate-900 pb-2 border-b border-slate-100">
+                Data &amp; Privacy
+              </h3>
+              <DataExportCard />
+              <section className="rounded-xl border border-rose-200 bg-rose-50/40 p-4" aria-labelledby="deactivate-heading">
+                <h4 id="deactivate-heading" className="text-xs font-bold text-slate-900">Deactivate your account</h4>
+                <ul className="mt-2 list-disc space-y-1 pl-4 text-[11px] leading-relaxed text-slate-600">
+                  <li>You are signed out everywhere and can no longer sign in.</li>
+                  <li>Your profile is hidden from the workspace member directory.</li>
+                  <li>Work you created in the workspace (tasks, files, messages{isEducation ? ', and academic records linked to you' : ''}) stays with the workspace and is managed by its administrators.</li>
+                </ul>
+                <div className="mt-3">
+                  {isOwnerAccount ? (
+                    <p className="text-[11px] leading-relaxed text-slate-500">
+                      Workspace owners can&apos;t deactivate their account while they own the workspace.
+                    </p>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setDeleteModalOpen(true)}
+                      className="inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-100"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Deactivate Account
+                    </button>
+                  )}
+                </div>
+              </section>
+            </div>
           )}
 
           {/* AUDIT LOGS */}
@@ -2078,6 +2154,44 @@ export default function SettingsPage() {
               <h3 className="text-sm font-bold text-slate-900 pb-2 border-b border-slate-100">
                 Administrative Audit Trail
               </h3>
+
+              <form
+                className="flex flex-wrap items-end gap-3"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  if (auditFrom && auditTo && auditFrom > auditTo) {
+                    setAuditError('The start date must be on or before the end date.');
+                    return;
+                  }
+                  void fetchAuditLogs(1);
+                }}
+              >
+                <div>
+                  <label htmlFor="audit-action" className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">Event type</label>
+                  <select id="audit-action" value={auditAction} onChange={(e) => setAuditAction(e.target.value)} className="mt-1 rounded-xl border border-slate-200 bg-white py-1.5 px-3 text-xs text-slate-700">
+                    <option value="">All events</option>
+                    {auditActions.map((action) => <option key={action} value={action}>{action}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="audit-from" className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">From</label>
+                  <input id="audit-from" type="date" value={auditFrom} max={auditTo || undefined} onChange={(e) => setAuditFrom(e.target.value)} className="mt-1 rounded-xl border border-slate-200 py-1.5 px-3 text-xs text-slate-700" />
+                </div>
+                <div>
+                  <label htmlFor="audit-to" className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">To</label>
+                  <input id="audit-to" type="date" value={auditTo} min={auditFrom || undefined} onChange={(e) => setAuditTo(e.target.value)} className="mt-1 rounded-xl border border-slate-200 py-1.5 px-3 text-xs text-slate-700" />
+                </div>
+                <button type="submit" disabled={auditLoading} className="rounded-xl bg-indigo-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-indigo-500 disabled:opacity-60">Apply</button>
+                {(auditAction || auditFrom || auditTo) && (
+                  <button
+                    type="button"
+                    onClick={() => { setAuditAction(''); setAuditFrom(''); setAuditTo(''); setAuditFiltersCleared((count) => count + 1); }}
+                    className="rounded-xl border border-slate-200 px-3.5 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                  >
+                    Clear
+                  </button>
+                )}
+              </form>
 
               {auditError && (
                 <div role="alert" className="flex items-center justify-between gap-2 rounded-xl border border-rose-300/60 bg-rose-50 px-3 py-2.5 text-xs font-medium text-rose-700">
@@ -2090,7 +2204,7 @@ export default function SettingsPage() {
                 {auditLoading && auditLogs.length === 0 ? (
                   <p className="py-6 text-center text-slate-400">Loading audit records…</p>
                 ) : auditLogs.length === 0 ? (
-                  !auditError && <p className="py-6 text-center text-slate-400">No audit records logged yet.</p>
+                  !auditError && <p className="py-6 text-center text-slate-400">{auditAction || auditFrom || auditTo ? 'No audit records match these filters.' : 'No audit records logged yet.'}</p>
                 ) : (
                   auditLogs.map((log) => (
                     <div key={log._id} className="py-2.5 flex items-center justify-between gap-3">

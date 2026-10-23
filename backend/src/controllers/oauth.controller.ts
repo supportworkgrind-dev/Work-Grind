@@ -384,7 +384,9 @@ export const startOAuth = async (req: Request, res: Response): Promise<void> => 
 
 async function useExistingSocialUser(user: IUser | null, field: 'googleId' | 'appleId' | 'linkedinId', subject: string): Promise<IUser> {
   if (!user || !user.isActive || user.isDeleted || !user.isVerified) throw new Error('account_unavailable');
-  if (user.isSuperAdmin || user.mfaEnabled) throw new Error('mfa_required');
+  // Super admins sign in through the Admin Portal. Members with MFA continue to
+  // the session exchange, which asks for their authenticator code first.
+  if (user.isSuperAdmin) throw new Error('mfa_required');
 
   const currentIdentity = user.get(field) as string | undefined;
   if (currentIdentity && currentIdentity !== subject) throw new Error('identity_in_use');

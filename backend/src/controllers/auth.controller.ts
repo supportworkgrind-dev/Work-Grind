@@ -764,8 +764,16 @@ export const changePassword = async (req: AuthRequest, res: Response): Promise<v
 
     // Fetch user with +password to perform cryptographic comparison against stored hash
     const user = await User.findById(req.user!.userId).select('+password');
-    if (!user || !user.password) {
+    if (!user) {
       res.status(404).json({ success: false, message: 'User not found' });
+      return;
+    }
+    if (!user.password) {
+      res.status(400).json({
+        success: false,
+        code: 'PASSWORD_NOT_SET',
+        message: 'This account signs in with Google or LinkedIn and has no password yet. Use "Forgot password" to create one.',
+      });
       return;
     }
 

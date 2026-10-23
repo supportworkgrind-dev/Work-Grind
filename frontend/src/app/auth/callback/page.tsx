@@ -9,6 +9,7 @@ import { AuthShell } from '@/components/auth/AuthShell';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/store/useAuthStore';
 import { getAuthenticatedDestination, getSafeReturnPath } from '@/lib/authRedirect';
+import { storeMfaChallenge } from '@/lib/mfaChallenge';
 
 const errorMessages: Record<string, string> = {
   mfa_required: 'Administrator accounts must sign in through the Admin Portal and complete multi-factor authentication.',
@@ -46,6 +47,12 @@ function CallbackContent() {
     void api.post('/auth/oauth/exchange', { code, ...(attemptId ? { attemptId } : {}) })
       .then(async (response) => {
         const data = response.data;
+        if (data?.success && data.mfaRequired && typeof data.mfaToken === 'string') {
+          // The provider was the first factor; the login page asks for the code.
+          storeMfaChallenge(data.mfaToken, getSafeReturnPath(data.returnTo));
+          router.replace('/login?step=mfa');
+          return;
+        }
         if (!data?.success || !data.user?._id || !data.accessToken) {
           throw new Error('Sign-in response was incomplete.');
         }

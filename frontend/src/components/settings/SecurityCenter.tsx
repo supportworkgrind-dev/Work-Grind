@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { AlertCircle, Check, CheckCircle2, Copy, Download, KeyRound, LogOut, MailCheck, ShieldCheck, Smartphone } from 'lucide-react';
 import { api } from '@/lib/api';
@@ -99,28 +99,26 @@ export function SecurityCenter() {
   const [notice, setNotice] = useState<Notice>(null);
   const [recoveryCodes, setRecoveryCodes] = useState<string[] | null>(null);
   const [codesCopied, setCodesCopied] = useState(false);
-  const request = useRef(0);
 
+  // State is only set after each request settles (loads are triggered one at a
+  // time: on mount, after a confirmed change, or from Retry).
   const loadOverview = useCallback(async () => {
-    const current = ++request.current;
-    setOverviewError('');
     try {
       const res = await api.get('/auth/security');
-      if (current !== request.current) return;
       if (!res.data.success) throw new Error();
       setOverview(res.data.security);
+      setOverviewError('');
     } catch (error) {
-      if (current === request.current) setOverviewError(errorMessage(error, 'Security settings could not be loaded.'));
+      setOverviewError(errorMessage(error, 'Security settings could not be loaded.'));
     }
   }, []);
 
   const loadEvents = useCallback(async () => {
-    setEventsLoading(true);
-    setEventsError('');
     try {
       const res = await api.get('/auth/security/events');
       if (!res.data.success) throw new Error();
       setEvents(res.data.events ?? []);
+      setEventsError('');
     } catch (error) {
       setEventsError(errorMessage(error, 'Security activity could not be loaded.'));
     } finally {
@@ -128,9 +126,18 @@ export function SecurityCenter() {
     }
   }, []);
 
-  useEffect(() => {
-    void loadOverview();
+  const retryEvents = () => {
+    setEventsLoading(true);
+    setEventsError('');
     void loadEvents();
+  };
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void loadOverview();
+      void loadEvents();
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [loadOverview, loadEvents]);
 
   const openDialog = (next: Dialog) => {
@@ -478,7 +485,7 @@ export function SecurityCenter() {
         {eventsError ? (
           <div role="alert" className="mt-3 flex items-center justify-between gap-2 rounded-xl border border-rose-300/60 bg-rose-50 px-3 py-2.5 text-xs font-medium text-rose-700">
             <span>{eventsError}</span>
-            <button type="button" onClick={() => void loadEvents()} className="font-semibold underline">Retry</button>
+            <button type="button" onClick={retryEvents} className="font-semibold underline">Retry</button>
           </div>
         ) : eventsLoading ? (
           <p className="mt-3 text-xs text-slate-400">Loading activity…</p>

@@ -1,16 +1,17 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { AxiosError } from 'axios';
-import { AlertCircle, ArrowRight, Eye, EyeOff, Lock, Mail } from 'lucide-react';
+import { AlertCircle, ArrowRight, Eye, EyeOff, KeyRound, Lock, Mail } from 'lucide-react';
 import { api } from '@/lib/api';
 import { AuthShell } from '@/components/auth/AuthShell';
 import { SocialAuthButtons } from '@/components/auth/SocialAuthButtons';
 import { useAuthStore } from '@/store/useAuthStore';
 import type { User } from '@/types';
 import { getAuthenticatedDestination, getSafeReturnPath } from '@/lib/authRedirect';
+import { takeMfaChallenge } from '@/lib/mfaChallenge';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -20,20 +21,39 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  // Second sign-in step for accounts with two-factor authentication.
+  const [mfaToken, setMfaToken] = useState('');
+  const [mfaCode, setMfaCode] = useState('');
+  const [mfaReturnTo, setMfaReturnTo] = useState<string | undefined>();
+
+  useEffect(() => {
+    // Google/LinkedIn sign-in hands its challenge over through sessionStorage.
+    if (new URLSearchParams(window.location.search).get('step') !== 'mfa') return;
+    const challenge = takeMfaChallenge();
+    const timer = window.setTimeout(() => {
+      if (challenge) {
+        setMfaToken(challenge.token);
+        setMfaReturnTo(challenge.returnTo);
+      } else {
+        setError('Your sign-in session expired. Sign in again.');
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   const getReturnTo = () => {
     if (typeof window === 'undefined') return undefined;
     return getSafeReturnPath(new URLSearchParams(window.location.search).get('redirect'));
   };
 
-  const completeLogin = async (response: { data: { user: User; accessToken: string } }) => {
+  const completeLogin = async (response: { data: { user: User; accessToken: string } }, returnTo = getReturnTo()) => {
     login(response.data.user, response.data.accessToken);
     try {
       const current = await api.get('/auth/me');
       const user = current.data?.user as User | undefined;
       if (!current.data?.success || !user?._id) throw new Error('The account profile was incomplete.');
       login(user, response.data.accessToken);
-      router.replace(getAuthenticatedDestination(user, getReturnTo()));
+      router.replace(getAuthenticatedDestination(user, returnTo));
     } catch {
       setError('You are signed in, but we could not load your workspace yet. Please try again.');
     }
@@ -50,6 +70,12 @@ export default function LoginPage() {
         setError('We could not sign you in. Check your details and try again.');
         return;
       }
+      if (response.data.mfaRequired && typeof response.data.mfaToken === 'string') {
+        setPassword('');
+        setMfaReturnTo(getReturnTo());
+        setMfaToken(response.data.mfaToken);
+        return;
+      }
       await completeLogin(response);
     } catch (requestError: unknown) {
       const response = (requestError as AxiosError<{ code?: string; message?: string }>).response;
@@ -58,6 +84,61 @@ export default function LoginPage() {
       setLoading(false);
     }
   };
+
+  const handleMfaSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (loading) return;
+    setError('');
+    setLoading(true);
+    try {
+      const response = await api.post('/auth/mfa/verify-login', { mfaToken, code: mfaCode.trim() });
+      if (!response.data.success || !response.data.accessToken) {
+        setError('That code could not be verified. Try again.');
+        return;
+      }
+      await completeLogin(response, mfaReturnTo);
+    } catch (requestError: unknown) {
+      const response = (requestError as AxiosError<{ message?: string }>).response;
+      setError(response?.data?.message || 'That code could not be verified. Try again.');
+      if (response?.status === 401 && /expired/i.test(response.data?.message ?? '')) setMfaToken('');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const cancelMfa = () => {
+    setMfaToken('');
+    setMfaCode('');
+    setError('');
+  };
+
+  if (mfaToken) {
+    return (
+      <AuthShell>
+        <p className="auth-kicker !mb-3 !text-[9px]">TWO-FACTOR AUTHENTICATION</p>
+        <h1 className="auth-form-title">Enter your code.</h1>
+        <p className="auth-form-subtitle">Open your authenticator app and enter the 6-digit code for WorkGrind, or use one of your recovery codes.</p>
+        {error && <div className="auth-error mt-5" role="alert"><AlertCircle size={15} className="mr-2 inline align-[-2px]" />{error}</div>}
+        <form onSubmit={handleMfaSubmit} className="mt-5">
+          <div className="auth-field">
+            <label className="auth-label" htmlFor="login-mfa-code">Authentication code</label>
+            <div className="auth-input-wrap">
+              <KeyRound size={16} className="auth-icon" />
+              <input id="login-mfa-code" className="auth-input" required autoFocus autoComplete="one-time-code"
+                inputMode="text" maxLength={16} placeholder="123456 or XXXX-XXXX" value={mfaCode}
+                onChange={(event) => setMfaCode(event.target.value)} />
+            </div>
+          </div>
+          <button className="auth-primary" type="submit" disabled={loading || !mfaCode.trim()}>
+            {loading ? 'Verifying…' : <>Verify and sign in <ArrowRight size={16} /></>}
+          </button>
+        </form>
+        <p className="mt-5 text-center text-xs text-stone-500">
+          <button type="button" onClick={cancelMfa} className="auth-link">Back to sign in</button>
+        </p>
+      </AuthShell>
+    );
+  }
 
   return (
     <AuthShell>
