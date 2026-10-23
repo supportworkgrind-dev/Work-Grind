@@ -129,7 +129,7 @@ for (const [label, workspace] of unsupported) {
 test('education settings do not offer publishing connections', async ({ page }) => {
   const socialRequests = await signIn(page, { organizationType: 'university', accountType: 'company', role: 'admin' });
   await page.goto('/settings?tab=security');
-  await expect(page.getByRole('heading', { name: 'Security & Authentication' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Authentication & Security' })).toBeVisible();
   await expect(page.getByText(/LinkedIn publishing/i)).toHaveCount(0);
   expect(socialRequests).toEqual([]);
 });
