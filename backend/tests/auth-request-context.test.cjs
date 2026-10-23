@@ -143,7 +143,9 @@ test('the organization guard still enforces the plan entitlement from the shared
   const passed = await runChain(makeRequest(), res, [authenticate, requireOrganizationFeature('educationMeetings')]);
   assert.equal(passed, false);
   assert.equal(res.statusCode, 403);
-  assert.equal(res.body.code, 'ORGANIZATION_FEATURE_FORBIDDEN');
+  // The workspace and role qualify, so the refusal names the plan, not the role.
+  assert.equal(res.body.code, 'PLAN_UPGRADE_REQUIRED');
+  assert.equal(res.body.message, 'Your workspace plan does not include this feature.');
 });
 
 test('a failed subscription lookup is retried by the next guard instead of being replayed', async () => {
@@ -166,4 +168,92 @@ test('a failed subscription lookup is retried by the next guard instead of being
   const second = makeResponse();
   assert.equal(await runChain(req, second, [requireEntitlement('meetingsCalendar')]), true);
   assert.equal(calls.subscription, 2);
+});
+
+test('a workspace saved before organization and account types existed keeps its features', async () => {
+  // Lean reads skip schema defaults; the record must resolve as business/company.
+  const calls = mockWorkspace({ company: { organizationType: undefined, accountType: undefined } });
+  const req = makeRequest();
+  const res = makeResponse();
+  const passed = await runChain(req, res, [authenticate, requireOrganizationFeature('educationMeetings'), requireEntitlement('meetingsCalendar')]);
+  assert.equal(passed, true, JSON.stringify(res.body));
+  assert.equal(req.user.organizationType, 'business');
+  assert.equal(req.user.accountType, 'company');
+  assert.equal(calls.subscription, 1);
+});
+
+test('legacy casing of the organization type is normalized, not refused', async () => {
+  mockWorkspace({ company: { organizationType: '  Business ', accountType: 'Company' } });
+  const req = makeRequest();
+  const passed = await runChain(req, makeResponse(), [authenticate, requireOrganizationFeature('educationMeetings')]);
+  assert.equal(passed, true);
+  assert.equal(req.user.organizationType, 'business');
+});
+
+test('an unknown workspace type is refused rather than guessed', async () => {
+  mockWorkspace({ company: { organizationType: 'enterprise' } });
+  const res = makeResponse();
+  const passed = await runChain(makeRequest(), res, [authenticate, requireOrganizationFeature('educationMeetings')]);
+  assert.equal(passed, false);
+  assert.equal(res.statusCode, 403);
+  assert.equal(res.body.code, 'ORGANIZATION_FEATURE_FORBIDDEN');
+});
+
+test('a role outside the feature policy is still refused for its role', async () => {
+  // Guests are not Social Publishing contributors in business workspaces.
+  mockWorkspace({ user: { role: 'guest' } });
+  const res = makeResponse();
+  const passed = await runChain(makeRequest(), res, [authenticate, requireOrganizationFeature('socialPublishing')]);
+  assert.equal(passed, false);
+  assert.equal(res.body.code, 'ORGANIZATION_FEATURE_FORBIDDEN');
+});
+
+test('an inactive subscription is reported as a subscription problem', async () => {
+  mockWorkspace({ subscription: { hasActiveAccess: false } });
+  const req = makeRequest();
+  req.originalUrl = '/api/subscription/status'; // exempt from the authenticate subscription gate
+  const res = makeResponse();
+  const passed = await runChain(req, res, [authenticate, requireOrganizationFeature('educationMeetings')]);
+  assert.equal(passed, false);
+  assert.equal(res.body.code, 'SUBSCRIPTION_REQUIRED');
+});
+
+test('invitation, member, and audit routes admit the owner of a workspace saved before organization types existed', async () => {
+  // Workspaces created before organizationType was added rely on the schema
+  // default; lean reads must not turn that into "not available for your role".
+  const companiesRouter = require('../dist/routes/companies').default;
+  const adminRouter = require('../dist/routes/admin').default;
+  const gateChain = (router, method, routePath) => {
+    const layer = router.stack.find((entry) => entry.route?.path === routePath && entry.route.methods[method]);
+    assert.ok(layer, `${method.toUpperCase()} ${routePath}`);
+    const routerLevel = router.stack.filter((entry) => !entry.route).map((entry) => entry.handle);
+    const routeLevel = layer.route.stack.map((entry) => entry.handle);
+    // Everything except the controller at the end of the chain.
+    return [...routerLevel, ...routeLevel.slice(0, -1)];
+  };
+  for (const [router, method, routePath, url] of [
+    [companiesRouter, 'get', '/invites', '/api/companies/invites'],
+    [companiesRouter, 'post', '/regenerate-invite-code', '/api/companies/regenerate-invite-code'],
+    [adminRouter, 'get', '/members', '/api/admin/members'],
+    [adminRouter, 'get', '/audit-logs', '/api/admin/audit-logs'],
+  ]) {
+    mockWorkspace({ user: { role: 'owner' }, company: { organizationType: undefined } });
+    const req = makeRequest();
+    req.originalUrl = url;
+    const res = makeResponse();
+    const passed = await runChain(req, res, gateChain(router, method, routePath));
+    assert.equal(passed, true, `${url}: ${JSON.stringify(res.body)}`);
+  }
+});
+
+test('those routes still refuse an employee of the same legacy workspace', async () => {
+  const adminRouter = require('../dist/routes/admin').default;
+  const layer = adminRouter.stack.find((entry) => entry.route?.path === '/audit-logs');
+  const chain = [...adminRouter.stack.filter((entry) => !entry.route).map((entry) => entry.handle), ...layer.route.stack.slice(0, -1).map((entry) => entry.handle)];
+  mockWorkspace({ user: { role: 'employee' }, company: { organizationType: undefined } });
+  const req = makeRequest();
+  req.originalUrl = '/api/admin/audit-logs';
+  const res = makeResponse();
+  assert.equal(await runChain(req, res, chain), false);
+  assert.equal(res.statusCode, 403);
 });

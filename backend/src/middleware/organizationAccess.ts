@@ -6,6 +6,7 @@ import {
   OrganizationType,
   isOrganizationRoleEligible,
   isWorkspaceAdministrator,
+  resolveWorkspaceClassification,
   roleMatches,
 } from '../config/organization';
 import { AuthRequest } from './auth';
@@ -130,6 +131,13 @@ export function isOrganizationFeatureAllowed(
   feature: OrganizationFeature,
 ): boolean {
   const policy = ORGANIZATION_FEATURE_POLICIES[feature];
+  // Callers pass a classification already resolved from the stored record
+  // (authenticate, the membership lookup, or a hydrated document). Here only
+  // casing is normalized: a missing or unknown value is refused, never defaulted.
+  if (!organization.organizationType || !organization.accountType) return false;
+  const classification = resolveWorkspaceClassification(organization.organizationType, organization.accountType);
+  if (!classification.organizationType || !classification.accountType) return false;
+  organization = { organizationType: classification.organizationType, accountType: classification.accountType };
   const roles = feature === 'socialPublishing' && organization.accountType === 'individual'
     ? ['owner']
     : policy.roles;
@@ -182,8 +190,7 @@ async function loadOrganizationMembership(
   return {
     role: user.role || '',
     companyId: company._id.toString(),
-    organizationType: company.organizationType,
-    accountType: company.accountType,
+    ...resolveWorkspaceClassification(company.organizationType, company.accountType),
   };
 }
 
@@ -206,6 +213,22 @@ export function requireWorkspaceAdministrator(req: AuthRequest, res: Response, n
     return;
   }
   next();
+}
+
+/** Why a feature was refused, without user identifiers, for diagnosing access reports. */
+function logFeatureDenial(
+  feature: OrganizationFeature,
+  reason: 'organization_or_role' | 'plan_entitlement' | 'inactive_subscription',
+  organization: { organizationType?: string; accountType?: string },
+  role: string,
+): void {
+  console.warn('[OrganizationAccess] Feature refused.', {
+    feature,
+    reason,
+    organizationType: organization.organizationType ?? 'unknown',
+    accountType: organization.accountType ?? 'unknown',
+    role: role || 'none',
+  });
 }
 
 export function requireOrganizationFeature(feature: OrganizationFeature) {
@@ -231,25 +254,37 @@ export function requireOrganizationFeature(feature: OrganizationFeature) {
         organizationType: membership.organizationType as OrganizationType,
         accountType: membership.accountType as AccountType,
       };
-      let allowed = isOrganizationFeatureAllowed(organization, role, feature);
-      const policy = ORGANIZATION_FEATURE_POLICIES[feature];
-      if (allowed && policy.entitlement) {
-        // A company member's effective subscription is the company's, so the
-        // one authenticate already resolved for this request is reused.
-        const effective = await getRequestSubscription(req, req.user.userId);
-        const subscription = effective.companyId === companyId
-          ? effective
-          : await getCompanySubscription(companyId);
-        allowed = subscription.hasActiveAccess && subscription.planConfig.entitlements[policy.entitlement];
-      }
-
-      if (!allowed) {
+      if (!isOrganizationFeatureAllowed(organization, role, feature)) {
+        logFeatureDenial(feature, 'organization_or_role', organization, role);
         res.status(403).json({
           success: false,
           code: 'ORGANIZATION_FEATURE_FORBIDDEN',
           message: 'This feature is not available for your organization or role.',
         });
         return;
+      }
+      const policy = ORGANIZATION_FEATURE_POLICIES[feature];
+      if (policy.entitlement) {
+        // A company member's effective subscription is the company's, so the
+        // one authenticate already resolved for this request is reused.
+        const effective = await getRequestSubscription(req, req.user.userId);
+        const subscription = effective.companyId === companyId
+          ? effective
+          : await getCompanySubscription(companyId);
+        // The workspace and role qualify; only the plan or subscription does not.
+        if (!subscription.hasActiveAccess || !subscription.planConfig.entitlements[policy.entitlement]) {
+          logFeatureDenial(feature, subscription.hasActiveAccess ? 'plan_entitlement' : 'inactive_subscription', organization, role);
+          res.status(403).json({
+            success: false,
+            code: subscription.hasActiveAccess ? 'PLAN_UPGRADE_REQUIRED' : 'SUBSCRIPTION_REQUIRED',
+            message: subscription.hasActiveAccess
+              ? 'Your workspace plan does not include this feature.'
+              : 'Your workspace subscription is not active.',
+            requiresUpgrade: true,
+            billingPath: '/billing',
+          });
+          return;
+        }
       }
       next();
     } catch (error) {

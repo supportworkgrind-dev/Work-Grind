@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
+import { describeApiError, type ApiErrorInfo } from '@/lib/apiError';
 import { useAuthStore } from '@/store/useAuthStore';
 import {
   Sparkles,
@@ -53,7 +54,8 @@ export function DailyFocusCard({ className = '', onRefresh }: DailyFocusCardProp
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [expanded, setExpanded] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // A failed load is shown as an error, never as an empty ("all clear") day.
+  const [error, setError] = useState<ApiErrorInfo | null>(null);
 
   const fetchDailyFocus = async (forceRefresh = false) => {
     try {
@@ -69,11 +71,10 @@ export function DailyFocusCard({ className = '', onRefresh }: DailyFocusCardProp
         if (forceRefresh) void refreshSubscription();
         if (onRefresh) onRefresh();
       } else {
-        setError('Unable to load Daily Focus.');
+        setError({ kind: 'invalid', message: 'Daily Focus returned an unexpected response.', retryable: true });
       }
-    } catch (err: any) {
-      console.error('Daily focus load error:', err);
-      setError(err?.response?.data?.message || 'Failed to sync Daily Focus');
+    } catch (err: unknown) {
+      setError(describeApiError(err, 'Daily Focus could not be loaded.'));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -205,7 +206,17 @@ export function DailyFocusCard({ className = '', onRefresh }: DailyFocusCardProp
 
       {/* ── RANKED FOCUS LIST ── */}
       <div className="mt-4 space-y-2.5">
-        {data?.isAllClear || items.length === 0 ? (
+        {error ? (
+          <div role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 p-5 text-center">
+            <AlertCircle className="mx-auto h-5 w-5 text-rose-600" />
+            <p className="mt-2 text-sm font-semibold text-rose-700">{error.message}</p>
+            {error.retryable && (
+              <button type="button" onClick={() => void fetchDailyFocus(false)} className="mt-3 rounded-xl border border-rose-300 bg-white px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-100">
+                Retry
+              </button>
+            )}
+          </div>
+        ) : data?.isAllClear || items.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-emerald-200 bg-emerald-50/50 p-6 text-center">
             <div className="h-10 w-10 mx-auto rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mb-2">
               <CheckCircle2 className="h-5 w-5" />

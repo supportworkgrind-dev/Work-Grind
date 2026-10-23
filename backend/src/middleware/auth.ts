@@ -6,7 +6,7 @@ import { EntitlementId, PlanId } from '../config/subscription';
 import mongoose from 'mongoose';
 import { getEffectiveSubscription } from '../services/companySubscription';
 import { getRequestSubscription, rememberVerifiedMembership } from './requestContext';
-import { roleMatches } from '../config/organization';
+import { resolveWorkspaceClassification, roleMatches } from '../config/organization';
 import type { AcademicDepartmentScope } from './academicDepartmentAccess';
 
 export interface AuthRequest extends Request {
@@ -114,15 +114,16 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
       return;
     }
     let organizationType: string | undefined;
-    let accountType = user.accountType;
+    let accountType = resolveWorkspaceClassification(undefined, user.accountType).accountType;
     if (user.companyId) {
       const company = tokenCompany;
       if (!company) {
         res.status(403).json({ success: false, message: 'Your workspace is unavailable.' });
         return;
       }
-      organizationType = company.organizationType;
-      accountType = company.accountType;
+      const classification = resolveWorkspaceClassification(company.organizationType, company.accountType);
+      organizationType = classification.organizationType;
+      accountType = classification.accountType;
     }
     req.user = {
       ...payload,

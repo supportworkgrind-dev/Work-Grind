@@ -10,6 +10,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import { api } from '@/lib/api';
+import { describeApiError } from '@/lib/apiError';
 import { useAuthStore } from '@/store/useAuthStore';
 import Link from 'next/link';
 import {
@@ -518,32 +519,20 @@ export default function AIAgentPage() {
         assistantMsg,
       ]);
     } catch (err: unknown) {
-      const failure = err && typeof err === 'object'
-        ? err as { response?: { data?: unknown }; code?: string; message?: string; name?: string }
-        : {};
-      const responseMessage = typeof failure.response?.data === 'string'
-        ? (() => {
-            try { return (JSON.parse(failure.response!.data as string) as { message?: string }).message; } catch { return undefined; }
-          })()
-        : failure.response?.data && typeof failure.response.data === 'object' &&
-          'message' in failure.response.data && typeof failure.response.data.message === 'string'
-          ? failure.response.data.message
-          : undefined;
-      const cancelled = failure.code === 'ERR_CANCELED' || failure.name === 'CanceledError';
-      const errMsg = responseMessage ?? (cancelled
+      const failure = describeApiError(err, 'Tavro AI could not reach the service. Check your connection and try again.');
+      const errMsg = failure.kind === 'cancelled'
         ? 'Response cancelled.'
-        : (
-        failure.code === 'ECONNABORTED' || failure.code === 'ETIMEDOUT'
+        : failure.kind === 'timeout'
           ? 'Tavro AI timed out while waiting for the service. Please try again.'
-          : failure.message && failure.message !== 'Network Error'
-            ? failure.message
-            : 'Tavro AI could not reach the service. Check your connection and try again.'
-        ));
+          : failure.kind === 'network'
+            ? 'Tavro AI could not reach the service. Check your connection and try again.'
+            : failure.message;
       setMessages(prev => prev
         .filter(m => m.id !== 'loading')
         .map((message) => message.id === userMsg.id ? { ...message, requestStatus: 'failed' as const } : message));
       setRequestError(errMsg);
-      setRetryPrompt(prompt);
+      // Access, plan, and session refusals do not change on retry.
+      setRetryPrompt(failure.retryable ? prompt : '');
     } finally {
       setIsLoading(false);
       requestInFlight.current = false;

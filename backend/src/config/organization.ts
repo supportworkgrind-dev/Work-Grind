@@ -73,6 +73,31 @@ export function normalizeOrganizationType(value: unknown): OrganizationType | un
   return isOrganizationType(normalized) ? normalized : undefined;
 }
 
+/** Account type with the schema default (`company`) for records saved before the field existed. */
+export function normalizeAccountType(value: unknown): AccountType | undefined {
+  if (value === undefined || value === null || value === '') return 'company';
+  if (typeof value !== 'string') return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) return 'company';
+  return (ACCOUNT_TYPES as readonly string[]).includes(normalized) ? normalized as AccountType : undefined;
+}
+
+/**
+ * The workspace classification every authorization check should use. Lean
+ * reads skip Mongoose schema defaults, so legacy workspaces missing these
+ * fields must resolve exactly as the hydrated document (and /auth/me) does;
+ * unrecognized values stay undefined so feature checks fail closed.
+ */
+export function resolveWorkspaceClassification(
+  organizationType: unknown,
+  accountType: unknown,
+): { organizationType?: OrganizationType; accountType?: AccountType } {
+  return {
+    organizationType: normalizeOrganizationType(organizationType),
+    accountType: normalizeAccountType(accountType),
+  };
+}
+
 export function isAcademicOrganizationType(value: unknown): value is AcademicOrganizationType {
   return typeof value === 'string' &&
     ACADEMIC_ORGANIZATION_TYPES.includes(value as AcademicOrganizationType);

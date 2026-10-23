@@ -110,11 +110,14 @@ export function getWorkspaceExperience(
   organization: OrganizationInfo | null | undefined,
 ): Experience | null {
   if (!organization) return null;
-  const organizationType = organization.organizationType === undefined
-    ? undefined
-    : normalizeOrganizationType(organization.organizationType);
-  if (organization.accountType === 'individual' && organizationType === 'business') return 'solo';
-  if (organization.accountType !== 'company') return null;
+  // Same defaults as the backend (resolveWorkspaceClassification) for workspaces
+  // saved before these fields existed: a missing organization type is business
+  // and a missing account type is a team (company) workspace. Unknown values
+  // still resolve to no workspace experience.
+  const organizationType = normalizeOrganizationType(organization.organizationType);
+  const accountType = organization.accountType ?? 'company';
+  if (accountType === 'individual' && organizationType === 'business') return 'solo';
+  if (accountType !== 'company') return null;
   if (organizationType === 'business') return 'company';
   if (organizationType && EDUCATION_TYPES.has(organizationType)) {
     return organizationType;
@@ -219,6 +222,11 @@ export function canAccessRoute(
   const feature = getRouteOrganizationFeature(pathname);
   if (!feature) return false;
 
+  // The Daily Focus API serves team and Solo workspaces (dashboard card and page).
+  if (pathname === '/daily-focus') {
+    return canAccessOrganizationFeature(organization, role, 'soloWorkspace') ||
+      canAccessOrganizationFeature(organization, role, 'companyWorkspace');
+  }
   if (pathname === '/calendar') {
     return canAccessOrganizationFeature(organization, role, 'soloWorkspace') ||
       canAccessOrganizationFeature(organization, role, 'companyWorkspace') ||
