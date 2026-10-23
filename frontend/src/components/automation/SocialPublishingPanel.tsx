@@ -46,7 +46,10 @@ function failureMessage(post: SocialPost): string {
   const provider = PROVIDER_NAMES[post.platform];
   const messages: Record<string, string> = {
     authorization_revoked: `Reconnect ${provider} and try again.`,
-    permission_or_member_access_denied: `${provider} permission is unavailable. Reconnect the publishing account.`,
+    permission_or_member_access_denied: post.platform === 'linkedin'
+      ? 'LinkedIn refused posting for this profile (w_member_social). Reconnect LinkedIn and approve posting.'
+      : `${provider} permission is unavailable. Reconnect the publishing account.`,
+    provider_version_unsupported: `${provider} no longer accepts the API version WorkGrind uses. Contact WorkGrind support.`,
     rate_limited: `${provider} is rate limiting requests. Retry after a short wait.`,
     quota_exceeded: 'The YouTube upload quota is exhausted. Retry after it resets.',
     post_rejected: `${provider} rejected this post. Edit the draft before retrying.`,

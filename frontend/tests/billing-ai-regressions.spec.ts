@@ -48,8 +48,13 @@ const plans = ['free', 'starter', 'pro'].map((id, index) => ({
 
 type AgentMessage = { role: 'user' | 'assistant'; content: string; createdAt: string };
 
-function setSessionAuth(page: import('@playwright/test').Page) {
-  return page.addInitScript(() => {
+async function setSessionAuth(page: import('@playwright/test').Page) {
+  // Keep the app off the real Socket.IO server: its "Invalid token" reply to the
+  // fixture token starts a session-recovery refresh that these tests count.
+  await page.routeWebSocket('**/socket.io/**', (socket) => {
+    socket.close({ code: 1000, reason: 'Socket.IO is not under test.' });
+  });
+  await page.addInitScript(() => {
     sessionStorage.setItem('workgrind_access_token', 'playwright-regression-access');
     sessionStorage.setItem('workgrind_refresh_token', 'playwright-regression-refresh');
   });

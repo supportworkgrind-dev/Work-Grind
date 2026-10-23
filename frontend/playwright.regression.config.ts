@@ -4,7 +4,7 @@ const baseURL = 'http://127.0.0.1:3101';
 
 export default defineConfig({
   testDir: './tests',
-  testMatch: '**/{billing-ai-regressions,billing-organization-plans,feature-access-errors,help-center,settings-workspace,social-publishing-visibility,social-publishing-youtube}.spec.ts',
+  testMatch: '**/{billing-ai-regressions,billing-organization-plans,feature-access-errors,help-center,linkedin-connection,settings-workspace,social-publishing-visibility,social-publishing-youtube}.spec.ts',
   timeout: 60_000,
   expect: { timeout: 15_000 },
   fullyParallel: false,
