@@ -14,6 +14,8 @@ type SocialAuthButtonsProps = {
   returnTo?: string;
   className?: string;
   connectedProviders?: Pick<AuthProviders, 'google' | 'linkedin'>;
+  /** Button text for the publishing intent, e.g. "Reconnect LinkedIn". */
+  publishingLabel?: string;
 };
 
 const providers = [
@@ -28,6 +30,7 @@ export function SocialAuthButtons({
   returnTo: returnToProp,
   className = '',
   connectedProviders,
+  publishingLabel = 'Connect LinkedIn publishing',
 }: SocialAuthButtonsProps) {
   const [busyProvider, setBusyProvider] = useState<string | null>(null);
   const requestStarted = useRef(false);
@@ -35,7 +38,9 @@ export function SocialAuthButtons({
   const [notice, setNotice] = useState('');
 
   useEffect(() => {
-    if (intent !== 'link' && intent !== 'publishing') return;
+    // Publishing results are reported by LinkedInConnectionCard once the backend
+    // confirms the granted scopes; reporting them here would claim success early.
+    if (intent !== 'link') return;
     const url = new URL(window.location.href);
     // YouTube consent results are handled by the YouTube connection card.
     if (url.searchParams.get('oauth_provider') === 'youtube') return;
@@ -44,7 +49,6 @@ export function SocialAuthButtons({
     if (result || issue) {
       const timer = window.setTimeout(() => {
         if (result === 'linked') setNotice('Sign-in provider linked successfully.');
-        if (result === 'connected') setNotice('LinkedIn publishing connected successfully.');
         if (issue) setError(issue === 'cancelled'
           ? 'Provider connection was cancelled.'
           : issue === 'publishing_permission_denied'
@@ -136,7 +140,7 @@ export function SocialAuthButtons({
               disabled={busyProvider !== null || (intent === 'signup' && !signupSelection)}
               onClick={() => void connect(provider.id)}
               className={`flex min-h-11 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${provider.className}`}
-              aria-label={`${intent === 'link' ? 'Link' : intent === 'publishing' ? 'Connect publishing for' : 'Continue with'} ${provider.label}`}
+              aria-label={intent === 'publishing' ? publishingLabel : `${intent === 'link' ? 'Link' : 'Continue with'} ${provider.label}`}
               aria-busy={busyProvider === provider.id}
             >
               {busyProvider === provider.id
@@ -154,7 +158,7 @@ export function SocialAuthButtons({
               {busyProvider === provider.id
                 ? `Connecting to ${provider.label}…`
                 : intent === 'publishing'
-                  ? 'Connect LinkedIn publishing'
+                  ? publishingLabel
                   : `${intent === 'link' ? 'Link' : 'Continue with'} ${provider.label}`}
             </button>
           );

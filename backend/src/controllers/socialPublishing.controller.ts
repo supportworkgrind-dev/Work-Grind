@@ -9,6 +9,7 @@ import User from '../models/User';
 import { AuthRequest } from '../middleware/auth';
 import { isOrganizationType, roleMatches } from '../config/organization';
 import { isOrganizationFeatureAllowed } from '../middleware/organizationAccess';
+import { getOAuthConfigurationIssue } from '../services/oauth';
 import { getCompanySubscription } from '../services/companySubscription';
 import { createNotification } from './channel.controller';
 import { runAgentTurn } from '../ai/agentRuntime';
@@ -173,9 +174,30 @@ export const getLinkedInConnection = async (req: AuthRequest, res: Response): Pr
     : [];
   const expiresAt = connection?.tokenExpiresAt ?? null;
   const tokenValid = Boolean(expiresAt && expiresAt.getTime() > Date.now());
+  const hasPublishingScope = scopes.includes(LINKEDIN_PUBLISHING_SCOPE);
+  const providerConfigured = getOAuthConfigurationIssue('linkedin') === null;
+  // One explicit state so the UI never has to infer "not connected" from
+  // "permission unavailable". LinkedIn issues no refresh token for member
+  // posting, so an expired token needs the member to reauthorize.
+  const state = !providerConfigured
+    ? 'configuration_required'
+    : !connection || connection.status === 'disconnected'
+      ? 'not_connected'
+      : connection.status === 'error'
+        ? connection.errorMessage === 'permission_or_member_access_denied' ? 'permission_missing' : 'reauthorization_required'
+        : !tokenValid
+          ? 'reauthorization_required'
+          : !hasPublishingScope
+            ? 'permission_missing'
+            : connection.status === 'connected' ? 'connected' : 'not_connected';
   res.json({
     success: true,
     connection: {
+      state,
+      providerConfigured,
+      requiredScope: LINKEDIN_PUBLISHING_SCOPE,
+      // Formats this integration implements end to end (member profile only).
+      formats: { text: true, image: ['image/jpeg', 'image/png'], video: ['video/mp4'] },
       connected: connection?.status === 'connected' && tokenValid,
       status: connection?.status ?? 'disconnected',
       identityName: connection?.config?.identityName ?? null,
@@ -851,19 +873,8 @@ export const publishSocialPost = async (req: AuthRequest, res: Response): Promis
     }
     const status = error instanceof LinkedInApiError ? error.status : undefined;
     const mediaUnavailable = error instanceof SocialMediaValidationError;
-    const failureCode = status === 401
-      ? 'authorization_revoked'
-      : status === 403
-        ? 'permission_or_member_access_denied'
-        : status === 429
-          ? 'rate_limited'
-          : error instanceof Error && error.name === 'TimeoutError'
-            ? 'provider_timeout'
-            : mediaUnavailable
-              ? 'media_unavailable'
-            : status && status >= 400 && status < 500
-              ? 'post_rejected'
-              : 'provider_unavailable';
+    const failureCode = linkedInFailureCode(error);
+    logLinkedInFailure('publish', failureCode, post._id.toString(), error);
     await markPostFailed(post, failureCode);
     if (status === 401 || status === 403) {
       connection.status = 'error';
@@ -880,12 +891,48 @@ export const publishSocialPost = async (req: AuthRequest, res: Response): Promis
         ? 'LinkedIn is rate limiting publish requests. Wait before trying again.'
         : failureCode === 'authorization_revoked' || failureCode === 'permission_or_member_access_denied'
           ? 'LinkedIn authorization or member posting permission is unavailable. Reconnect LinkedIn and verify access.'
+          : failureCode === 'provider_version_unsupported'
+            ? 'LinkedIn no longer accepts the API version WorkGrind is configured to use. Contact WorkGrind support.'
           : failureCode === 'post_rejected'
             ? 'LinkedIn rejected this post. Review its text and try saving an updated draft.'
             : 'LinkedIn could not confirm publication. Check the post status before taking further action.',
     });
   }
 };
+
+/** Maps a LinkedIn publishing failure to the failure code stored on the post. */
+function linkedInFailureCode(error: unknown): string {
+  if (error instanceof SocialMediaValidationError) return 'media_unavailable';
+  if (error instanceof Error && error.name === 'TimeoutError') return 'provider_timeout';
+  if (!(error instanceof LinkedInApiError)) return 'provider_unavailable';
+  if (error.status === 401) return 'authorization_revoked';
+  if (error.status === 403) return 'permission_or_member_access_denied';
+  // LinkedIn retired or does not recognise the configured LinkedIn-Version.
+  if (error.status === 426) return 'provider_version_unsupported';
+  if (error.status === 429) return 'rate_limited';
+  if (error.status >= 400 && error.status < 500) return 'post_rejected';
+  return 'provider_unavailable';
+}
+
+/**
+ * LinkedIn's status, error code, and message identify the real cause (for
+ * example a missing w_member_social grant). Tokens and headers are never logged.
+ */
+function logLinkedInFailure(path: 'publish' | 'scheduled', failureCode: string, postId: string, error: unknown): void {
+  console.error('[SocialPublishing] LinkedIn publish failed.', {
+    path,
+    failureCode,
+    postId,
+    ...(error instanceof LinkedInApiError
+      ? {
+          httpStatus: error.status,
+          stage: error.stage,
+          ...(error.providerCode ? { providerErrorCode: error.providerCode } : {}),
+          ...(error.providerMessage ? { providerMessage: error.providerMessage } : {}),
+        }
+      : { errorName: error instanceof Error ? error.name : 'UnknownError' }),
+  });
+}
 
 function youtubeFailureCode(error: unknown): string {
   if (error instanceof SocialMediaValidationError) return 'media_unavailable';
@@ -1383,19 +1430,8 @@ async function publishScheduledPost(postId: mongoose.Types.ObjectId): Promise<'p
       );
       return 'retrying';
     }
-    const failureCode = status === 401
-      ? 'authorization_revoked'
-      : status === 403
-        ? 'permission_or_member_access_denied'
-        : status === 429
-          ? 'rate_limited'
-          : error instanceof Error && error.name === 'TimeoutError'
-            ? 'provider_timeout'
-            : error instanceof SocialMediaValidationError
-              ? 'media_unavailable'
-            : status && status >= 400 && status < 500
-              ? 'post_rejected'
-              : 'provider_unavailable';
+    const failureCode = linkedInFailureCode(error);
+    logLinkedInFailure('scheduled', failureCode, post._id.toString(), error);
     await markPostFailed(post, failureCode);
     await AuditLog.create({
       companyId: post.companyId,

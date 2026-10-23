@@ -1,3 +1,4 @@
+import { getOAuthConfigurationIssue } from './oauth';
 import {
   LinkedInApiError,
   LINKEDIN_PUBLISHING_SCOPE,
@@ -131,8 +132,26 @@ function youtubeDefinition(): SocialProviderDefinition {
   };
 }
 
+/** LinkedIn is offered only when its OAuth client is configured on the server. */
+function linkedinDefinition(): SocialProviderDefinition {
+  const definition: SocialProviderDefinition = {
+    id: linkedin.id,
+    name: linkedin.name,
+    availability: linkedin.availability,
+    capabilities: linkedin.capabilities,
+    requiredScopes: linkedin.requiredScopes,
+    maxTextLength: linkedin.maxTextLength,
+  };
+  if (getOAuthConfigurationIssue('linkedin') === null) return definition;
+  return {
+    ...definition,
+    availability: 'setup_required',
+    capabilities: { ...definition.capabilities, connect: false, publishText: false, publishMedia: false, schedule: false },
+  };
+}
+
 export function getSocialProviderCatalog(): SocialProviderDefinition[] {
-  return [...providerCatalog, youtubeDefinition()]
+  return [linkedinDefinition(), ...providerCatalog.filter((provider) => provider.id !== linkedin.id), youtubeDefinition()]
     .map((provider) => ({ ...provider, capabilities: { ...provider.capabilities } }));
 }
 

@@ -65,7 +65,8 @@ function providerPicture(provider: OAuthProvider, picture?: string): string | un
 const safeError = (value: string) =>
   ['cancelled', 'mfa_required', 'provider_unavailable', 'authorization_failed', 'invalid_request', 'attempt_expired', 'account_exists', 'signup_required',
     'identity_in_use', 'link_email_mismatch', 'verified_email_required', 'client_invitation_required', 'publishing_permission_denied',
-    'provider_already_linked', 'youtube_channel_required', 'try_again'].includes(value)
+    'provider_already_linked', 'youtube_channel_required', 'publishing_scope_not_approved', 'provider_credentials_rejected',
+    'try_again'].includes(value)
     ? value
     : 'try_again';
 
@@ -529,6 +530,12 @@ async function finishLinkedInPublishingConnection(
   if (!accessToken || accessToken.length > 16_384 ||
       !Number.isFinite(expiresAt.getTime()) || expiresAt.getTime() <= Date.now() ||
       !scopes.includes(LINKEDIN_PUBLISHING_SCOPE)) {
+    // Scope names only; LinkedIn may grant sign-in scopes without member posting.
+    console.error('[OAuth] LinkedIn did not grant the member-posting scope.', {
+      requiredScope: LINKEDIN_PUBLISHING_SCOPE,
+      grantedScopes: scopes.filter((scope) => /^[a-z_]{1,64}$/.test(scope)),
+      tokenExpiryValid: Number.isFinite(expiresAt.getTime()) && expiresAt.getTime() > Date.now(),
+    });
     throw new Error('publishing_permission_denied');
   }
   const user = await User.findById(transactionUserId);
@@ -701,9 +708,16 @@ export const completeOAuthCallback = async (req: Request, res: Response): Promis
       new Error(providerError === 'access_denied' ? 'cancelled' : `provider_error_${safeProviderError}`),
       correlationId,
     );
+    const scopeNotApproved = transaction.intent === 'publishing' && providerError === 'unauthorized_scope_error';
+    if (scopeNotApproved) {
+      console.error('[OAuth] The provider app is not approved for the publishing scope. Add the product that grants it in the provider developer portal.', {
+        provider,
+        correlationId,
+      });
+    }
     errorRedirect(
       res,
-      providerError === 'access_denied' ? 'cancelled' : 'authorization_failed',
+      providerError === 'access_denied' ? 'cancelled' : scopeNotApproved ? 'publishing_scope_not_approved' : 'authorization_failed',
       signupErrorReturnTo(transaction) ?? transaction.returnTo,
       transaction.intent === 'link' || transaction.intent === 'publishing',
       transaction.audience,
@@ -877,7 +891,8 @@ export const completeOAuthCallback = async (req: Request, res: Response): Promis
         correlationId,
       });
     }
-    const errorCode = clientCredentialsRejected ? 'provider_unavailable'
+    const errorCode = clientCredentialsRejected
+      ? transaction.intent === 'publishing' ? 'provider_credentials_rejected' : 'provider_unavailable'
       : error?.message === 'account_exists'
       ? 'account_exists'
       : error?.message === 'client_invitation_required' ? 'client_invitation_required'

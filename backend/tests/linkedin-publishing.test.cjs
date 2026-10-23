@@ -175,6 +175,21 @@ test('LinkedIn API version configuration accepts YYYYMM and rejects malformed va
 });
 
 test('provider catalog exposes only verified capabilities and leaves unconfigured platforms disabled', async (context) => {
+  const previousEnv = { ...process.env };
+  context.after(() => {
+    for (const key of ['BACKEND_URL', 'LINKEDIN_CLIENT_ID', 'LINKEDIN_CLIENT_SECRET', 'LINKEDIN_CALLBACK_URL']) {
+      if (previousEnv[key] === undefined) delete process.env[key]; else process.env[key] = previousEnv[key];
+    }
+  });
+  delete process.env.LINKEDIN_CLIENT_SECRET;
+  const unconfigured = getSocialProviderCatalog().find((provider) => provider.id === 'linkedin');
+  assert.equal(unconfigured.availability, 'setup_required', 'LinkedIn is not offered without its OAuth client');
+  assert.equal(unconfigured.capabilities.publishText, false);
+
+  process.env.BACKEND_URL = 'https://backend.example.test';
+  process.env.LINKEDIN_CLIENT_ID = 'test-linkedin-client';
+  process.env.LINKEDIN_CLIENT_SECRET = 'test-linkedin-secret';
+  process.env.LINKEDIN_CALLBACK_URL = 'https://backend.example.test/api/auth/oauth/linkedin/callback';
   const linkedin = getSocialProviderCatalog().find((provider) => provider.id === 'linkedin');
   assert.equal(linkedin.availability, 'available');
   assert.deepEqual(linkedin.capabilities, {
