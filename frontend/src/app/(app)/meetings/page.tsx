@@ -33,6 +33,17 @@ import { BackButton } from '@/components/common/BackButton';
 import { Avatar } from '@/components/common/Avatar';
 import { getRtcConfiguration, logRtcIceDiagnostics, type WorkGrindRtcConfiguration } from '@/lib/rtcConfig';
 import { shouldInitiateMeetingOffer } from '@/lib/meetingConnection';
+import { useI18n, useT, type NamespaceKey } from '@/lib/i18n';
+import { describeApiError } from '@/lib/apiError';
+
+/** Media connection warnings, stored as message keys and translated at render. */
+type RtcWarning = '' | Extract<NamespaceKey<'meetings'>, `rtc.${string}`>;
+const PEER_CONNECTION_WARNINGS: ReadonlySet<RtcWarning> = new Set<RtcWarning>([
+  'rtc.peerFailed',
+  'rtc.peerInterrupted',
+  'rtc.peerStartFailed',
+  'rtc.peerNegotiationFailed',
+]);
 
 interface RemotePeer {
   socketId: string;
@@ -105,6 +116,7 @@ function requestMeetings(userId: string): Promise<Meeting[]> {
 
 // Component for rendering remote participant video/stream
 function RemotePeerVideo({ peer }: { peer: RemotePeer }) {
+  const t = useT('meetings');
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
 
@@ -141,28 +153,28 @@ function RemotePeerVideo({ peer }: { peer: RemotePeer }) {
       {!hasVideoTrack && (
         <div className="flex flex-col items-center gap-3">
           <Avatar
-            name={peer.user?.fullName || 'User'}
+            name={peer.user?.fullName || t('fallback.user')}
             src={peer.user?.avatar}
             size="xl"
             shape="circle"
             className="h-20 w-20 ring-4 ring-purple-500/20"
           />
           <span className="text-xs font-semibold text-slate-400">
-            Camera Off
+            {t('room.cameraOff')}
           </span>
         </div>
       )}
 
       {/* Peer Info Overlay */}
-      <div className="absolute bottom-3 left-3 flex items-center gap-2 rounded-xl bg-black/60 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-md border border-white/10">
-        <span>{peer.user?.fullName || 'Team Member'}</span>
+      <div className="absolute bottom-3 start-3 flex items-center gap-2 rounded-xl bg-black/60 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-md border border-white/10">
+        <span>{peer.user?.fullName || t('fallback.teamMember')}</span>
         {peer.isMicOn === false && (
-          <span className="text-rose-400 text-xs" title="Muted">
+          <span className="text-rose-400 text-xs" title={t('room.muted')}>
             🔇
           </span>
         )}
         {peer.isHandRaised && (
-          <span className="text-amber-400 animate-bounce" title="Hand Raised">
+          <span className="text-amber-400 animate-bounce" title={t('room.handRaised')}>
             ✋
           </span>
         )}
@@ -177,12 +189,18 @@ export default function MeetingsPage() {
   const joinLink = searchParams.get('join');
   const { user } = useAuthStore();
   const { openCreateModal } = useAppStore();
+  const t = useT('meetings');
+  const tc = useT('common');
+  const { lang, tOptional, formatTime } = useI18n();
+  // Socket and WebRTC handlers are bound once per meeting; they read the current translator from here.
+  const i18nRef = useRef({ t, tOptional, lang });
+  useEffect(() => { i18nRef.current = { t, tOptional, lang }; }, [t, tOptional, lang]);
 
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [activeMeeting, setActiveMeeting] = useState<Meeting | null>(null);
   const [meetingGrant, setMeetingGrant] = useState<string | null>(null);
   const [joinError, setJoinError] = useState('');
-  const [rtcWarning, setRtcWarning] = useState('');
+  const [rtcWarning, setRtcWarning] = useState<RtcWarning>('');
   const [isLoadingMeetings, setIsLoadingMeetings] = useState(true);
 
   // Video Room Media States
@@ -303,8 +321,8 @@ export default function MeetingsPage() {
           setActiveMeeting(response.meeting);
           setMeetingGrant(response.meetingGrant);
         }
-      } catch (error: any) {
-        setJoinError(error?.response?.data?.message || 'This meeting link is invalid, expired, or unavailable.');
+      } catch (error) {
+        setJoinError(describeApiError(error, i18nRef.current.t('errors.joinInvalid')).message);
       }
     };
 
@@ -407,7 +425,7 @@ export default function MeetingsPage() {
             [targetSocketId]: {
               socketId: targetSocketId,
               userId: peerInfo?.userId || existing?.userId || targetSocketId,
-              user: peerInfo?.user || existing?.user || { fullName: 'Team Member' },
+              user: peerInfo?.user || existing?.user || { _id: targetSocketId, fullName: i18nRef.current.t('fallback.teamMember') },
               stream: remoteStream,
               isMicOn: peerInfo?.isMicOn ?? existing?.isMicOn ?? true,
               isCamOn: peerInfo?.isCamOn ?? existing?.isCamOn ?? true,
@@ -436,11 +454,11 @@ export default function MeetingsPage() {
           console.debug('[Meeting WebRTC] Peer state:', pc.connectionState);
         }
         if (pc.connectionState === 'failed') {
-          setRtcWarning('A meeting participant’s media connection failed. Check the network or ask your administrator to configure TURN.');
+          setRtcWarning('rtc.peerFailed');
         } else if (pc.connectionState === 'disconnected') {
-          setRtcWarning('A meeting participant’s media connection is interrupted. Check the network.');
+          setRtcWarning('rtc.peerInterrupted');
         } else if (pc.connectionState === 'connected') {
-          setRtcWarning((warning) => warning.startsWith('A meeting participant’s media connection') ? '' : warning);
+          setRtcWarning((warning) => PEER_CONNECTION_WARNINGS.has(warning) ? '' : warning);
         }
       };
 
@@ -484,7 +502,7 @@ export default function MeetingsPage() {
       } catch (error) {
         initiatedOfferPeers.delete(peerSocketId);
         console.error('[Meeting WebRTC] Could not start peer negotiation.', error);
-        setRtcWarning('A meeting participant’s media connection could not be started. Check the network and try rejoining.');
+        setRtcWarning('rtc.peerStartFailed');
       } finally {
         makingOfferPeers.delete(peerSocketId);
       }
@@ -507,7 +525,7 @@ export default function MeetingsPage() {
         } catch (error) {
           console.error('[Meeting WebRTC] Could not load ICE configuration:', error);
           if (!isDisposed) {
-            setJoinError('Media network configuration is unavailable. Please retry after the server is restored.');
+            setJoinError(i18nRef.current.t('errors.mediaConfig'));
             setActiveMeeting(null);
             setMeetingGrant(null);
           }
@@ -516,9 +534,8 @@ export default function MeetingsPage() {
         if (isDisposed) return;
         rtcConfigurationRef.current = rtcConfiguration;
         if (!rtcConfiguration.turnConfigured) {
-          const warning = 'TURN is not configured. Participants behind restrictive NATs may not connect.';
-          setRtcWarning(warning);
-          console.warn('[Meeting WebRTC]', warning);
+          setRtcWarning('rtc.turnMissing');
+          console.warn('[Meeting WebRTC]', 'TURN is not configured. Participants behind restrictive NATs may not connect.');
         } else {
           setRtcWarning('');
         }
@@ -571,9 +588,9 @@ export default function MeetingsPage() {
 
     // Step C: Listen for existing participants in the room
     const onRoomUsers = async ({ participants }: { participants: MeetingPeerInfo[] }) => {
-      setRtcWarning((warning) => warning.startsWith('Meeting signaling disconnected')
+      setRtcWarning((warning) => warning === 'rtc.signalingDisconnected'
         ? rtcConfigurationRef.current?.turnConfigured === false
-          ? 'TURN is not configured. Participants behind restrictive NATs may not connect.'
+          ? 'rtc.turnMissing'
           : ''
         : warning);
       for (const peer of participants) {
@@ -687,7 +704,7 @@ export default function MeetingsPage() {
         }
       }).catch((error: unknown) => {
         console.error('[Meeting WebRTC] Signal negotiation failed.', error);
-        setRtcWarning('A meeting participant’s media connection could not be negotiated. Check the network and try rejoining.');
+        setRtcWarning('rtc.peerNegotiationFailed');
       });
       signalQueuesRef.current[fromSocketId] = current;
     };
@@ -757,13 +774,16 @@ export default function MeetingsPage() {
         endedLink === activeMeeting.meetingLink ||
         meetingId === activeMeeting._id
       ) {
-        alert('The host has ended this live meeting.');
+        alert(i18nRef.current.t('errors.hostEnded'));
         handleLeaveRoom(false);
       }
     };
 
-    const onMeetingError = ({ message }: { code?: string; message?: string }) => {
-      setJoinError(message || 'You could not join this meeting. Check the meeting link and your access.');
+    const onMeetingError = ({ code, message }: { code?: string; message?: string }) => {
+      // The server explains the refusal in English; other languages show the message for its code.
+      const { t: translateNow, tOptional: translateOptional, lang: currentLang } = i18nRef.current;
+      const codeMessage = code ? translateOptional(`common.apiCodes.${code}`) : undefined;
+      setJoinError((currentLang === 'en' ? message : codeMessage) || translateNow('errors.joinFailed'));
       setActiveMeeting(null);
       setMeetingGrant(null);
     };
@@ -772,7 +792,7 @@ export default function MeetingsPage() {
     };
     const onSocketDisconnect = () => {
       joinedSocketId = null;
-      setRtcWarning('Meeting signaling disconnected. Reconnecting…');
+      setRtcWarning('rtc.signalingDisconnected');
       Object.values(peersRef.current).forEach((pc) => pc.close());
       peersRef.current = {};
       signalQueuesRef.current = {};
@@ -948,9 +968,9 @@ export default function MeetingsPage() {
     if (!roomInput.trim() || !activeMeeting) return;
 
     const socket = getSocket();
-    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const timeStr = formatTime(new Date(), { hour: '2-digit', minute: '2-digit' });
     const msg = {
-      sender: user?.fullName || 'You',
+      sender: user?.fullName || tc('states.you'),
       text: roomInput.trim(),
       time: timeStr,
     };
@@ -1001,7 +1021,7 @@ export default function MeetingsPage() {
   const handleEndMeetingForEveryone = async () => {
     if (!activeMeeting) return;
     const confirmEnd = window.confirm(
-      'Are you sure you want to end this live meeting for everyone?'
+      t('controls.endConfirm')
     );
     if (!confirmEnd) return;
 
@@ -1020,10 +1040,11 @@ export default function MeetingsPage() {
     instantMeetingRequestRef.current.pending = true;
     instantMeetingRequestRef.current.key ??= crypto.randomUUID();
     try {
-      const title = `${user?.fullName?.split(' ')[0] || 'My'}'s Instant Meeting`;
+      const firstName = user?.fullName?.split(' ')[0];
+      const title = firstName ? t('instant.title', { name: firstName }) : t('instant.titleNoName');
       const res = await api.post('/meetings', {
         title,
-        description: 'Instant live collaborative audio/video session',
+        description: t('instant.description'),
         isInstant: true,
       }, { headers: { 'Idempotency-Key': instantMeetingRequestRef.current.key } });
       if (res.data.success && res.data.meeting) {
@@ -1070,11 +1091,11 @@ export default function MeetingsPage() {
     try {
       await api.post('/tasks', {
         title: actionItem.title,
-        description: `Auto-generated by Tavro AI for ${actionItem.assignedTo || 'Assignee'}`,
+        description: t('ai.taskDescription', { name: actionItem.assignedTo || t('ai.assigneeFallback') }),
         priority: 'high',
         status: 'todo',
       });
-      alert(`Created Task: "${actionItem.title}"`);
+      alert(t('ai.taskCreated', { title: actionItem.title }));
     } catch (err) {
       console.error(err);
     }
@@ -1105,8 +1126,8 @@ export default function MeetingsPage() {
         setActiveMeeting(response.meeting);
         setMeetingGrant(response.meetingGrant);
       }
-    } catch (error: any) {
-      setJoinError(error?.response?.data?.message || 'This meeting link is invalid, expired, or unavailable.');
+    } catch (error) {
+      setJoinError(describeApiError(error, t('errors.joinInvalid')).message);
     }
   };
 
@@ -1128,7 +1149,7 @@ export default function MeetingsPage() {
           <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             <div className="flex items-center gap-2 rounded-lg bg-rose-500/20 px-2.5 py-1 text-xs font-bold text-rose-400 border border-rose-500/30">
               <span className="h-2 w-2 rounded-full bg-rose-500 animate-pulse" />
-              <span>LIVE</span>
+              <span>{t('room.live')}</span>
             </div>
             <h2 className="max-w-[32vw] truncate text-sm font-bold text-white sm:max-w-md">
               {activeMeeting.title}
@@ -1137,12 +1158,12 @@ export default function MeetingsPage() {
               {meetingDuration}
             </span>
           </div>
-          {rtcWarning && <span role="status" className="hidden max-w-sm truncate text-[11px] text-amber-300 lg:inline" title={rtcWarning}>{rtcWarning}</span>}
+          {rtcWarning && <span role="status" className="hidden max-w-sm truncate text-[11px] text-amber-300 lg:inline" title={t(rtcWarning)}>{t(rtcWarning)}</span>}
 
           <div className="flex shrink-0 items-center gap-2 sm:gap-3">
             <div className="hidden sm:flex items-center gap-1.5 text-xs text-slate-400 font-medium">
               <Users className="h-3.5 w-3.5 text-indigo-400" />
-              <span>{totalParticipantCount} in meeting</span>
+              <span>{t('room.inMeeting', { count: totalParticipantCount })}</span>
             </div>
 
             {isHost && <button
@@ -1154,11 +1175,11 @@ export default function MeetingsPage() {
               ) : (
                 <Copy className="h-3.5 w-3.5" />
               )}
-              <span>{copiedLink ? 'Copied' : 'Copy Invite'}</span>
+              <span>{copiedLink ? tc('actions.copied') : t('room.copyInvite')}</span>
             </button>}
           </div>
         </div>
-        {rtcWarning && <p role="status" className="border-b border-amber-500/20 bg-amber-500/10 px-4 py-2 text-xs text-amber-200 lg:hidden">{rtcWarning}</p>}
+        {rtcWarning && <p role="status" className="border-b border-amber-500/20 bg-amber-500/10 px-4 py-2 text-xs text-amber-200 lg:hidden">{t(rtcWarning)}</p>}
 
         {/* Video Grid & Drawer */}
         <div className="relative flex min-h-0 flex-1 overflow-hidden">
@@ -1187,29 +1208,29 @@ export default function MeetingsPage() {
                   />
                 ) : (
                   <div className="flex flex-col items-center gap-3">
-                    <Avatar name={user?.fullName || 'User'} src={user?.avatar} size="xl" shape="circle" className="h-20 w-20 ring-4 ring-white/10 shadow-xl" />
+                    <Avatar name={user?.fullName || t('fallback.user')} src={user?.avatar} size="xl" shape="circle" className="h-20 w-20 ring-4 ring-white/10 shadow-xl" />
                     <span className="text-xs font-semibold text-slate-300">
-                      Camera Off
+                      {t('room.cameraOff')}
                     </span>
                   </div>
                 )}
 
                 {/* Local Info Overlay */}
-                <div className="absolute bottom-3 left-3 flex max-w-[calc(100%-1.5rem)] items-center gap-2 rounded-xl border border-white/10 bg-black/65 px-3 py-2 text-xs font-semibold text-white shadow-lg backdrop-blur-md">
-                  <span className="truncate">{user?.fullName} (You)</span>
+                <div className="absolute bottom-3 start-3 flex max-w-[calc(100%-1.5rem)] items-center gap-2 rounded-xl border border-white/10 bg-black/65 px-3 py-2 text-xs font-semibold text-white shadow-lg backdrop-blur-md">
+                  <span className="truncate">{t('room.selfName', { name: user?.fullName ?? '' })}</span>
                   {!isMicOn && (
-                    <span className="text-rose-400 text-xs" title="Muted">
+                    <span className="text-rose-400 text-xs" title={t('room.muted')}>
                       🔇
                     </span>
                   )}
                   {isHandRaised && (
-                    <span className="text-amber-400 animate-bounce" title="Hand Raised">
+                    <span className="text-amber-400 animate-bounce" title={t('room.handRaised')}>
                       ✋
                     </span>
                   )}
                   {isScreenSharing && (
                     <span className="text-indigo-400 text-[10px] font-bold">
-                      SCREEN
+                      {t('room.screen')}
                     </span>
                   )}
                 </div>
@@ -1224,14 +1245,14 @@ export default function MeetingsPage() {
 
           {/* Right Floating Drawer (Chat / Participants / Tavro AI) */}
           {activeTab && (
-            <div className="absolute inset-y-2 right-2 z-20 flex w-[min(21rem,calc(100%-1rem))] flex-col rounded-2xl border border-slate-700 bg-slate-900/95 shadow-2xl backdrop-blur-md animate-in slide-in-from-right duration-200 sm:inset-y-4 sm:right-4 sm:w-80">
+            <div className="absolute inset-y-2 end-2 z-20 flex w-[min(21rem,calc(100%-1rem))] flex-col rounded-2xl border border-slate-700 bg-slate-900/95 shadow-2xl backdrop-blur-md animate-in slide-in-from-right duration-200 sm:inset-y-4 sm:end-4 sm:w-80">
               <div className="flex h-12 items-center justify-between px-4 border-b border-slate-800 text-xs font-bold uppercase tracking-wider text-slate-400">
                 <span>
                   {activeTab === 'ai'
-                    ? 'Tavro AI Meeting Insights'
+                    ? t('panel.aiTitle')
                     : activeTab === 'chat'
-                    ? 'In-Meeting Chat'
-                    : `Participants (${totalParticipantCount})`}
+                    ? t('panel.chatTitle')
+                    : t('panel.participants', { count: totalParticipantCount })}
                 </span>
                 <button
                   onClick={() => setActiveTab(null)}
@@ -1245,7 +1266,7 @@ export default function MeetingsPage() {
               {activeTab === 'ai' && (
                 <div className="flex-1 overflow-y-auto p-4 space-y-4 text-xs">
                   <p className="text-slate-400 leading-relaxed">
-                    Tavro AI provides real-time analysis of meeting discussion, key decisions, and action items.
+                    {t('ai.intro')}
                   </p>
 
                   <button
@@ -1255,7 +1276,7 @@ export default function MeetingsPage() {
                   >
                     <Sparkles className="h-4 w-4" />
                     <span>
-                      {aiLoading ? 'Tavro AI is analyzing the transcript...' : 'Generate Tavro AI Summary'}
+                      {aiLoading ? t('ai.analyzing') : t('ai.generate')}
                     </span>
                   </button>
 
@@ -1263,7 +1284,7 @@ export default function MeetingsPage() {
                     <div className="space-y-4 rounded-xl border border-slate-800 bg-slate-950/60 p-4">
                       <div>
                         <span className="font-bold text-indigo-400 uppercase tracking-wider text-[10px]">
-                          Overview
+                          {t('ai.overview')}
                         </span>
                         <p className="mt-1 text-slate-300 leading-relaxed">
                           {activeMeeting.aiSummary.summary}
@@ -1272,9 +1293,9 @@ export default function MeetingsPage() {
 
                       <div>
                         <span className="font-bold text-indigo-400 uppercase tracking-wider text-[10px]">
-                          Decisions
+                          {t('ai.decisions')}
                         </span>
-                        <ul className="mt-1 list-disc pl-4 space-y-1 text-slate-300">
+                        <ul className="mt-1 list-disc ps-4 space-y-1 text-slate-300">
                           {activeMeeting.aiSummary.decisions?.map((d, i) => (
                             <li key={i}>{d}</li>
                           ))}
@@ -1283,7 +1304,7 @@ export default function MeetingsPage() {
 
                       <div>
                         <span className="font-bold text-indigo-400 uppercase tracking-wider text-[10px]">
-                          Action Items
+                          {t('ai.actionItems')}
                         </span>
                         <div className="mt-2 space-y-2">
                           {activeMeeting.aiSummary.actionItems?.map((act, i) => (
@@ -1293,13 +1314,13 @@ export default function MeetingsPage() {
                             >
                               <p className="font-bold text-slate-200">{act.title}</p>
                               <p className="text-[11px] text-slate-400 mt-0.5">
-                                Assigned to: {act.assignedTo || 'Team'}
+                                {t('ai.assignedTo', { name: act.assignedTo || t('ai.team') })}
                               </p>
                               <button
                                 onClick={() => handleConvertToTask(act)}
                                 className="mt-2 flex items-center gap-1 rounded bg-indigo-600/30 px-2 py-1 text-[10px] font-bold text-indigo-300 hover:bg-indigo-600/50"
                               >
-                                <CheckCircle2 className="h-3 w-3" /> Convert to Task
+                                <CheckCircle2 className="h-3 w-3" /> {t('ai.convertToTask')}
                               </button>
                             </div>
                           ))}
@@ -1316,7 +1337,7 @@ export default function MeetingsPage() {
                   <div className="flex-1 p-4 space-y-2.5 overflow-y-auto text-xs">
                     {roomMessages.length === 0 ? (
                       <p className="text-center text-slate-500 py-8">
-                        No messages yet. Say hi to your team!
+                        {t('chat.empty')}
                       </p>
                     ) : (
                       roomMessages.map((m, i) => (
@@ -1339,7 +1360,7 @@ export default function MeetingsPage() {
                       type="text"
                       value={roomInput}
                       onChange={(e) => setRoomInput(e.target.value)}
-                      placeholder="Type a message to the room..."
+                      placeholder={t('chat.placeholder')}
                       className="flex-1 rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-white placeholder:text-slate-500 focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
                     />
                     <button
@@ -1359,11 +1380,11 @@ export default function MeetingsPage() {
                   {/* Current User */}
                   <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-800/90 border border-slate-700/50">
                     <div className="flex items-center gap-2">
-                      <Avatar name={user?.fullName || 'User'} src={user?.avatar} size="xs" />
+                      <Avatar name={user?.fullName || t('fallback.user')} src={user?.avatar} size="xs" />
                       <div>
                         <span className="font-semibold block">{user?.fullName}</span>
                         <span className="text-[10px] text-indigo-400 font-medium">
-                          {isHost ? 'Host (You)' : 'You'}
+                          {isHost ? t('room.hostYou') : tc('states.you')}
                         </span>
                       </div>
                     </div>
@@ -1380,10 +1401,10 @@ export default function MeetingsPage() {
                       className="flex items-center justify-between p-2.5 rounded-xl bg-slate-800/60 border border-slate-700/30"
                     >
                       <div className="flex items-center gap-2">
-                        <Avatar name={peer.user?.fullName || 'User'} src={peer.user?.avatar} size="xs" />
+                        <Avatar name={peer.user?.fullName || t('fallback.user')} src={peer.user?.avatar} size="xs" />
                         <div>
                           <span className="font-semibold block">{peer.user?.fullName}</span>
-                          <span className="text-[10px] text-emerald-400 font-medium">Active</span>
+                          <span className="text-[10px] text-emerald-400 font-medium">{tc('states.active')}</span>
                         </div>
                       </div>
                       <div className="flex items-center gap-1.5">
@@ -1415,7 +1436,7 @@ export default function MeetingsPage() {
             className={`flex h-11 w-11 items-center justify-center rounded-2xl transition-all shadow-md ${
               isMicOn ? 'bg-slate-800 text-white hover:bg-slate-700' : 'bg-rose-600 text-white hover:bg-rose-500'
             }`}
-            title={isMicOn ? 'Mute Microphone' : 'Unmute Microphone'}
+            title={isMicOn ? t('controls.muteMic') : t('controls.unmuteMic')}
           >
             {isMicOn ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
           </button>
@@ -1426,7 +1447,7 @@ export default function MeetingsPage() {
             className={`flex h-11 w-11 items-center justify-center rounded-2xl transition-all shadow-md ${
               isCamOn ? 'bg-slate-800 text-white hover:bg-slate-700' : 'bg-rose-600 text-white hover:bg-rose-500'
             }`}
-            title={isCamOn ? 'Turn Off Camera' : 'Turn On Camera'}
+            title={isCamOn ? t('controls.cameraOff') : t('controls.cameraOn')}
           >
             {isCamOn ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
           </button>
@@ -1437,7 +1458,7 @@ export default function MeetingsPage() {
             className={`flex h-11 w-11 items-center justify-center rounded-2xl transition-all shadow-md ${
               isScreenSharing ? 'bg-indigo-600 text-white hover:bg-indigo-500 ring-2 ring-indigo-400' : 'bg-slate-800 text-white hover:bg-slate-700'
             }`}
-            title={isScreenSharing ? 'Stop Screen Sharing' : 'Share Screen'}
+            title={isScreenSharing ? t('controls.stopShare') : t('controls.shareScreen')}
           >
             <Share2 className="h-5 w-5" />
           </button>
@@ -1448,7 +1469,7 @@ export default function MeetingsPage() {
             className={`flex h-11 w-11 items-center justify-center rounded-2xl transition-all shadow-md ${
               isHandRaised ? 'bg-amber-500 text-white' : 'bg-slate-800 text-white hover:bg-slate-700'
             }`}
-            title={isHandRaised ? 'Lower Hand' : 'Raise Hand'}
+            title={isHandRaised ? t('controls.lowerHand') : t('controls.raiseHand')}
           >
             <Hand className="h-5 w-5" />
           </button>
@@ -1474,7 +1495,7 @@ export default function MeetingsPage() {
             className={`relative flex h-11 w-11 items-center justify-center rounded-2xl transition-all shadow-md ${
               activeTab === 'chat' ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-white hover:bg-slate-700'
             }`}
-            title="Meeting Chat"
+            title={t('controls.chat')}
           >
             <MessageSquare className="h-5 w-5" />
           </button>
@@ -1485,37 +1506,37 @@ export default function MeetingsPage() {
             className={`flex h-11 w-11 items-center justify-center rounded-2xl transition-all shadow-md ${
               activeTab === 'participants' ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-white hover:bg-slate-700'
             }`}
-            title="Participants"
+            title={t('controls.participants')}
           >
             <Users className="h-5 w-5" />
           </button>
 
           {/* Leave / End Meeting Controls */}
           {isHost ? (
-            <div className="flex items-center gap-2 ml-2">
+            <div className="flex items-center gap-2 ms-2">
               <button
                 onClick={() => handleLeaveRoom(true)}
                 className="flex items-center gap-1.5 rounded-2xl bg-slate-800 px-4 py-2.5 text-xs font-bold text-slate-300 hover:bg-slate-700 transition-all shadow-md"
-                title="Leave meeting without ending it for others"
+                title={t('controls.leaveTitle')}
               >
-                <span>Leave</span>
+                <span>{tc('actions.leave')}</span>
               </button>
               <button
                 onClick={handleEndMeetingForEveryone}
                 className="flex items-center gap-1.5 rounded-2xl bg-rose-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-rose-500 transition-all shadow-lg shadow-rose-900/30"
-                title="End this session for all participants"
+                title={t('controls.endForAllTitle')}
               >
                 <PhoneOff className="h-4 w-4" />
-                <span>End for All</span>
+                <span>{t('controls.endForAll')}</span>
               </button>
             </div>
           ) : (
             <button
               onClick={() => handleLeaveRoom(true)}
-              className="flex items-center gap-2 rounded-2xl bg-rose-600 px-5 py-2.5 text-xs font-bold text-white hover:bg-rose-500 transition-all shadow-lg shadow-rose-900/30 ml-2"
+              className="flex items-center gap-2 rounded-2xl bg-rose-600 px-5 py-2.5 text-xs font-bold text-white hover:bg-rose-500 transition-all shadow-lg shadow-rose-900/30 ms-2"
             >
               <PhoneOff className="h-4 w-4" />
-              <span>Leave</span>
+              <span>{tc('actions.leave')}</span>
             </button>
           )}
         </div>
@@ -1539,20 +1560,20 @@ export default function MeetingsPage() {
 
       {/* Header */}
       <div className="page-hero-sm relative isolate flex flex-col overflow-hidden rounded-3xl border p-5 shadow-[var(--shadow-card)] sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:p-7" style={{ borderColor: 'var(--border-color)', background: 'var(--bg-accent-strip)' }}>
-      <div className="pointer-events-none absolute -right-10 -top-20 h-56 w-56 rounded-full bg-[var(--accent)] opacity-[0.07] blur-3xl" />
+      <div className="pointer-events-none absolute -end-10 -top-20 h-56 w-56 rounded-full bg-[var(--accent)] opacity-[0.07] blur-3xl" />
       <div className="relative">
-        <h1 className="page-title">Meetings</h1>
-        <p className="page-subtitle">Launch instant video sessions, screen share, and schedule team syncs</p>
+        <h1 className="page-title">{t('header.title')}</h1>
+        <p className="page-subtitle">{t('header.subtitle')}</p>
       </div>
 
       <div className="relative flex flex-wrap items-center gap-2.5">
           <button onClick={handleStartInstant} className="btn-primary h-9 px-4">
             <Play className="h-3.5 w-3.5 fill-white" />
-            <span>Instant Meeting</span>
+            <span>{t('header.instantMeeting')}</span>
           </button>
           <button onClick={() => openCreateModal('meeting')} className="btn-secondary h-9 px-4">
             <Calendar className="h-3.5 w-3.5" style={{ color: 'var(--accent)' }} />
-            <span>Schedule</span>
+            <span>{t('header.schedule')}</span>
           </button>
         </div>
       </div>
@@ -1566,7 +1587,7 @@ export default function MeetingsPage() {
               <span className="relative inline-flex rounded-full h-3 w-3 bg-rose-500" />
             </span>
             <h2 className="text-sm font-bold theme-text-primary uppercase tracking-wider">
-              Live meetings in progress ({activeLiveMeetings.length})
+              {t('live.heading', { count: activeLiveMeetings.length })}
             </h2>
           </div>
 
@@ -1578,13 +1599,13 @@ export default function MeetingsPage() {
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 mb-0.5">
-                    <span className="badge badge-rose text-[9px]">LIVE NOW</span>
+                    <span className="badge badge-rose text-[9px]">{t('live.liveNow')}</span>
                     <h3 className="text-[13px] font-bold theme-text-primary truncate">
                       {liveMeet.title}
                     </h3>
                   </div>
                   <p className="text-[11px] theme-text-muted">
-                    Host: {liveMeet.hostId?.fullName || 'Team Member'}
+                    {t('live.host', { name: liveMeet.hostId?.fullName || t('fallback.teamMember') })}
                   </p>
                 </div>
 
@@ -1593,7 +1614,7 @@ export default function MeetingsPage() {
                   className="btn-danger flex items-center gap-1.5 border-rose-400/60 bg-rose-100 text-rose-700 hover:bg-rose-200 shrink-0"
                 >
                   <Video className="h-3.5 w-3.5" />
-                  <span>Join</span>
+                  <span>{tc('actions.join')}</span>
                 </button>
               </div>
             ))}
@@ -1604,7 +1625,7 @@ export default function MeetingsPage() {
       {/* All Meetings Grid */}
       <div>
         <h2 className="text-sm font-bold theme-text-primary mb-4">
-          All Meetings
+          {t('list.heading')}
         </h2>
 
         {isLoadingMeetings ? (
@@ -1618,14 +1639,14 @@ export default function MeetingsPage() {
             <div className="h-12 w-12 rounded-2xl mx-auto flex items-center justify-center mb-3" style={{ background: 'var(--bg-hover)' }}>
               <Video className="h-6 w-6 theme-text-muted" />
             </div>
-            <h3 className="text-sm font-semibold theme-text-primary">No meetings scheduled yet</h3>
-            <p className="mt-1 text-xs theme-text-muted">Host an instant sync or schedule upcoming reviews.</p>
+            <h3 className="text-sm font-semibold theme-text-primary">{t('empty.title')}</h3>
+            <p className="mt-1 text-xs theme-text-muted">{t('empty.body')}</p>
             <button
               onClick={handleStartInstant}
               className="btn-primary mt-4 mx-auto"
             >
               <Play className="h-3.5 w-3.5 fill-white" />
-              <span>Start Instant Meeting</span>
+              <span>{t('empty.start')}</span>
             </button>
           </div>
         ) : (
@@ -1650,7 +1671,7 @@ export default function MeetingsPage() {
                           {meet.title}
                         </h3>
                         <span className="text-[11px] theme-text-muted truncate block">
-                          {meet.hostId?.fullName || 'Team Member'}
+                          {meet.hostId?.fullName || t('fallback.teamMember')}
                         </span>
                       </div>
                     </div>
@@ -1663,7 +1684,7 @@ export default function MeetingsPage() {
                           : 'badge-blue'
                       }`}
                     >
-                      {meet.status === 'active' ? '● Live' : meet.status}
+                      {meet.status === 'active' ? t('status.live') : tOptional(`meetings.status.${meet.status}`) ?? meet.status}
                     </span>
                   </div>
 
@@ -1678,7 +1699,7 @@ export default function MeetingsPage() {
                     <span>
                       {meet.scheduledAt
                         ? formatDate(meet.scheduledAt, 'MMM d, h:mm a')
-                        : 'Instant session'}
+                        : t('list.instantSession')}
                     </span>
                   </div>
                 </div>
@@ -1686,7 +1707,7 @@ export default function MeetingsPage() {
                 <div className="mt-5 pt-4 border-t" style={{ borderColor: 'var(--border-subtle)' }}>
                   {meet.status === 'ended' ? (
                     <button disabled className="w-full btn-secondary opacity-50 justify-center cursor-not-allowed">
-                      Meeting ended
+                      {t('list.ended')}
                     </button>
                   ) : (
                     <button
@@ -1699,7 +1720,7 @@ export default function MeetingsPage() {
                       style={{ background: meet.status === 'active' ? '' : 'var(--accent)' }}
                     >
                       <Video className="h-3.5 w-3.5" />
-                      <span>{meet.status === 'active' ? 'Join Live' : 'Join Meeting'}</span>
+                      <span>{meet.status === 'active' ? t('list.joinLive') : t('list.joinMeeting')}</span>
                     </button>
                   )}
                 </div>

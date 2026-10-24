@@ -2,11 +2,16 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { PublicFooter } from '@/components/landing/PublicFooter';
 import { PublicNavbar } from '@/components/landing/PublicNavbar';
+import { getBillingServerTranslator } from '@/components/billing/serverMessages';
 import { ArrowLeft, CreditCard, XCircle } from 'lucide-react';
 
-export const metadata: Metadata = { title: 'Checkout Canceled | WorkGrind' };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getBillingServerTranslator();
+  return { title: t('meta.checkoutCanceledTitle') };
+}
 
-export default function PaymentCancelPage() {
+export default async function PaymentCancelPage() {
+  const t = await getBillingServerTranslator();
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <PublicNavbar />
@@ -15,17 +20,17 @@ export default function PaymentCancelPage() {
           <div className="mx-auto mb-5 grid h-14 w-14 place-items-center rounded-full bg-slate-100 text-slate-500">
             <XCircle className="h-7 w-7" />
           </div>
-          <p className="text-xs font-bold uppercase tracking-widest text-indigo-700">WorkGrind Billing</p>
-          <h1 className="mt-2 text-2xl font-extrabold tracking-tight sm:text-3xl">Checkout was not completed</h1>
+          <p className="text-xs font-bold uppercase tracking-widest text-indigo-700">{t('payment.eyebrow')}</p>
+          <h1 className="mt-2 text-2xl font-extrabold tracking-tight sm:text-3xl">{t('payment.cancel.title')}</h1>
           <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-slate-600">
-            This page does not determine whether a charge was made or whether a subscription changed. Review the current status on Billing before starting another checkout.
+            {t('payment.cancel.body')}
           </p>
           <div className="mt-7 flex flex-col justify-center gap-3 sm:flex-row">
             <Link href="/billing" className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white hover:bg-indigo-500">
-              <CreditCard className="h-4 w-4" />Review Billing
+              <CreditCard className="h-4 w-4" />{t('payment.cancel.review')}
             </Link>
             <Link href="/dashboard" className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 px-5 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50">
-              <ArrowLeft className="h-4 w-4" />Back to dashboard
+              <ArrowLeft className="rtl-mirror h-4 w-4" />{t('payment.cancel.back')}
             </Link>
           </div>
         </section>

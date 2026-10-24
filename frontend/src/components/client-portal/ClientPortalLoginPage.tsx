@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
+import { describeApiError } from '@/lib/apiError';
+import { renderRich, useI18n, useT } from '@/lib/i18n';
 import { SocialAuthButtons } from '@/components/auth/SocialAuthButtons';
 import { ThemeAwareLogo } from '@/components/common/ThemeAwareLogo';
 import {
@@ -11,18 +13,21 @@ import {
   Bell, ExternalLink,
 } from 'lucide-react';
 
-/* ── Features the client portal actually exposes ── */
+/* ── Features the client portal actually exposes (text under clientPortal.login.features.<id>) ── */
 const PORTAL_FEATURES = [
-  { icon: FolderKanban,  label: 'Shared Projects',   desc: 'View projects and milestones shared with you' },
-  { icon: CheckCircle2,  label: 'Tasks & Progress',   desc: 'Track tasks assigned to or shared with you' },
-  { icon: MessageSquare, label: 'Team Messaging',     desc: 'Communicate directly with the team' },
-  { icon: FileText,      label: 'Files & Documents',  desc: 'Access shared files and documentation' },
-  { icon: Video,         label: 'Meetings & Calendar',desc: 'View meeting schedules and invitations' },
-  { icon: Bell,          label: 'Live Updates',       desc: 'Receive important workspace notifications' },
-];
+  { id: 'sharedProjects', icon: FolderKanban },
+  { id: 'tasks',          icon: CheckCircle2 },
+  { id: 'messaging',      icon: MessageSquare },
+  { id: 'files',          icon: FileText },
+  { id: 'meetings',       icon: Video },
+  { id: 'updates',        icon: Bell },
+] as const;
 
 export function ClientPortalLoginPage() {
   const router = useRouter();
+  const t = useT('clientPortal');
+  const tc = useT('common');
+  const { lang } = useI18n();
   const [email,    setEmail]    = useState('');
   const [password, setPassword] = useState('');
   const [loading,  setLoading]  = useState(false);
@@ -42,8 +47,15 @@ export function ClientPortalLoginPage() {
       localStorage.setItem('workgrind_client_token', r.data.accessToken);
       localStorage.setItem('workgrind_client_user',  JSON.stringify(r.data.client));
       router.push('/client-portal/portal');
-    } catch (err: any) {
-      setError(err.response?.data?.message ?? 'Login failed. Please check your credentials.');
+    } catch (err: unknown) {
+      const fallback = t('login.errors.failed');
+      const failure = describeApiError(err, fallback);
+      // A 401 here means wrong credentials, not an expired session: English keeps the server's
+      // message (as before); other languages show the translated fallback.
+      const serverMessage = (err as { response?: { data?: { message?: unknown } } })?.response?.data?.message;
+      setError(failure.kind === 'unauthorized'
+        ? (lang === 'en' && typeof serverMessage === 'string' && serverMessage ? serverMessage : fallback)
+        : failure.message);
     } finally { setLoading(false); }
   }
 
@@ -63,7 +75,7 @@ export function ClientPortalLoginPage() {
               borderColor: 'rgba(99,102,241,0.3)',
             }}
           >
-            Client Portal
+            {t('login.badge')}
           </div>
         </div>
 
@@ -78,35 +90,37 @@ export function ClientPortalLoginPage() {
             }}
           >
             <Shield className="h-3 w-3" />
-            Secure Access
+            {t('login.secureAccess')}
           </div>
 
           <h1
             className="text-3xl sm:text-4xl font-extrabold leading-tight mb-4"
             style={{ color: '#f1f5f9', letterSpacing: '-0.025em' }}
           >
-            Your company's workspace,{' '}
-            <span style={{
-              background: 'linear-gradient(90deg, #a5b4fc 0%, #c4b5fd 50%, #93c5fd 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              backgroundClip: 'text',
-            }}>
-              connected.
-            </span>
+            {renderRich(t('login.hero'), {
+              accent: (chunk) => (
+                <span style={{
+                  background: 'linear-gradient(90deg, #a5b4fc 0%, #c4b5fd 50%, #93c5fd 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  backgroundClip: 'text',
+                }}>
+                  {chunk}
+                </span>
+              ),
+            })}
           </h1>
 
           <p className="text-sm leading-relaxed mb-8" style={{ color: '#94a3b8' }}>
-            Everything your team has shared with you — projects, tasks, files,
-            messages and updates — in one secure portal.
+            {t('login.intro')}
           </p>
 
           {/* Feature grid */}
           <div className="grid grid-cols-1 gap-3">
-            {PORTAL_FEATURES.map(({ icon: Icon, label, desc }) => (
+            {PORTAL_FEATURES.map(({ id, icon: Icon }) => (
               <div
-                key={label}
-                className="flex items-center gap-3.5 rounded-xl px-4 py-3 transition-all duration-150 hover:translate-x-0.5"
+                key={id}
+                className="flex items-center gap-3.5 rounded-xl px-4 py-3 transition-all duration-150 hover:translate-x-0.5 rtl:hover:-translate-x-0.5"
                 style={{
                   background: 'rgba(255,255,255,0.04)',
                   border: '1px solid rgba(255,255,255,0.06)',
@@ -120,8 +134,8 @@ export function ClientPortalLoginPage() {
                   <Icon className="h-4 w-4" />
                 </div>
                 <div>
-                  <p className="text-[13px] font-semibold" style={{ color: '#e2e8f0' }}>{label}</p>
-                  <p className="text-[11px] leading-snug mt-0.5" style={{ color: '#64748b' }}>{desc}</p>
+                  <p className="text-[13px] font-semibold" style={{ color: '#e2e8f0' }}>{t(`login.features.${id}.label`)}</p>
+                  <p className="text-[11px] leading-snug mt-0.5" style={{ color: '#64748b' }}>{t(`login.features.${id}.desc`)}</p>
                 </div>
               </div>
             ))}
@@ -132,10 +146,13 @@ export function ClientPortalLoginPage() {
         <div className="relative z-10 mt-auto pt-8 flex items-center gap-2">
           <ExternalLink className="h-3.5 w-3.5" style={{ color: '#475569' }} />
           <p className="text-[11px]" style={{ color: '#475569' }}>
-            Not a client? Visit{' '}
-            <a href="/login" className="underline hover:opacity-80 transition-opacity" style={{ color: '#64748b' }}>
-              WorkGrind workspace login
-            </a>
+            {renderRich(t('login.notClient'), {
+              link: (chunk) => (
+                <a href="/login" className="underline hover:opacity-80 transition-opacity" style={{ color: '#64748b' }}>
+                  {chunk}
+                </a>
+              ),
+            })}
           </p>
         </div>
       </div>
@@ -156,21 +173,21 @@ export function ClientPortalLoginPage() {
               border: '1px solid rgba(99,102,241,0.2)',
             }}
           >
-            Client Portal
+            {t('login.badge')}
           </span>
         </div>
 
         <div className="w-full max-w-sm">
           {/* Card header */}
-          <div className="mb-7 text-center lg:text-left">
+          <div className="mb-7 text-center lg:text-start">
             <h2
               className="text-2xl font-extrabold tracking-tight mb-1.5"
               style={{ color: 'var(--text-primary)', letterSpacing: '-0.025em' }}
             >
-              Welcome back
+              {t('login.welcomeBack')}
             </h2>
             <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-              Sign in to your client portal
+              {t('login.subtitle')}
             </p>
           </div>
 
@@ -206,21 +223,21 @@ export function ClientPortalLoginPage() {
             )}
 
             <p className="mb-3 text-center text-xs" style={{ color: 'var(--text-secondary)' }}>
-              Continue with a provider already linked to your client account
+              {t('login.providerHint')}
             </p>
             <SocialAuthButtons audience="client" />
             <div className="my-5 flex items-center gap-3 text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
               <span className="h-px flex-1" style={{ background: 'var(--border-subtle)' }} />
-              or sign in with your password
+              {t('login.divider')}
               <span className="h-px flex-1" style={{ background: 'var(--border-subtle)' }} />
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
-                <label className="form-label" htmlFor="cp-email">Email address</label>
+                <label className="form-label" htmlFor="cp-email">{tc('fields.emailAddress')}</label>
                 <div className="relative mt-1">
                   <Mail
-                    className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 pointer-events-none"
+                    className="absolute start-3.5 top-1/2 -translate-y-1/2 h-4 w-4 pointer-events-none"
                     style={{ color: 'var(--text-muted)' }}
                   />
                   <input
@@ -228,8 +245,8 @@ export function ClientPortalLoginPage() {
                     type="email"
                     value={email}
                     onChange={e => setEmail(e.target.value)}
-                    placeholder="you@company.com"
-                    className="input-premium w-full pl-10"
+                    placeholder={t('login.emailPlaceholder')}
+                    className="input-premium w-full ps-10"
                     required
                     autoComplete="email"
                   />
@@ -237,10 +254,10 @@ export function ClientPortalLoginPage() {
               </div>
 
               <div>
-                <label className="form-label" htmlFor="cp-pass">Password</label>
+                <label className="form-label" htmlFor="cp-pass">{tc('fields.password')}</label>
                 <div className="relative mt-1">
                   <Lock
-                    className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 pointer-events-none"
+                    className="absolute start-3.5 top-1/2 -translate-y-1/2 h-4 w-4 pointer-events-none"
                     style={{ color: 'var(--text-muted)' }}
                   />
                   <input
@@ -248,8 +265,8 @@ export function ClientPortalLoginPage() {
                     type="password"
                     value={password}
                     onChange={e => setPassword(e.target.value)}
-                    placeholder="Your password"
-                    className="input-premium w-full pl-10"
+                    placeholder={t('login.passwordPlaceholder')}
+                    className="input-premium w-full ps-10"
                     required
                     autoComplete="current-password"
                   />
@@ -273,12 +290,12 @@ export function ClientPortalLoginPage() {
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
                     </svg>
-                    Signing in…
+                    {t('login.signingIn')}
                   </span>
                 ) : (
                   <>
-                    <span>Sign in to Portal</span>
-                    <ArrowRight className="h-4 w-4" />
+                    <span>{t('login.submit')}</span>
+                    <ArrowRight className="rtl-mirror h-4 w-4" />
                   </>
                 )}
               </button>
@@ -295,14 +312,13 @@ export function ClientPortalLoginPage() {
             }}
           >
             <Shield className="h-3.5 w-3.5 shrink-0" style={{ color: 'var(--accent)' }} />
-            <span>Protected by WorkGrind — end-to-end secure</span>
+            <span>{t('login.securityNote')}</span>
           </div>
 
           <p className="mt-4 text-center text-xs" style={{ color: 'var(--text-muted)' }}>
-            Don't have access?{' '}
-            <span style={{ color: 'var(--accent-text)' }}>
-              Contact your account manager for an invitation.
-            </span>
+            {renderRich(t('login.noAccess'), {
+              accent: (chunk) => <span style={{ color: 'var(--accent-text)' }}>{chunk}</span>,
+            })}
           </p>
         </div>
       </div>

@@ -3,24 +3,18 @@
 import { Suspense, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import type { AxiosError } from 'axios';
+import axios from 'axios';
 import { AlertCircle, LoaderCircle } from 'lucide-react';
 import { AuthShell } from '@/components/auth/AuthShell';
 import { api } from '@/lib/api';
-
-const errorMessages: Record<string, string> = {
-  account_exists: 'This email already has a client portal account. Sign in with its password, then link the provider from your portal.',
-  client_invitation_required: 'This provider account is not linked to an active client invitation. Ask your account manager for portal access.',
-  cancelled: 'Sign-in was cancelled. You can try again whenever you’re ready.',
-  invalid_request: 'This sign-in link is invalid or expired. Please start again.',
-  provider_unavailable: 'This sign-in provider is temporarily unavailable. Please try again later.',
-  verified_email_required: 'The provider must confirm your email address before it can be used here.',
-  try_again: 'We could not complete secure sign-in. Please try again.',
-};
+import { describeApiError } from '@/lib/apiError';
+import { renderRich, useI18n, useT } from '@/lib/i18n';
 
 function ClientOAuthCallbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const t = useT('clientPortal');
+  const { tOptional } = useI18n();
   const started = useRef(false);
   const [error, setError] = useState('');
   const [supportId, setSupportId] = useState('');
@@ -30,7 +24,7 @@ function ClientOAuthCallbackContent() {
     const attemptId = searchParams.get('attemptId') || '';
     if (searchParams.has('error')) return;
     if (!code || started.current) {
-      if (!code && !started.current) setError(errorMessages.invalid_request);
+      if (!code && !started.current) setError(t('oauth.errors.invalid_request'));
       return;
     }
     started.current = true;
@@ -46,13 +40,14 @@ function ClientOAuthCallbackContent() {
         router.replace('/client-portal/portal');
       })
       .catch((requestError: unknown) => {
-        const message = (requestError as AxiosError<{ message?: string }>).response?.data?.message;
-        setError(message || errorMessages.try_again);
+        // An incomplete success response is not an HTTP failure: show the generic message.
+        const fallback = t('oauth.errors.try_again');
+        setError(axios.isAxiosError(requestError) ? describeApiError(requestError, fallback).message : fallback);
         if (/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(attemptId)) {
           setSupportId(attemptId);
         }
       });
-  }, [router, searchParams]);
+  }, [router, searchParams, t]);
 
   const errorCode = searchParams.get('error');
   const querySupportId = searchParams.get('supportId');
@@ -61,32 +56,37 @@ function ClientOAuthCallbackContent() {
       ? querySupportId
       : ''
   );
-  const displayedError = error || (errorCode ? errorMessages[errorCode] || errorMessages.try_again : '');
+  const displayedError = error || (errorCode
+    ? tOptional(`clientPortal.oauth.errors.${errorCode}`) || t('oauth.errors.try_again')
+    : '');
 
   return (
     <AuthShell>
       {displayedError
         ? <>
           <div className="auth-error" role="alert">
-            <AlertCircle size={16} className="mr-2 inline" />{displayedError}
+            <AlertCircle size={16} className="me-2 inline" />{displayedError}
           </div>
           {displayedSupportId && (
-            <p className="mt-3 text-center text-xs text-stone-500">Reference ID: <code>{displayedSupportId}</code></p>
+            <p className="mt-3 text-center text-xs text-stone-500">
+              {renderRich(t('oauth.referenceId', { id: displayedSupportId }), { code: (chunk) => <code>{chunk}</code> })}
+            </p>
           )}
           <p className="mt-5 text-center text-xs text-stone-500">
-            <Link href="/client-portal" className="auth-link">Return to client portal sign in</Link>
+            <Link href="/client-portal" className="auth-link">{t('oauth.returnToSignIn')}</Link>
           </p>
         </>
         : <div className="flex items-center gap-3 py-8 text-sm text-stone-600" role="status">
-          <LoaderCircle size={18} className="animate-spin" /> Completing secure sign-in…
+          <LoaderCircle size={18} className="animate-spin" /> {t('oauth.completing')}
         </div>}
     </AuthShell>
   );
 }
 
 export default function ClientOAuthCallbackPage() {
+  const t = useT('clientPortal');
   return (
-    <Suspense fallback={<AuthShell><p className="py-8 text-sm text-stone-600">Completing secure sign-in…</p></AuthShell>}>
+    <Suspense fallback={<AuthShell><p className="py-8 text-sm text-stone-600">{t('oauth.completing')}</p></AuthShell>}>
       <ClientOAuthCallbackContent />
     </Suspense>
   );

@@ -8,8 +8,10 @@ import { ThemeAwareLogo } from '@/components/common/ThemeAwareLogo';
 import { ExpiredSubscriptionExperience } from '@/components/subscription/ExpiredSubscriptionExperience';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useSubscriptionRevalidation } from '@/lib/useSubscriptionRevalidation';
+import { useT } from '@/lib/i18n';
 
 export default function SubscriptionExpiredPage() {
+  const t = useT('billing');
   const router = useRouter();
   const pathname = usePathname();
   const pendingRedirect = useRef<string | null>(null);
@@ -62,31 +64,31 @@ export default function SubscriptionExpiredPage() {
     subscription?.status === 'none';
   const expired = subscription?.status === 'expired';
   const inactiveTitle = subscription?.status === 'unpaid'
-    ? 'Payment needs attention'
+    ? t('expiredPage.titles.unpaid')
     : subscription?.status === 'paused'
-      ? 'Your subscription is paused'
+      ? t('expiredPage.titles.paused')
       : subscription?.status === 'incomplete'
-        ? 'Complete your subscription'
-        : 'Your WorkGrind subscription has ended';
+        ? t('expiredPage.titles.incomplete')
+        : t('expiredPage.titles.ended');
   const heading = subscriptionError
-    ? 'Unable to verify your subscription'
+    ? t('expiredPage.titles.unverified')
     : neverSubscribed
-      ? 'Choose a WorkGrind plan to get started'
+      ? t('expiredPage.titles.neverSubscribed')
       : inactiveTitle;
   const description = subscriptionError
     ? subscriptionError
     : neverSubscribed
-      ? 'This workspace does not have a subscription yet. Choose a plan to access WorkGrind.'
+      ? t('expiredPage.descriptions.neverSubscribed')
       : expired || subscription?.status === 'cancelled'
-        ? 'Your workspace data is safe. Renew your subscription to continue using WorkGrind.'
-        : 'Your workspace data is safe. Resolve your billing status to restore WorkGrind access.';
+        ? t('expiredPage.descriptions.renew')
+        : t('expiredPage.descriptions.resolve');
   const primaryAction = neverSubscribed
-    ? 'Choose a plan'
+    ? t('expiredPage.actions.choosePlan')
     : subscription?.status === 'unpaid' || subscription?.status === 'past_due'
-      ? 'Resolve payment'
+      ? t('expiredPage.actions.resolvePayment')
       : subscription?.status === 'paused'
-        ? 'Resume subscription'
-        : 'Renew subscription';
+        ? t('expiredPage.actions.resume')
+        : t('expiredPage.actions.renew');
 
   return (
     <main className="flex min-h-screen items-center justify-center px-5 py-12" style={{ background: 'var(--wg-bg, #f5f2e9)' }}>
@@ -105,10 +107,10 @@ export default function SubscriptionExpiredPage() {
         </p>
         <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
           <Link href="/billing" className="theme-primary-action inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-5 text-sm font-semibold">
-            {primaryAction} <ArrowRight className="h-4 w-4" />
+            {primaryAction} <ArrowRight className="rtl-mirror h-4 w-4" />
           </Link>
           <Link href="/billing" className="inline-flex min-h-11 items-center justify-center rounded-xl border px-5 text-sm font-semibold" style={{ borderColor: 'var(--wg-border)', color: 'var(--wg-text)' }}>
-            View billing
+            {t('expiredPage.actions.viewBilling')}
           </Link>
         </div>
       </section>

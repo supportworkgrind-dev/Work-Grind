@@ -38,70 +38,69 @@ import {
   School,
 } from 'lucide-react';
 import styles from '@/app/landing.module.css';
+import { useT } from '@/lib/i18n';
 
 /* ═══════════════════════════════════════════════════════════
    DEMO DATA — consistent across all scenes
+   Display text lives in the `landing` messages (hero.demo.*);
+   names, companies and amounts are sample values shown as-is.
    ═══════════════════════════════════════════════════════════ */
 
 const D = {
   user:  { name: 'Sarah Chen', initials: 'SC' },
 
   stats: [
-    { label: 'Open Tasks',      value: '12', sub: '+2 today',   col: '#6366f1' },
-    { label: 'Active Projects', value: '4',  sub: '2 on track', col: '#10b981' },
-    { label: 'Meetings Today',  value: '3',  sub: '1 in 45m',   col: '#3b82f6' },
+    { id: 'openTasks',      value: '12', col: '#6366f1' },
+    { id: 'activeProjects', value: '4',  col: '#10b981' },
+    { id: 'meetingsToday',  value: '3',  col: '#3b82f6' },
   ],
 
-  pipeline: ['New Lead', 'Qualified', 'Proposal', 'Negotiation', 'Won'],
+  pipeline: ['newLead', 'qualified', 'proposal', 'negotiation', 'won'],
 
   crm: [
-    { name: 'Acme Corp',     contact: 'David Park',   stage: 'Proposal',   value: '$48k', col: '#3b82f6', av: 'AC', st: 'active'   },
-    { name: 'Globex Inc',    contact: 'Maria Santos', stage: 'Qualified',  value: '$22k', col: '#f59e0b', av: 'GI', st: 'followup' },
-    { name: 'Initech Group', contact: 'James Liu',    stage: 'Won',        value: '$95k', col: '#10b981', av: 'IG', st: 'won'      },
-    { name: 'Umbrella Co',   contact: 'Lin Chen',     stage: 'New Lead',   value: '$9k',  col: '#8b5cf6', av: 'UC', st: 'new'      },
+    { name: 'Acme Corp',     contact: 'David Park',   stage: 'proposal',   value: '$48k', col: '#3b82f6', av: 'AC', st: 'active'   },
+    { name: 'Globex Inc',    contact: 'Maria Santos', stage: 'qualified',  value: '$22k', col: '#f59e0b', av: 'GI', st: 'followup' },
+    { name: 'Initech Group', contact: 'James Liu',    stage: 'won',        value: '$95k', col: '#10b981', av: 'IG', st: 'won'      },
+    { name: 'Umbrella Co',   contact: 'Lin Chen',     stage: 'newLead',    value: '$9k',  col: '#8b5cf6', av: 'UC', st: 'new'      },
   ],
 
   tasks: [
-    { title: 'Review Acme proposal',     priority: 'Urgent', pct: 90,  done: false, av: 'SC' },
-    { title: 'Update onboarding docs',   priority: 'High',   pct: 55,  done: false, av: 'AR' },
-    { title: 'Q4 planning session',      priority: 'Normal', pct: 20,  done: false, av: 'SC' },
-    { title: 'Deploy auth improvements', priority: 'High',   pct: 100, done: true,  av: 'TL' },
+    { id: 'reviewAcme',     priority: 'urgent', pct: 90,  done: false, av: 'SC' },
+    { id: 'onboardingDocs', priority: 'high',   pct: 55,  done: false, av: 'AR' },
+    { id: 'q4Planning',     priority: 'normal', pct: 20,  done: false, av: 'SC' },
+    { id: 'deployAuth',     priority: 'high',   pct: 100, done: true,  av: 'TL' },
   ],
 
   team: [
-    { dept: 'Engineering', count: 8, pct: 78, col: '#6366f1' },
-    { dept: 'Design',      count: 4, pct: 60, col: '#ec4899' },
-    { dept: 'Sales',       count: 6, pct: 85, col: '#10b981' },
-    { dept: 'Marketing',   count: 5, pct: 55, col: '#f59e0b' },
+    { dept: 'engineering', count: 8, pct: 78, col: '#6366f1' },
+    { dept: 'design',      count: 4, pct: 60, col: '#ec4899' },
+    { dept: 'sales',       count: 6, pct: 85, col: '#10b981' },
+    { dept: 'marketing',   count: 5, pct: 55, col: '#f59e0b' },
   ],
 
   chat: {
     channel: 'sales',
     messages: [
-      { from: 'Maria S',  av: 'MS', col: '#f59e0b', text: 'Globex demo went great! They want a proposal by Friday.' },
-      { from: 'David P',  av: 'DP', col: '#3b82f6', text: 'On it — I\'ll prep the Globex deck now.' },
-      { from: 'Sarah C',  av: 'SC', col: '#6366f1', text: 'Nice work 🎉 Tagging this to the Globex deal in CRM.' },
+      { id: 'maria', from: 'Maria S',  av: 'MS', col: '#f59e0b' },
+      { id: 'david', from: 'David P',  av: 'DP', col: '#3b82f6' },
+      { id: 'sarah', from: 'Sarah C',  av: 'SC', col: '#6366f1' },
     ],
   },
 
   meetings: [
-    { title: 'Acme Demo Call',  time: '2:00 PM', people: 4, status: 'soon'  },
-    { title: 'Sprint Review',   time: '4:30 PM', people: 6, status: 'later' },
+    { id: 'acmeDemo',     people: 4, status: 'soon'  },
+    { id: 'sprintReview', people: 6, status: 'later' },
   ],
-
-  ai: {
-    q: 'What should I focus on in my workspace?',
-    a: 'Tavro AI can help with supported work and learning information available to this account.',
-  },
 } as const;
 
 /* colour helpers */
-const PRIO_COL: Record<string, string> = { Urgent: '#ef4444', High: '#f59e0b', Normal: '#6366f1' };
-const ST_STYLE: Record<string, { label: string; col: string; bg: string }> = {
-  active:   { label: 'Active',    col: '#10b981', bg: '#10b98118' },
-  followup: { label: 'Follow-up', col: '#f59e0b', bg: '#f59e0b18' },
-  won:      { label: 'Won',       col: '#6366f1', bg: '#6366f118' },
-  new:      { label: 'New Lead',  col: '#3b82f6', bg: '#3b82f618' },
+type Priority = (typeof D.tasks)[number]['priority'];
+const PRIO_COL: Record<Priority, string> = { urgent: '#ef4444', high: '#f59e0b', normal: '#6366f1' };
+const ST_STYLE: Record<string, { col: string; bg: string }> = {
+  active:   { col: '#10b981', bg: '#10b98118' },
+  followup: { col: '#f59e0b', bg: '#f59e0b18' },
+  won:      { col: '#6366f1', bg: '#6366f118' },
+  new:      { col: '#3b82f6', bg: '#3b82f618' },
 };
 
 /* ═══════════════════════════════════════════════════════════
@@ -109,25 +108,26 @@ const ST_STYLE: Record<string, { label: string; col: string; bg: string }> = {
    ═══════════════════════════════════════════════════════════ */
 
 type SceneKey = 'overview' | 'crm' | 'team' | 'tasks' | 'chat' | 'ai' | 'return';
+type SceneTabKey = Exclude<SceneKey, 'return'>;
 
-const SCENES: { key: SceneKey; label: string; icon: React.ElementType; col: string }[] = [
-  { key: 'overview', label: 'Overview',  icon: LayoutDashboard, col: '#6366f1' },
-  { key: 'tasks',    label: 'Tasks',     icon: CheckSquare,     col: '#10b981' },
-  { key: 'crm',      label: 'CRM',       icon: Building2,       col: '#3b82f6' },
-  { key: 'team',     label: 'Team',      icon: Users,           col: '#8b5cf6' },
-  { key: 'chat',     label: 'Collaboration', icon: MessageSquare, col: '#06b6d4' },
-  { key: 'ai',       label: 'Tavro AI',  icon: Sparkles,        col: '#c084fc' },
+const SCENES: { key: SceneTabKey; icon: React.ElementType; col: string }[] = [
+  { key: 'overview', icon: LayoutDashboard, col: '#6366f1' },
+  { key: 'tasks',    icon: CheckSquare,     col: '#10b981' },
+  { key: 'crm',      icon: Building2,       col: '#3b82f6' },
+  { key: 'team',     icon: Users,           col: '#8b5cf6' },
+  { key: 'chat',     icon: MessageSquare,   col: '#06b6d4' },
+  { key: 'ai',       icon: Sparkles,        col: '#c084fc' },
 ];
 
 const STORY_SCENES: SceneKey[] = ['overview', 'tasks', 'crm', 'chat', 'ai'];
 
 const WORKSPACE_AREAS = [
-  { label: 'Personal', icon: CheckSquare, color: '#34d399' },
-  { label: 'Business', icon: Building2, color: '#60a5fa' },
-  { label: 'Classes', icon: BookOpen, color: '#a78bfa' },
-  { label: 'Academics', icon: GraduationCap, color: '#c084fc' },
-  { label: 'Tavro AI', icon: Sparkles, color: '#67e8f9' },
-];
+  { id: 'personal',  icon: CheckSquare,   color: '#34d399' },
+  { id: 'business',  icon: Building2,     color: '#60a5fa' },
+  { id: 'classes',   icon: BookOpen,      color: '#a78bfa' },
+  { id: 'academics', icon: GraduationCap, color: '#c084fc' },
+  { id: 'tavro',     icon: Sparkles,      color: '#67e8f9' },
+] as const;
 
 const SCENE_DURATION = 5000;
 
@@ -143,7 +143,7 @@ function Bar({
     <div className="h-[3px] w-full rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.07)' }}>
       {/* Animate scaleX (compositor-only) rather than width, which relaid out every frame. */}
       <motion.div
-        className="h-full rounded-full origin-left"
+        className="h-full rounded-full origin-left rtl:origin-right"
         style={{ background: col, width: `${pct}%` }}
         initial={{ scaleX: 0 }}
         animate={{ scaleX: 1 }}
@@ -169,21 +169,23 @@ function SideNav({ icon: Icon, label, active, col }: {
 
 /** Window chrome bar */
 function Chrome({ label }: { label: string }) {
+  const t = useT('landing');
   return (
     <div className="flex items-center gap-1.5 px-4 py-2.5 border-b border-white/[0.06] bg-[#090c13]">
       <div className="h-2 w-2 rounded-full bg-rose-500/50" />
       <div className="h-2 w-2 rounded-full bg-amber-400/50" />
       <div className="h-2 w-2 rounded-full bg-emerald-400/50" />
-      <div className="ml-3 flex items-center gap-1.5">
+      <div className="ms-3 flex items-center gap-1.5">
         <div className="h-5 w-5 rounded-md bg-indigo-600 flex items-center justify-center">
           <span className="text-[7px] font-black text-white">WG</span>
         </div>
+        {/* Product name and window label; the label is translated. */}
         <span className="text-[10px] text-slate-500">WorkGrind — {label}</span>
       </div>
-      <div className="ml-auto flex items-center gap-2">
+      <div className="ms-auto flex items-center gap-2">
         <div className="hidden sm:flex items-center gap-1.5 rounded-lg bg-white/[0.04] border border-white/[0.05] px-2 py-1">
           <Search className="h-2.5 w-2.5 text-slate-600" />
-          <span className="text-[9px] text-slate-600">Search…</span>
+          <span className="text-[9px] text-slate-600">{t('hero.demo.search')}</span>
         </div>
         <Bell className="h-3.5 w-3.5 text-slate-600" />
         <div className="h-5 w-5 rounded-md bg-indigo-600/40 flex items-center justify-center text-[7px] font-black text-indigo-300">SC</div>
@@ -193,24 +195,25 @@ function Chrome({ label }: { label: string }) {
 }
 
 const ALL_NAV = [
-  { label: 'Overview',  icon: LayoutDashboard, col: '#6366f1' },
-  { label: 'CRM',       icon: Building2,       col: '#3b82f6' },
-  { label: 'Team',      icon: Users,           col: '#8b5cf6' },
-  { label: 'Chat',      icon: MessageSquare,   col: '#06b6d4' },
-  { label: 'Tasks',     icon: CheckSquare,     col: '#10b981' },
-  { label: 'Projects',  icon: Briefcase,       col: '#f59e0b' },
-  { label: 'Meetings',  icon: Video,           col: '#ec4899' },
-  { label: 'Calendar',  icon: Calendar,        col: '#a78bfa' },
-  { label: 'Tavro AI',  icon: Sparkles,        col: '#c084fc' },
+  { id: 'overview',  icon: LayoutDashboard, col: '#6366f1' },
+  { id: 'crm',       icon: Building2,       col: '#3b82f6' },
+  { id: 'team',      icon: Users,           col: '#8b5cf6' },
+  { id: 'chat',      icon: MessageSquare,   col: '#06b6d4' },
+  { id: 'tasks',     icon: CheckSquare,     col: '#10b981' },
+  { id: 'projects',  icon: Briefcase,       col: '#f59e0b' },
+  { id: 'meetings',  icon: Video,           col: '#ec4899' },
+  { id: 'calendar',  icon: Calendar,        col: '#a78bfa' },
+  { id: 'tavro',     icon: Sparkles,        col: '#c084fc' },
 ] as const;
 
 /** Persistent sidebar used in every scene */
-function AppSidebar({ activeLabel }: { activeLabel: string }) {
+function AppSidebar({ activeId }: { activeId: string }) {
+  const t = useT('landing');
   return (
-    <div className="w-[108px] shrink-0 border-r border-white/[0.06] bg-[#090c13] flex flex-col py-2 px-1.5 gap-0.5 overflow-hidden">
+    <div className="w-[108px] shrink-0 border-e border-white/[0.06] bg-[#090c13] flex flex-col py-2 px-1.5 gap-0.5 overflow-hidden">
       {ALL_NAV.map((n) => (
-        <SideNav key={n.label} icon={n.icon as React.ElementType} label={n.label}
-          active={n.label === activeLabel} col={n.col} />
+        <SideNav key={n.id} icon={n.icon as React.ElementType} label={t(`hero.demo.nav.${n.id}`)}
+          active={n.id === activeId} col={n.col} />
       ))}
     </div>
   );
@@ -222,40 +225,41 @@ function AppSidebar({ activeLabel }: { activeLabel: string }) {
 
 /** Scene 1 — Overview dashboard */
 function SceneOverview({ reduced }: { reduced: boolean }) {
+  const t = useT('landing');
   return (
     <div className="flex-1 overflow-hidden p-3 space-y-3">
       <div>
-        <p className="text-[9px] text-slate-600 uppercase tracking-wider font-semibold mb-0.5">Overview</p>
-        <p className="text-[13px] font-bold text-white">Good morning, {D.user.name} ☀️</p>
+        <p className="text-[9px] text-slate-600 uppercase tracking-wider font-semibold mb-0.5">{t('hero.demo.scenes.overview')}</p>
+        <p className="text-[13px] font-bold text-white">{t('hero.demo.overview.greeting', { name: D.user.name })}</p>
       </div>
       {/* Stat tiles */}
       <div className="grid grid-cols-3 gap-1.5">
         {D.stats.map((s) => (
-          <div key={s.label} className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-2">
-            <p className="text-[8px] text-slate-500 mb-1">{s.label}</p>
+          <div key={s.id} className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-2">
+            <p className="text-[8px] text-slate-500 mb-1">{t(`hero.demo.overview.stats.${s.id}.label`)}</p>
             <span className="text-[17px] font-black text-white leading-none">{s.value}</span>
-            <p className="text-[8px] font-semibold" style={{ color: s.col }}>{s.sub}</p>
+            <p className="text-[8px] font-semibold" style={{ color: s.col }}>{t(`hero.demo.overview.stats.${s.id}.sub`)}</p>
           </div>
         ))}
       </div>
       {/* Recent tasks */}
       <div>
-        <p className="text-[9px] text-slate-500 uppercase tracking-wider font-bold mb-1.5">My Tasks</p>
+        <p className="text-[9px] text-slate-500 uppercase tracking-wider font-bold mb-1.5">{t('hero.demo.overview.myTasks')}</p>
         <div className="space-y-1">
-          {D.tasks.slice(0, 3).map((t, i) => (
-            <motion.div key={t.title}
+          {D.tasks.slice(0, 3).map((task, i) => (
+            <motion.div key={task.id}
               initial={{ opacity: 0, x: -6 }} animate={{ opacity: 1, x: 0 }}
               transition={{ duration: reduced ? 0 : 0.3, delay: reduced ? 0 : i * 0.07 }}
               className="flex items-center gap-2 rounded-lg border border-white/[0.04] bg-white/[0.02] px-2.5 py-1.5">
               <div className={`h-3 w-3 rounded border shrink-0 flex items-center justify-center ${
-                t.done ? 'border-emerald-500 bg-emerald-500/20' : 'border-white/20'
+                task.done ? 'border-emerald-500 bg-emerald-500/20' : 'border-white/20'
               }`}>
-                {t.done && <CheckCircle2 className="h-2 w-2 text-emerald-400" />}
+                {task.done && <CheckCircle2 className="h-2 w-2 text-emerald-400" />}
               </div>
-              <span className={`text-[10px] flex-1 truncate ${t.done ? 'line-through text-slate-600' : 'text-slate-300'}`}>{t.title}</span>
+              <span className={`text-[10px] flex-1 truncate ${task.done ? 'line-through text-slate-600' : 'text-slate-300'}`}>{t(`hero.demo.tasks.${task.id}`)}</span>
               <span className="text-[8px] font-bold px-1 py-0.5 rounded shrink-0"
-                style={{ color: PRIO_COL[t.priority], background: PRIO_COL[t.priority] + '18' }}>
-                {t.priority}
+                style={{ color: PRIO_COL[task.priority], background: PRIO_COL[task.priority] + '18' }}>
+                {t(`sample.priority.${task.priority}`)}
               </span>
             </motion.div>
           ))}
@@ -263,15 +267,15 @@ function SceneOverview({ reduced }: { reduced: boolean }) {
       </div>
       {/* Meetings */}
       <div>
-        <p className="text-[9px] text-slate-500 uppercase tracking-wider font-bold mb-1.5">Today's Meetings</p>
+        <p className="text-[9px] text-slate-500 uppercase tracking-wider font-bold mb-1.5">{t('hero.demo.overview.todaysMeetings')}</p>
         <div className="flex gap-1.5">
           {D.meetings.map((m) => (
-            <div key={m.title} className="flex-1 rounded-xl border border-white/[0.05] bg-white/[0.02] p-2">
+            <div key={m.id} className="flex-1 rounded-xl border border-white/[0.05] bg-white/[0.02] p-2">
               <div className="flex items-center gap-1 mb-0.5">
-                <Clock className="h-2.5 w-2.5 text-blue-400" /><span className="text-[9px] font-bold text-blue-400">{m.time}</span>
+                <Clock className="h-2.5 w-2.5 text-blue-400" /><span className="text-[9px] font-bold text-blue-400">{t(`hero.demo.meetings.${m.id}.time`)}</span>
               </div>
-              <p className="text-[10px] font-semibold text-white truncate">{m.title}</p>
-              <p className="text-[9px] text-slate-500">{m.people} people</p>
+              <p className="text-[10px] font-semibold text-white truncate">{t(`hero.demo.meetings.${m.id}.title`)}</p>
+              <p className="text-[9px] text-slate-500">{t('hero.demo.overview.people', { count: m.people })}</p>
             </div>
           ))}
         </div>
@@ -282,14 +286,15 @@ function SceneOverview({ reduced }: { reduced: boolean }) {
 
 /** Scene 2 — CRM Pipeline */
 function SceneCRM({ reduced }: { reduced: boolean }) {
+  const t = useT('landing');
   return (
     <div className="flex-1 overflow-hidden flex flex-col">
       {/* Pipeline stages */}
       <div className="px-3 pt-3 pb-2">
         <div className="flex items-center justify-between mb-2">
-          <p className="text-[9px] text-slate-500 uppercase tracking-wider font-bold">Sales Pipeline · Demo workspace</p>
+          <p className="text-[9px] text-slate-500 uppercase tracking-wider font-bold">{t('hero.demo.crm.heading')}</p>
           <button className="flex items-center gap-1 text-[9px] font-semibold text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded-lg">
-            <Plus className="h-2.5 w-2.5" />New deal
+            <Plus className="h-2.5 w-2.5" />{t('hero.demo.crm.newDeal')}
           </button>
         </div>
         <div className="flex items-center gap-0.5 overflow-hidden">
@@ -297,8 +302,8 @@ function SceneCRM({ reduced }: { reduced: boolean }) {
             <React.Fragment key={stage}>
               <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap ${
                 i < 3 ? 'text-indigo-300 bg-indigo-500/15' : i === 4 ? 'text-emerald-300 bg-emerald-500/15' : 'text-slate-400 bg-white/[0.05]'
-              }`}>{stage}</span>
-              {i < D.pipeline.length - 1 && <ChevronRight className="h-2.5 w-2.5 text-slate-700 shrink-0" />}
+              }`}>{t(`hero.demo.crm.stages.${stage}`)}</span>
+              {i < D.pipeline.length - 1 && <ChevronRight className="rtl-mirror h-2.5 w-2.5 text-slate-700 shrink-0" />}
             </React.Fragment>
           ))}
         </div>
@@ -319,7 +324,7 @@ function SceneCRM({ reduced }: { reduced: boolean }) {
                 <p className="text-[9px] text-slate-500 truncate">{c.contact}</p>
               </div>
               <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-md whitespace-nowrap"
-                style={{ color: ss.col, background: ss.bg }}>{c.stage}</span>
+                style={{ color: ss.col, background: ss.bg }}>{t(`hero.demo.crm.stages.${c.stage}`)}</span>
               <span className="text-[9px] font-bold text-slate-400 shrink-0">{c.value}</span>
             </motion.div>
           );
@@ -327,7 +332,7 @@ function SceneCRM({ reduced }: { reduced: boolean }) {
       </div>
       {/* Pipeline total */}
       <div className="px-3 py-2 border-t border-white/[0.06] flex items-center justify-between">
-        <span className="text-[9px] text-slate-500">Total pipeline value</span>
+        <span className="text-[9px] text-slate-500">{t('hero.demo.crm.totalValue')}</span>
         <span className="text-[11px] font-black text-emerald-400">$174k</span>
       </div>
     </div>
@@ -336,39 +341,40 @@ function SceneCRM({ reduced }: { reduced: boolean }) {
 
 /** Scene 3 — Team */
 function SceneTeam({ reduced }: { reduced: boolean }) {
+  const t = useT('landing');
   return (
     <div className="flex-1 overflow-hidden p-3 space-y-3">
       <div className="flex items-center justify-between">
-        <p className="text-[9px] text-slate-500 uppercase tracking-wider font-bold">Team Workload</p>
-        <span className="text-[9px] text-slate-500">23 members</span>
+        <p className="text-[9px] text-slate-500 uppercase tracking-wider font-bold">{t('hero.demo.team.heading')}</p>
+        <span className="text-[9px] text-slate-500">{t('sample.members', { count: 23 })}</span>
       </div>
-      {D.team.map((t, i) => (
-        <motion.div key={t.dept}
+      {D.team.map((team, i) => (
+        <motion.div key={team.dept}
           initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
           transition={{ duration: reduced ? 0 : 0.3, delay: reduced ? 0 : i * 0.07 }}>
           <div className="flex items-center justify-between mb-1.5">
             <div className="flex items-center gap-2">
-              <div className="h-2 w-2 rounded-full shrink-0" style={{ background: t.col }} />
-              <span className="text-[10px] font-semibold text-slate-200">{t.dept}</span>
+              <div className="h-2 w-2 rounded-full shrink-0" style={{ background: team.col }} />
+              <span className="text-[10px] font-semibold text-slate-200">{t(`sample.departments.${team.dept}`)}</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-[9px] text-slate-500">{t.count} members</span>
-              <span className="text-[9px] font-bold" style={{ color: t.col }}>{t.pct}%</span>
+              <span className="text-[9px] text-slate-500">{t('sample.members', { count: team.count })}</span>
+              <span className="text-[9px] font-bold" style={{ color: team.col }}>{team.pct}%</span>
             </div>
           </div>
-          <Bar pct={t.pct} col={t.col} delay={i * 0.09} reduced={reduced} />
+          <Bar pct={team.pct} col={team.col} delay={i * 0.09} reduced={reduced} />
         </motion.div>
       ))}
       {/* Quick member avatars */}
       <div className="pt-1">
-        <p className="text-[9px] text-slate-500 uppercase tracking-wider font-bold mb-2">Online now</p>
+        <p className="text-[9px] text-slate-500 uppercase tracking-wider font-bold mb-2">{t('hero.demo.team.onlineNow')}</p>
         <div className="flex items-center gap-1.5 flex-wrap">
           {['SC', 'DP', 'AR', 'TL', 'MS', 'JL'].map((av, i) => (
             <div key={av} className="relative">
               <div className="h-7 w-7 rounded-xl bg-indigo-600/30 flex items-center justify-center text-[8px] font-black text-indigo-300">
                 {av}
               </div>
-              <span className="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full bg-emerald-400 ring-1 ring-[#0d1117]" />
+              <span className="absolute -bottom-0.5 -end-0.5 h-2 w-2 rounded-full bg-emerald-400 ring-1 ring-[#0d1117]" />
             </div>
           ))}
           <div className="h-7 w-7 rounded-xl bg-white/[0.05] flex items-center justify-center text-[8px] text-slate-500">+17</div>
@@ -380,38 +386,39 @@ function SceneTeam({ reduced }: { reduced: boolean }) {
 
 /** Scene 4 — Tasks */
 function SceneTasks({ reduced }: { reduced: boolean }) {
+  const t = useT('landing');
   return (
     <div className="flex-1 overflow-hidden p-3 space-y-2">
       <div className="flex items-center justify-between">
-        <p className="text-[9px] text-slate-500 uppercase tracking-wider font-bold">My Tasks</p>
+        <p className="text-[9px] text-slate-500 uppercase tracking-wider font-bold">{t('hero.demo.overview.myTasks')}</p>
         <button className="flex items-center gap-1 text-[9px] font-semibold text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded-lg">
-          <Plus className="h-2.5 w-2.5" />New
+          <Plus className="h-2.5 w-2.5" />{t('hero.demo.newTask')}
         </button>
       </div>
-      {D.tasks.map((t, i) => (
-        <motion.div key={t.title}
+      {D.tasks.map((task, i) => (
+        <motion.div key={task.id}
           initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
           transition={{ duration: reduced ? 0 : 0.3, delay: reduced ? 0 : i * 0.07 }}
           className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-2.5">
           <div className="flex items-center gap-2 mb-2">
             <div className={`h-3.5 w-3.5 rounded border shrink-0 flex items-center justify-center ${
-              t.done ? 'border-emerald-500 bg-emerald-500/20' : 'border-white/20'
+              task.done ? 'border-emerald-500 bg-emerald-500/20' : 'border-white/20'
             }`}>
-              {t.done && <CheckCircle2 className="h-2.5 w-2.5 text-emerald-400" />}
+              {task.done && <CheckCircle2 className="h-2.5 w-2.5 text-emerald-400" />}
             </div>
-            <span className={`text-[10px] font-medium flex-1 truncate ${t.done ? 'line-through text-slate-600' : 'text-slate-200'}`}>
-              {t.title}
+            <span className={`text-[10px] font-medium flex-1 truncate ${task.done ? 'line-through text-slate-600' : 'text-slate-200'}`}>
+              {t(`hero.demo.tasks.${task.id}`)}
             </span>
             <span className="text-[8px] font-bold px-1 py-0.5 rounded shrink-0"
-              style={{ color: PRIO_COL[t.priority], background: PRIO_COL[t.priority] + '18' }}>
-              {t.priority}
+              style={{ color: PRIO_COL[task.priority], background: PRIO_COL[task.priority] + '18' }}>
+              {t(`sample.priority.${task.priority}`)}
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <Bar pct={t.pct} col={t.done ? '#10b981' : PRIO_COL[t.priority]} delay={i * 0.1} reduced={reduced} />
+            <Bar pct={task.pct} col={task.done ? '#10b981' : PRIO_COL[task.priority]} delay={i * 0.1} reduced={reduced} />
             <span className="text-[9px] font-bold shrink-0"
-              style={{ color: t.done ? '#10b981' : PRIO_COL[t.priority] }}>
-              {t.pct}%
+              style={{ color: task.done ? '#10b981' : PRIO_COL[task.priority] }}>
+              {task.pct}%
             </span>
           </div>
         </motion.div>

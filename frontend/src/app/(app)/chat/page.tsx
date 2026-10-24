@@ -1307,7 +1307,7 @@ export default function ChatPage() {
 
         {/* Project Banner (if tied to project) */}
         {linkedProject && (
-          <div className="bg-gradient-to-r from-indigo-50 via-blue-50/50 to-slate-50 border-b border-indigo-100/80 px-4 sm:px-6 py-2 flex items-center justify-between gap-4 shrink-0 text-xs">
+          <div className="bg-gradient-to-r rtl:bg-gradient-to-l from-indigo-50 via-blue-50/50 to-slate-50 border-b border-indigo-100/80 px-4 sm:px-6 py-2 flex items-center justify-between gap-4 shrink-0 text-xs">
             <div className="flex items-center gap-2.5 truncate">
               <span className="flex items-center gap-1 rounded-md bg-indigo-100/80 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-indigo-700 shrink-0">
                 <Briefcase className="h-3 w-3" />

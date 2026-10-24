@@ -37,6 +37,7 @@ import { api } from '@/lib/api';
 import { PageHeader } from '@/components/common/PageHeader';
 import { evaluateSheet, formulaFunctionNames, type FormulaValue } from '@/lib/sheetFormulas';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useI18n, useT } from '@/lib/i18n';
 
 type CellStyle = {
   bold?: boolean;
@@ -219,13 +220,21 @@ function selectionRange(selection: Selection): string {
   return start === end ? start : `${start}:${end}`;
 }
 
-function formattedCell(value: FormulaValue, format?: CellStyle['numberFormat']): string {
+/** Locale-aware formatters from useI18n(), so number-formatted cells follow the interface language. */
+type CellFormatters = {
+  formatNumber: (value: number, options?: Intl.NumberFormatOptions) => string;
+  formatDate: (value: Date, options?: Intl.DateTimeFormatOptions) => string;
+};
+
+function formattedCell(value: FormulaValue, format: CellStyle['numberFormat'] | undefined, formatters: CellFormatters): string {
   const scalarValue = firstValue(value);
   if (typeof scalarValue !== 'number' || format === 'general' || !format) return String(scalarValue ?? '');
-  if (format === 'percentage') return new Intl.NumberFormat(undefined, { style: 'percent', maximumFractionDigits: 2 }).format(scalarValue);
-  if (format === 'currency') return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(scalarValue);
-  if (format === 'date') return new Date(Date.UTC(1899, 11, 30) + scalarValue * 86_400_000).toLocaleDateString();
-  return new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(scalarValue);
+  if (format === 'percentage') return formatters.formatNumber(scalarValue, { style: 'percent', maximumFractionDigits: 2 });
+  if (format === 'currency') return formatters.formatNumber(scalarValue, { style: 'currency', currency: 'USD' });
+  if (format === 'date') {
+    return formatters.formatDate(new Date(Date.UTC(1899, 11, 30) + scalarValue * 86_400_000), { year: 'numeric', month: 'numeric', day: 'numeric' });
+  }
+  return formatters.formatNumber(scalarValue, { maximumFractionDigits: 2 });
 }
 
 function firstValue(value: FormulaValue): string | number | boolean | null {
@@ -259,8 +268,8 @@ function chartRows(sheet: SpreadsheetSheet, chart: SheetChart, values: Map<strin
   });
 }
 
-function excelSheetTitle(title: string, used: Set<string>): string {
-  const base = (title.replace(/[\\/:?*]/g, ' ').replace(/[\[\]]/g, ' ').trim().slice(0, 31) || 'Sheet');
+function excelSheetTitle(title: string, used: Set<string>, fallback: string): string {
+  const base = (title.replace(/[\\/:?*]/g, ' ').replace(/[\[\]]/g, ' ').trim().slice(0, 31) || fallback.slice(0, 31));
   let candidate = base;
   let suffix = 2;
   while (used.has(candidate.toLowerCase())) {
@@ -284,6 +293,10 @@ function downloadBlob(content: BlobPart, filename: string, type: string): void {
 export default function SheetsPage() {
   const user = useAuthStore((state) => state.user);
   const userId = user?._id;
+  const t = useT('sheets');
+  const tc = useT('common');
+  const { formatNumber, formatDate } = useI18n();
+  const cellFormatters: CellFormatters = { formatNumber, formatDate };
   const [workbooks, setWorkbooks] = useState<Workbook[]>([]);
   const [activeWorkbook, setActiveWorkbook] = useState<Workbook | null>(null);
   const [activeSheetId, setActiveSheetId] = useState('');

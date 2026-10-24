@@ -1,17 +1,21 @@
 import type { Metadata } from 'next';
+import { getBillingServerTranslator } from '@/components/billing/serverMessages';
 
-export const metadata: Metadata = {
-  title: 'WorkGrind Pricing | Plans for Each Workspace',
-  description: 'Review Solo and Company plans alongside configured education pricing for School / Academy, College, and University workspaces.',
-  openGraph: {
-    title: 'WorkGrind Pricing',
-    description: 'Plan availability, prices, and limits are provided by WorkGrind billing configuration.',
-    url: '/pricing',
-    siteName: 'WorkGrind',
-    images: [{ url: '/workgrind-og.png', width: 1200, height: 630, alt: 'WorkGrind — Connected Workspaces for Work and Learning' }],
-    type: 'website',
-  },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getBillingServerTranslator();
+  return {
+    title: t('meta.pricingTitle'),
+    description: t('meta.pricingDescription'),
+    openGraph: {
+      title: t('meta.pricingOgTitle'),
+      description: t('meta.pricingOgDescription'),
+      url: '/pricing',
+      siteName: 'WorkGrind',
+      images: [{ url: '/workgrind-og.png', width: 1200, height: 630, alt: t('meta.ogImageAlt') }],
+      type: 'website',
+    },
+  };
+}
 
 export default function PricingLayout({ children }: { children: React.ReactNode }) {
   return children;

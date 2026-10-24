@@ -15,6 +15,8 @@ import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ThemeAwareLogo } from '@/components/common/ThemeAwareLogo';
 import { getApiBaseUrl } from '@/lib/apiConfig';
+import { describeApiError } from '@/lib/apiError';
+import { renderRich, useT } from '@/lib/i18n';
 import {
   Lock, Eye, EyeOff, CheckCircle2, AlertCircle, ArrowRight, Loader2,
 } from 'lucide-react';
@@ -26,6 +28,8 @@ function AcceptInviteForm() {
   const router       = useRouter();
   const searchParams = useSearchParams();
   const token        = searchParams.get('token') ?? '';
+  const t            = useT('clientPortal');
+  const tc           = useT('common');
 
   const [password,    setPassword]    = useState('');
   const [confirm,     setConfirm]     = useState('');
@@ -52,14 +56,14 @@ function AcceptInviteForm() {
   const passwordsMatch  = password && confirm && password === confirm;
   const strengthLevel   = password.length === 0 ? 0 : password.length < 5 ? 1 : password.length < 8 ? 2 : 3;
   const strengthColors  = ['#e2e8f0', '#f87171', '#fbbf24', '#34d399'];
-  const strengthLabels  = ['', 'Weak', 'Fair', 'Strong'];
+  const strengthLabels  = ['', t('accept.strength.weak'), t('accept.strength.fair'), t('accept.strength.strong')];
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
 
-    if (password !== confirm) { setError('Passwords do not match.'); return; }
-    if (password.length < 6)  { setError('Password must be at least 6 characters.'); return; }
+    if (password !== confirm) { setError(tc('validation.passwordsMatch')); return; }
+    if (password.length < 6)  { setError(t('accept.errors.minLength')); return; }
 
     setLoading(true);
     try {
@@ -71,7 +75,8 @@ function AcceptInviteForm() {
       const data = await res.json();
 
       if (!res.ok || !data.success) {
-        setError(data.message ?? 'Invalid or expired invitation link.');
+        // Same shape as an Axios failure so the message follows the interface language.
+        setError(describeApiError({ isAxiosError: true, response: { status: res.status, data } }, t('accept.errors.invalidLink')).message);
         setTokenValid(false);
         return;
       }
@@ -82,7 +87,7 @@ function AcceptInviteForm() {
       setSuccess(true);
       setTimeout(() => router.push('/client-portal/portal'), 1800);
     } catch {
-      setError('Something went wrong. Please try again or contact support.');
+      setError(t('accept.errors.generic'));
     } finally {
       setLoading(false);
     }
@@ -93,7 +98,7 @@ function AcceptInviteForm() {
     return (
       <div className="flex flex-col items-center gap-4 py-12">
         <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
-        <p className="text-sm text-slate-500">Validating your invitation…</p>
+        <p className="text-sm text-slate-500">{t('accept.validating')}</p>
       </div>
     );
   }
@@ -105,16 +110,15 @@ function AcceptInviteForm() {
         <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-50">
           <AlertCircle className="h-7 w-7 text-rose-500" />
         </div>
-        <h2 className="text-lg font-bold text-slate-900">Invalid invitation</h2>
+        <h2 className="text-lg font-bold text-slate-900">{t('accept.invalid.title')}</h2>
         <p className="text-sm text-slate-500 max-w-sm">
-          This invitation link is missing, invalid, or has already been used.
-          Ask your account manager to resend the invitation.
+          {t('accept.invalid.body')}
         </p>
         <a
           href="/client-portal"
           className="mt-2 text-sm font-semibold text-indigo-600 hover:underline"
         >
-          Go to login →
+          {t('accept.invalid.goToLogin')}
         </a>
       </div>
     );
@@ -127,9 +131,9 @@ function AcceptInviteForm() {
         <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50">
           <CheckCircle2 className="h-7 w-7 text-emerald-500" />
         </div>
-        <h2 className="text-lg font-bold text-slate-900">Account created!</h2>
+        <h2 className="text-lg font-bold text-slate-900">{t('accept.success.title')}</h2>
         <p className="text-sm text-slate-500">
-          Redirecting you to your portal…
+          {t('accept.success.body')}
         </p>
         <Loader2 className="h-5 w-5 animate-spin text-indigo-500 mt-2" />
       </div>
@@ -141,10 +145,10 @@ function AcceptInviteForm() {
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
         <h1 className="text-xl font-extrabold tracking-tight text-slate-900">
-          Set up your account
+          {t('accept.form.title')}
         </h1>
         <p className="mt-1 text-sm text-slate-500">
-          Choose a password to activate your client portal access.
+          {t('accept.form.subtitle')}
         </p>
       </div>
 
@@ -157,24 +161,24 @@ function AcceptInviteForm() {
 
       {/* Password */}
       <div>
-        <label className="form-label" htmlFor="cp-pass">Password</label>
+        <label className="form-label" htmlFor="cp-pass">{tc('fields.password')}</label>
         <div className="relative">
-          <Lock className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <Lock className="pointer-events-none absolute start-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <input
             id="cp-pass"
             type={showPass ? 'text' : 'password'}
             value={password}
             onChange={e => setPassword(e.target.value)}
-            placeholder="Minimum 6 characters"
-            className="input-premium w-full pl-10 pr-11"
+            placeholder={t('accept.form.passwordPlaceholder')}
+            className="input-premium w-full ps-10 pe-11"
             autoComplete="new-password"
             required
           />
           <button
             type="button"
             onClick={() => setShowPass(p => !p)}
-            aria-label={showPass ? 'Hide password' : 'Show password'}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+            aria-label={showPass ? t('accept.form.hidePassword') : t('accept.form.showPassword')}
+            className="absolute end-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
           >
             {showPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </button>
@@ -200,16 +204,16 @@ function AcceptInviteForm() {
 
       {/* Confirm password */}
       <div>
-        <label className="form-label" htmlFor="cp-conf">Confirm Password</label>
+        <label className="form-label" htmlFor="cp-conf">{t('accept.form.confirmLabel')}</label>
         <div className="relative">
-          <Lock className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <Lock className="pointer-events-none absolute start-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <input
             id="cp-conf"
             type={showConf ? 'text' : 'password'}
             value={confirm}
             onChange={e => setConfirm(e.target.value)}
-            placeholder="Repeat your password"
-            className={`input-premium w-full pl-10 pr-11 ${
+            placeholder={t('accept.form.confirmPlaceholder')}
+            className={`input-premium w-full ps-10 pe-11 ${
               confirm
                 ? passwordsMatch
                   ? 'border-emerald-400 focus:border-emerald-400'
@@ -222,8 +226,8 @@ function AcceptInviteForm() {
           <button
             type="button"
             onClick={() => setShowConf(p => !p)}
-            aria-label={showConf ? 'Hide password' : 'Show password'}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+            aria-label={showConf ? t('accept.form.hidePassword') : t('accept.form.showPassword')}
+            className="absolute end-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
           >
             {confirm && passwordsMatch
               ? <CheckCircle2 className="h-4 w-4 text-emerald-500" />
@@ -240,23 +244,27 @@ function AcceptInviteForm() {
         style={{ fontWeight: 600 }}
       >
         {loading ? (
-          <><Loader2 className="h-4 w-4 animate-spin" /><span>Activating…</span></>
+          <><Loader2 className="h-4 w-4 animate-spin" /><span>{t('accept.form.activating')}</span></>
         ) : (
-          <><span>Activate Account</span><ArrowRight className="h-4 w-4" /></>
+          <><span>{t('accept.form.activate')}</span><ArrowRight className="rtl-mirror h-4 w-4" /></>
         )}
       </button>
 
       <p className="text-center text-xs text-slate-500">
-        Already activated?{' '}
-        <a href="/client-portal" className="font-semibold text-indigo-600 hover:underline">
-          Sign in
-        </a>
+        {renderRich(t('accept.form.alreadyActivated'), {
+          link: (chunk) => (
+            <a href="/client-portal" className="font-semibold text-indigo-600 hover:underline">
+              {chunk}
+            </a>
+          ),
+        })}
       </p>
     </form>
   );
 }
 
 export default function AcceptInvitePage() {
+  const t = useT('clientPortal');
   return (
     <div
       className="min-h-screen flex flex-col items-center justify-center px-4 py-10"
@@ -266,7 +274,7 @@ export default function AcceptInvitePage() {
         {/* Logo */}
         <div className="flex flex-col items-center gap-2">
           <ThemeAwareLogo size="md" showWordmark />
-          <p className="text-xs text-slate-500 mt-1">Client Portal Invitation</p>
+          <p className="text-xs text-slate-500 mt-1">{t('accept.invitationLabel')}</p>
         </div>
 
         {/* Card */}
@@ -285,7 +293,7 @@ export default function AcceptInvitePage() {
         </div>
 
         <p className="text-center text-xs text-slate-400">
-          🔒 Secure · Encrypted · Isolated workspace access
+          {t('accept.secureNote')}
         </p>
       </div>
     </div>

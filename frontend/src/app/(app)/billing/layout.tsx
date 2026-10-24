@@ -1,6 +1,10 @@
 import type { Metadata } from 'next';
+import { getBillingServerTranslator } from '@/components/billing/serverMessages';
 
-export const metadata: Metadata = { title: 'Billing | WorkGrind' };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getBillingServerTranslator();
+  return { title: t('meta.billingTitle') };
+}
 
 export default function BillingLayout({ children }: { children: React.ReactNode }) {
   return children;
