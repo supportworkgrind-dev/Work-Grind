@@ -1,18 +1,26 @@
-export const ACADEMIC_SECTIONS = [
-  { id: 'overview', label: 'Academic Overview' },
-  { id: 'students', label: 'Students' },
-  { id: 'teachers', label: 'Teachers' },
-  { id: 'parents', label: 'Parents' },
-  { id: 'departments', label: 'Departments' },
-  { id: 'courses', label: 'Courses' },
-  { id: 'classes', label: 'Classes' },
-  { id: 'timetable', label: 'Timetable' },
-  { id: 'assignments', label: 'Assignments' },
-  { id: 'attendance', label: 'Attendance' },
-  { id: 'exams', label: 'Exams' },
-  { id: 'results', label: 'Results' },
-  { id: 'fees', label: 'Fees' },
+import { academic } from '@/lib/i18n/messages/academic';
+
+const ACADEMIC_SECTION_IDS = [
+  'overview',
+  'students',
+  'teachers',
+  'parents',
+  'departments',
+  'courses',
+  'classes',
+  'timetable',
+  'assignments',
+  'attendance',
+  'exams',
+  'results',
+  'fees',
 ] as const;
+
+/**
+ * Sections of the academic workspace, in navigation order. `label` is the English
+ * name; screens show the translated name with t(`academic.sections.${id}`).
+ */
+export const ACADEMIC_SECTIONS = ACADEMIC_SECTION_IDS.map((id) => ({ id, label: academic.en.sections[id] }));
 
 export type AcademicSection = (typeof ACADEMIC_SECTIONS)[number]['id'];
 

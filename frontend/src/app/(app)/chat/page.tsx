@@ -6,7 +6,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useAppStore } from '@/store/useAppStore';
 import { api } from '@/lib/api';
-import { getApiErrorMessage } from '@/lib/getApiErrorMessage';
+import { describeApiError } from '@/lib/apiError';
+import { useI18n, useT } from '@/lib/i18n';
 import { getSocket, joinRoom, leaveRoom } from '@/lib/socket';
 import { Channel, Conversation, Message, User } from '@/types';
 import { useChatSound } from '@/lib/useChatSound';
@@ -161,6 +162,9 @@ export default function ChatPage() {
   const { openCreateModal } = useAppStore();
   const { isMuted, toggleMute, playChime } = useChatSound();
   const { notify } = useChatNotifications();
+  const t = useT('chat');
+  const tc = useT('common');
+  const { formatTime } = useI18n();
 
   // Primary Data
   const [channels, setChannels] = useState<Channel[]>([]);
@@ -293,7 +297,7 @@ export default function ChatPage() {
     setNewDmUser(null);
     setNewDmError('');
     if (!/^WG-\d{5,8}$/.test(id)) {
-      setNewDmError('Enter a valid WorkGrind User ID, such as WG-25724.');
+      setNewDmError(t('newDm.errors.invalidId'));
       return;
     }
     setNewDmUserId(id);
@@ -303,13 +307,10 @@ export default function ChatPage() {
       if (response.data?.success && response.data.user?.callingId === id) {
         setNewDmUser(response.data.user as DmLookupUser);
       } else {
-        setNewDmError('That WorkGrind User ID could not be verified.');
+        setNewDmError(t('newDm.errors.notVerified'));
       }
     } catch (error: unknown) {
-      setNewDmError(getApiErrorMessage(
-        error,
-        'No active user was found with that WorkGrind User ID.',
-      ));
+      setNewDmError(describeApiError(error, t('newDm.errors.notFound')).message);
     } finally {
       setNewDmSearching(false);
     }
@@ -323,7 +324,7 @@ export default function ChatPage() {
       const response = await api.post('/direct-messages/conversations', { recipientCallingId: newDmUser.callingId });
       const conversation = response.data?.conversation as Conversation | undefined;
       if (!response.data?.success || !conversation?._id) {
-        setNewDmError('The conversation could not be opened. Please try again.');
+        setNewDmError(t('newDm.errors.openFailed'));
         return;
       }
       setConversations((current) => [
@@ -338,10 +339,7 @@ export default function ChatPage() {
       setNewDmUser(null);
       router.push(`/chat?conversationId=${encodeURIComponent(conversation._id)}`);
     } catch (error: unknown) {
-      setNewDmError(getApiErrorMessage(
-        error,
-        'This user is not currently available for direct messages.',
-      ));
+      setNewDmError(describeApiError(error, t('newDm.errors.unavailable')).message);
     } finally {
       setNewDmStarting(false);
     }
@@ -450,8 +448,8 @@ export default function ChatPage() {
         if (msg.senderId?._id !== user?._id) {
           playChime();
           notify(
-            activeChannel ? `#${activeChannel.name}` : (msg.senderId?.fullName || 'Direct Message'),
-            `${msg.senderId?.fullName}: ${msg.content || 'Sent an attachment'}`
+            activeChannel ? `#${activeChannel.name}` : (msg.senderId?.fullName || t('labels.directMessage')),
+            `${msg.senderId?.fullName}: ${msg.content || t('labels.sentAttachment')}`
           );
         }
       } else {
@@ -461,7 +459,7 @@ export default function ChatPage() {
           setUnreadCounts((prev) => ({ ...prev, [targetId]: (prev[targetId] || 0) + 1 }));
           if (msg.senderId?._id !== user?._id) {
             playChime();
-            notify(msg.senderId?.fullName || 'WorkGrind', msg.content || 'Sent an attachment');
+            notify(msg.senderId?.fullName || 'WorkGrind', msg.content || t('labels.sentAttachment'));
           }
         }
       }
@@ -492,7 +490,7 @@ export default function ChatPage() {
     const handleTypingStart = ({ userId, userName, channelId, dmId }: any) => {
       const isForCurrent = (activeChannel && channelId === activeChannel._id) || (activeConv && dmId === activeConv._id);
       if (isForCurrent && userId !== user?._id) {
-        setTypingUsers((prev) => ({ ...prev, [userId]: userName || 'Someone' }));
+        setTypingUsers((prev) => ({ ...prev, [userId]: userName || t('labels.someone') }));
       }
     };
 
@@ -534,8 +532,8 @@ export default function ChatPage() {
         if (incomingMsg?.senderId?._id !== user?._id) {
           playChime();
           notify(
-            incomingMsg?.senderId?.fullName || 'Direct Message',
-            incomingMsg?.content || 'Sent an attachment'
+            incomingMsg?.senderId?.fullName || t('labels.directMessage'),
+            incomingMsg?.content || t('labels.sentAttachment')
           );
         }
       }
@@ -561,7 +559,7 @@ export default function ChatPage() {
       socket.off('typing:stop', handleTypingStop);
       socket.off('dm:notification', handleDmNotification);
     };
-  }, [activeChannel, activeConv, user, playChime, notify]);
+  }, [activeChannel, activeConv, user, playChime, notify, t]);
 
   // Smart Auto-scroll: Only scroll to bottom if user is near bottom
   const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
@@ -626,7 +624,7 @@ export default function ChatPage() {
     if (!files || files.length === 0) return;
     if (storageLimitReached) {
       window.dispatchEvent(new CustomEvent('workgrind:upgrade-required', {
-        detail: { message: 'Your workspace storage limit is reached. Upgrade your plan to attach more files.' },
+        detail: { message: t('composer.storageLimitReached') },
       }));
       return;
     }
@@ -660,7 +658,7 @@ export default function ChatPage() {
       }
     } catch (err) {
       console.error('File upload error:', err);
-      setUploadError(getApiErrorMessage(err, 'File could not be attached.'));
+      setUploadError(describeApiError(err, t('composer.attachFailed')).message);
     } finally {
       setIsUploading(false);
     }
@@ -775,7 +773,7 @@ export default function ChatPage() {
   };
 
   const handleDeleteMessage = async (messageId: string) => {
-    if (!confirm('Are you sure you want to delete this message?')) return;
+    if (!confirm(t('message.deleteConfirm'))) return;
     try {
       const endpoint = activeConv
         ? `/direct-messages/${activeConv._id}/messages/${messageId}`
@@ -810,12 +808,10 @@ export default function ChatPage() {
   };
 
   const handleReportMessage = async (messageId: string, content: string) => {
-    const reason = prompt(
-      'Report reason:\n1. harassment\n2. spam\n3. inappropriate_content\n4. hate_speech\n5. violence\n6. privacy_violation\n7. other\n\nType the reason:'
-    );
+    const reason = prompt(t('report.reasonPrompt'));
     const validReasons = ['harassment','spam','inappropriate_content','hate_speech','violence','privacy_violation','other'];
     if (!reason || !validReasons.includes(reason.toLowerCase().replace(/\s+/g,'_'))) return;
-    const details = prompt('Additional details (optional):') || undefined;
+    const details = prompt(t('report.detailsPrompt')) || undefined;
     try {
       await api.post('/moderation/reports', {
         targetType: 'message',
@@ -823,9 +819,9 @@ export default function ChatPage() {
         reason: reason.toLowerCase().replace(/\s+/g,'_'),
         details,
       });
-      alert('Report submitted. Our moderators will review it shortly.');
+      alert(t('report.submitted'));
     } catch (err: any) {
-      alert(err?.response?.data?.message || 'Failed to submit report.');
+      alert(describeApiError(err, t('report.failed')).message);
     }
   };
 
@@ -836,7 +832,7 @@ export default function ChatPage() {
   const getRecipientName = (conv: Conversation) => {
     if (conv.isGroup && conv.groupName) return conv.groupName;
     const other = getRecipientUser(conv);
-    return other?.fullName || 'Direct Message';
+    return other?.fullName || t('labels.directMessage');
   };
 
   // Filtering and categorizing channels
@@ -863,9 +859,9 @@ export default function ChatPage() {
   const typingNames = Object.values(typingUsers);
   const typingText =
     typingNames.length === 1
-      ? `${typingNames[0]} is typing...`
+      ? t('typing.single', { name: typingNames[0] })
       : typingNames.length > 1
-      ? `${typingNames.join(', ')} are typing...`
+      ? t('typing.multiple', { names: typingNames.join(t('typing.separator')) })
       : null;
 
   return (
@@ -887,14 +883,14 @@ export default function ChatPage() {
       {isDragging && (
         <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-indigo-600/90 text-[var(--text-on-accent)] backdrop-blur-xs animate-in fade-in duration-150">
           <UploadCloud className="h-16 w-16 animate-bounce stroke-1" />
-          <p className="mt-4 text-lg font-bold">Drop files here to upload & attach</p>
-          <p className="text-xs text-indigo-200 mt-1">Images, PDFs, documents up to 50MB</p>
+          <p className="mt-4 text-lg font-bold">{t('composer.dropTitle')}</p>
+          <p className="text-xs text-indigo-200 mt-1">{t('composer.dropHint')}</p>
         </div>
       )}
       {isMobileSidebarOpen && (
         <button
           type="button"
-          aria-label="Close conversations"
+          aria-label={t('sidebar.closeConversations')}
           onClick={() => setIsMobileSidebarOpen(false)}
           className="absolute inset-0 z-20 bg-slate-950/35 backdrop-blur-[1px] md:hidden"
         />
@@ -902,29 +898,29 @@ export default function ChatPage() {
 
       {/* ── SIDEBAR: Channels & Conversations ── */}
       <div
-        className={`absolute inset-y-0 left-0 z-30 flex w-[min(20rem,88vw)] shrink-0 flex-col transition-transform duration-200 md:static md:w-72 ${
+        className={`absolute inset-y-0 start-0 z-30 flex w-[min(20rem,88vw)] shrink-0 flex-col transition-transform duration-200 md:static md:w-72 ${
           isMobileSidebarOpen
             ? 'translate-x-0 shadow-2xl'
             : 'hidden md:flex'
         }`}
-        style={{ borderRight: '1px solid var(--border-color)', background: 'var(--bg-sidebar)' }}
+        style={{ borderInlineEnd: '1px solid var(--border-color)', background: 'var(--bg-sidebar)' }}
       >
         {/* Search Header */}
         <div className="border-b p-4 sm:p-5" style={{ borderColor: 'var(--border-color)' }}>
           <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-2.5 h-3.5 w-3.5 theme-text-muted" />
+            <Search className="pointer-events-none absolute start-3 top-2.5 h-3.5 w-3.5 theme-text-muted" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Jump to channel or DM..."
-              className="w-full rounded-xl border py-2 pl-9 pr-8 text-xs theme-text-primary outline-none transition-all placeholder:theme-text-muted focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-glow)]"
+              placeholder={t('sidebar.searchPlaceholder')}
+              className="w-full rounded-xl border py-2 ps-9 pe-8 text-xs theme-text-primary outline-none transition-all placeholder:theme-text-muted focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-glow)]"
               style={{ borderColor: 'var(--border-color)', background: 'var(--bg-input)' }}
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600"
+                className="absolute end-2.5 top-2 text-slate-400 hover:text-slate-600"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
@@ -939,7 +935,7 @@ export default function ChatPage() {
             <div>
               <div className="flex items-center gap-1.5 px-2 text-[10px] font-bold uppercase tracking-wider text-amber-600 mb-1.5">
                 <Star className="h-3 w-3 fill-amber-400 text-amber-500" />
-                <span>Pinned Channels</span>
+                <span>{t('sidebar.pinnedChannels')}</span>
               </div>
               <div className="space-y-1">
                 {pinnedChannels.map((ch) => (
@@ -978,7 +974,7 @@ export default function ChatPage() {
                         type="button"
                         onClick={(e) => togglePinItem(ch._id, e)}
                         className="opacity-0 group-hover/ch:opacity-100 p-0.5 hover:scale-110"
-                        title="Unpin"
+                        title={t('sidebar.unpin')}
                       >
                         <Star className="h-3 w-3 fill-amber-400 text-amber-500" />
                       </button>
@@ -995,7 +991,7 @@ export default function ChatPage() {
               <div className="flex items-center justify-between px-2 text-[10px] font-bold uppercase tracking-wider text-indigo-700 mb-1.5">
                 <span className="flex items-center gap-1.5">
                   <Briefcase className="h-3 w-3" />
-                  <span>Projects</span>
+                  <span>{t('sidebar.projects')}</span>
                 </span>
                 <span className="text-[10px] font-medium text-slate-400">{projectChannels.length}</span>
               </div>
@@ -1036,7 +1032,7 @@ export default function ChatPage() {
                         type="button"
                         onClick={(e) => togglePinItem(ch._id, e)}
                         className="opacity-0 group-hover/ch:opacity-100 p-0.5 hover:scale-110 text-slate-400 hover:text-amber-500"
-                        title="Pin Channel"
+                        title={t('sidebar.pinChannel')}
                       >
                         <Star className="h-3 w-3" />
                       </button>
@@ -1050,12 +1046,12 @@ export default function ChatPage() {
           {/* General & Public Channels */}
           <div>
             <div className="flex items-center justify-between px-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-              <span>Channels</span>
+              <span>{t('sidebar.channels')}</span>
               {(user?.role === 'owner' || user?.role === 'admin' || user?.role === 'manager') && (
                 <button
                   onClick={() => openCreateModal('channel')}
                   className="rounded-lg p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700 transition-colors"
-                  title="Create Channel"
+                  title={t('sidebar.createChannel')}
                 >
                   <Plus className="h-3.5 w-3.5" />
                 </button>
@@ -1102,7 +1098,7 @@ export default function ChatPage() {
                       type="button"
                       onClick={(e) => togglePinItem(ch._id, e)}
                       className="opacity-0 group-hover/ch:opacity-100 p-0.5 hover:scale-110 text-slate-400 hover:text-amber-500"
-                      title="Pin Channel"
+                      title={t('sidebar.pinChannel')}
                     >
                       <Star className="h-3 w-3" />
                     </button>
@@ -1115,15 +1111,15 @@ export default function ChatPage() {
           {/* Direct Messages */}
           <div>
           <div className="flex items-center justify-between px-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-            <span>Direct Messages</span>
+            <span>{t('sidebar.directMessages')}</span>
             <div className="flex items-center gap-2">
               <span className="text-[10px] font-medium text-slate-400">{filteredConversations.length}</span>
               <button
                 type="button"
                 onClick={() => { setShowNewDm(true); setNewDmError(''); }}
                 className="rounded-lg p-1 theme-text-muted transition hover:bg-[var(--bg-hover)] hover:text-[var(--accent-text)]"
-                title="Start a direct message by user ID"
-                aria-label="Start a direct message by user ID"
+                title={t('sidebar.startDm')}
+                aria-label={t('sidebar.startDm')}
               >
                 <UserRoundPlus className="h-3.5 w-3.5" />
               </button>
@@ -1131,7 +1127,7 @@ export default function ChatPage() {
           </div>
             <div className="space-y-1">
               {filteredConversations.length === 0 ? (
-                <p className="px-2 text-[11px] text-slate-400 py-1 italic">No direct messages</p>
+                <p className="px-2 text-[11px] text-slate-400 py-1 italic">{t('sidebar.noDirectMessages')}</p>
               ) : (
                 filteredConversations.map((conv) => {
                   const otherUser = getRecipientUser(conv);
@@ -1154,7 +1150,7 @@ export default function ChatPage() {
                         <div className="relative shrink-0">
                           <Avatar name={getRecipientName(conv)} src={otherUser?.avatar || undefined} size="xs" shape="circle" />
                           <span
-                            className={`absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full ring-2 ${
+                            className={`absolute -bottom-0.5 -end-0.5 h-2 w-2 rounded-full ring-2 ${
                               isOnline ? 'bg-emerald-500' : 'bg-slate-300'
                             }`}
                             style={{ ['--tw-ring-color' as string]: 'var(--bg-sidebar)' }}
@@ -1182,15 +1178,15 @@ export default function ChatPage() {
           <section role="dialog" aria-modal="true" aria-labelledby="new-dm-title" className="w-full max-w-md rounded-2xl border p-5 shadow-2xl theme-bg-card theme-border">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <h2 id="new-dm-title" className="text-base font-bold theme-text-primary">Start a direct message</h2>
-                <p className="mt-1 text-xs theme-text-muted">Find an active user using their public WorkGrind User ID.</p>
+                <h2 id="new-dm-title" className="text-base font-bold theme-text-primary">{t('newDm.title')}</h2>
+                <p className="mt-1 text-xs theme-text-muted">{t('newDm.subtitle')}</p>
               </div>
-              <button type="button" onClick={() => setShowNewDm(false)} className="rounded-lg p-1.5 theme-text-muted hover:bg-[var(--bg-hover)]" aria-label="Close new direct message">
+              <button type="button" onClick={() => setShowNewDm(false)} className="rounded-lg p-1.5 theme-text-muted hover:bg-[var(--bg-hover)]" aria-label={t('newDm.close')}>
                 <X className="h-4 w-4" />
               </button>
             </div>
             <form onSubmit={(event) => void findDmUser(event)} className="mt-4 space-y-2">
-              <label htmlFor="new-dm-user-id" className="block text-xs font-medium theme-text-secondary">WorkGrind User ID</label>
+              <label htmlFor="new-dm-user-id" className="block text-xs font-medium theme-text-secondary">{t('newDm.userIdLabel')}</label>
               <div className="flex gap-2">
                 <input
                   id="new-dm-user-id"
@@ -1205,24 +1201,24 @@ export default function ChatPage() {
                 />
                 <button type="submit" disabled={newDmSearching} className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[var(--accent)] px-4 text-xs font-semibold text-white disabled:opacity-60">
                   {newDmSearching ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}
-                  Find
+                  {t('newDm.find')}
                 </button>
               </div>
             </form>
-            <p className="mt-2 text-[11px] theme-text-muted">Messaging is available with active WorkGrind users across workspaces.</p>
+            <p className="mt-2 text-[11px] theme-text-muted">{t('newDm.availability')}</p>
             {newDmError && <p role="alert" className="mt-3 rounded-xl border border-rose-500/25 bg-rose-500/5 px-3 py-2 text-xs text-rose-600">{newDmError}</p>}
             {newDmUser && (
               <div className="mt-4 flex items-center gap-3 rounded-xl border p-3" style={{ borderColor: 'var(--border-color)', background: 'var(--bg-sunken)' }}>
                 <Avatar name={newDmUser.fullName} src={newDmUser.avatar} size="md" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold theme-text-primary">{newDmUser.fullName}</p>
-                  <p className="truncate font-mono text-[10px] theme-text-muted">WorkGrind User ID · {newDmUser.callingId}</p>
-                  <p className="truncate text-xs theme-text-muted">{newDmUser.jobTitle || 'WorkGrind user'}</p>
-                  <p className="mt-1 text-[10px] font-medium text-emerald-600">Active WorkGrind user · direct message available</p>
+                  <p className="truncate font-mono text-[10px] theme-text-muted">{t('newDm.userIdLine', { id: newDmUser.callingId })}</p>
+                  <p className="truncate text-xs theme-text-muted">{newDmUser.jobTitle || t('newDm.defaultJobTitle')}</p>
+                  <p className="mt-1 text-[10px] font-medium text-emerald-600">{t('newDm.activeUser')}</p>
                 </div>
                 <button type="button" onClick={() => void startDmWithFoundUser()} disabled={newDmStarting} className="inline-flex min-h-9 shrink-0 items-center gap-2 rounded-xl bg-[var(--accent)] px-3 text-xs font-semibold text-white disabled:opacity-60">
                   {newDmStarting ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <MessageSquare className="h-3.5 w-3.5" />}
-                  Open DM
+                  {t('newDm.openDm')}
                 </button>
               </div>
             )}
@@ -1252,7 +1248,7 @@ export default function ChatPage() {
                   <div className="flex items-center gap-2">
                     <h2 className="truncate text-sm font-bold theme-text-primary">#{activeChannel.name}</h2>
                     {activeChannel.isDefault && (
-                      <span className="rounded bg-[var(--bg-hover)] px-1.5 py-0.5 text-[10px] font-bold theme-text-muted">Default</span>
+                      <span className="rounded bg-[var(--bg-hover)] px-1.5 py-0.5 text-[10px] font-bold theme-text-muted">{t('header.default')}</span>
                     )}
                   </div>
                   {activeChannel.description && (
@@ -1267,7 +1263,7 @@ export default function ChatPage() {
                 <div className="relative shrink-0">
                   <Avatar name={getRecipientName(activeConv)} src={otherUserInDM?.avatar || undefined} size="sm" shape="circle" />
                   <span
-                    className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full ring-2 ${
+                    className={`absolute bottom-0 end-0 h-2.5 w-2.5 rounded-full ring-2 ${
                       isRecipientOnline ? 'bg-emerald-500' : 'bg-slate-300'
                     }`}
                     style={{ ['--tw-ring-color' as string]: 'var(--bg-card)' }}
@@ -1276,12 +1272,12 @@ export default function ChatPage() {
                 <div>
                   <h2 className="truncate text-sm font-bold theme-text-primary">{getRecipientName(activeConv)}</h2>
                   <p className="text-[10px] theme-text-muted">
-                    {isRecipientOnline ? 'Active now' : 'Offline'}
+                    {isRecipientOnline ? t('header.activeNow') : t('header.offline')}
                   </p>
                 </div>
               </div>
             ) : (
-              <h2 className="text-sm font-bold theme-text-primary">Select a conversation</h2>
+              <h2 className="text-sm font-bold theme-text-primary">{t('header.selectConversation')}</h2>
             )}
           </div>
 
@@ -1295,7 +1291,7 @@ export default function ChatPage() {
                   : 'text-[var(--accent-text)]'
               }`}
               style={{ borderColor: 'var(--border-color)', background: isMuted ? 'var(--bg-sunken)' : 'var(--accent-subtle)' }}
-              title={isMuted ? 'Unmute chat sounds' : 'Mute chat sounds'}
+              title={isMuted ? t('header.unmute') : t('header.mute')}
             >
               {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
             </button>
@@ -1303,7 +1299,7 @@ export default function ChatPage() {
             {activeChannel && (
               <span className="hidden items-center gap-1.5 rounded-xl border px-2.5 py-1 font-medium theme-text-secondary sm:flex" style={{ borderColor: 'var(--border-color)', background: 'var(--bg-sunken)' }}>
                 <Users className="h-3.5 w-3.5 theme-text-muted" />
-                <span>{activeChannel.members?.length || 1} members</span>
+                <span>{t('header.members', { count: activeChannel.members?.length || 1 })}</span>
               </span>
             )}
           </div>
@@ -1315,17 +1311,17 @@ export default function ChatPage() {
             <div className="flex items-center gap-2.5 truncate">
               <span className="flex items-center gap-1 rounded-md bg-indigo-100/80 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-indigo-700 shrink-0">
                 <Briefcase className="h-3 w-3" />
-                Project
+                {t('project.badge')}
               </span>
               <span className="font-bold text-slate-900 truncate">{linkedProject.name}</span>
               <span className="text-slate-300">•</span>
-              <span className="text-slate-500 truncate">{linkedProject.progress || 0}% completed</span>
+              <span className="text-slate-500 truncate">{t('project.progress', { progress: linkedProject.progress || 0 })}</span>
             </div>
             <Link
               href="/projects"
               className="inline-flex items-center gap-1 rounded-xl bg-white border border-indigo-200/80 px-2.5 py-1 font-semibold text-indigo-600 shadow-2xs hover:bg-indigo-50 transition-colors shrink-0"
             >
-              <span>View Roadmap</span>
+              <span>{t('project.viewRoadmap')}</span>
               <ExternalLink className="h-3 w-3" />
             </Link>
           </div>
@@ -1357,13 +1353,13 @@ export default function ChatPage() {
                 <MessageSquare className="h-7 w-7 stroke-1" />
               </div>
               <h3 className="text-base font-bold theme-text-primary">
-                {activeChannel ? `Welcome to #${activeChannel.name}!` : 'Start this conversation!'}
+                {activeChannel ? t('empty.welcome', { name: activeChannel.name }) : t('empty.startConversation')}
               </h3>
               <p className="mt-1 text-xs leading-relaxed theme-text-secondary">
-                This is the very beginning of the thread. Send a message, share files, or brainstorm ideas with your team.
+                {t('empty.body')}
               </p>
               <div className="mt-5 flex flex-wrap justify-center gap-2">
-                {['👋 Say hello!', '🚀 Share sprint goals', '📋 Post an update'].map((prompt, idx) => (
+                {[t('empty.prompts.sayHello'), t('empty.prompts.shareGoals'), t('empty.prompts.postUpdate')].map((prompt, idx) => (
                   <button
                     key={idx}
                     onClick={() => {
@@ -1406,10 +1402,10 @@ export default function ChatPage() {
                     {/* Avatar Column */}
                     <div className="flex w-8 shrink-0 justify-center">
                       {!isGrouped ? (
-                        <Avatar name={msg.senderId?.fullName || 'User'} src={msg.senderId?.avatar || undefined} size="sm" />
+                        <Avatar name={msg.senderId?.fullName || t('labels.user')} src={msg.senderId?.avatar || undefined} size="sm" />
                       ) : (
                         <span className="hidden group-hover:block text-[9px] text-slate-400 mt-1">
-                          {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          {formatTime(msg.createdAt, { hour: '2-digit', minute: '2-digit' })}
                         </span>
                       )}
                     </div>
@@ -1422,14 +1418,14 @@ export default function ChatPage() {
                             {msg.senderId?.fullName}
                           </span>
                           {isMe && (
-                            <span className="rounded-md bg-[var(--accent-subtle)] px-1.5 py-0.5 text-[9px] font-bold text-[var(--accent-text)]">You</span>
+                            <span className="rounded-md bg-[var(--accent-subtle)] px-1.5 py-0.5 text-[9px] font-bold text-[var(--accent-text)]">{tc('states.you')}</span>
                           )}
                           <span className="text-[10px] theme-text-muted">
                             {formatTimeAgo(msg.createdAt)}
                           </span>
                           {msg.isPinned && (
                             <span className="flex items-center gap-0.5 text-[9px] text-amber-600 font-bold bg-amber-50 px-1.5 py-0.5 rounded-md">
-                              <Pin className="h-2.5 w-2.5" /> Pinned
+                              <Pin className="h-2.5 w-2.5" /> {t('message.pinned')}
                             </span>
                           )}
                         </div>
@@ -1437,13 +1433,13 @@ export default function ChatPage() {
 
                       {/* Quoted Message (Reply Preview) */}
                       {parentMessage && !isGrouped && (
-                        <div className="mb-1.5 flex max-w-xl items-center gap-2 rounded-xl border-l-2 border-[var(--accent)] px-3 py-1.5 text-xs theme-text-secondary" style={{ background: 'var(--bg-sunken)' }}>
-                          <CornerDownRight className="h-3 w-3 text-indigo-500 shrink-0" />
+                        <div className="mb-1.5 flex max-w-xl items-center gap-2 rounded-xl border-s-2 border-[var(--accent)] px-3 py-1.5 text-xs theme-text-secondary" style={{ background: 'var(--bg-sunken)' }}>
+                          <CornerDownRight className="rtl-mirror h-3 w-3 text-indigo-500 shrink-0" />
                           <span className="truncate text-[11px] font-semibold theme-text-primary">
-                            {parentMessage.senderId?.fullName || 'Original message'}:
+                            {parentMessage.senderId?.fullName || t('message.originalMessage')}:
                           </span>
                           <span className="truncate text-[11px] theme-text-muted">
-                            {parentMessage.content || '[Attachment]'}
+                            {parentMessage.content || t('message.attachment')}
                           </span>
                         </div>
                       )}
@@ -1463,13 +1459,13 @@ export default function ChatPage() {
                               onClick={() => handleEditMessage(msg._id)}
                               className="rounded-lg bg-indigo-600 px-3 py-1 text-xs font-semibold text-white hover:bg-indigo-500"
                             >
-                              Save Changes
+                              {t('message.saveChanges')}
                             </button>
                             <button
                               onClick={() => setEditingMessageId(null)}
                               className="rounded-lg border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50"
                             >
-                              Cancel (Esc)
+                              {t('message.cancelEdit')}
                             </button>
                           </div>
                         </div>
@@ -1477,13 +1473,13 @@ export default function ChatPage() {
                         <div>
                           <div
                             className={`max-w-3xl break-words rounded-2xl px-3 py-2 text-[13px] leading-relaxed ${
-                              isMe ? 'rounded-tr-md text-white shadow-sm' : 'rounded-tl-md theme-text-primary'
+                              isMe ? 'rounded-se-md text-white shadow-sm' : 'rounded-ss-md theme-text-primary'
                             }`}
                             style={isMe ? { background: 'var(--accent)' } : { background: 'var(--bg-sunken)' }}
                           >
                             {formatMessageContent(msg.content)}
                             {msg.isEdited && (
-                              <span className="ml-1.5 text-[10px] text-slate-400 italic">(edited)</span>
+                              <span className="ms-1.5 text-[10px] text-slate-400 italic">{t('message.edited')}</span>
                             )}
                           </div>
 
@@ -1525,7 +1521,7 @@ export default function ChatPage() {
 
                     {/* Delivery ticks for my messages */}
                     {isMe && !isEditing && (
-                      <div className="shrink-0 pt-0.5 opacity-60 group-hover:opacity-100" title="Delivered">
+                      <div className="shrink-0 pt-0.5 opacity-60 group-hover:opacity-100" title={t('message.delivered')}>
                         <CheckCheck className="h-3.5 w-3.5 text-indigo-500" />
                       </div>
                     )}
@@ -1533,14 +1529,14 @@ export default function ChatPage() {
 
                   {/* ── Hover Action Bar (Slack / Discord style) ── */}
                   {!isEditing && (
-                    <div className="absolute right-3 -top-3 hidden group-hover:flex items-center gap-0.5 rounded-xl border border-slate-200 bg-white p-0.5 shadow-md z-20 animate-in fade-in-50 zoom-in-95 duration-100">
+                    <div className="absolute end-3 -top-3 hidden group-hover:flex items-center gap-0.5 rounded-xl border border-slate-200 bg-white p-0.5 shadow-md z-20 animate-in fade-in-50 zoom-in-95 duration-100">
                       {/* Quick Reactions */}
                       {QUICK_REACTIONS.slice(0, 4).map((emoji) => (
                         <button
                           key={emoji}
                           onClick={() => handleReaction(msg._id, emoji)}
                           className="flex h-6 w-6 items-center justify-center rounded-lg text-sm hover:bg-slate-100 transition-transform active:scale-90"
-                          title={`React ${emoji}`}
+                          title={t('actions.react', { emoji })}
                         >
                           {emoji}
                         </button>
@@ -1552,7 +1548,7 @@ export default function ChatPage() {
                       <button
                         onClick={() => setActiveReactionMsgId(activeReactionMsgId === msg._id ? null : msg._id)}
                         className="p-1 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700"
-                        title="Add Reaction"
+                        title={t('actions.addReaction')}
                       >
                         <Smile className="h-3.5 w-3.5" />
                       </button>
@@ -1564,16 +1560,16 @@ export default function ChatPage() {
                           textareaRef.current?.focus();
                         }}
                         className="p-1 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700"
-                        title="Reply / Quote"
+                        title={t('actions.reply')}
                       >
-                        <Reply className="h-3.5 w-3.5" />
+                        <Reply className="rtl-mirror h-3.5 w-3.5" />
                       </button>
 
                       {/* Pin */}
                       <button
                         onClick={() => handlePin(msg._id)}
                         className="p-1 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700"
-                        title={msg.isPinned ? 'Unpin message' : 'Pin message'}
+                        title={msg.isPinned ? t('actions.unpin') : t('actions.pin')}
                       >
                         <Pin className="h-3.5 w-3.5" />
                       </button>
@@ -1587,14 +1583,14 @@ export default function ChatPage() {
                               setEditContent(msg.content);
                             }}
                             className="p-1 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700"
-                            title="Edit message"
+                            title={t('actions.edit')}
                           >
                             <Edit2 className="h-3.5 w-3.5" />
                           </button>
                           <button
                             onClick={() => handleDeleteMessage(msg._id)}
                             className="p-1 rounded-lg hover:bg-slate-100 text-rose-500 hover:text-rose-700"
-                            title="Delete message"
+                            title={t('actions.delete')}
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
@@ -1606,7 +1602,7 @@ export default function ChatPage() {
                         <button
                           onClick={() => handleReportMessage(msg._id, msg.content)}
                           className="p-1 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-colors"
-                          title="Report message"
+                          title={t('actions.report')}
                         >
                           <Flag className="h-3.5 w-3.5" />
                         </button>
@@ -1614,7 +1610,7 @@ export default function ChatPage() {
 
                       {/* Emoji Picker Popover */}
                       {activeReactionMsgId === msg._id && (
-                        <div className="absolute right-0 top-8 z-50">
+                        <div className="absolute end-0 top-8 z-50">
                           <EmojiPicker
                             onSelect={(emoji) => handleReaction(msg._id, emoji)}
                             onClose={() => setActiveReactionMsgId(null)}
@@ -1634,10 +1630,10 @@ export default function ChatPage() {
         {showScrollBottomPill && (
           <button
             onClick={() => scrollToBottom('smooth')}
-            className="absolute bottom-24 right-8 z-30 flex items-center gap-1.5 rounded-full bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-lg hover:bg-indigo-500 animate-in fade-in slide-in-from-bottom-3 duration-200"
+            className="absolute bottom-24 end-8 z-30 flex items-center gap-1.5 rounded-full bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-lg hover:bg-indigo-500 animate-in fade-in slide-in-from-bottom-3 duration-200"
           >
             <ChevronDown className="h-4 w-4" />
-            <span>New messages</span>
+            <span>{t('composer.newMessages')}</span>
           </button>
         )}
 
@@ -1657,11 +1653,11 @@ export default function ChatPage() {
           {replyingTo && (
             <div className="mb-2 flex items-center justify-between rounded-xl border px-3 py-1.5 text-xs animate-in fade-in duration-150 theme-text-secondary" style={{ borderColor: 'var(--border-color)', background: 'var(--bg-sunken)' }}>
               <div className="flex items-center gap-2 truncate">
-                <Reply className="h-3.5 w-3.5 text-indigo-600 shrink-0" />
+                <Reply className="rtl-mirror h-3.5 w-3.5 text-indigo-600 shrink-0" />
                 <span className="truncate font-bold theme-text-primary">
-                  Replying to {replyingTo.senderId?.fullName}:
+                  {t('composer.replyingTo', { name: replyingTo.senderId?.fullName ?? '' })}
                 </span>
-                <span className="truncate theme-text-muted">{replyingTo.content || '[Attachment]'}</span>
+                <span className="truncate theme-text-muted">{replyingTo.content || t('message.attachment')}</span>
               </div>
               <button
                 onClick={() => setReplyingTo(null)}
@@ -1705,10 +1701,10 @@ export default function ChatPage() {
               onKeyDown={handleKeyDown}
               placeholder={
                 activeChannel
-                  ? `Message #${activeChannel.name}... (Shift+Enter for new line)`
+                  ? t('composer.channelPlaceholder', { name: activeChannel.name })
                   : activeConv
-                  ? `Message ${getRecipientName(activeConv)}...`
-                  : 'Select a conversation to start typing...'
+                  ? t('composer.dmPlaceholder', { name: getRecipientName(activeConv) })
+                  : t('composer.noConversationPlaceholder')
               }
               disabled={!activeChannel && !activeConv}
               rows={1}
@@ -1731,7 +1727,7 @@ export default function ChatPage() {
                   onClick={() => fileInputRef.current?.click()}
                   disabled={isUploading || storageLimitReached || (!activeChannel && !activeConv)}
                   className="flex h-8 w-8 items-center justify-center rounded-lg theme-text-secondary transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--accent-text)] disabled:opacity-40"
-                  title={storageLimitReached ? 'Storage limit reached; upgrade to attach files' : 'Attach Files'}
+                  title={storageLimitReached ? t('composer.storageLimitTitle') : t('composer.attachFiles')}
                 >
                   <Paperclip className="h-4 w-4" />
                 </button>
@@ -1743,13 +1739,13 @@ export default function ChatPage() {
                     onClick={() => setShowEmojiPicker(!showEmojiPicker)}
                     disabled={!activeChannel && !activeConv}
                     className="flex h-8 w-8 items-center justify-center rounded-lg theme-text-secondary transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--accent-text)] disabled:opacity-40"
-                    title="Insert Emoji"
+                    title={t('composer.insertEmoji')}
                   >
                     <Smile className="h-4 w-4" />
                   </button>
 
                   {showEmojiPicker && (
-                    <div className="absolute bottom-10 left-0 z-50">
+                    <div className="absolute bottom-10 start-0 z-50">
                       <EmojiPicker
                         onSelect={(emoji) => {
                           setInputText((prev) => prev + emoji);
@@ -1762,9 +1758,9 @@ export default function ChatPage() {
                 </div>
 
                 {isUploading && (
-                  <span className="ml-2 flex items-center gap-1 text-[11px] font-medium text-[var(--accent-text)]">
+                  <span className="ms-2 flex items-center gap-1 text-[11px] font-medium text-[var(--accent-text)]">
                     <span className="h-2 w-2 rounded-full bg-indigo-600 animate-ping" />
-                    Uploading...
+                    {t('composer.uploading')}
                   </span>
                 )}
               </div>
@@ -1775,9 +1771,9 @@ export default function ChatPage() {
                 onClick={() => handleSendMessage()}
                 disabled={(!inputText.trim() && pendingAttachments.length === 0) || isUploading}
                 className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--accent)] text-white shadow-sm transition-all hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-40"
-                title="Send message (Enter)"
+                title={t('composer.send')}
               >
-                <Send className="h-3.5 w-3.5" />
+                <Send className="rtl-mirror h-3.5 w-3.5" />
               </button>
             </div>
           </div>

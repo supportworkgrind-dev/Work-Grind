@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { FileText, Download, ExternalLink, Image as ImageIcon, X } from 'lucide-react';
 import { formatBytes } from '@/lib/utils';
 import { getApiBaseUrl } from '@/lib/apiConfig';
+import { useT } from '@/lib/i18n';
 
 interface Attachment {
   name: string;
@@ -41,6 +42,8 @@ const buildAttachmentUrl = (url: string): string => {
 };
 
 export function MessageAttachment({ attachment }: { attachment: Attachment }) {
+  const t = useT('chat');
+  const tc = useT('common');
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const isImage =
@@ -61,11 +64,11 @@ export function MessageAttachment({ attachment }: { attachment: Attachment }) {
             loading="lazy"
             referrerPolicy="no-referrer"
           />
-          <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover/img:opacity-100 transition-opacity bg-slate-900/60 backdrop-blur-xs p-1 rounded-xl">
+          <div className="absolute top-2 end-2 flex items-center gap-1 opacity-0 group-hover/img:opacity-100 transition-opacity bg-slate-900/60 backdrop-blur-xs p-1 rounded-xl">
             <button
               onClick={() => setIsModalOpen(true)}
               className="p-1 text-white hover:text-slate-200"
-              title="Expand Image"
+              title={t('attachment.expandImage')}
             >
               <ExternalLink className="h-3.5 w-3.5" />
             </button>
@@ -74,7 +77,7 @@ export function MessageAttachment({ attachment }: { attachment: Attachment }) {
               download={attachment.name}
               rel="noopener noreferrer"
               className="p-1 text-white hover:text-slate-200"
-              title="Download Image"
+              title={t('attachment.downloadImage')}
             >
               <Download className="h-3.5 w-3.5" />
             </a>
@@ -89,8 +92,8 @@ export function MessageAttachment({ attachment }: { attachment: Attachment }) {
           >
             <button
               onClick={() => setIsModalOpen(false)}
-              className="absolute top-4 right-4 rounded-full bg-white/10 p-2 text-white hover:bg-white/20 transition-colors"
-              aria-label="Close image preview"
+              className="absolute top-4 end-4 rounded-full bg-white/10 p-2 text-white hover:bg-white/20 transition-colors"
+              aria-label={t('attachment.closePreview')}
             >
               <X className="h-6 w-6" />
             </button>
@@ -118,7 +121,7 @@ export function MessageAttachment({ attachment }: { attachment: Attachment }) {
           {attachment.name}
         </p>
         <p className="text-[10px] text-slate-400">
-          {attachment.size ? formatBytes(attachment.size) : 'Attachment'}
+          {attachment.size ? formatBytes(attachment.size) : t('attachment.fallbackLabel')}
         </p>
       </div>
       <a
@@ -126,7 +129,7 @@ export function MessageAttachment({ attachment }: { attachment: Attachment }) {
         download={attachment.name}
         rel="noopener noreferrer"
         className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
-        title="Download"
+        title={tc('actions.download')}
       >
         <Download className="h-4 w-4" />
       </a>
