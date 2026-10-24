@@ -1,14 +1,31 @@
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { format, formatDistanceToNow } from 'date-fns';
+import { formatDate as formatLocalizedDate, formatRelativeTime, getActiveLanguage } from '@/lib/i18n/core';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+// date-fns patterns used across the app, as Intl options for other languages.
+const INTL_PATTERNS: Record<string, Intl.DateTimeFormatOptions> = {
+  'MMM d, yyyy': { month: 'short', day: 'numeric', year: 'numeric' },
+  'MMM d, yyyy h:mm a': { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' },
+  'MMM d, yyyy · h:mm a': { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' },
+  'MMM d, h:mm a': { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' },
+  'MMM d': { month: 'short', day: 'numeric' },
+  'MMMM yyyy': { month: 'long', year: 'numeric' },
+  'h:mm a': { hour: 'numeric', minute: '2-digit' },
+  'EEEE': { weekday: 'long' },
+  'EEE': { weekday: 'short' },
+};
+
+/** Formats in the interface language (English keeps its date-fns pattern). */
 export function formatDate(dateString?: string | Date, fmt: string = 'MMM d, yyyy') {
   if (!dateString) return '';
   try {
+    const lang = getActiveLanguage();
+    if (lang !== 'en') return formatLocalizedDate(dateString, INTL_PATTERNS[fmt] ?? INTL_PATTERNS['MMM d, yyyy'], lang);
     return format(new Date(dateString), fmt);
   } catch {
     return '';
@@ -18,6 +35,8 @@ export function formatDate(dateString?: string | Date, fmt: string = 'MMM d, yyy
 export function formatTimeAgo(dateString?: string | Date) {
   if (!dateString) return '';
   try {
+    const lang = getActiveLanguage();
+    if (lang !== 'en') return formatRelativeTime(dateString, lang);
     return formatDistanceToNow(new Date(dateString), { addSuffix: true });
   } catch {
     return '';

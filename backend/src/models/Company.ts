@@ -89,6 +89,21 @@ export interface ICompany extends Document {
   /** Convenience flag: set to true when WORKGRINDLIFE is successfully redeemed. */
   isLifetime: boolean;
 
+  /**
+   * Access granted by a super admin, kept apart from the Polar billing fields
+   * so provider webhooks cannot silently undo it (and it never masquerades as
+   * a payment). getCompanySubscription applies it while unexpired.
+   */
+  manualGrant?: {
+    plan: CompanyPlan;
+    grantedBy: mongoose.Types.ObjectId;
+    grantedAt: Date;
+    expiresAt?: Date;
+    reason?: string;
+  };
+  /** Polar's modifiedAt of the last applied subscription event (stale-event guard). */
+  polarSubscriptionModifiedAt?: Date;
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -183,6 +198,16 @@ const CompanySchema = new Schema<ICompany>(
     // ── Coupon ────────────────────────────────────────────────────────────────
     coupon:     { type: CouponSchema },
     isLifetime: { type: Boolean, default: false },
+    manualGrant: {
+      type: new Schema({
+        plan:      { type: String, enum: ['starter', 'pro', 'school', 'college', 'university'], required: true },
+        grantedBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+        grantedAt: { type: Date, required: true },
+        expiresAt: { type: Date },
+        reason:    { type: String, maxlength: 300 },
+      }, { _id: false }),
+    },
+    polarSubscriptionModifiedAt: { type: Date },
   },
   { timestamps: true }
 );

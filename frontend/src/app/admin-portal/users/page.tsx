@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import { adminApi } from '@/lib/adminApi';
+import { SubscriptionGrantDialog, describeWorkspaceSubscription, type WorkspaceSubscriptionSummary } from '@/components/admin/SubscriptionGrantDialog';
 import { User, Company } from '@/types';
 import {
   Search,
@@ -31,11 +32,36 @@ function getWorkspaceName(user: User, company: Company | null): string {
 }
 
 function getSubscriptionDetails(user: User, company: Company | null) {
-  const status = company?.subscriptionStatus ?? user.subscriptionStatus ?? 'never_subscribed';
-  const plan = company?.subscriptionPlan ?? user.subscriptionPlan ?? company?.plan ?? 'free';
+  // The server's effective workspace subscription is what members actually get;
+  // raw billing fields can disagree with it (admin grants, education checks).
+  const effective = (user as User & { workspaceSubscription?: WorkspaceSubscriptionSummary | null }).workspaceSubscription;
+  const status = effective
+    ? effective.hasActiveAccess ? (effective.status === 'expired' ? 'active' : effective.status) : 'expired'
+    : company?.subscriptionStatus ?? user.subscriptionStatus ?? 'never_subscribed';
+  const plan = effective?.plan ?? company?.subscriptionPlan ?? user.subscriptionPlan ?? company?.plan ?? 'free';
   const trialEndDate = company?.trialEndDate ?? user.trialEndDate;
 
   return { status, plan, trialEndDate };
+}
+
+function planChangeWorkspaceId(user: User): string | null {
+  const company = user.companyId as unknown;
+  if (typeof company === 'string') return company;
+  if (company && typeof company === 'object' && '_id' in company) return String((company as { _id: string })._id);
+  return null;
+}
+
+function SubscriptionGrantUnavailable({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
+      <div role="dialog" aria-label="Workspace subscription" className="w-full max-w-sm rounded-3xl border border-slate-800 bg-slate-900 p-6 shadow-2xl space-y-4">
+        <p className="text-xs text-slate-300">This user has not joined or created a workspace yet, so there is no workspace subscription to change.</p>
+        <div className="flex justify-end">
+          <button type="button" onClick={onClose} className="rounded-xl border border-slate-800 px-4 py-2 text-xs font-semibold text-slate-400 hover:bg-slate-800">Close</button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function formatSignupDate(value: string): string {
@@ -181,8 +207,6 @@ export default function SuperAdminUsersPage() {
   const [isResettingPass, setIsResettingPass] = useState(false);
 
   const [planChangeUser, setPlanChangeUser] = useState<User | null>(null);
-  const [selectedPlan, setSelectedPlan] = useState<'free' | 'starter' | 'pro'>('pro');
-  const [isUpdatingPlan, setIsUpdatingPlan] = useState(false);
 
   const [deleteUserModal, setDeleteUserModal] = useState<User | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -278,26 +302,6 @@ export default function SuperAdminUsersPage() {
     }
   };
 
-  // Change Plan
-  const handleChangePlan = async () => {
-    if (!planChangeUser) return;
-    setIsUpdatingPlan(true);
-    try {
-      const res = await adminApi.patch(`/users/${planChangeUser._id}/plan`, {
-        plan: selectedPlan,
-      });
-      if (res.data.success) {
-        showToast(`Workspace plan upgraded to ${selectedPlan.toUpperCase()}!`);
-        setPlanChangeUser(null);
-        fetchUsers();
-      }
-    } catch (err: any) {
-      showToast(err.response?.data?.message || 'Plan update failed.', 'error');
-    } finally {
-      setIsUpdatingPlan(false);
-    }
-  };
-
   // Delete User
   const handleDeleteUser = async () => {
     if (!deleteUserModal) return;
@@ -362,11 +366,7 @@ export default function SuperAdminUsersPage() {
             </button>
             <button
               type="button"
-              onClick={() => {
-                setPlanChangeUser(user);
-                const plan = company?.subscriptionPlan ?? user.subscriptionPlan;
-                setSelectedPlan(plan === 'starter' || plan === 'pro' ? plan : 'free');
-              }}
+              onClick={() => setPlanChangeUser(user)}
               className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs text-slate-300 hover:bg-slate-800 hover:text-white"
             >
               <Sparkles className="h-3.5 w-3.5" />
@@ -922,70 +922,19 @@ export default function SuperAdminUsersPage() {
 
       {/* ── PLAN CHANGE MODAL ── */}
       {planChangeUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md rounded-3xl border border-slate-800 bg-slate-900 p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-purple-400" />
-                <span>Change Workspace Subscription Tier</span>
-              </h3>
-              <button
-                onClick={() => setPlanChangeUser(null)}
-                className="rounded-lg p-1 text-slate-400 hover:bg-slate-800"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            <p className="text-xs text-slate-400">
-              Upgrade or downgrade the platform tier for{' '}
-              <strong className="text-white">{planChangeUser.fullName}</strong>.
-            </p>
-
-            <div className="space-y-2">
-              {(['free', 'starter', 'pro'] as const).map((tier) => (
-                <label
-                  key={tier}
-                  className={`flex items-center justify-between rounded-xl border p-3 cursor-pointer transition-all ${
-                    selectedPlan === tier
-                      ? 'border-indigo-500 bg-indigo-500/10 text-white'
-                      : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:bg-slate-800/40'
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5">
-                    <input
-                      type="radio"
-                      name="plan"
-                      checked={selectedPlan === tier}
-                      onChange={() => setSelectedPlan(tier)}
-                      className="text-indigo-600 focus:ring-indigo-500 h-4 w-4"
-                    />
-                    <span className="text-xs font-bold uppercase tracking-wider">{tier}</span>
-                  </div>
-                  <span className="text-[11px] text-slate-400">
-                    {tier === 'pro' ? '100 GB storage, unlimited AI and members' : tier === 'starter' ? '10 GB storage, 200 AI requests and 20 members' : '1 GB storage, 50 AI requests and 5 members'}
-                  </span>
-                </label>
-              ))}
-            </div>
-
-            <div className="flex justify-end gap-2 pt-3">
-              <button
-                onClick={() => setPlanChangeUser(null)}
-                className="rounded-xl border border-slate-800 px-4 py-2 text-xs font-semibold text-slate-400 hover:bg-slate-800"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleChangePlan}
-                disabled={isUpdatingPlan}
-                className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-md hover:bg-indigo-500 disabled:opacity-50"
-              >
-                {isUpdatingPlan ? 'Updating...' : 'Save Plan'}
-              </button>
-            </div>
-          </div>
-        </div>
+        planChangeWorkspaceId(planChangeUser) ? (
+          <SubscriptionGrantDialog
+            workspaceId={planChangeWorkspaceId(planChangeUser)!}
+            workspaceName={getWorkspaceName(planChangeUser, typeof planChangeUser.companyId === 'object' ? planChangeUser.companyId as Company : null)}
+            onClose={() => setPlanChangeUser(null)}
+            onSaved={(summary) => {
+              showToast(`Saved: ${describeWorkspaceSubscription(summary)}`);
+              fetchUsers();
+            }}
+          />
+        ) : (
+          <SubscriptionGrantUnavailable onClose={() => setPlanChangeUser(null)} />
+        )
       )}
 
       {/* ── PERMANENT DELETE MODAL ── */}

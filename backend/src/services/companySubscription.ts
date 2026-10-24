@@ -17,7 +17,7 @@ import mongoose from 'mongoose';
 import Company, { CompanySubscriptionStatus, CompanyPlan, ICompany } from '../models/Company';
 import User from '../models/User';
 import { normalizeOrganizationType } from '../config/organization';
-import { educationPlanForOrganization,getEducationPolarProductId, getPlan, getPolarProductId, hasActiveAccess, PlanId, resolveEffectivePlanId, TRIAL_DAYS } from '../config/subscription';
+import { educationPlanForOrganization, getEducationPolarProductId, getPlan, getPolarProductId, getPurchasablePlanIds, hasActiveAccess, PlanId, resolveEffectivePlanId, TRIAL_DAYS } from '../config/subscription';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -47,6 +47,24 @@ export interface CompanySubscriptionInfo {
     redeemedAt: Date;
     freeUntil?: Date;
   };
+  /** Why the workspace has (or lacks) access; the same answer for admins and members. */
+  accessSource:           'lifetime' | 'manual_grant' | 'billing' | 'trial' | 'none';
+  manualGrant?: { plan: CompanyPlan; grantedAt: Date; expiresAt?: Date };
+}
+
+/**
+ * A super-admin grant applies while it is unexpired and names a plan this
+ * workspace type can hold (a business plan for business, its own plan for a
+ * school, college, or university).
+ */
+export function activeManualGrant(
+  company: Pick<ICompany, 'manualGrant' | 'organizationType'>,
+  now: Date = new Date(),
+): NonNullable<ICompany['manualGrant']> | undefined {
+  const grant = company.manualGrant;
+  if (!grant?.plan) return undefined;
+  if (grant.expiresAt && grant.expiresAt.getTime() <= now.getTime()) return undefined;
+  return (getPurchasablePlanIds(company.organizationType) as string[]).includes(grant.plan) ? grant : undefined;
 }
 
 type EducationSubscriptionRecord = Pick<
@@ -129,7 +147,7 @@ export async function getCompanySubscription(
     'subscriptionStatus subscriptionPlan isLifetime ' +
     'trialStartDate trialEndDate subscriptionStartDate subscriptionEndDate ' +
     'pendingSubscriptionPlan pendingSubscriptionPlanEffectiveDate cancelAtPeriodEnd ' +
-    'ownerId polarCustomerId polarSubscriptionId polarProductId polarOrderId coupon createdAt storage plan organizationType accountType',
+    'ownerId polarCustomerId polarSubscriptionId polarProductId polarOrderId coupon createdAt storage plan organizationType accountType manualGrant',
   );
 
   if (!company) throw new Error(`Company ${companyId} not found`);
@@ -256,6 +274,10 @@ export async function getCompanySubscription(
     }
   }
 
+  // An admin grant outranks the billing record while it lasts; lifetime outranks both.
+  const grant = status === 'lifetime' ? undefined : activeManualGrant(company, now);
+  if (grant) status = 'active';
+
   const polarPlan = company.polarProductId
     ? (['starter', 'pro'] as const).find((candidate) => getPolarProductId(candidate) === company.polarProductId)
     : undefined;
@@ -263,14 +285,20 @@ export async function getCompanySubscription(
     ? company.subscriptionPlan
     : polarPlan ??
       (company.plan === 'starter' || company.plan === 'pro' ? company.plan : company.subscriptionPlan);
-  const effectiveBusinessPlanId = resolveEffectivePlanId(
-    status,
-    historicalPlan,
-    company.isLifetime,
-    company.subscriptionEndDate,
-  );
+  const effectiveBusinessPlanId = grant && (grant.plan === 'starter' || grant.plan === 'pro')
+    ? grant.plan
+    : resolveEffectivePlanId(
+      status,
+      historicalPlan,
+      company.isLifetime,
+      company.subscriptionEndDate,
+    );
   const educationPlanId = educationPlanForOrganization(company.organizationType);
-  const enforcedEducationStatus = enforceEducationSubscriptionTruth(status, company);
+  // A grant for the workspace's own education plan is the verification; without
+  // one, paid education access still requires the verified Polar subscription.
+  const enforcedEducationStatus = grant
+    ? { status, subscriptionMismatch: false }
+    : enforceEducationSubscriptionTruth(status, company);
   status = enforcedEducationStatus.status;
   const hasPaidPlanHistory = Boolean(
     company.polarSubscriptionId ||
@@ -281,7 +309,7 @@ export async function getCompanySubscription(
     company.plan === 'starter' ||
     company.plan === 'pro',
   );
-  const subscriptionMismatch = Boolean(
+  const subscriptionMismatch = !grant && Boolean(
     enforcedEducationStatus.subscriptionMismatch ||
     (
       educationPlanId &&
@@ -295,7 +323,7 @@ export async function getCompanySubscription(
   if (subscriptionMismatch) status = 'expired';
   const effectivePlanId = educationPlanId ?? effectiveBusinessPlanId;
 
-  const activeAccess = hasActiveAccess(
+  const activeAccess = grant ? true : hasActiveAccess(
     status,
     company.subscriptionEndDate,
     company.trialEndDate ?? (company.trialStartDate
@@ -315,7 +343,7 @@ export async function getCompanySubscription(
           : { members: 0, storage: 0, aiRequests: 0 },
       };
   const storedPlanId = educationPlanId
-    ? hasVerifiedEducationSubscription(company) && status !== 'expired'
+    ? (grant || hasVerifiedEducationSubscription(company)) && status !== 'expired'
       ? educationPlanId
       : 'free'
     : effectivePlanId;
@@ -338,8 +366,8 @@ export async function getCompanySubscription(
     isLifetime:           company.isLifetime,
     hasActiveAccess:      activeAccess,
     planConfig,
-    subscriptionStartDate: company.subscriptionStartDate,
-    subscriptionEndDate:   company.subscriptionEndDate,
+    subscriptionStartDate: grant ? grant.grantedAt : company.subscriptionStartDate,
+    subscriptionEndDate:   grant ? grant.expiresAt : company.subscriptionEndDate,
     pendingSubscriptionPlan: company.pendingSubscriptionPlan,
     pendingSubscriptionPlanEffectiveDate: company.pendingSubscriptionPlanEffectiveDate,
     trialStartDate:        company.trialStartDate,
@@ -347,6 +375,14 @@ export async function getCompanySubscription(
     cancelAtPeriodEnd:     company.cancelAtPeriodEnd,
     polarCustomerId:       company.polarCustomerId,
     polarSubscriptionId:   company.polarSubscriptionId,
+    accessSource: status === 'lifetime'
+      ? 'lifetime'
+      : grant
+        ? 'manual_grant'
+        : !activeAccess
+          ? 'none'
+          : status === 'trialing' ? 'trial' : 'billing',
+    ...(grant ? { manualGrant: { plan: grant.plan, grantedAt: grant.grantedAt, expiresAt: grant.expiresAt } } : {}),
     coupon: company.coupon
       ? {
           code:       company.coupon.code,

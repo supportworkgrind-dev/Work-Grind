@@ -2,7 +2,7 @@
 
 import { InstallPromptBanner } from '@/components/pwa/InstallPromptBanner';
 import { ServiceWorkerRegister } from '@/components/pwa/ServiceWorkerRegister';
-import { I18nProvider } from '@/lib/i18n';
+import { I18nProvider, type LangCode } from '@/lib/i18n';
 import { hydrateThemeFromStorage, useThemeStore } from '@/lib/themeStore';
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
@@ -71,7 +71,7 @@ function PlanUpgradePrompt() {
   );
 }
 
-export function RootClientProviders({ children }: { children: React.ReactNode }) {
+export function RootClientProviders({ children, initialLang }: { children: React.ReactNode; initialLang?: LangCode }) {
   const router = useRouter();
   const pathname = usePathname();
   const redirectingForSubscription = useRef(false);
@@ -122,7 +122,7 @@ export function RootClientProviders({ children }: { children: React.ReactNode })
   }, [pathname, router]);
 
   return (
-    <I18nProvider>
+    <I18nProvider initialLang={initialLang}>
       <ServiceWorkerRegister />
       {children}
       <PlanUpgradePrompt />

@@ -294,7 +294,6 @@ export const useAuthStore = create<AuthState>((set, get) => {
             isAuthenticated: true,
             isLoading: false,
             authError: null,
-            trialDaysRemaining: res.data.trialDaysRemaining ?? null,
           });
           await subscriptionRefresh;
         } catch (err: any) {

@@ -18,6 +18,7 @@ import { AuthRequest } from '../middleware/auth';
 import { getTransporter, sendAdminReplyEmail, sendPasswordResetEmail } from '../utils/email';
 import { getPlatformAiUsage, getUsageSummaryForCompany, getUsageForCompany } from '../services/aiUsageTracker';
 import { getCompanySubscription } from '../services/companySubscription';
+import { AdminSubscriptionError, applyAdminSubscriptionChange, assignablePlansFor, summarizeSubscription } from '../services/adminSubscription';
 import { getPlanUsage } from '../utils/planLimits';
 import { parsePagination } from '../utils/pagination';
 import {
@@ -510,9 +511,22 @@ export const getUsers = async (req: AuthRequest, res: Response): Promise<void> =
       .limit(limit)
       .lean();
 
+    const companyIds = [...new Set(users
+      .map((user: any) => user.companyId?._id?.toString())
+      .filter((companyId: unknown): companyId is string => typeof companyId === 'string'))];
+    const effective = new Map(await Promise.all(companyIds.map(async (companyId) => {
+      try {
+        return [companyId, summarizeSubscription(await getCompanySubscription(companyId))] as const;
+      } catch {
+        return [companyId, null] as const;
+      }
+    })));
     res.json({
       success: true,
-      users: users.map((user: any) => adminUserDto(user, ADMIN_USER_LIST_FIELDS)),
+      users: users.map((user: any) => ({
+        ...adminUserDto(user, ADMIN_USER_LIST_FIELDS),
+        workspaceSubscription: user.companyId?._id ? effective.get(user.companyId._id.toString()) ?? null : null,
+      })),
       total,
       page,
       limit,
@@ -707,46 +721,28 @@ async function clearAdminPasswordResetToken(userId: mongoose.Types.ObjectId, has
   }
 }
 
+function sendAdminSubscriptionError(res: Response, err: unknown): void {
+  if (err instanceof AdminSubscriptionError) {
+    res.status(err.status).json({ success: false, code: err.code, message: err.message });
+    return;
+  }
+  console.error('[SuperAdmin] Subscription change failed.', { errorName: err instanceof Error ? err.name : 'UnknownError' });
+  res.status(500).json({ success: false, message: 'The subscription could not be updated.' });
+}
+
+/** Changes the subscription of the workspace the user belongs to. */
 export const updateUserPlan = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const { plan } = req.body;
-
-    if (!['free', 'starter', 'pro'].includes(plan)) {
-      res.status(400).json({ success: false, message: 'Invalid plan. Allowed: free, starter, pro' });
+    const user = mongoose.isValidObjectId(id) ? await User.findById(id).select('companyId').lean() : null;
+    if (!user?.companyId) {
+      res.status(404).json({ success: false, code: 'WORKSPACE_NOT_FOUND', message: 'This user does not belong to a workspace.' });
       return;
     }
-
-    const user = await User.findById(id);
-    if (!user || !user.companyId) {
-      res.status(404).json({ success: false, message: 'User workspace not found' });
-      return;
-    }
-
-    const company = await Company.findById(user.companyId);
-    if (!company) {
-      res.status(404).json({ success: false, message: 'User workspace not found' });
-      return;
-    }
-    company.subscriptionPlan = plan;
-    company.subscriptionStatus = plan === 'free' ? 'expired' : 'active';
-    company.plan = plan;
-    company.cancelAtPeriodEnd = false;
-    company.isLifetime = false;
-    if (plan === 'free') company.subscriptionEndDate = new Date();
-    else {
-      company.subscriptionEndDate = undefined;
-      company.subscriptionStartDate = new Date();
-    }
-    await company.save();
-
-    res.json({
-      success: true,
-      message: `Workspace plan updated to ${plan.toUpperCase()}`,
-      company,
-    });
-  } catch (err: any) {
-    res.status(500).json({ success: false, message: err.message });
+    const result = await applyAdminSubscriptionChange(user.companyId.toString(), req.body ?? {}, req.user!.userId, req);
+    res.json({ success: true, ...result });
+  } catch (err) {
+    sendAdminSubscriptionError(res, err);
   }
 };
 
@@ -840,37 +836,27 @@ export const getWorkspaces = async (req: AuthRequest, res: Response): Promise<vo
   }
 };
 
+export const getWorkspaceAssignablePlans = async (req: AuthRequest, res: Response): Promise<void> => {
+  const company = mongoose.isValidObjectId(req.params.id)
+    ? await Company.findById(req.params.id).select('organizationType').lean()
+    : null;
+  if (!company) {
+    res.status(404).json({ success: false, code: 'WORKSPACE_NOT_FOUND', message: 'Workspace not found.' });
+    return;
+  }
+  res.json({
+    success: true,
+    plans: assignablePlansFor(company.organizationType),
+    subscription: summarizeSubscription(await getCompanySubscription(String(req.params.id))),
+  });
+};
+
 export const updateWorkspacePlan = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { id } = req.params;
-    const { plan } = req.body;
-
-    if (!['free', 'starter', 'pro'].includes(plan)) {
-      res.status(400).json({ success: false, message: 'Invalid plan' });
-      return;
-    }
-
-    const company = await Company.findById(id);
-    if (!company) {
-      res.status(404).json({ success: false, message: 'Workspace not found' });
-      return;
-    }
-
-    company.subscriptionPlan = plan;
-    company.subscriptionStatus = plan === 'free' ? 'expired' : 'active';
-    company.plan = plan;
-    company.cancelAtPeriodEnd = false;
-    company.isLifetime = false;
-    if (plan === 'free') company.subscriptionEndDate = new Date();
-    else {
-      company.subscriptionEndDate = undefined;
-      company.subscriptionStartDate = new Date();
-    }
-    await company.save();
-
-    res.json({ success: true, message: `Workspace plan updated to ${plan.toUpperCase()}`, company });
-  } catch (err: any) {
-    res.status(500).json({ success: false, message: err.message });
+    const result = await applyAdminSubscriptionChange(String(req.params.id), req.body ?? {}, req.user!.userId, req);
+    res.json({ success: true, ...result });
+  } catch (err) {
+    sendAdminSubscriptionError(res, err);
   }
 };
 

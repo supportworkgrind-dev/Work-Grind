@@ -19,11 +19,11 @@ import { ThemeAwareLogo } from '@/components/common/ThemeAwareLogo';
 import { ExpiredSubscriptionExperience } from '@/components/subscription/ExpiredSubscriptionExperience';
 import { DeveloperShell } from '@/components/layout/DeveloperShell';
 import { canAccessRoute, getWorkspaceHome } from '@/lib/organizationAccess';
+import { useSubscriptionRevalidation } from '@/lib/useSubscriptionRevalidation';
 import Link from 'next/link';
 
 // How long a cached user is considered "fresh" before we re-validate with the server.
 const USER_REVALIDATION_MS = 3 * 60 * 1000;
-const FOCUS_REVALIDATION_MS = 60 * 1000;
 
 // ── Memoized shell — only re-renders when sidebar open state changes ──────────
 const AppShell = memo(function AppShell({
@@ -78,6 +78,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const fetchCurrentUser = useAuthStore((s) => s.fetchCurrentUser);
   const refreshSubscription = useAuthStore((s) => s.refreshSubscription);
   const userId = user?._id;
+  const subscriptionActive = subscription?.hasActiveAccess === true;
   const pathname = usePathname();
   const academicSection = searchParams.get('section');
   const setTheme = useThemeStore((s) => s.setTheme);
@@ -145,25 +146,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }
   }, [user, subscription, subscriptionLoading, subscriptionError, refreshSubscription]);
 
-  useEffect(() => {
-    if (!userId) return;
-    let lastRefreshAt = Date.now();
-    const refreshVisibleSubscription = () => {
-      if (document.visibilityState !== 'visible') return;
-      lastRefreshAt = Date.now();
-      void refreshSubscription();
-    };
-    // Focus fires on every alt-tab or devtools click; each refresh re-renders the shell.
-    const refreshOnFocus = () => {
-      if (Date.now() - lastRefreshAt >= FOCUS_REVALIDATION_MS) refreshVisibleSubscription();
-    };
-    const interval = window.setInterval(refreshVisibleSubscription, USER_REVALIDATION_MS);
-    window.addEventListener('focus', refreshOnFocus);
-    return () => {
-      window.clearInterval(interval);
-      window.removeEventListener('focus', refreshOnFocus);
-    };
-  }, [userId, refreshSubscription]);
+  useSubscriptionRevalidation(userId, subscriptionActive);
 
   useEffect(() => {
     if (user && !subscriptionLoading && !subscriptionError && subscription && !subscription.hasActiveAccess && pathname !== '/billing') {

@@ -182,6 +182,36 @@ export function isCurrentPolarSubscription(
     (!company.polarProductId || company.polarProductId === subscription.productId);
 }
 
+function polarModifiedAt(subscription: { modifiedAt?: unknown; modified_at?: unknown }): Date | undefined {
+  const raw = subscription.modifiedAt ?? subscription.modified_at;
+  if (!raw) return undefined;
+  const date = new Date(raw as string | number | Date);
+  return Number.isNaN(date.getTime()) ? undefined : date;
+}
+
+/**
+ * Polar retries and may deliver events out of order; an event older than the
+ * last one applied must not overwrite the newer state it describes.
+ */
+export function isStalePolarEvent(
+  company: Pick<ICompany, 'polarSubscriptionModifiedAt'>,
+  subscription: { modifiedAt?: unknown; modified_at?: unknown },
+): boolean {
+  const eventAt = polarModifiedAt(subscription);
+  return Boolean(eventAt && company.polarSubscriptionModifiedAt &&
+    eventAt.getTime() < company.polarSubscriptionModifiedAt.getTime());
+}
+
+function recordPolarModifiedAt(
+  company: Pick<ICompany, 'polarSubscriptionModifiedAt'>,
+  subscription: { modifiedAt?: unknown; modified_at?: unknown },
+): void {
+  const eventAt = polarModifiedAt(subscription);
+  if (eventAt && (!company.polarSubscriptionModifiedAt || eventAt > company.polarSubscriptionModifiedAt)) {
+    company.polarSubscriptionModifiedAt = eventAt;
+  }
+}
+
 function normalizePolarSubscriptionStatus(status: string): CompanySubscriptionStatus | undefined {
   switch (status) {
     case 'trialing':
@@ -1003,6 +1033,10 @@ export const handleWebhook = async (
           console.warn(`[Webhook] subscription.updated: event does not match the recorded subscription for ${companyId}`);
           break;
         }
+        if (isStalePolarEvent(company, sub)) {
+          console.warn(`[Webhook] subscription.updated: ignored an event older than the last applied update for ${companyId}`);
+          break;
+        }
 
         const productPlan = resolveWebhookPlan(company, sub.productId, meta?.planId);
         if (!productPlan) {
@@ -1036,6 +1070,7 @@ export const handleWebhook = async (
           company.trialEndDate = new Date(sub.currentPeriodEnd);
         }
         company.cancelAtPeriodEnd = sub.cancelAtPeriodEnd ?? false;
+        recordPolarModifiedAt(company, sub);
         await company.save();
         disconnectIfSubscriptionInactive(company);
 
@@ -1056,6 +1091,10 @@ export const handleWebhook = async (
           console.warn(`[Webhook] subscription.canceled: event does not match the recorded subscription for ${companyId}`);
           break;
         }
+        if (isStalePolarEvent(company, sub)) {
+          console.warn(`[Webhook] subscription.canceled: ignored an event older than the last applied update for ${companyId}`);
+          break;
+        }
         if (!resolveWebhookPlan(company, sub.productId, meta?.planId) &&
             !(company.polarSubscriptionId === sub.id && company.polarProductId === sub.productId)) {
           console.warn(`[Webhook] subscription.canceled: product does not match workspace type for ${companyId}`);
@@ -1071,6 +1110,7 @@ export const handleWebhook = async (
           company.pendingSubscriptionPlan = undefined;
           company.pendingSubscriptionPlanEffectiveDate = undefined;
         }
+        recordPolarModifiedAt(company, sub);
         await company.save();
         disconnectIfSubscriptionInactive(company);
 
@@ -1089,6 +1129,10 @@ export const handleWebhook = async (
           console.warn(`[Webhook] subscription.uncanceled: event does not match the recorded subscription for ${companyId}`);
           break;
         }
+        if (isStalePolarEvent(company, sub)) {
+          console.warn(`[Webhook] subscription.uncanceled: ignored an event older than the last applied update for ${companyId}`);
+          break;
+        }
         if (!resolveWebhookPlan(company, sub.productId, meta?.planId) &&
             !(company.polarSubscriptionId === sub.id && company.polarProductId === sub.productId)) {
           console.warn(`[Webhook] subscription.uncanceled: product does not match workspace type for ${companyId}`);
@@ -1102,6 +1146,7 @@ export const handleWebhook = async (
         company.subscriptionStatus = polarStatus;
         company.cancelAtPeriodEnd  = false;
         if (sub.currentPeriodEnd) company.subscriptionEndDate = new Date(sub.currentPeriodEnd);
+        recordPolarModifiedAt(company, sub);
         await company.save();
         disconnectIfSubscriptionInactive(company);
         break;
@@ -1118,6 +1163,10 @@ export const handleWebhook = async (
           console.warn(`[Webhook] subscription.revoked: event does not match the recorded subscription for ${companyId}`);
           break;
         }
+        if (isStalePolarEvent(company, sub)) {
+          console.warn(`[Webhook] subscription.revoked: ignored an event older than the last applied update for ${companyId}`);
+          break;
+        }
         if (!resolveWebhookPlan(company, sub.productId, meta?.planId) &&
             !(company.polarSubscriptionId === sub.id && company.polarProductId === sub.productId)) {
           console.warn(`[Webhook] subscription.revoked: product does not match workspace type for ${companyId}`);
@@ -1127,6 +1176,7 @@ export const handleWebhook = async (
         if (sub.currentPeriodEnd) company.subscriptionEndDate = new Date(sub.currentPeriodEnd);
         if (sub.productId) company.polarProductId = sub.productId;
         if (sub.customerId) company.polarCustomerId = sub.customerId;
+        recordPolarModifiedAt(company, sub);
         await company.save();
         disconnectCompanySockets(company._id.toString());
         break;

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { adminApi } from '@/lib/adminApi';
+import { SubscriptionGrantDialog, describeWorkspaceSubscription } from '@/components/admin/SubscriptionGrantDialog';
 import {
   Building2,
   Search,
@@ -41,8 +42,6 @@ export default function SuperAdminWorkspacesPage() {
   const [accountTypeFilter, setAccountTypeFilter] = useState('all');
 
   const [planChangeWs, setPlanChangeWs] = useState<any | null>(null);
-  const [newPlan, setNewPlan] = useState<'free' | 'starter' | 'pro'>('pro');
-  const [isUpdatingPlan, setIsUpdatingPlan] = useState(false);
 
   const [deleteWsModal, setDeleteWsModal] = useState<any | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -81,25 +80,6 @@ export default function SuperAdminWorkspacesPage() {
   useEffect(() => {
     fetchWorkspaces();
   }, [fetchWorkspaces]);
-
-  const handleUpdatePlan = async () => {
-    if (!planChangeWs) return;
-    setIsUpdatingPlan(true);
-    try {
-      const res = await adminApi.patch(`/workspaces/${planChangeWs._id}/plan`, {
-        plan: newPlan,
-      });
-      if (res.data.success) {
-        showToast(`Workspace "${planChangeWs.name}" updated to ${newPlan.toUpperCase()}`);
-        setPlanChangeWs(null);
-        fetchWorkspaces();
-      }
-    } catch (err: any) {
-      showToast(err.response?.data?.message || 'Plan update failed', 'error');
-    } finally {
-      setIsUpdatingPlan(false);
-    }
-  };
 
   const handleDeleteWorkspace = async () => {
     if (!deleteWsModal) return;
@@ -315,7 +295,6 @@ export default function SuperAdminWorkspacesPage() {
                         <button
                           onClick={() => {
                             setPlanChangeWs(ws);
-                            setNewPlan(ws.subscription?.plan || 'free');
                           }}
                           className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-purple-400 transition-colors"
                           title="Change Plan"
@@ -370,57 +349,15 @@ export default function SuperAdminWorkspacesPage() {
       </div>
 
       {planChangeWs && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md rounded-3xl border border-slate-800 bg-slate-900 p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <h3 className="text-sm font-bold text-white">Adjust Subscription Plan</h3>
-              <button onClick={() => setPlanChangeWs(null)} className="text-slate-400 hover:bg-slate-800 rounded p-1">
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <p className="text-xs text-slate-400">
-              Change subscription tier for workspace <strong className="text-white">{planChangeWs.name}</strong>:
-            </p>
-            <div className="space-y-2">
-              {(['free', 'starter', 'pro'] as const).map((tier) => (
-                <label
-                  key={tier}
-                  className={`flex items-center justify-between rounded-xl border p-3 cursor-pointer ${
-                    newPlan === tier
-                      ? 'border-indigo-500 bg-indigo-500/10 text-white'
-                      : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:bg-slate-800/40'
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5">
-                    <input
-                      type="radio"
-                      name="plan"
-                      checked={newPlan === tier}
-                      onChange={() => setNewPlan(tier)}
-                      className="text-indigo-600 h-4 w-4"
-                    />
-                    <span className="text-xs font-bold uppercase">{tier}</span>
-                  </div>
-                </label>
-              ))}
-            </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <button
-                onClick={() => setPlanChangeWs(null)}
-                className="rounded-xl border border-slate-800 px-4 py-2 text-xs font-semibold text-slate-400"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleUpdatePlan}
-                disabled={isUpdatingPlan}
-                className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-500 disabled:opacity-50"
-              >
-                {isUpdatingPlan ? 'Saving...' : 'Update Plan'}
-              </button>
-            </div>
-          </div>
-        </div>
+        <SubscriptionGrantDialog
+          workspaceId={planChangeWs._id}
+          workspaceName={planChangeWs.name}
+          onClose={() => setPlanChangeWs(null)}
+          onSaved={(summary) => {
+            showToast(`Saved: ${describeWorkspaceSubscription(summary)}`);
+            fetchWorkspaces();
+          }}
+        />
       )}
 
       {/* Delete Modal */}

@@ -17,6 +17,7 @@ import {
   updateUserPlan,
   getWorkspaces,
   updateWorkspacePlan,
+  getWorkspaceAssignablePlans,
   deleteWorkspace,
   getTickets,
   getTicketCounts,
@@ -63,6 +64,7 @@ router.patch('/users/:id/plan', updateUserPlan);
 
 // Workspace / Company Management
 router.get('/workspaces', getWorkspaces);
+router.get('/workspaces/:id/plans', getWorkspaceAssignablePlans);
 router.patch('/workspaces/:id/plan', updateWorkspacePlan);
 router.delete('/workspaces/:id', deleteWorkspace);
 

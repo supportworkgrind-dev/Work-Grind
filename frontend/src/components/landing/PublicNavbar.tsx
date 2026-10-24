@@ -5,17 +5,18 @@ import Link from 'next/link';
 import { ThemeAwareLogo } from '@/components/common/ThemeAwareLogo';
 import { Globe, ChevronDown, Menu, X } from 'lucide-react';
 import { useI18n, LANGUAGES, type LangCode } from '@/lib/i18n';
+import { useLanguagePreference } from '@/lib/useLanguagePreference';
 
 /* ────────────────────────────────────────────────────────────────────────────
    Language Selector — labels always in their own language (never translated)
    ──────────────────────────────────────────────────────────────────────────── */
 export function LangSelector({ dark = false }: { dark?: boolean }) {
-  const { lang, setLang } = useI18n();
+  const { lang, changeLanguage } = useLanguagePreference();
   const [open, setOpen] = useState(false);
 
   const current = LANGUAGES.find(l => l.code === lang) ?? LANGUAGES[0];
 
-  const select = (code: LangCode) => { setLang(code); setOpen(false); };
+  const select = (code: LangCode) => { void changeLanguage(code); setOpen(false); };
 
   const textCls    = dark ? 'text-slate-300 hover:text-white' : 'public-nav-text';
   const dropdownBg = dark ? 'bg-[#0d1117] border-slate-700' : 'public-nav-dropdown';

@@ -103,11 +103,15 @@ export const Navbar = memo(function Navbar() {
     socket.on('notification:new', onNewNotif);
     socket.on('meeting:started',  onMeetingStart);
     socket.on('meeting:ended',    onMeetingEnd);
+    // An administrator changed this workspace's subscription: refetch it.
+    const onSubscriptionUpdated = () => { void useAuthStore.getState().refreshSubscription(); };
+    socket.on('subscription:updated', onSubscriptionUpdated);
 
     return () => {
       socket.off('notification:new', onNewNotif);
       socket.off('meeting:started',  onMeetingStart);
       socket.off('meeting:ended',    onMeetingEnd);
+      socket.off('subscription:updated', onSubscriptionUpdated);
     };
     // Keyed on the id: profile/status edits replace the user object and must not refetch.
   }, [userId]);

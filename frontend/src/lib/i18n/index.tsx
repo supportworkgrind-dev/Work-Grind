@@ -1,20 +1,21 @@
 'use client';
 
 /**
- * WorkGrind i18n — lightweight React context + hook.
+ * WorkGrind i18n — React provider and hooks.
  *
- * Architecture:
- *  - I18nProvider wraps the entire app (added to root layout)
- *  - useI18n() returns { t, lang, setLang, dir }
- *  - t(key) resolves dot-path keys against the active translation object
- *  - Selected language is persisted to localStorage under 'wg_lang'
- *  - RTL is applied via document.documentElement.dir and the CSS class 'rtl'
- *  - On first render, server always gets 'en' (no hydration mismatch)
- *  - Client reads localStorage after mount and updates instantly
+ *  - The root layout reads the `workgrind_lang` cookie and passes it as
+ *    `initialLang`, so the server renders the chosen language and direction
+ *    and the first paint never flips from English.
+ *  - useT('tasks') returns a translator typed to that namespace's keys;
+ *    useI18n().t accepts any dot-path (marketing dictionaries included).
+ *  - Missing translations fall back to English, with a console warning in
+ *    development. English is the source of truth for every key.
+ *  - Signed-in members' language is their profile's `preferredLanguage`
+ *    (applied by the app layout); see useLanguagePreference for changing it.
  */
 
 import React, {
-  createContext, useContext, useState, useEffect,
+  createContext, useContext, useState, useEffect, useLayoutEffect,
   useCallback, useMemo, type ReactNode,
 } from 'react';
 import { en, type Translations } from './translations';
@@ -25,14 +26,26 @@ import { fr } from './translations/fr';
 import { hi } from './translations/hi';
 import { ur } from './translations/ur';
 import { zh } from './translations/zh';
+import { appMessagesEn, appMessagesUr, type NamespaceMessages, type NamespaceName } from './messages';
+import {
+  DEFAULT_LANG, LANG_COOKIE, LANG_STORAGE_KEY, LOCALE_TAGS,
+  directionOf, isLangCode, resolveMessage, setActiveLanguage,
+  formatCurrency as formatCurrencyIn, formatDate as formatDateIn, formatNumber as formatNumberIn,
+  formatRelativeTime as formatRelativeTimeIn, formatTime as formatTimeIn,
+  type LangCode, type MessagePath, type TranslateVars,
+} from './core';
 
-// Keep the translation graph in the same client module instead of generating
-// lazy RSC chunks for the RootLayout provider.
-const TRANSLATIONS: Record<string, Translations> = {
-  en, ur, ar, fr, de, es, zh, hi,
+export type { LangCode, TranslateVars } from './core';
+export { LANG_COOKIE, isLangCode, directionOf, translate, getActiveLanguage } from './core';
+
+// Marketing dictionaries (all languages) plus app namespaces (English and Urdu).
+// Keys a language lacks resolve to English.
+const DICTIONARIES: Record<LangCode, object> = {
+  en: { ...en, ...appMessagesEn },
+  ur: { ...ur, ...appMessagesUr },
+  ar, fr, de, es, zh, hi,
 };
-
-export type LangCode = 'en' | 'ur' | 'ar' | 'fr' | 'de' | 'es' | 'zh' | 'hi';
+const MARKETING: Record<LangCode, Translations> = { en, ur, ar, fr, de, es, zh, hi };
 
 export const LANGUAGES: { code: LangCode; label: string; native: string }[] = [
   { code: 'en', label: 'English', native: 'English'  },
@@ -45,125 +58,154 @@ export const LANGUAGES: { code: LangCode; label: string; native: string }[] = [
   { code: 'hi', label: 'Hindi',   native: 'हिन्दी'    },
 ];
 
-const STORAGE_KEY = 'wg_lang';
-const DEFAULT_LANG: LangCode = 'en';
+const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 
-// ── Translation resolution ─────────────────────────────────────────────────
+function readCookieLang(): LangCode | null {
+  const value = document.cookie
+    .split(';')
+    .map((cookie) => cookie.trim())
+    .find((cookie) => cookie.startsWith(`${LANG_COOKIE}=`))
+    ?.slice(LANG_COOKIE.length + 1);
+  return isLangCode(value) ? value : null;
+}
 
-/**
- * Resolve a dot-notation key against a translation object.
- * Supports simple template interpolation: {{year}}, {{email}} etc.
- */
-function resolve(
-  obj: Record<string, unknown>,
-  key: string,
-  vars?: Record<string, string | number>,
-): string {
-  const parts = key.split('.');
-  let cur: unknown = obj;
-  for (const p of parts) {
-    if (cur == null || typeof cur !== 'object') return key;
-    cur = (cur as Record<string, unknown>)[p];
-  }
-  if (typeof cur !== 'string') return key;
-  if (!vars) return cur;
-  return cur.replace(/\{\{(\w+)\}\}/g, (_, k) =>
-    k in vars ? String(vars[k]) : `{{${k}}}`,
-  );
+function persistLang(code: LangCode) {
+  try { localStorage.setItem(LANG_STORAGE_KEY, code); } catch {}
+  const secure = window.location.protocol === 'https:' ? '; Secure' : '';
+  document.cookie = `${LANG_COOKIE}=${code}; Path=/; Max-Age=31536000; SameSite=Lax${secure}`;
+}
+
+function applyToDocument(code: LangCode) {
+  const dir = directionOf(code);
+  document.documentElement.lang = code;
+  document.documentElement.dir = dir;
+  document.documentElement.classList.toggle('rtl', dir === 'rtl');
 }
 
 // ── Context ────────────────────────────────────────────────────────────────
 
-interface I18nContextValue {
+type Formatters = {
+  /** Intl.DateTimeFormat in the active language. */
+  formatDate: (value: string | number | Date | null | undefined, options?: Intl.DateTimeFormatOptions) => string;
+  formatTime: (value: string | number | Date | null | undefined, options?: Intl.DateTimeFormatOptions) => string;
+  formatNumber: (value: number, options?: Intl.NumberFormatOptions) => string;
+  /** `amount` in major units (e.g. 29 for $29). */
+  formatCurrency: (amount: number, currency?: string) => string;
+  formatRelativeTime: (value: string | number | Date | null | undefined) => string;
+};
+
+interface I18nContextValue extends Formatters {
   lang: LangCode;
   dir: 'ltr' | 'rtl';
+  /** BCP 47 tag for the active language, e.g. "ur-PK". */
+  locale: string;
+  /** Switches the interface language on this device (does not save to the profile). */
   setLang: (code: LangCode) => void;
-  /** Translate a dot-path key, with optional variable interpolation */
-  t: (key: string, vars?: Record<string, string | number>) => string;
-  /** Raw translations object — use t() instead where possible */
+  /** Translate any dot-path key, with optional {{variable}} interpolation. */
+  t: (key: string, vars?: TranslateVars) => string;
+  /** Marketing dictionary object — prefer t() */
   translations: Translations;
 }
 
+function createFormatters(lang: LangCode): Formatters {
+  return {
+    formatDate: (value, options) => formatDateIn(value, options, lang),
+    formatTime: (value, options) => formatTimeIn(value, options, lang),
+    formatNumber: (value, options) => formatNumberIn(value, options, lang),
+    formatCurrency: (amount, currency) => formatCurrencyIn(amount, currency, lang),
+    formatRelativeTime: (value) => formatRelativeTimeIn(value, lang),
+  };
+}
+
 const I18nContext = createContext<I18nContextValue>({
-  lang:         DEFAULT_LANG,
-  dir:          'ltr',
-  setLang:      () => {},
-  t:            (k) => k,
+  lang: DEFAULT_LANG,
+  dir: 'ltr',
+  locale: LOCALE_TAGS[DEFAULT_LANG],
+  setLang: () => {},
+  t: (key, vars) => resolveMessage(DICTIONARIES, DEFAULT_LANG, key, vars),
   translations: en,
+  ...createFormatters(DEFAULT_LANG),
 });
 
 // ── Provider ───────────────────────────────────────────────────────────────
 
-export function I18nProvider({ children }: { children: ReactNode }) {
-  // Always start with English so SSR and first client paint match exactly
-  const [lang, setLangState] = useState<LangCode>(DEFAULT_LANG);
-  const [translations, setTranslations] = useState<Translations>(en);
-  const [mounted, setMounted] = useState(false);
+export function I18nProvider({ children, initialLang = DEFAULT_LANG }: { children: ReactNode; initialLang?: LangCode }) {
+  // The server rendered `initialLang` (from the cookie), so hydration matches.
+  const [lang, setLangState] = useState<LangCode>(initialLang);
 
-  // After hydration: read localStorage and load the persisted language
+  // Code outside render (stores, interceptors) follows the rendered language.
+  if (typeof window !== 'undefined') setActiveLanguage(lang, DICTIONARIES);
+
+  useIsomorphicLayoutEffect(() => {
+    applyToDocument(lang);
+  }, [lang]);
+
+  // One-time migration: earlier releases kept the choice only in localStorage.
   useEffect(() => {
-    setMounted(true);
-    let stored = DEFAULT_LANG;
-    try {
-      const v = localStorage.getItem(STORAGE_KEY) as LangCode | null;
-      if (v && v in TRANSLATIONS) stored = v as LangCode;
-    } catch {}
-    if (stored !== DEFAULT_LANG) {
-      loadAndApply(stored);
-    } else {
-      applyToDocument(DEFAULT_LANG, 'ltr');
+    if (readCookieLang()) return;
+    let stored: string | null = null;
+    try { stored = localStorage.getItem(LANG_STORAGE_KEY); } catch {}
+    if (isLangCode(stored)) {
+      persistLang(stored);
+      if (stored !== initialLang) setLangState(stored);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const applyToDocument = (code: LangCode, dir: 'ltr' | 'rtl') => {
-    if (typeof document === 'undefined') return;
-    document.documentElement.lang = code;
-    document.documentElement.dir  = dir;
-    if (dir === 'rtl') {
-      document.documentElement.classList.add('rtl');
-    } else {
-      document.documentElement.classList.remove('rtl');
-    }
-  };
-
-  const loadAndApply = useCallback(async (code: LangCode) => {
-    try {
-      const trans = TRANSLATIONS[code];
-      if (!trans) return;
-      setTranslations(trans);
-      setLangState(code);
-      applyToDocument(code, trans.dir);
-    } catch (e) {
-      console.error('[i18n] Failed to load language:', code, e);
-    }
-  }, []);
+  }, [initialLang]);
 
   const setLang = useCallback((code: LangCode) => {
-    try { localStorage.setItem(STORAGE_KEY, code); } catch {}
-    loadAndApply(code);
-  }, [loadAndApply]);
+    if (!isLangCode(code)) return;
+    persistLang(code);
+    setLangState(code);
+  }, []);
 
-  const t = useCallback(
-    (key: string, vars?: Record<string, string | number>) =>
-      resolve(translations as unknown as Record<string, unknown>, key, vars),
-    [translations],
-  );
+  const value = useMemo<I18nContextValue>(() => ({
+    lang,
+    dir: directionOf(lang),
+    locale: LOCALE_TAGS[lang],
+    setLang,
+    t: (key, vars) => resolveMessage(DICTIONARIES, lang, key, vars),
+    translations: MARKETING[lang],
+    ...createFormatters(lang),
+  }), [lang, setLang]);
 
-  const dir: 'ltr' | 'rtl' = translations.dir;
-  // Stable unless the language changes, so a provider re-render (every route
-  // change) does not re-render every useI18n consumer.
-  const value = useMemo(() => ({ lang, dir, setLang, t, translations }), [lang, dir, setLang, t, translations]);
-
-  return (
-    <I18nContext.Provider value={value}>
-      {children}
-    </I18nContext.Provider>
-  );
+  return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
 }
 
-// ── Hook ───────────────────────────────────────────────────────────────────
+// ── Hooks ──────────────────────────────────────────────────────────────────
 
 export function useI18n(): I18nContextValue {
   return useContext(I18nContext);
+}
+
+export type NamespaceKey<N extends NamespaceName> = MessagePath<NamespaceMessages<N>>;
+export type Translator<N extends NamespaceName> = (key: NamespaceKey<N>, vars?: TranslateVars) => string;
+
+/**
+ * Translator for one namespace with typed keys:
+ *   const t = useT('tasks'); t('empty.title'); t('count', { count: 3 })
+ */
+export function useT<N extends NamespaceName>(namespace: N): Translator<N> {
+  const { t } = useI18n();
+  return useCallback((key: NamespaceKey<N>, vars?: TranslateVars) => t(`${namespace}.${key}`, vars), [t, namespace]);
+}
+
+type RichRenderers = Record<string, (chunk: ReactNode) => ReactNode>;
+
+/**
+ * Renders a message containing simple tags, e.g.
+ *   "Read the <terms>Terms</terms> first" with { terms: (c) => <Link href="/terms">{c}</Link> }.
+ * Tags are not nested; text outside tags is rendered as-is (never as HTML).
+ */
+export function renderRich(message: string, renderers: RichRenderers): ReactNode[] {
+  const nodes: ReactNode[] = [];
+  const pattern = /<(\w+)>(.*?)<\/\1>/g;
+  let last = 0;
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(message))) {
+    if (match.index > last) nodes.push(message.slice(last, match.index));
+    const render = renderers[match[1]];
+    nodes.push(<React.Fragment key={`${match[1]}-${match.index}`}>{render ? render(match[2]) : match[2]}</React.Fragment>);
+    last = match.index + match[0].length;
+  }
+  if (last < message.length) nodes.push(message.slice(last));
+  return nodes;
 }

@@ -2164,28 +2164,34 @@ body {
    ═══════════════════════════════════════════════════════════ */
 
 /* ── Base direction on the root element ── */
+/* Rows, grids and inline text already flow right-to-left under direction:
+   rtl; new code should use logical utilities (ms-/me-/ps-/pe-/start-/end-/
+   text-start/border-s). The rules below cover older physical classes. */
 html[dir="rtl"],
 .rtl {
   direction: rtl;
-  text-align: right;
 }
 
-/* ── Flip margin/padding shorthands that aren't logical ── */
+/* Arabic-script letters join; letter-spacing breaks those joins. */
+html:is([lang="ur"], [lang="ar"]) body * {
+  letter-spacing: normal !important;
+}
+
+/* ── Flip margin shorthands that aren't logical ── */
 html[dir="rtl"] .ml-auto  { margin-left: unset;  margin-right: auto;  }
 html[dir="rtl"] .mr-auto  { margin-right: unset; margin-left: auto;   }
-
-/* ── Flex row direction ── */
-html[dir="rtl"] .flex-row          { flex-direction: row-reverse; }
-html[dir="rtl"] .items-start       { align-items: flex-start; }   /* unchanged — fine */
 
 /* ── Space-x gaps flip in RTL ── */
 html[dir="rtl"] [class*="space-x-"] > * + * {
   --tw-space-x-reverse: 1;
 }
 
-/* ── Borders that indicate "left" side become right side in RTL ── */
-html[dir="rtl"] .border-l { border-left: none; border-right: inherit; }
-html[dir="rtl"] .border-r { border-right: none; border-left: inherit; }
+/* ── Single-side borders move to the other side in RTL ── */
+html[dir="rtl"] .border-l { border-left-width: 0; border-right-width: 1px; }
+html[dir="rtl"] .border-r { border-right-width: 0; border-left-width: 1px; }
+
+/* ── Direction-bearing icons (arrows, chevrons) mirror in RTL ── */
+html[dir="rtl"] .rtl-mirror { transform: scaleX(-1); }
 
 /* ── Sidebar nav active indicator stripe flips ── */
 html[dir="rtl"] .sidebar-active-premium {
@@ -2274,7 +2280,7 @@ html[dir="rtl"] ::-webkit-scrollbar {
 /* ── Premium font for Urdu/Arabic ── */
 html[lang="ur"],
 html[lang="ar"] {
-  font-family: var(--font-plus-jakarta-sans), sans-serif;
+  font-family: var(--font-plus-jakarta-sans), var(--font-arabic-script), sans-serif;
   letter-spacing: 0;   /* Arabic/Urdu don't use letter-spacing */
   word-spacing: 0.05em;
 }
@@ -2623,7 +2629,7 @@ html:not([data-theme]) .theme-scope {
   max-width: 104rem;
   padding-top: clamp(1.25rem, 2.3vw, 2.25rem);
   padding-bottom: clamp(1.75rem, 3vw, 3rem);
-  font-family: var(--font-plus-jakarta-sans), "Segoe UI", sans-serif;
+  font-family: var(--font-plus-jakarta-sans), var(--font-arabic-script), "Segoe UI", sans-serif;
 }
 
 .theme-scope .page-title,
@@ -2951,7 +2957,7 @@ html:not([data-theme]) .theme-scope {
   min-height: 100dvh;
   background: #171915;
   color: #e8e6dd;
-  font-family: var(--font-plus-jakarta-sans), "Segoe UI", sans-serif;
+  font-family: var(--font-plus-jakarta-sans), var(--font-arabic-script), "Segoe UI", sans-serif;
 }
 
 .admin-portal-shell aside {
@@ -3353,8 +3359,8 @@ html:not([data-theme]) .theme-scope {
 
 /* Shared authenticated WorkGrind system */
 .theme-scope {
-  --wg-font-display: var(--font-plus-jakarta-sans), "Segoe UI", sans-serif;
-  --wg-font-ui: var(--font-plus-jakarta-sans), "Segoe UI", sans-serif;
+  --wg-font-display: var(--font-plus-jakarta-sans), var(--font-arabic-script), "Segoe UI", sans-serif;
+  --wg-font-ui: var(--font-plus-jakarta-sans), var(--font-arabic-script), "Segoe UI", sans-serif;
   --wg-radius-control: 5px;
   --wg-radius-panel: 8px;
   --wg-shadow-panel: 0 1px 2px rgb(28 35 28 / 0.04), 0 8px 24px -18px rgb(28 35 28 / 0.18);
@@ -3714,7 +3720,7 @@ html:not([data-theme]) .theme-scope {
 .client-auth-shell {
   background: #f5f3ed;
   color: #202820;
-  font-family: var(--font-plus-jakarta-sans), "Segoe UI", sans-serif;
+  font-family: var(--font-plus-jakarta-sans), var(--font-arabic-script), "Segoe UI", sans-serif;
 }
 
 .client-auth-shell .client-portal-panel {
@@ -3804,7 +3810,7 @@ html:not([data-theme]) .theme-scope {
   min-height: 100dvh;
   background: #f5f3ed !important;
   color: #202820 !important;
-  font-family: var(--font-plus-jakarta-sans), "Segoe UI", sans-serif;
+  font-family: var(--font-plus-jakarta-sans), var(--font-arabic-script), "Segoe UI", sans-serif;
 }
 
 .admin-portal-shell aside,
@@ -3912,7 +3918,7 @@ html:not([data-theme]) .theme-scope {
   --admin-terra: #bf6548;
   color: var(--admin-ink);
   background: #f5f3ed;
-  font-family: var(--font-plus-jakarta-sans), "Segoe UI", sans-serif;
+  font-family: var(--font-plus-jakarta-sans), var(--font-arabic-script), "Segoe UI", sans-serif;
 }
 
 .admin-portal-loading > div > div:first-child,

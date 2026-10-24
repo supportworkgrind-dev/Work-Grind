@@ -7,6 +7,7 @@ import { ArrowRight, ShieldCheck } from 'lucide-react';
 import { ThemeAwareLogo } from '@/components/common/ThemeAwareLogo';
 import { ExpiredSubscriptionExperience } from '@/components/subscription/ExpiredSubscriptionExperience';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useSubscriptionRevalidation } from '@/lib/useSubscriptionRevalidation';
 
 export default function SubscriptionExpiredPage() {
   const router = useRouter();
@@ -41,7 +42,12 @@ export default function SubscriptionExpiredPage() {
     if (subscription?.hasActiveAccess) redirectOnce('/tasks');
   }, [subscription, redirectOnce]);
 
-  if (isLoading || !user || subscriptionLoading || (!subscription && !subscriptionError)) {
+  // Access restored elsewhere (an administrator grant, a payment in another
+  // tab) is picked up here without the member reloading.
+  useSubscriptionRevalidation(user?._id, subscription?.hasActiveAccess === true);
+
+  // Background re-checks keep the current screen; only the first load shows the loader.
+  if (isLoading || !user || (!subscription && (subscriptionLoading || !subscriptionError))) {
     return (
       <main className="flex min-h-screen items-center justify-center" style={{ background: 'var(--wg-bg, #f5f2e9)' }}>
         <ThemeAwareLogo size="md" surface="light" />

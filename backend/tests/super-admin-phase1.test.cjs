@@ -131,7 +131,7 @@ test('admin user list and detail responses contain only required fields', async 
   assert.deepEqual(Object.keys(listedUser).sort(), [
     '_id', 'accountType', 'avatar', 'companyId', 'createdAt', 'email', 'fullName',
     'isActive', 'isVerified', 'lastLogin', 'lastSeen', 'role', 'subscriptionPlan',
-    'subscriptionStatus',
+    'subscriptionStatus', 'workspaceSubscription',
   ].sort());
   assert.deepEqual(Object.keys(listedUser.companyId).sort(), [
     '_id', 'accountType', 'country', 'industry', 'name', 'plan', 'subscriptionEndDate',

@@ -1,14 +1,25 @@
 import type { Metadata, Viewport } from 'next';
 import { headers } from 'next/headers';
-import { Plus_Jakarta_Sans } from 'next/font/google';
+import { Noto_Naskh_Arabic, Plus_Jakarta_Sans } from 'next/font/google';
 import './globals.css';
 import { RootClientProviders } from '@/components/layout/RootClientProviders';
 import { getSiteUrl } from '@/lib/siteUrl';
+import { LANG_COOKIE, directionOf, isLangCode } from '@/lib/i18n/core';
 
 const plusJakartaSans = Plus_Jakarta_Sans({
   subsets: ['latin'],
   variable: '--font-plus-jakarta-sans',
   display: 'swap',
+});
+
+// Urdu (and Arabic) script. Not preloaded: the browser fetches it only when a
+// page actually contains Arabic-script text, so English pages pay nothing.
+const notoNaskhArabic = Noto_Naskh_Arabic({
+  subsets: ['arabic'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-arabic-script',
+  display: 'swap',
+  preload: false,
 });
 
 export const viewport: Viewport = {
@@ -68,6 +79,13 @@ export default async function RootLayout({
     .find((cookie) => cookie.startsWith('workgrind_theme='))
     ?.slice('workgrind_theme='.length);
   const savedTheme = themeCookie ?? '';
+  const langCookie = requestHeaders.get('cookie')
+    ?.split(';')
+    .map((cookie) => cookie.trim())
+    .find((cookie) => cookie.startsWith(`${LANG_COOKIE}=`))
+    ?.slice(LANG_COOKIE.length + 1);
+  const initialLang = isLangCode(langCookie) ? langCookie : 'en';
+  const dir = directionOf(initialLang);
   const themeAliases: Record<string, string> = {
     light: 'original',
     dark: 'midnight',
@@ -87,9 +105,14 @@ export default async function RootLayout({
   const allowedThemes = ['original', 'midnight', 'slate', 'forest', 'ocean', 'sand', 'plum', 'high-contrast'];
   const initialTheme = themeAliases[savedTheme] ?? (allowedThemes.includes(savedTheme) ? savedTheme : 'original');
   return (
-    <html lang="en" className={plusJakartaSans.variable} data-theme={initialTheme}>
+    <html
+      lang={initialLang}
+      dir={dir}
+      className={`${plusJakartaSans.variable} ${notoNaskhArabic.variable}${dir === 'rtl' ? ' rtl' : ''}`}
+      data-theme={initialTheme}
+    >
       <body className="min-h-screen antialiased">
-        <RootClientProviders>{children}</RootClientProviders>
+        <RootClientProviders initialLang={initialLang}>{children}</RootClientProviders>
       </body>
     </html>
   );

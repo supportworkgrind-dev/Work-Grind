@@ -3,7 +3,12 @@
  * and plan refusals are final (no Retry), while network, timeout, rate-limit,
  * and server failures are recoverable (Retry). Expired sessions are handled by
  * the API client's refresh flow and surface here only when that also failed.
+ *
+ * Messages follow the interface language. The API answers in English, so in
+ * other languages a known error code shows its translated message and any
+ * other failure shows a translated message for its kind.
  */
+import { getActiveLanguage, translate } from '@/lib/i18n/core';
 
 export type ApiErrorKind =
   | 'forbidden'
@@ -40,7 +45,35 @@ function responseBody(data: unknown): { message?: string; code?: string } {
   return data && typeof data === 'object' ? data as { message?: string; code?: string } : {};
 }
 
-export function describeApiError(error: unknown, fallback = 'Something went wrong. Please try again.'): ApiErrorInfo {
+const KIND_MESSAGE_KEYS: Record<ApiErrorKind, string> = {
+  forbidden: 'common.errors.forbidden',
+  plan: 'common.apiCodes.PLAN_UPGRADE_REQUIRED',
+  subscription: 'common.apiCodes.SUBSCRIPTION_REQUIRED',
+  unauthorized: 'common.errors.unauthorized',
+  invalid: 'common.errors.generic',
+  rate_limited: 'common.errors.rateLimited',
+  server: 'common.errors.server',
+  timeout: 'common.errors.timeout',
+  network: 'common.errors.network',
+  cancelled: 'common.errors.generic',
+};
+
+function localizedMessage(info: ApiErrorInfo, code: string | undefined, serverMessage: string | undefined, fallback: string): string {
+  if (code) {
+    const key = `common.apiCodes.${code}`;
+    const message = translate(key);
+    if (message !== key) return message;
+  }
+  // A caller's own fallback is already in the interface language.
+  if (info.kind === 'invalid' || (info.kind === 'server' && !serverMessage)) {
+    return fallback === DEFAULT_FALLBACK ? translate(KIND_MESSAGE_KEYS[info.kind]) : fallback;
+  }
+  return translate(KIND_MESSAGE_KEYS[info.kind]);
+}
+
+const DEFAULT_FALLBACK = 'Something went wrong. Please try again.';
+
+export function describeApiError(error: unknown, fallback = DEFAULT_FALLBACK): ApiErrorInfo {
   const failure = (error && typeof error === 'object' ? error : {}) as AxiosLike;
   const status = failure.response?.status;
   const body = responseBody(failure.response?.data);
@@ -72,6 +105,8 @@ export function describeApiError(error: unknown, fallback = 'Something went wron
   } else {
     info = { kind: 'invalid', message: serverMessage ?? fallback, retryable: false };
   }
+
+  if (getActiveLanguage() !== 'en') info = { ...info, message: localizedMessage(info, code, serverMessage, fallback) };
 
   if (process.env.NODE_ENV !== 'production' && info.kind !== 'cancelled') {
     // Method, path, status, and code only — never headers, tokens, or bodies.
