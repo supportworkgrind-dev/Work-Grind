@@ -9,7 +9,7 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { PageHeader } from '@/components/common/PageHeader';
 import { BookOpen, GraduationCap, Loader2, Pencil, Plus, Trash2, Users } from 'lucide-react';
 import { ACADEMIC_SECTIONS, isAcademicSection } from '@/lib/academicSections';
-import { canAccessAcademicSection, canAccessOrganizationFeature, isEducationOrganization } from '@/lib/organizationAccess';
+import { canAccessAcademicSection, canAccessOrganizationFeature, isEducationOrganization, permissionRole } from '@/lib/organizationAccess';
 import { renderRich, useI18n, useT } from '@/lib/i18n';
 
 type AcademicPerson = {
@@ -22,7 +22,11 @@ type AcademicPerson = {
   status?: 'active' | 'inactive';
 };
 
-type AcademicDepartment = { _id: string; name: string; code: string; description?: string };
+type AcademicDepartment = {
+  _id: string; name: string; code: string; description?: string;
+  authorizedDeanUserIds?: string[]; authorizedHodUserIds?: string[];
+};
+type WorkspaceMember = { _id: string; fullName: string; role: string };
 type AcademicCourse = { _id: string; name: string; code: string; departmentId: string | AcademicDepartment; credits?: number };
 type AcademicGuardianLink = { _id: string; studentId: string; guardianId: string; relationship: 'parent' | 'guardian' | 'other' };
 type AcademicClass = { _id: string; name: string; academicYear: string; departmentId?: string | AcademicDepartment; courseIds?: (string | AcademicCourse)[] };
@@ -187,6 +191,10 @@ export default function AcademicPage() {
   const [success, setSuccess] = useState('');
   const [people, setPeople] = useState<AcademicPerson[]>([]);
   const [departments, setDepartments] = useState<AcademicDepartment[]>([]);
+  // Deans and heads of department act only on departments assigned to them;
+  // institution administrators (as on the server) make those assignments.
+  const canAssignDepartmentLeaders = ['owner', 'principal', 'admin'].includes(permissionRole(user?.role));
+  const [departmentLeaders, setDepartmentLeaders] = useState<WorkspaceMember[]>([]);
   const [courses, setCourses] = useState<AcademicCourse[]>([]);
   const [guardianLinks, setGuardianLinks] = useState<AcademicGuardianLink[]>([]);
   const [classes, setClasses] = useState<AcademicClass[]>([]);
@@ -294,7 +302,12 @@ export default function AcademicPage() {
     setAssessments(assessmentsResponse.data.assessments);
     setResults(resultsResponse.data.results);
     setFeeCharges(feesResponse.data.charges);
-  }, []);
+    if (canAssignDepartmentLeaders) {
+      const membersResponse = await api.get('/users');
+      setDepartmentLeaders((membersResponse.data.users as WorkspaceMember[])
+        .filter((member) => ['dean', 'hod'].includes(permissionRole(member.role))));
+    }
+  }, [canAssignDepartmentLeaders]);
 
   useEffect(() => {
     if (!isEducationWorkspace) return;
@@ -352,6 +365,11 @@ export default function AcademicPage() {
     const payload: Record<string, unknown> = {};
     for (const field of editing.fields) {
       const value = editDraft[field.key] ?? '';
+      // Removing every dean or head of department is a real change, not an omitted field.
+      if (!value && ['authorizedDeanUserIds', 'authorizedHodUserIds'].includes(field.key)) {
+        payload[field.key] = [];
+        continue;
+      }
       if (!value && !field.required) {
         if (['dueAt', 'validFrom', 'validUntil', 'completedAt', 'scheduledAt'].includes(field.key)) payload[field.key] = null;
         else if (['email', 'externalId', 'description', 'instructions', 'location', 'note', 'feedback'].includes(field.key)) payload[field.key] = null;
@@ -376,6 +394,14 @@ export default function AcademicPage() {
     }, resource === 'fees' ? t('toast.feeVoided') : t('toast.deleted'));
   };
   const selectedPaymentCharge = feeCharges.find((charge) => charge._id === paymentChargeId);
+  const departmentDetail = (department: AcademicDepartment) => {
+    if (!canAssignDepartmentLeaders) return department.code;
+    const leaderIds = [...(department.authorizedDeanUserIds ?? []), ...(department.authorizedHodUserIds ?? [])];
+    const names = departmentLeaders.filter((member) => leaderIds.includes(member._id)).map((member) => member.fullName);
+    return names.length
+      ? t('departments.leaders', { code: department.code, leaders: names.join(', ') })
+      : t('departments.unassigned', { code: department.code });
+  };
 
   if (!isEducationWorkspace) {
     return <div className="academic-card m-6"><h1 className="academic-heading">{t('gate.title')}</h1><p className="text-sm" style={{ color: 'var(--text-muted)' }}>{renderRich(t('gate.body'), { link: (chunk) => <Link className="underline" href="/settings">{chunk}</Link> })}</p></div>;
@@ -428,11 +454,23 @@ export default function AcademicPage() {
                 <label>{t('fields.code')}<input required maxLength={30} value={departmentCode} onChange={(event) => setDepartmentCode(event.target.value)} /></label>
                 <SubmitButton saving={saving} label={t('departments.submit')} />
               </form>
-              <div className="mt-5 space-y-2">{departments.length ? departments.map((department) => <RecordRow key={department._id} title={department.name} detail={department.code}
+              <div className="mt-5 space-y-2">{departments.length ? departments.map((department) => <RecordRow key={department._id} title={department.name} detail={departmentDetail(department)}
                 onEdit={() => beginEdit('departments', department._id, department.name, [
                   editField('name', t('fields.departmentName'), department.name, { required: true, maxLength: 120 }),
                   editField('code', t('fields.code'), department.code, { required: true, maxLength: 30 }),
                   editField('description', t('fields.description'), (department as AcademicDepartment & { description?: string }).description, { maxLength: 1000 }),
+                  ...(canAssignDepartmentLeaders ? [
+                    editField('authorizedHodUserIds', t('fields.departmentHeads'), (department.authorizedHodUserIds ?? []).join(','), {
+                      type: 'multiselect',
+                      options: departmentLeaders.filter((member) => member.role === 'hod').map((member) => ({ value: member._id, label: member.fullName })),
+                    }),
+                    ...(company?.organizationType === 'university' ? [
+                      editField('authorizedDeanUserIds', t('fields.deans'), (department.authorizedDeanUserIds ?? []).join(','), {
+                        type: 'multiselect',
+                        options: departmentLeaders.filter((member) => member.role === 'dean').map((member) => ({ value: member._id, label: member.fullName })),
+                      }),
+                    ] : []),
+                  ] : []),
                 ])}
                 onDelete={() => void deleteRecord('departments', department._id, department.name)} />) : <EmptyState label={t('departments.empty')} />}</div>
             </section>

@@ -13,7 +13,7 @@ import AcademicPerson from '../models/AcademicPerson';
 import AcademicResult from '../models/AcademicResult';
 import AcademicSchedule from '../models/AcademicSchedule';
 import AcademicTeachingAssignment from '../models/AcademicTeachingAssignment';
-import { normalizeOrganizationRole, roleMatches } from '../config/organization';
+import { permissionRole, roleMatches } from '../config/organization';
 import { AuthRequest } from './auth';
 
 export interface AcademicDepartmentScope {
@@ -38,7 +38,7 @@ function isHod(role: string): boolean {
 }
 
 function isTrustedAssignmentActor(role: string): boolean {
-  return ['owner', 'principal', 'admin'].includes(normalizeOrganizationRole(role, 'university'));
+  return ['owner', 'principal', 'admin'].includes(permissionRole(role));
 }
 
 function ids(values: unknown[]): string[] {

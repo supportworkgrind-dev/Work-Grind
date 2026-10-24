@@ -429,13 +429,14 @@ function SceneTasks({ reduced }: { reduced: boolean }) {
 
 /** Scene 5 — Chat */
 function SceneChat({ reduced }: { reduced: boolean }) {
+  const t = useT('landing');
   return (
     <div className="flex-1 overflow-hidden flex flex-col">
       {/* Channel header */}
       <div className="flex items-center gap-2 px-3 py-2 border-b border-white/[0.06]">
         <Hash className="h-3.5 w-3.5 text-slate-500" />
         <span className="text-[11px] font-semibold text-white">{D.chat.channel}</span>
-        <span className="text-[9px] text-slate-600 ml-1">Sales team</span>
+        <span className="text-[9px] text-slate-600 ms-1">{t('hero.demo.chat.teamName')}</span>
       </div>
       {/* Messages */}
       <div className="flex-1 p-3 space-y-3 overflow-hidden">
@@ -449,9 +450,9 @@ function SceneChat({ reduced }: { reduced: boolean }) {
             <div>
               <div className="flex items-baseline gap-2 mb-0.5">
                 <span className="text-[10px] font-semibold text-slate-300">{msg.from}</span>
-                <span className="text-[8px] text-slate-600">just now</span>
+                <span className="text-[8px] text-slate-600">{t('hero.demo.chat.justNow')}</span>
               </div>
-              <p className="text-[10px] text-slate-400 leading-relaxed">{msg.text}</p>
+              <p className="text-[10px] text-slate-400 leading-relaxed">{t(`hero.demo.chat.messages.${msg.id}`)}</p>
             </div>
           </motion.div>
         ))}
@@ -459,7 +460,7 @@ function SceneChat({ reduced }: { reduced: boolean }) {
       {/* Input bar */}
       <div className="px-3 py-2 border-t border-white/[0.06]">
         <div className="flex items-center gap-2 rounded-xl bg-white/[0.04] border border-white/[0.06] px-3 py-1.5">
-          <span className="text-[10px] text-slate-600 flex-1">Message #sales…</span>
+          <span className="text-[10px] text-slate-600 flex-1">{t('hero.demo.chat.placeholder', { channel: D.chat.channel })}</span>
           <Send className="h-3 w-3 text-slate-600" />
         </div>
       </div>
@@ -469,6 +470,7 @@ function SceneChat({ reduced }: { reduced: boolean }) {
 
 /** Scene 6 — AI */
 function SceneAI({ reduced }: { reduced: boolean }) {
+  const t = useT('landing');
   const [showResp, setShowResp] = useState(false);
   const [dots, setDots] = useState('');
 
@@ -495,7 +497,7 @@ function SceneAI({ reduced }: { reduced: boolean }) {
             <Sparkles className="h-3 w-3 text-violet-400" />
             <span className="text-[10px] font-semibold text-violet-300">Tavro AI</span>
           </div>
-          <p className="text-[10px] text-slate-400">Uses supported work and learning information available to your account.</p>
+          <p className="text-[10px] text-slate-400">{t('hero.demo.ai.note')}</p>
         </div>
       </div>
 
@@ -505,7 +507,7 @@ function SceneAI({ reduced }: { reduced: boolean }) {
         <div className="flex items-start gap-2">
           <div className="h-5 w-5 rounded-md bg-indigo-600/30 flex items-center justify-center text-[7px] font-black text-indigo-300">SC</div>
           <div className="rounded-xl bg-indigo-600/15 border border-indigo-500/20 px-2.5 py-1.5">
-            <p className="text-[10px] text-indigo-200">{D.ai.q}</p>
+            <p className="text-[10px] text-indigo-200">{t('hero.demo.ai.question')}</p>
           </div>
         </div>
         {/* AI response */}
@@ -518,13 +520,13 @@ function SceneAI({ reduced }: { reduced: boolean }) {
               {!showResp ? (
                 <motion.p key="typing" className="text-[10px] text-slate-600"
                   initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                  Thinking{dots}
+                  {t('hero.demo.ai.thinking')}{dots}
                 </motion.p>
               ) : (
                 <motion.p key="resp" className="text-[10px] text-slate-300 leading-relaxed"
                   initial={{ opacity: 0, y: 3 }} animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.3 }}>
-                  {D.ai.a}
+                  {t('hero.demo.ai.answer')}
                 </motion.p>
               )}
             </AnimatePresence>
@@ -605,8 +607,10 @@ function useMouseParallax(factor = 0.004) {
    ═══════════════════════════════════════════════════════════ */
 
 function ProductDemo({ reduced }: { reduced: boolean }) {
+  const tl = useT('landing');
   const [sceneIdx, setSceneIdx] = useState(0);
   const scene = SCENES[sceneIdx];
+  const sceneLabel = (key: SceneTabKey) => tl(`hero.demo.scenes.${key}`);
 
   /* Auto-advance unless reduced-motion */
   useEffect(() => {
@@ -625,25 +629,25 @@ function ProductDemo({ reduced }: { reduced: boolean }) {
     exit:   { opacity: 0, y: -4, transition: { duration: 0.2, ease: 'easeIn' as const } },
   };
 
-  /* Map scene key → sidebar active label */
-  const sidebarLabel: Record<SceneKey, string> = {
-    overview: 'Overview',
-    crm:      'CRM',
-    team:     'Team',
-    tasks:    'Tasks',
-    chat:     'Chat',
-    ai:       'AI',
-    return:   'Overview',
+  /* Map scene key → active sidebar item */
+  const sidebarItem: Record<SceneKey, string> = {
+    overview: 'overview',
+    crm:      'crm',
+    team:     'team',
+    tasks:    'tasks',
+    chat:     'chat',
+    ai:       'tavro',
+    return:   'overview',
   };
 
   return (
     <div className="landing-preview rounded-2xl border border-white/[0.09] bg-[#0d1117] shadow-[0_28px_72px_rgba(0,0,0,0.65)] overflow-hidden">
       {/* Window chrome */}
-      <Chrome label={scene.label} />
+      <Chrome label={sceneLabel(scene.key)} />
 
       <div className="flex" style={{ height: 340 }}>
         {/* Persistent sidebar — active item animates on scene change */}
-        <AppSidebar activeLabel={sidebarLabel[scene.key]} />
+        <AppSidebar activeId={sidebarItem[scene.key]} />
 
         {/* Scene content — crossfades between scenes */}
         <div className="flex-1 overflow-hidden relative">
@@ -674,17 +678,17 @@ function ProductDemo({ reduced }: { reduced: boolean }) {
                 className: 'h-3 w-3 shrink-0',
                 style: { color: scene.col },
               })}
-              <span className="text-[9px] font-semibold" style={{ color: scene.col }}>{scene.label}</span>
+              <span className="text-[9px] font-semibold" style={{ color: scene.col }}>{sceneLabel(scene.key)}</span>
             </motion.div>
           </AnimatePresence>
         </div>
         <div className="flex items-center gap-1.5">
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-          <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-400">Illustrative Preview</span>
+          <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-400">{tl('sample.illustrativePreview')}</span>
         </div>
       </div>
 
-      <div role="group" aria-label="Choose a product preview scene" className="flex flex-wrap items-center justify-center gap-2 border-t border-white/[0.05] bg-[#090c13] px-3 py-2">
+      <div role="group" aria-label={tl('hero.demo.chooseScene')} className="flex flex-wrap items-center justify-center gap-2 border-t border-white/[0.05] bg-[#090c13] px-3 py-2">
         {SCENES.map((s, i) => {
           const Icon = s.icon;
           const selected = i === sceneIdx;
@@ -692,8 +696,8 @@ function ProductDemo({ reduced }: { reduced: boolean }) {
             <button
               key={s.key}
               type="button"
-              title={`Show ${s.label} preview`}
-              aria-label={`Show ${s.label} preview`}
+              title={tl('hero.demo.showPreview', { label: sceneLabel(s.key) })}
+              aria-label={tl('hero.demo.showPreview', { label: sceneLabel(s.key) })}
               aria-pressed={selected}
               onClick={() => setSceneIdx(i)}
               className="landing-button-icon flex h-10 min-w-10 items-center justify-center gap-2 rounded-lg border px-2.5 text-xs font-semibold transition-all duration-200 hover:scale-[1.03] focus-visible:outline-none"
@@ -704,7 +708,7 @@ function ProductDemo({ reduced }: { reduced: boolean }) {
               }}
             >
               <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
-              <span className="hidden sm:inline">{s.label}</span>
+              <span className="hidden sm:inline">{sceneLabel(s.key)}</span>
             </button>
           );
         })}
@@ -712,17 +716,17 @@ function ProductDemo({ reduced }: { reduced: boolean }) {
 
       <div
         role="img"
-        aria-label="Illustrative WorkGrind preview spanning personal work, business, and academic workspaces"
+        aria-label={tl('hero.demo.previewAlt')}
         className="relative border-t border-white/[0.05] bg-gradient-to-b from-[#0b0f19] to-[#090c13] px-2 py-3 sm:px-4"
       >
         <div className="absolute left-[12%] right-[12%] top-[28px] h-px bg-gradient-to-r from-blue-400/20 via-indigo-300/60 to-cyan-300/20" aria-hidden="true" />
         <div className="relative grid grid-cols-5 gap-1">
-          {WORKSPACE_AREAS.map(({ label, icon: Icon, color }) => (
-            <div key={label} className="flex min-w-0 flex-col items-center gap-1.5 text-center">
+          {WORKSPACE_AREAS.map(({ id, icon: Icon, color }) => (
+            <div key={id} className="flex min-w-0 flex-col items-center gap-1.5 text-center">
               <span className="flex h-8 w-8 items-center justify-center rounded-xl border border-white/10 bg-[#111827] shadow-[0_4px_14px_rgba(0,0,0,.24)]">
                 <Icon className="h-4 w-4" style={{ color }} aria-hidden="true" />
               </span>
-              <span className="truncate text-[9px] font-semibold text-slate-300">{label}</span>
+              <span className="truncate text-[9px] font-semibold text-slate-300">{tl(`hero.demo.areas.${id}`)}</span>
             </div>
           ))}
         </div>

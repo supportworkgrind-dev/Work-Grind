@@ -39,7 +39,9 @@ test('every English interface message has an Urdu translation with the same vari
       if (!translated.trim() && text.trim()) problems.push(`${name}.${key}: empty`);
       if (placeholders(text).join() !== placeholders(translated).join()) problems.push(`${name}.${key}: variables differ`);
       if (tags(text).join() !== tags(translated).join()) problems.push(`${name}.${key}: markup tags differ`);
-      if (text.trim() && translated === text && !SAME_IN_URDU.test(text)) problems.push(`${name}.${key}: identical to English`);
+      // A message made only of {{variables}} and punctuation reads the same in Urdu.
+      const wording = text.replace(/\{\{\w+\}\}/g, '').trim();
+      if (wording && translated === text && !SAME_IN_URDU.test(wording)) problems.push(`${name}.${key}: identical to English`);
     }
   }
   expect(problems).toEqual([]);

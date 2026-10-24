@@ -160,7 +160,9 @@ async function expectTabs(page: Page, visible: string[], hidden: string[]) {
 
 test.describe('settings visibility by workspace and role', () => {
   const ADMIN_TABS = ['Workspace Settings', 'Members & Roles', 'Audit Logs', 'Integrations', 'Billing & Subscription'];
-  const ADMIN = ['Workspace Settings', 'Members & Roles', 'Audit Logs'];
+  // Schools, colleges and universities name the tab for their institution.
+  const ADMIN = ['Institution Settings', 'Members & Roles', 'Audit Logs'];
+  const ALL_TABS = [...ADMIN_TABS, 'Institution Settings'];
   const cases: Array<[string, Workspace, string[]]> = [
     ['business owner', { organizationType: 'business', accountType: 'company', role: 'owner', owner: true }, ADMIN_TABS],
     ['business admin', { organizationType: 'business', accountType: 'company', role: 'admin' }, ADMIN_TABS],
@@ -178,7 +180,7 @@ test.describe('settings visibility by workspace and role', () => {
   for (const [label, workspace, visible] of cases) {
     test(`${label} sees only the settings their role can use`, async ({ page }) => {
       await openSettings(page, workspace);
-      await expectTabs(page, visible, ADMIN_TABS.filter((name) => !visible.includes(name)));
+      await expectTabs(page, visible, ALL_TABS.filter((name) => !visible.includes(name)));
     });
   }
 });
@@ -201,7 +203,8 @@ test('solo workspace settings omit team administration and offer the supported t
 
 test('education workspace settings show academic preferences and hide business-only fields', async ({ page }) => {
   await openSettings(page, { organizationType: 'school', accountType: 'company', role: 'principal' });
-  await tab(page, 'Workspace Settings').click();
+  await tab(page, 'Institution Settings').click();
+  await expect(page.getByRole('heading', { name: 'School Configuration' })).toBeVisible();
   await expect(page.getByLabel('Institution Name')).toHaveValue('Fixture Workspace');
   await expect(page.getByLabel('Academic year starts')).toHaveValue('9');
   await expect(page.getByLabel('Default grading scale')).toHaveValue('letter');
@@ -209,6 +212,12 @@ test('education workspace settings show academic preferences and hide business-o
   // Organization type is shown but not editable from Settings.
   await expect(page.getByRole('combobox', { name: 'Organization type' })).toHaveCount(0);
   await expect(page.getByText('School', { exact: true })).toBeVisible();
+  // Invite-code joiners get an education role, never Employee or Guest.
+  await expect(page.getByLabel('Default Member Role').locator('option')).toHaveText(['Student', 'Parent / Guardian']);
+  // The academic structure is managed in Academic, linked from here.
+  const structure = page.getByRole('region', { name: 'Academic structure' });
+  await expect(structure.getByRole('link', { name: 'Open Departments' })).toHaveAttribute('href', '/academic?section=departments');
+  await expect(page.getByRole('region', { name: 'Business tools' })).toHaveCount(0);
 });
 
 test('notification toggles match the features the workspace can use', async ({ page }) => {

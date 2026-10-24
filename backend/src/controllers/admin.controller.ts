@@ -11,7 +11,12 @@ import { CrmCompany } from '../models/CrmCompany';
 import { ClientUser } from '../models/ClientPortal';
 import { AuthRequest } from '../middleware/auth';
 import { getCompanySubscription } from '../services/companySubscription';
-import { isOrganizationRoleEligible, normalizeOrganizationRole, roleMatches } from '../config/organization';
+import {
+  canAssignOrganizationRole,
+  isOrganizationRoleAssignable,
+  normalizeOrganizationRole,
+  roleMatches,
+} from '../config/organization';
 import { parsePagination } from '../utils/pagination';
 
 export const getAdminMembers = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -59,22 +64,20 @@ export const updateMemberRole = async (req: AuthRequest, res: Response): Promise
     }
 
     const role = normalizeOrganizationRole(requestedRole, company.organizationType, '');
-    if (
-      !role ||
-      role === 'owner' ||
-      !isOrganizationRoleEligible(requestedRole, company.organizationType)
-    ) {
+    // Roles come from the workspace type (business, school, college, university);
+    // titles kept only for existing members are not assignable.
+    if (!role || role === 'owner' || !isOrganizationRoleAssignable(role, company.organizationType)) {
       res.status(400).json({ success: false, message: 'This role is not eligible for the organization.' });
       return;
     }
 
     const actorOwnsOrganization = company.ownerId.toString() === req.user!.userId;
-    const isElevatedRole = roleMatches(
-      role,
-      ['admin', 'manager', 'principal', 'dean', 'hod'],
-      company.organizationType,
-    );
-    if (isElevatedRole && !actorOwnsOrganization) {
+    // Only the owner changes the role of someone who administers the workspace or a department.
+    if (!actorOwnsOrganization && roleMatches(target.role, ['owner', 'admin', 'manager', 'principal', 'dean', 'hod'], company.organizationType)) {
+      res.status(403).json({ success: false, message: 'Only the workspace owner can change the role of an administrator.' });
+      return;
+    }
+    if (!canAssignOrganizationRole(req.user!.role, role, company.organizationType, actorOwnsOrganization)) {
       res.status(403).json({ success: false, message: 'Only the workspace owner can assign elevated organization roles.' });
       return;
     }
@@ -96,7 +99,7 @@ export const updateMemberRole = async (req: AuthRequest, res: Response): Promise
       action: 'MEMBER_ROLE_UPDATED',
       resource: 'User',
       resourceId: userId,
-      details: { newRole: role, updatedUser: member.fullName },
+      details: { previousRole: target.role, newRole: role, updatedUser: member.fullName },
     });
 
     res.json({ success: true, member });

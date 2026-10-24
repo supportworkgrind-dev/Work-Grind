@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, memo } from 'react';
 import Link from 'next/link';
 import { useAuthStore } from '@/store/useAuthStore';
-import { canAccessRoute } from '@/lib/organizationAccess';
+import { canAccessRoute, isWorkspaceManagerRole } from '@/lib/organizationAccess';
 import { useAppStore } from '@/store/useAppStore';
 import { api } from '@/lib/api';
 import { getSocket } from '@/lib/socket';
@@ -257,13 +257,14 @@ export const Navbar = memo(function Navbar() {
                     label={t('navbar.createProject')}
                     onClick={() => { openCreateModal('project'); setShowCreate(false); }}
                   />
-                  {canAccessRoute(company, user?.role, '/chat') && <MenuAction
-                    icon={<Hash className="h-4 w-4 theme-text-secondary" />}
-                    label={t('navbar.createChannel')}
-                    onClick={() => { openCreateModal('channel'); setShowCreate(false); }}
-                  />}
                 </>
               )}
+              {/* Channels: business managers and institution administrators alike. */}
+              {isWorkspaceManagerRole(company, user?.role) && canAccessRoute(company, user?.role, '/chat') && <MenuAction
+                icon={<Hash className="h-4 w-4 theme-text-secondary" />}
+                label={t('navbar.createChannel')}
+                onClick={() => { openCreateModal('channel'); setShowCreate(false); }}
+              />}
               {canAccessRoute(company, user?.role, '/meetings') && <MenuAction
                 icon={<Video className="h-4 w-4 theme-text-secondary" />}
                 label={t('navbar.createMeeting')}

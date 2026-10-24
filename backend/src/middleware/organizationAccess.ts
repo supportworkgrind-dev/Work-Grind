@@ -44,9 +44,6 @@ type FeaturePolicy = {
   entitlement?: EntitlementId;
 };
 
-const ALL_EDUCATION_ROLES = [
-  'owner', 'principal', 'admin', 'teacher', 'student', 'parent', 'dean', 'hod', 'manager', 'employee',
-] as const;
 const ACADEMIC_ADMIN_ROLES = ['owner', 'principal', 'admin', 'dean', 'hod'] as const;
 const BUSINESS_ADMIN_ROLES = ['owner', 'admin', 'manager'] as const;
 const SOCIAL_PUBLISHING_BUSINESS_ROLES = ['owner', 'admin', 'manager', 'employee'] as const;

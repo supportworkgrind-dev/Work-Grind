@@ -18,9 +18,6 @@ export const EDUCATION_ROLES = [
   ...EDUCATION_TEACHER_ROLES,
   ...EDUCATION_STUDENT_ROLES,
   ...EDUCATION_PARENT_ROLES,
-  'manager',
-  'employee',
-  'guest',
 ] as const;
 
 export const ROLE_ALIASES: Record<string, string> = {
@@ -39,7 +36,12 @@ export const ROLE_ALIASES: Record<string, string> = {
   hod: 'hod',
   head_of_department: 'hod',
   head_of_dept: 'hod',
+  department_head: 'hod',
   head: 'hod',
+  vice_chancellor: 'vice_chancellor',
+  vc: 'vice_chancellor',
+  professor: 'professor',
+  lecturer: 'lecturer',
   owner: 'owner',
   admin: 'admin',
   manager: 'manager',
@@ -48,11 +50,93 @@ export const ROLE_ALIASES: Record<string, string> = {
   student: 'student',
 };
 
-const EDUCATION_COMMON_ROLES = ['owner', 'principal', 'admin', 'teacher', 'student', 'parent', 'manager', 'employee', 'guest'] as const;
-const UNIVERSITY_ROLES = [...EDUCATION_COMMON_ROLES, 'dean', 'hod'] as const;
+/**
+ * Institution titles that carry the permissions of an existing role. A Vice
+ * Chancellor heads a university the way a principal heads a school; professors
+ * and lecturers teach with a teacher's access. Permission checks use the base
+ * role, while the stored and displayed role keeps the title.
+ */
+export const ROLE_PERMISSION_BASE: Readonly<Record<string, string>> = {
+  vice_chancellor: 'principal',
+  professor: 'teacher',
+  lecturer: 'teacher',
+};
+
+export type WorkspaceRoleCatalog = {
+  /** Roles a workspace owner can give members, in display order. The owner role is never assignable. */
+  assignable: readonly string[];
+  /** Assignable roles that administer the workspace or a department; only the owner assigns them. */
+  elevated: readonly string[];
+  /**
+   * Roles earlier releases stored for this workspace type. Existing members keep
+   * their access, but these roles are never offered or newly assigned.
+   */
+  legacy: readonly string[];
+  /** Roles a workspace may give people who join with its invite code (never elevated). */
+  joinRoles: readonly string[];
+  defaultJoinRole: string;
+};
+
+// Business titles that education workspaces could hold before roles were
+// separated by workspace type.
+const EDUCATION_LEGACY_ROLES = ['manager', 'employee', 'guest'] as const;
+
+/** The single definition of which roles each workspace type supports. */
+export const WORKSPACE_ROLE_CATALOG: Readonly<Record<OrganizationType, WorkspaceRoleCatalog>> = {
+  business: {
+    assignable: ['admin', 'manager', 'employee', 'guest'],
+    elevated: ['admin', 'manager'],
+    legacy: [],
+    joinRoles: ['employee', 'guest'],
+    defaultJoinRole: 'employee',
+  },
+  school: {
+    assignable: ['principal', 'admin', 'teacher', 'student', 'parent'],
+    elevated: ['principal', 'admin'],
+    legacy: EDUCATION_LEGACY_ROLES,
+    joinRoles: ['student', 'parent'],
+    defaultJoinRole: 'student',
+  },
+  college: {
+    assignable: ['principal', 'admin', 'hod', 'lecturer', 'teacher', 'student', 'parent'],
+    elevated: ['principal', 'admin', 'hod'],
+    legacy: EDUCATION_LEGACY_ROLES,
+    joinRoles: ['student', 'parent'],
+    defaultJoinRole: 'student',
+  },
+  university: {
+    assignable: ['vice_chancellor', 'admin', 'dean', 'hod', 'professor', 'lecturer', 'teacher', 'student', 'parent'],
+    elevated: ['vice_chancellor', 'admin', 'dean', 'hod'],
+    // Universities used the school title "principal" before Vice Chancellor existed.
+    legacy: ['principal', ...EDUCATION_LEGACY_ROLES],
+    joinRoles: ['student', 'parent'],
+    defaultJoinRole: 'student',
+  },
+};
+
+/** A Solo workspace has its owner and nobody else. */
+const SOLO_ROLE_CATALOG: WorkspaceRoleCatalog = {
+  assignable: [],
+  elevated: [],
+  legacy: [],
+  joinRoles: [],
+  defaultJoinRole: '',
+};
 
 function keyForRole(value: string): string {
   return value.trim().toLowerCase().replace(/[\s-]+/g, '_');
+}
+
+function canonicalRole(role: unknown): string {
+  if (typeof role !== 'string') return '';
+  const key = keyForRole(role);
+  return ROLE_ALIASES[key] ?? key;
+}
+
+/** The role whose permissions a stored (or aliased) role carries. */
+export function permissionRole(role: unknown): string {
+  const canonical = canonicalRole(role);
+  return ROLE_PERMISSION_BASE[canonical] ?? canonical;
 }
 
 export function isOrganizationType(value: unknown): value is OrganizationType {
@@ -103,62 +187,95 @@ export function isAcademicOrganizationType(value: unknown): value is AcademicOrg
     ACADEMIC_ORGANIZATION_TYPES.includes(value as AcademicOrganizationType);
 }
 
+/**
+ * Role definitions for a workspace. Unknown classifications get no roles, so
+ * every check that consults them fails closed.
+ */
+export function getWorkspaceRoleCatalog(
+  organizationType: OrganizationType | string | null | undefined,
+  accountType?: AccountType | string | null,
+): WorkspaceRoleCatalog {
+  const type = normalizeOrganizationType(organizationType);
+  if (!type) return SOLO_ROLE_CATALOG;
+  if (normalizeAccountType(accountType) === 'individual') return SOLO_ROLE_CATALOG;
+  return WORKSPACE_ROLE_CATALOG[type];
+}
+
+/**
+ * Whether a member holding this role belongs to the workspace type: the owner,
+ * any assignable role, and roles earlier releases stored (so existing members
+ * keep working until an administrator updates them).
+ */
 export function isOrganizationRoleEligible(role: unknown, organizationType: OrganizationType | string | null | undefined): boolean {
   if (typeof role !== 'string') return false;
+  if (organizationType && !isOrganizationType(organizationType)) return false;
+  const canonical = canonicalRole(role);
+  if (canonical === 'owner') return true;
+  const catalog = WORKSPACE_ROLE_CATALOG[(organizationType || 'business') as OrganizationType];
+  return catalog.assignable.includes(canonical) || catalog.legacy.includes(canonical);
+}
 
-  const normalized = keyForRole(role);
-  const canonical = ROLE_ALIASES[normalized] ?? normalized;
-  if (isAcademicOrganizationType(organizationType)) {
-    const allowed = organizationType === 'university' ? UNIVERSITY_ROLES : EDUCATION_COMMON_ROLES;
-    return (allowed as readonly string[]).includes(canonical);
-  }
-  if (organizationType === 'business' || !organizationType) {
-    return (BUSINESS_ROLES as readonly string[]).includes(canonical);
-  }
-  return false;
+/** Whether the role may be newly given to a member of this workspace type. */
+export function isOrganizationRoleAssignable(role: unknown, organizationType: OrganizationType | string | null | undefined): boolean {
+  if (typeof role !== 'string') return false;
+  if (organizationType && !isOrganizationType(organizationType)) return false;
+  return WORKSPACE_ROLE_CATALOG[(organizationType || 'business') as OrganizationType].assignable.includes(canonicalRole(role));
 }
 
 export function normalizeOrganizationRole(role: unknown, organizationType: OrganizationType | string | null | undefined, fallback = 'employee'): string {
   if (typeof role !== 'string' || !isOrganizationRoleEligible(role, organizationType)) return fallback;
-
-  const normalized = keyForRole(role);
-  return ROLE_ALIASES[normalized] ?? normalized;
+  return canonicalRole(role);
 }
 
 export function isOrganizationRoleAllowed(role: unknown, organizationType: OrganizationType | string | null | undefined): boolean {
   return isOrganizationRoleEligible(role, organizationType);
 }
 
+/** Every role a member of this workspace type may hold, including the owner and legacy roles. */
 export function getAllowedRolesByOrganizationType(organizationType: OrganizationType | string | null | undefined): string[] {
-  if (organizationType === 'university') return [...UNIVERSITY_ROLES, 'founder', 'director', 'office_staff', 'faculty', 'guardian'];
-  if (isAcademicOrganizationType(organizationType)) return [...EDUCATION_COMMON_ROLES, 'founder', 'director', 'office_staff', 'faculty', 'guardian'];
-  return [...BUSINESS_ROLES, 'founder'];
+  const type = normalizeOrganizationType(organizationType);
+  if (!type) return [];
+  const catalog = WORKSPACE_ROLE_CATALOG[type];
+  return ['owner', ...catalog.assignable, ...catalog.legacy];
+}
+
+/**
+ * The invite-code role: the workspace's saved default when it is one the
+ * workspace type allows for open joining, otherwise the type's default. Legacy
+ * education workspaces saved "employee" as their default; they get "student".
+ */
+export function resolveDefaultJoinRole(
+  organizationType: OrganizationType | string | null | undefined,
+  savedDefaultRole: unknown,
+  accountType?: AccountType | string | null,
+): string {
+  const catalog = getWorkspaceRoleCatalog(organizationType, accountType);
+  const saved = canonicalRole(savedDefaultRole);
+  return catalog.joinRoles.includes(saved) ? saved : catalog.defaultJoinRole;
 }
 
 export function isAcademicRole(role: unknown): boolean {
-  const normalized = typeof role === 'string' ? (ROLE_ALIASES[keyForRole(role)] ?? keyForRole(role)) : '';
-  return (EDUCATION_ROLES as readonly string[]).includes(normalized);
+  return (EDUCATION_ROLES as readonly string[]).includes(permissionRole(role));
 }
 
 export function roleMatches(role: unknown, requestedRoles: readonly string[], organizationType?: OrganizationType | string): boolean {
   if (typeof role !== 'string') return false;
   if (organizationType && !isOrganizationRoleEligible(role, organizationType)) return false;
-  const key = keyForRole(role);
-  const normalized = ROLE_ALIASES[key] ?? key;
+  const normalized = canonicalRole(role);
+  const base = permissionRole(normalized);
   const requested = new Set(requestedRoles.flatMap((requestedRole) => {
     const requestedKey = keyForRole(requestedRole);
     return [requestedKey, ROLE_ALIASES[requestedKey] ?? requestedKey];
   }));
 
-  if (requested.has(normalized)) return true;
-  if (requested.has('owner') && normalized === 'owner') return true;
+  if (requested.has(normalized) || requested.has(base)) return true;
 
   if (requested.has('admin') || requested.has('manager')) {
     if (isAcademicOrganizationType(organizationType)) {
-      return (EDUCATION_ADMIN_ROLES as readonly string[]).includes(normalized) ||
-        (normalized === 'manager' && requested.has('manager'));
+      return (EDUCATION_ADMIN_ROLES as readonly string[]).includes(base) ||
+        (base === 'manager' && requested.has('manager'));
     }
-    return normalized === 'admin' || normalized === 'manager';
+    return base === 'admin' || base === 'manager';
   }
   return false;
 }
@@ -173,11 +290,18 @@ export function isWorkspaceAdministrator(role: unknown, organizationType: unknow
   if (typeof role !== 'string') return false;
   const type = normalizeOrganizationType(organizationType);
   if (!type || !isOrganizationRoleEligible(role, type)) return false;
-  const key = keyForRole(role);
-  const normalized = ROLE_ALIASES[key] ?? key;
+  const base = permissionRole(role);
   return isAcademicOrganizationType(type)
-    ? ['owner', 'principal', 'admin'].includes(normalized)
-    : ['owner', 'admin'].includes(normalized);
+    ? ['owner', 'principal', 'admin'].includes(base)
+    : ['owner', 'admin'].includes(base);
+}
+
+/** Whether the target role administers the workspace or a department (owner-only to assign). */
+export function isElevatedOrganizationRole(role: unknown, organizationType: OrganizationType | string): boolean {
+  const canonical = canonicalRole(role);
+  if (canonical === 'owner') return true;
+  const type = normalizeOrganizationType(organizationType);
+  return Boolean(type && WORKSPACE_ROLE_CATALOG[type].elevated.includes(canonical));
 }
 
 export function canAssignOrganizationRole(
@@ -186,19 +310,26 @@ export function canAssignOrganizationRole(
   organizationType: OrganizationType | string,
   actorOwnsOrganization: boolean,
 ): boolean {
-  if (!isOrganizationRoleEligible(targetRole, organizationType)) return false;
-  const normalizedTarget = normalizeOrganizationRole(targetRole, organizationType, '');
+  if (!isOrganizationRoleAssignable(targetRole, organizationType)) return false;
+  const normalizedTarget = canonicalRole(targetRole);
   if (!normalizedTarget || normalizedTarget === 'owner') return false;
   if (actorOwnsOrganization) return true;
-
-  const isElevated = roleMatches(
-    normalizedTarget,
-    ['owner', 'admin', 'manager', 'principal', 'dean', 'hod'],
-    organizationType,
-  );
-  if (isElevated) return false;
+  if (isElevatedOrganizationRole(normalizedTarget, organizationType)) return false;
 
   if (roleMatches(actorRole, ['admin'], organizationType)) return true;
   return roleMatches(actorRole, ['manager'], organizationType) &&
     ['employee', 'guest'].includes(normalizedTarget);
+}
+
+/** The roles this actor may give members, in display order. */
+export function getAssignableOrganizationRoles(
+  actorRole: unknown,
+  organizationType: OrganizationType | string | null | undefined,
+  accountType: AccountType | string | null | undefined,
+  actorOwnsOrganization: boolean,
+): string[] {
+  const type = normalizeOrganizationType(organizationType);
+  if (!type) return [];
+  return getWorkspaceRoleCatalog(type, accountType).assignable
+    .filter((role) => canAssignOrganizationRole(actorRole, role, type, actorOwnsOrganization));
 }

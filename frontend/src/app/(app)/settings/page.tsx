@@ -44,12 +44,21 @@ import { SearchableSelect } from '@/components/common/SearchableSelect';
 import { PhoneNumberField } from '@/components/common/PhoneNumberField';
 import { getCurrencyOptions, getTimeZoneOptions, regionCodeForCountryName, type LocaleOption } from '@/lib/localeOptions';
 import {
+  canAccessAcademicSection,
   canAccessOrganizationFeature,
   canAccessRoute,
+  canonicalRole,
   getAssignableRoles,
   getWorkspaceExperience,
+  getWorkspaceRoleCatalog,
+  isElevatedWorkspaceRole,
   isWorkspaceOwnerRole,
+  permissionRole,
+  resolveDefaultJoinRole,
 } from '@/lib/organizationAccess';
+import { useT } from '@/lib/i18n';
+import { useRoleLabel } from '@/lib/useRoleLabel';
+import { ACADEMIC_SECTIONS } from '@/lib/academicSections';
 import { LinkedInConnectionCard } from '@/components/automation/LinkedInConnectionCard';
 import { YouTubeConnectionCard } from '@/components/automation/YouTubeConnectionCard';
 import { SecurityCenter } from '@/components/settings/SecurityCenter';
@@ -122,8 +131,29 @@ function withSavedOption(options: LocaleOption[], saved: string): LocaleOption[]
     : [{ value: saved, label: `${saved} (current setting)` }, ...options];
 }
 
-function formatRole(role: string): string {
-  return role.charAt(0).toUpperCase() + role.slice(1);
+/** Links to where a workspace type's structure is managed (only routes the member can open). */
+function WorkspaceStructurePanel({ kind, heading, body, links }: {
+  kind: 'company' | 'education' | 'solo';
+  heading: string;
+  body: string;
+  links: { href: string; label: string }[];
+}) {
+  if (!links.length) return null;
+  return (
+    <section aria-label={heading} data-workspace-kind={kind} className="rounded-2xl border border-slate-200 bg-white p-5 space-y-3">
+      <div>
+        <h4 className="text-xs font-bold text-slate-900">{heading}</h4>
+        <p className="mt-1 text-[11px] text-slate-500">{body}</p>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {links.map((link) => (
+          <Link key={link.href} href={link.href} className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-100 transition-colors">
+            {link.label}
+          </Link>
+        ))}
+      </div>
+    </section>
+  );
 }
 
 export default function SettingsPage() {
@@ -170,7 +200,8 @@ export default function SettingsPage() {
   const [currency, setCurrency] = useState(company?.currency || '');
   const [academicYearStartMonth, setAcademicYearStartMonth] = useState(company?.academicSettings?.academicYearStartMonth || 8);
   const [gradingScale, setGradingScale] = useState<NonNullable<Company['academicSettings']>['gradingScale']>(company?.academicSettings?.gradingScale || 'percentage');
-  const [defaultRole, setDefaultRole] = useState(company?.settings?.defaultRole || 'employee');
+  // The invite-code role must be one this workspace type allows (student in education).
+  const [defaultRole, setDefaultRole] = useState(resolveDefaultJoinRole(company, company?.settings?.defaultRole));
   const [companySaving, setCompanySaving] = useState(false);
   const [companySaved, setCompanySaved] = useState(false);
   const [companyError, setCompanyError] = useState('');
@@ -208,7 +239,7 @@ export default function SettingsPage() {
   // Invite Modal State
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteRole, setInviteRole] = useState('employee');
+  const [inviteRole, setInviteRole] = useState('');
   const [inviteSending, setInviteSending] = useState(false);
   const [inviteSuccess, setInviteSuccess] = useState('');
   const [inviteError, setInviteError] = useState('');
@@ -293,7 +324,7 @@ export default function SettingsPage() {
     setCurrency(source.currency || '');
     setAcademicYearStartMonth(source.academicSettings?.academicYearStartMonth || 8);
     setGradingScale(source.academicSettings?.gradingScale || 'percentage');
-    setDefaultRole(source.settings?.defaultRole || 'employee');
+    setDefaultRole(resolveDefaultJoinRole(source, source.settings?.defaultRole));
   };
 
   // Seed the forms when the signed-in user or workspace changes, not on every
@@ -416,6 +447,17 @@ export default function SettingsPage() {
     (isSolo ? ownsWorkspace : canAccessOrganizationFeature(organization, user?.role, 'businessAutomation'));
   const canViewBilling = canAccessOrganizationFeature(organization, user?.role, 'billingAdmin');
   const assignableRoles = getAssignableRoles(organization, user?.role, ownsWorkspace);
+  const roleCatalog = getWorkspaceRoleCatalog(organization);
+  const roleLabel = useRoleLabel(organization);
+  const tk = useT('settings');
+  const ta = useT('academic');
+  const translateSection = (id: (typeof ACADEMIC_SECTIONS)[number]['id']) => ta(`sections.${id}`);
+  const workspaceKind = isEducation ? 'education' : isSolo ? 'solo' : 'company';
+  const workspaceType = experience ?? 'company';
+  // Preselect the workspace's member role, not the first (most privileged) one.
+  const defaultInviteRole = assignableRoles.includes(resolveDefaultJoinRole(organization, company?.settings?.defaultRole))
+    ? resolveDefaultJoinRole(organization, company?.settings?.defaultRole)
+    : assignableRoles[assignableRoles.length - 1] ?? '';
   const visibleNotificationOptions = NOTIFICATION_OPTIONS.filter((option) =>
     canAccessRoute(organization, user?.role, option.route));
   const isOwnerAccount = ownsWorkspace;
@@ -805,7 +847,7 @@ export default function SettingsPage() {
       const res = await api.patch(`/admin/members/${userId}/role`, { role: newRole });
       if (!res.data.success || !res.data.member) throw new Error(res.data.message);
       setMembers((prev) => prev.map((m) => (m._id === userId ? res.data.member : m)));
-      setMemberNotice({ tone: 'success', text: `${res.data.member.fullName}'s role is now ${formatRole(res.data.member.role)}.` });
+      setMemberNotice({ tone: 'success', text: tk('workspaceKinds.roleChanged', { name: res.data.member.fullName, role: roleLabel(res.data.member.role) }) });
     } catch (err) {
       // The select is controlled by the stored role, so it stays on the old value.
       setMemberNotice({ tone: 'error', text: errorMessage(err, 'The role could not be changed.') });
@@ -931,7 +973,7 @@ export default function SettingsPage() {
     { id: 'preferences', label: 'Preferences & Appearance', icon: Palette },
     { id: 'security', label: 'Authentication & Security', icon: Shield },
     { id: 'notifications', label: 'Notifications', icon: Bell },
-    { id: 'workspace', label: 'Workspace Settings', icon: Building2 },
+    { id: 'workspace', label: tk(`workspaceKinds.tab.${workspaceKind}`), icon: Building2 },
     { id: 'members', label: 'Members & Roles', icon: Users },
     { id: 'integrations', label: 'Integrations', icon: Plug },
     { id: 'billing', label: 'Billing & Subscription', icon: CreditCard },
@@ -954,11 +996,14 @@ export default function SettingsPage() {
   const navTabs = allNavTabs.filter((tab) => tabAllowed[tab.id]);
 
   const getRoleBadgeStyle = (role: string) => {
-    switch (role) {
+    switch (permissionRole(role)) {
       case 'owner':
         return 'bg-purple-100 text-purple-700 border-purple-200';
       case 'admin':
+      case 'principal':
         return 'bg-rose-100 text-rose-700 border-rose-200';
+      case 'dean':
+      case 'hod':
       case 'manager':
         return 'bg-blue-100 text-blue-700 border-blue-200';
       case 'guest':
@@ -1444,7 +1489,7 @@ export default function SettingsPage() {
               <form onSubmit={handleSaveWorkspace} className="space-y-4">
                 <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                   <h3 className="text-sm font-bold text-slate-900">
-                    Workspace Configuration
+                    {tk(`workspaceKinds.heading.${isSolo ? 'solo' : workspaceType}`)}
                   </h3>
                   <button
                     type="submit"
@@ -1555,7 +1600,7 @@ export default function SettingsPage() {
                   <div>
                     <span className="block text-xs font-semibold uppercase tracking-wider text-slate-700">Organization type</span>
                     <p className="mt-1.5 rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3 text-xs font-semibold text-slate-700">
-                      {isSolo ? 'Solo workspace' : formatRole(organization?.organizationType || 'business')}
+                      {tk(`workspaceKinds.typeLabel.${isSolo ? 'solo' : workspaceType}`)}
                     </p>
                     <p className="mt-1 text-[10px] text-slate-400">Set when the workspace was created; it determines plans and available roles.</p>
                   </div>
@@ -1610,24 +1655,30 @@ export default function SettingsPage() {
                         onChange={(e) => setDefaultRole(e.target.value)}
                         className="mt-1.5 block w-full rounded-xl border border-slate-200 py-2.5 px-3 text-xs text-slate-900 focus:ring-2 focus:ring-indigo-600"
                       >
-                        {isEducation ? (
-                          <>
-                            <option value="student">Student</option>
-                            <option value="employee">Employee / Staff</option>
-                            <option value="guest">Guest (Restricted Access)</option>
-                          </>
-                        ) : (
-                          <>
-                            <option value="employee">Employee (Standard Member)</option>
-                            <option value="guest">Guest (Restricted Access)</option>
-                          </>
-                        )}
+                        {roleCatalog.joinRoles.map((role) => (
+                          <option key={role} value={role}>{roleLabel(role)}</option>
+                        ))}
                       </select>
                       <p className="mt-1 text-[10px] text-slate-400">Given to people who join with the workspace invite code.</p>
                     </div>
                   </div>
                 )}
               </form>
+
+              <WorkspaceStructurePanel
+                kind={isSolo ? 'solo' : isEducation ? 'education' : 'company'}
+                links={(isEducation
+                  ? ACADEMIC_SECTIONS
+                    .filter((section) => section.id !== 'overview' && canAccessAcademicSection(user?.role, section.id, organization?.organizationType))
+                    .map((section) => ({ href: `/academic?section=${section.id}`, label: tk('workspaceKinds.academic.open', { section: translateSection(section.id) }) }))
+                  : (isSolo
+                    ? [['/daily-focus', 'personal.dailyFocus'], ['/tasks', 'personal.tasks'], ['/calendar', 'personal.calendar'], ['/docs', 'personal.docs']] as const
+                    : [['/team', 'business.team'], ['/projects', 'business.projects'], ['/crm', 'business.crm'], ['/client-portal-mgmt', 'business.clientPortal'], ['/analytics', 'business.analytics'], ['/workflows', 'business.automation']] as const)
+                    .filter(([href]) => canAccessRoute(organization, user?.role, href))
+                    .map(([href, key]) => ({ href, label: tk(`workspaceKinds.${key}`) })))}
+                heading={tk(isEducation ? 'workspaceKinds.academic.heading' : isSolo ? 'workspaceKinds.personal.heading' : 'workspaceKinds.business.heading')}
+                body={tk(isEducation ? 'workspaceKinds.academic.body' : isSolo ? 'workspaceKinds.personal.body' : 'workspaceKinds.business.body')}
+              />
 
               {/* Shareable Invite Code & Link Card */}
               {canAdministerWorkspace && (
@@ -1722,7 +1773,7 @@ export default function SettingsPage() {
                 ) : (
                   <button
                     onClick={() => {
-                      setInviteRole(assignableRoles[0]);
+                      setInviteRole(defaultInviteRole);
                       setInviteError('');
                       setInviteSuccess('');
                       setIsInviteModalOpen(true);
@@ -1761,7 +1812,7 @@ export default function SettingsPage() {
                   <option value="all">All Roles</option>
                   {[...new Set(members.map((member) => member.role))].map((role) => (
                     <option key={role} value={role}>
-                      {formatRole(role)}
+                      {roleLabel(role)}
                     </option>
                   ))}
                 </select>
@@ -1807,10 +1858,8 @@ export default function SettingsPage() {
                       ) : (
                         filteredMembers.map((m) => {
                           const isSelf = m._id === user?._id;
-                          const isTargetOwner = ['owner', 'founder'].includes(m.role);
-                          const isTargetElevated = [
-                            'admin', 'manager', 'principal', 'director', 'dean', 'hod',
-                          ].includes(m.role);
+                          const isTargetOwner = canonicalRole(m.role) === 'owner';
+                          const isTargetElevated = isElevatedWorkspaceRole(m.role);
                           const canEditThisMember = canAdministerWorkspace && !isTargetOwner && !isSelf &&
                             (ownsWorkspace || !isTargetElevated);
                           const isBusy = busyMemberId === m._id;
@@ -1850,11 +1899,11 @@ export default function SettingsPage() {
                                     className="rounded-lg border border-slate-200 bg-white py-1 px-2 text-xs font-semibold text-slate-800 shadow-2xs focus:ring-1 focus:ring-indigo-600 disabled:opacity-60"
                                   >
                                     {!assignableRoles.includes(m.role) && (
-                                      <option value={m.role} disabled>{m.role}</option>
+                                      <option value={m.role} disabled>{roleLabel(m.role)}</option>
                                     )}
                                     {assignableRoles.map((role) => (
                                       <option key={role} value={role}>
-                                        {formatRole(role)}
+                                        {roleLabel(role)}
                                       </option>
                                     ))}
                                   </select>
@@ -1863,8 +1912,9 @@ export default function SettingsPage() {
                                     className={`inline-block rounded-md border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${getRoleBadgeStyle(
                                       m.role
                                     )}`}
+                                    data-role={m.role}
                                   >
-                                    {m.role}
+                                    {roleLabel(m.role)}
                                   </span>
                                 )}
                               </td>
@@ -1971,7 +2021,7 @@ export default function SettingsPage() {
                             <div>
                               <span className="font-bold text-slate-900">{invite.email}</span>
                               <div className="flex items-center gap-2 mt-0.5 text-[11px] text-slate-400">
-                                <span className="capitalize font-semibold text-slate-600">{invite.role}</span>
+                                <span className="font-semibold text-slate-600">{roleLabel(invite.role)}</span>
                                 <span>•</span>
                                 <span>Expires {formatDate(invite.expiresAt)}</span>
                               </div>
@@ -2405,7 +2455,7 @@ export default function SettingsPage() {
 
               <div>
                 <label htmlFor="settings-invite-role" className="block text-xs font-semibold uppercase tracking-wider text-slate-700">
-                  Role & Access Level
+                  {tk('workspaceKinds.inviteRole')}
                 </label>
                 <select
                   id="settings-invite-role"
@@ -2415,7 +2465,7 @@ export default function SettingsPage() {
                 >
                   {assignableRoles.map((role) => (
                     <option key={role} value={role}>
-                      {role.charAt(0).toUpperCase() + role.slice(1)}
+                      {roleLabel(role)}
                     </option>
                   ))}
                 </select>

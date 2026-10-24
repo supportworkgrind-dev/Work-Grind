@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/useAuthStore';
 import { api } from '@/lib/api';
@@ -9,32 +9,66 @@ import { User, Meeting } from '@/types';
 import { EmptyState } from '@/components/common/EmptyState';
 import { Avatar } from '@/components/common/Avatar';
 import { getApiErrorMessage } from '@/lib/getApiErrorMessage';
+import { describeApiError } from '@/lib/apiError';
+import { useT } from '@/lib/i18n';
+import { useRoleLabel } from '@/lib/useRoleLabel';
+import {
+  canAccessRoute,
+  getAssignableRoles,
+  getWorkspaceExperience,
+  isWorkspaceOwnerRole,
+  resolveDefaultJoinRole,
+} from '@/lib/organizationAccess';
 import Link from 'next/link';
 import {
   Users, Search, MessageSquare, Video, UserPlus,
-  CheckCircle2, X, Play, Radio, PhoneCall,
+  CheckCircle2, X, Play, PhoneCall,
 } from 'lucide-react';
 
 export default function TeamDirectoryPage() {
   const router = useRouter();
-  const { user, isAtLimit, refreshSubscription } = useAuthStore();
+  const t = useT('team');
+  const { user, company, isAtLimit, refreshSubscription } = useAuthStore();
   const memberLimitReached = isAtLimit('members');
-  const isOwnerAdmin = user?.role === 'owner' || user?.role === 'admin' || user?.role === 'manager';
+
+  // Roles and permissions come from the workspace the server says this member
+  // belongs to (/auth/me), so a university never offers business roles.
+  const organization = company ?? (user?.companyId && typeof user.companyId === 'object' ? user.companyId : null);
+  const experience = getWorkspaceExperience(organization);
+  const isEducation = experience === 'school' || experience === 'college' || experience === 'university';
+  const ownsWorkspace = Boolean(user && organization && 'ownerId' in organization && organization.ownerId === user._id) ||
+    isWorkspaceOwnerRole(user?.role);
+  const assignableRoles = useMemo(
+    () => getAssignableRoles(organization, user?.role, ownsWorkspace),
+    [organization, user?.role, ownsWorkspace],
+  );
+  const canInvite = assignableRoles.length > 0;
+  const canCallById = canAccessRoute(organization, user?.role, '/calling');
+  const roleLabel = useRoleLabel(organization);
+  // Preselect the workspace's member role (student in education, employee in a
+  // company) rather than the first, most privileged option.
+  const preferredInviteRole = resolveDefaultJoinRole(organization, company?.settings?.defaultRole);
+  const defaultInviteRole = assignableRoles.includes(preferredInviteRole)
+    ? preferredInviteRole
+    : assignableRoles[assignableRoles.length - 1] ?? '';
 
   const [members,       setMembers]       = useState<User[]>([]);
   const onlineUserIds = useRef(new Set<string>());
   const presenceStatusByUser = useRef(new Map<string, User['status']>());
   const [search,        setSearch]        = useState('');
   const [dept,          setDept]          = useState('all');
+  const [roleFilter,    setRoleFilter]    = useState('all');
   const [statusFilter,  setStatusFilter]  = useState('all');
   const [isInviteOpen,  setIsInviteOpen]  = useState(false);
   const [inviteEmail,   setInviteEmail]   = useState('');
-  const [inviteRole,    setInviteRole]    = useState('employee');
+  const [inviteRole,    setInviteRole]    = useState('');
   const [inviteLoading, setInviteLoading] = useState(false);
   const [inviteDone,    setInviteDone]    = useState(false);
+  const [inviteError,   setInviteError]   = useState('');
   const [liveMeetings,  setLiveMeetings]  = useState<Meeting[]>([]);
   const [starting,      setStarting]      = useState(false);
   const [dmError,       setDmError]       = useState('');
+  const [loadError,     setLoadError]     = useState('');
   const instantMeetingPending = useRef(false);
   const instantMeetingKey = useRef<string | null>(null);
   const callMeetingKeys = useRef(new Map<string, string>());
@@ -51,7 +85,7 @@ export default function TeamDirectoryPage() {
               : 'offline'),
         })));
       }
-    }).catch(() => {});
+    }).catch((error) => setLoadError(describeApiError(error, t('errors.loadFailed')).message));
     api.get('/meetings/active').then((r) => { if (r.data.success) setLiveMeetings(r.data.meetings); }).catch(() => {});
 
     const s = getSocket();
@@ -111,16 +145,28 @@ export default function TeamDirectoryPage() {
     s.on('connect', requestPresenceSnapshot);
     if (s.connected) requestPresenceSnapshot();
     return () => { s.off('user:online', onOnline); s.off('user:offline', onOffline); s.off('user:status-changed', onStatus); s.off('users:online-list', onOnlineList); s.off('presence:snapshot', onPresenceSnapshot); s.off('user:presence', onPresenceChanged); s.off('connect', requestPresenceSnapshot); s.off('meeting:started', onStart); s.off('meeting:ended', onEnd); };
+    // The directory loads once; translated fallbacks do not refetch it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const openInvite = () => {
+    setInviteRole(defaultInviteRole);
+    setInviteError('');
+    setIsInviteOpen(true);
+  };
 
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inviteEmail.trim()) return;
+    if (!inviteEmail.trim() || !inviteRole) return;
     setInviteLoading(true);
+    setInviteError('');
     try {
-      const r = await api.post('/users/invite', { email: inviteEmail, role: inviteRole });
+      const r = await api.post('/companies/invite', { email: inviteEmail.trim(), role: inviteRole });
       if (r.data.success) { setInviteDone(true); void refreshSubscription(); setTimeout(() => { setIsInviteOpen(false); setInviteDone(false); setInviteEmail(''); }, 1500); }
-    } catch { /* silent */ } finally { setInviteLoading(false); }
+    } catch (error) {
+      // The server re-checks the role against the workspace type and the inviter's authority.
+      setInviteError(describeApiError(error, t('errors.inviteFailed')).message);
+    } finally { setInviteLoading(false); }
   };
   const handleInstantMeeting = async () => {
     if (instantMeetingPending.current) return;
@@ -128,15 +174,18 @@ export default function TeamDirectoryPage() {
     instantMeetingKey.current ??= crypto.randomUUID();
     setStarting(true);
     try {
+      const firstName = user?.fullName?.split(' ')[0];
       const r = await api.post('/meetings', {
-        title: `${user?.fullName?.split(' ')[0] ?? 'Team'}'s Instant Meeting`,
+        title: firstName ? t('meeting.instantTitle', { name: firstName }) : t('meeting.instantTitleFallback'),
         isInstant: true,
       }, { headers: { 'Idempotency-Key': instantMeetingKey.current } });
       if (r.data.success) {
         instantMeetingKey.current = null;
         router.push(`/meetings?join=${r.data.meeting.meetingLink}`);
       }
-    } catch { /* silent */ } finally {
+    } catch (error) {
+      setDmError(describeApiError(error, t('errors.meetingFailed')).message);
+    } finally {
       instantMeetingPending.current = false;
       setStarting(false);
     }
@@ -144,19 +193,19 @@ export default function TeamDirectoryPage() {
   const handleDM = async (member: User) => {
     setDmError('');
     if (!member.callingId) {
-      setDmError('This user does not have an available WorkGrind User ID.');
+      setDmError(t('errors.noUserId'));
       return;
     }
     try {
       const response = await api.post('/direct-messages/conversations', { recipientCallingId: member.callingId });
       const conversationId = response.data?.conversation?._id;
       if (!response.data?.success || typeof conversationId !== 'string') {
-        setDmError('The conversation could not be opened. Please try again.');
+        setDmError(t('errors.conversationFailed'));
         return;
       }
       router.push(`/chat?conversationId=${encodeURIComponent(conversationId)}`);
     } catch (error: unknown) {
-      setDmError(getApiErrorMessage(error, 'This user is not currently available for direct messages.'));
+      setDmError(getApiErrorMessage(error, t('errors.dmUnavailable')));
     }
   };
   const handleCall = async (member: User) => {
@@ -167,7 +216,7 @@ export default function TeamDirectoryPage() {
     }
     try {
       const r = await api.post('/meetings', {
-        title: `Call with ${member.fullName}`,
+        title: t('meeting.callTitle', { name: member.fullName }),
         participantIds: [member._id],
         isInstant: true,
       }, { headers: { 'Idempotency-Key': callMeetingKeys.current.get(member._id) } });
@@ -175,39 +224,47 @@ export default function TeamDirectoryPage() {
         callMeetingKeys.current.delete(member._id);
         router.push(`/meetings?join=${r.data.meeting.meetingLink}`);
       }
-    } catch { /* silent */ } finally {
+    } catch (error) {
+      setDmError(describeApiError(error, t('errors.meetingFailed')).message);
+    } finally {
       pendingCallRecipients.current.delete(member._id);
     }
   };
 
   const depts = Array.from(new Set(members.map((m) => m.department).filter(Boolean)));
+  const memberRoles = Array.from(new Set(members.map((m) => m.role).filter(Boolean)));
   const filtered = members.filter((m) => {
     const s = search.toLowerCase();
-    const matchSearch = !s || (m.callingId ?? '').toLowerCase().includes(s) || m.fullName.toLowerCase().includes(s) || m.email.toLowerCase().includes(s) || (m.jobTitle ?? '').toLowerCase().includes(s);
-    return matchSearch && (dept === 'all' || m.department === dept) && (statusFilter === 'all' || m.status === statusFilter);
+    const matchSearch = !s || (m.callingId ?? '').toLowerCase().includes(s) || m.fullName.toLowerCase().includes(s) ||
+      m.email.toLowerCase().includes(s) || (m.jobTitle ?? '').toLowerCase().includes(s) ||
+      roleLabel(m.role).toLowerCase().includes(s);
+    return matchSearch && (dept === 'all' || m.department === dept) &&
+      (roleFilter === 'all' || m.role === roleFilter) &&
+      (statusFilter === 'all' || m.status === statusFilter);
   });
 
   const statusDot: Record<string, string> = { online: 'bg-emerald-500', away: 'bg-amber-400', busy: 'bg-rose-500', offline: 'bg-slate-300' };
+  const kind = isEducation ? 'education' : 'company';
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="page-hero-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="page-title">Team Directory</h1>
-          <p className="page-subtitle">Browse your team, check availability, and start conversations</p>
+          <h1 className="page-title">{t(`header.title.${kind}`)}</h1>
+          <p className="page-subtitle">{t(`header.subtitle.${isEducation && experience ? experience : 'company'}`)}</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button onClick={handleInstantMeeting} disabled={starting} className="btn-primary h-9 px-4">
             <Play className="h-3.5 w-3.5 fill-white" />
-            <span>{starting ? 'Starting...' : 'Instant Meeting'}</span>
+            <span>{starting ? t('actions.starting') : t('actions.instantMeeting')}</span>
           </button>
-          {isOwnerAdmin && (memberLimitReached ? (
-            <Link href="/billing" className="btn-secondary h-9 px-4">Member limit reached · Upgrade</Link>
+          {canInvite && (memberLimitReached ? (
+            <Link href="/billing" className="btn-secondary h-9 px-4">{t('actions.memberLimit')}</Link>
           ) : (
-            <button onClick={() => setIsInviteOpen(true)} className="btn-secondary h-9 px-4">
+            <button onClick={openInvite} className="btn-secondary h-9 px-4">
               <UserPlus className="h-3.5 w-3.5" style={{ color: 'var(--accent)' }} />
-              <span>Invite Member</span>
+              <span>{t('actions.inviteMember')}</span>
             </button>
           ))}
         </div>
@@ -222,7 +279,7 @@ export default function TeamDirectoryPage() {
               <span className="relative h-2.5 w-2.5 rounded-full bg-rose-500" />
             </span>
             <h2 className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-primary)' }}>
-              {liveMeetings.length} live meeting{liveMeetings.length > 1 ? 's' : ''} in progress
+              {t('live.count', { count: liveMeetings.length })}
             </h2>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -230,13 +287,13 @@ export default function TeamDirectoryPage() {
               <div key={m._id} className="surface rounded-xl p-3.5 flex items-center justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 mb-0.5">
-                    <span className="badge badge-rose text-[9px]">LIVE</span>
+                    <span className="badge badge-rose text-[9px]">{t('live.badge')}</span>
                     <p className="text-[13px] font-semibold theme-text-primary truncate">{m.title}</p>
                   </div>
-                  <p className="text-[11px] theme-text-muted">Host: {(m.hostId as any)?.fullName ?? 'Team Member'}</p>
+                  <p className="text-[11px] theme-text-muted">{t('live.host', { name: (m.hostId as { fullName?: string } | undefined)?.fullName ?? t('live.teamMember') })}</p>
                 </div>
                 <Link href={`/meetings?join=${m.meetingLink}`} className="btn-danger shrink-0 border-rose-400/60 bg-rose-100 text-rose-700 hover:bg-rose-200 flex items-center gap-1.5">
-                  <Video className="h-3.5 w-3.5" /><span>Join</span>
+                  <Video className="h-3.5 w-3.5" /><span>{t('actions.join')}</span>
                 </Link>
               </div>
             ))}
@@ -247,35 +304,54 @@ export default function TeamDirectoryPage() {
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-2.5">
         <div className="relative flex-1 min-w-[200px]">
-          <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 theme-text-muted" />
+          <Search className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 h-4 w-4 theme-text-muted" />
           <input
             type="text" value={search} onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search name, role, email, or user ID..."
-            className="input-base pl-9 h-9"
+            placeholder={t('filters.searchPlaceholder')}
+            aria-label={t('filters.searchLabel')}
+            className="input-base ps-9 h-9"
           />
         </div>
         <select value={dept} onChange={(e) => setDept(e.target.value)}
+          aria-label={t('filters.departmentLabel')}
           className="rounded-xl border px-3 py-2 text-xs theme-text-secondary focus-ring"
           style={{ borderColor: 'var(--border-color)', background: 'var(--bg-card)' }}>
-          <option value="all">All Departments</option>
+          <option value="all">{t('filters.allDepartments')}</option>
           {depts.map((d) => <option key={d} value={d!}>{d}</option>)}
         </select>
-        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
+        <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)}
+          aria-label={t('filters.roleLabel')}
           className="rounded-xl border px-3 py-2 text-xs theme-text-secondary focus-ring"
           style={{ borderColor: 'var(--border-color)', background: 'var(--bg-card)' }}>
-          <option value="all">All Statuses</option>
-          <option value="online">Online</option>
-          <option value="away">Away</option>
-          <option value="busy">Busy</option>
-          <option value="offline">Offline</option>
+          <option value="all">{t('filters.allRoles')}</option>
+          {memberRoles.map((role) => <option key={role} value={role}>{roleLabel(role)}</option>)}
+        </select>
+        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
+          aria-label={t('filters.statusLabel')}
+          className="rounded-xl border px-3 py-2 text-xs theme-text-secondary focus-ring"
+          style={{ borderColor: 'var(--border-color)', background: 'var(--bg-card)' }}>
+          <option value="all">{t('filters.allStatuses')}</option>
+          <option value="online">{t('filters.status.online')}</option>
+          <option value="away">{t('filters.status.away')}</option>
+          <option value="busy">{t('filters.status.busy')}</option>
+          <option value="offline">{t('filters.status.offline')}</option>
         </select>
       </div>
-      <p className="text-[11px] theme-text-muted">Direct messages are available to active users in this workspace. User IDs are searchable within this directory.</p>
+      <p className="text-[11px] theme-text-muted">{t('dmNote')}</p>
+      {loadError && <p role="alert" className="rounded-xl border border-rose-500/25 bg-rose-500/5 px-3 py-2 text-xs text-rose-600">{loadError}</p>}
       {dmError && <p role="alert" className="rounded-xl border border-rose-500/25 bg-rose-500/5 px-3 py-2 text-xs text-rose-600">{dmError}</p>}
 
       {/* Grid */}
       {filtered.length === 0 ? (
-        <EmptyState icon={Users} title="No members found" description="Invite team members to collaborate on projects and tasks." actionLabel={memberLimitReached ? 'Upgrade Plan' : 'Invite Member'} onAction={() => memberLimitReached ? router.push('/billing') : setIsInviteOpen(true)} />
+        <EmptyState
+          icon={Users}
+          title={t('empty.title')}
+          description={t(`empty.${kind}`)}
+          {...(canInvite ? {
+            actionLabel: memberLimitReached ? t('actions.upgradePlan') : t('actions.inviteMember'),
+            onAction: () => memberLimitReached ? router.push('/billing') : openInvite(),
+          } : {})}
+        />
       ) : (
         <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {filtered.map((m) => (
@@ -283,17 +359,17 @@ export default function TeamDirectoryPage() {
               <div className="flex items-start justify-between">
                 <div className="relative">
                   <Avatar name={m.fullName} src={m.avatar} size="lg" />
-                  <span className={`absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full ring-2 ring-[var(--bg-card)] ${statusDot[m.status ?? 'offline']}`} />
+                  <span className={`absolute -bottom-0.5 -end-0.5 h-3.5 w-3.5 rounded-full ring-2 ring-[var(--bg-card)] ${statusDot[m.status ?? 'offline']}`} />
                 </div>
-                <span className="badge badge-slate uppercase">{m.role}</span>
+                <span className="badge badge-slate uppercase" data-role={m.role}>{roleLabel(m.role)}</span>
               </div>
 
               <div className="flex-1">
                 <p className="text-[13px] font-bold theme-text-primary truncate">{m.fullName}</p>
-                <p className="text-[11px] theme-text-secondary truncate mt-0.5">{m.jobTitle ?? 'Team Member'}</p>
-                <p className="text-[10px] theme-text-muted mt-0.5">{m.department ?? 'General'}</p>
-                <p className="mt-1 text-[10px] theme-text-muted">User ID</p>
-                <p className="font-mono text-[10px] theme-text-primary">{m.callingId || 'Unavailable'}</p>
+                <p className="text-[11px] theme-text-secondary truncate mt-0.5">{m.jobTitle ?? t('card.teamMember')}</p>
+                <p className="text-[10px] theme-text-muted mt-0.5">{m.department ?? t('card.general')}</p>
+                <p className="mt-1 text-[10px] theme-text-muted">{t('card.userId')}</p>
+                <p className="font-mono text-[10px] theme-text-primary">{m.callingId || t('card.unavailable')}</p>
 
                 {m.skills && m.skills.length > 0 && (
                   <div className="mt-2.5 flex flex-wrap gap-1">
@@ -309,18 +385,20 @@ export default function TeamDirectoryPage() {
 
               <div className="border-t pt-3 grid grid-cols-2 gap-2" style={{ borderColor: 'var(--border-subtle)' }}>
                 <button onClick={() => handleDM(m)} className="btn-secondary h-8 justify-center text-[11px]">
-                  <MessageSquare className="h-3.5 w-3.5" style={{ color: 'var(--accent)' }} />DM
+                  <MessageSquare className="h-3.5 w-3.5" style={{ color: 'var(--accent)' }} />{t('actions.dm')}
                 </button>
                 <button onClick={() => handleCall(m)} className="btn-secondary h-8 justify-center text-[11px]">
-                  <Video className="h-3.5 w-3.5 text-blue-500" />Call
+                  <Video className="h-3.5 w-3.5 text-blue-500" />{t('actions.call')}
                 </button>
-                <Link
-                  href="/calling"
-                  className="btn-secondary col-span-2 h-8 justify-center text-[11px]"
-                  aria-label={`Open Calling ID for ${m.fullName}`}
-                >
-                  <PhoneCall className="h-3.5 w-3.5 text-emerald-600" />Call by ID
-                </Link>
+                {canCallById && (
+                  <Link
+                    href="/calling"
+                    className="btn-secondary col-span-2 h-8 justify-center text-[11px]"
+                    aria-label={t('actions.callByIdLabel', { name: m.fullName })}
+                  >
+                    <PhoneCall className="h-3.5 w-3.5 text-emerald-600" />{t('actions.callById')}
+                  </Link>
+                )}
               </div>
             </div>
           ))}
@@ -330,36 +408,35 @@ export default function TeamDirectoryPage() {
       {/* Invite modal */}
       {isInviteOpen && (
         <div className="modal-backdrop">
-          <div className="modal-panel max-w-md">
+          <div className="modal-panel max-w-md" role="dialog" aria-labelledby="team-invite-title">
             <div className="modal-header">
-              <h3 className="modal-title">Invite Team Member</h3>
-              <button onClick={() => setIsInviteOpen(false)} className="btn-ghost h-7 w-7 p-0 rounded-lg"><X className="h-4 w-4" /></button>
+              <h3 id="team-invite-title" className="modal-title">{t(`invite.title.${kind}`)}</h3>
+              <button onClick={() => setIsInviteOpen(false)} aria-label={t('invite.close')} className="btn-ghost h-7 w-7 p-0 rounded-lg"><X className="h-4 w-4" /></button>
             </div>
             {inviteDone ? (
-              <div className="p-8 text-center text-emerald-600 space-y-2">
+              <div className="p-8 text-center text-emerald-600 space-y-2" role="status">
                 <CheckCircle2 className="mx-auto h-10 w-10" />
-                <p className="text-sm font-bold">Invitation sent!</p>
-                <p className="text-xs theme-text-muted">Your colleague will receive an email shortly.</p>
+                <p className="text-sm font-bold">{t('invite.sent')}</p>
+                <p className="text-xs theme-text-muted">{isEducation ? t('invite.sentBodyEducation') : t('invite.sentBody')}</p>
               </div>
             ) : (
               <form onSubmit={handleInvite} className="modal-body">
                 <div>
-                  <label className="form-label" htmlFor="inv-email">Email Address</label>
-                  <input id="inv-email" type="email" required value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} placeholder="colleague@company.com" className="input-base" />
+                  <label className="form-label" htmlFor="inv-email">{t('invite.email')}</label>
+                  <input id="inv-email" type="email" required value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} placeholder={t(`invite.emailPlaceholder.${kind}`)} className="input-base" />
                 </div>
                 <div>
-                  <label className="form-label" htmlFor="inv-role">Role</label>
+                  <label className="form-label" htmlFor="inv-role">{t('invite.role')}</label>
                   <select id="inv-role" value={inviteRole} onChange={(e) => setInviteRole(e.target.value)} className="input-base">
-                    <option value="employee">Employee</option>
-                    <option value="manager">Manager</option>
-                    <option value="admin">Admin</option>
-                    <option value="guest">Guest</option>
+                    {assignableRoles.map((role) => <option key={role} value={role}>{roleLabel(role)}</option>)}
                   </select>
+                  <p className="mt-1 text-[10px] theme-text-muted">{t('invite.roleHint')}</p>
                 </div>
+                {inviteError && <p role="alert" className="text-xs text-rose-600">{inviteError}</p>}
                 <div className="modal-footer">
-                  <button type="button" onClick={() => setIsInviteOpen(false)} className="btn-secondary">Cancel</button>
-                  <button type="submit" disabled={inviteLoading || memberLimitReached} className="btn-primary">
-                    {inviteLoading ? 'Sending...' : 'Send Invite'}
+                  <button type="button" onClick={() => setIsInviteOpen(false)} className="btn-secondary">{t('invite.cancel')}</button>
+                  <button type="submit" disabled={inviteLoading || memberLimitReached || !inviteRole} className="btn-primary">
+                    {inviteLoading ? t('invite.sending') : t('invite.send')}
                   </button>
                 </div>
               </form>

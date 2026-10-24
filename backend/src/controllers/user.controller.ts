@@ -16,7 +16,7 @@ import { refreshAvatarUrls } from '../services/avatarUrls';
 import { ensureUserCallingId, isValidCallingId, normalizeCallingId } from '../services/callingId';
 import { publishUserPresence } from '../utils/socket';
 import { parsePhoneNumberFromString } from 'libphonenumber-js/max';
-import { canAssignOrganizationRole, normalizeOrganizationRole } from '../config/organization';
+import { canAssignOrganizationRole, normalizeOrganizationRole, resolveDefaultJoinRole } from '../config/organization';
 
 export const getUsers = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -401,7 +401,7 @@ export const updateStatus = async (req: AuthRequest, res: Response): Promise<voi
 
 export const inviteMember = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { email, role = 'employee' } = req.body;
+    const { email } = req.body;
     if (typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
       res.status(400).json({ success: false, message: 'A valid email address is required.' });
       return;
@@ -409,6 +409,7 @@ export const inviteMember = async (req: AuthRequest, res: Response): Promise<voi
     const company = await Company.findById(req.user!.companyId);
     if (!company) { res.status(404).json({ success: false, message: 'Company not found' }); return; }
 
+    const role = req.body.role ?? resolveDefaultJoinRole(company.organizationType, company.settings?.defaultRole, company.accountType);
     const assignedRole = normalizeOrganizationRole(role, company.organizationType, '');
     const isOwner = company.ownerId.toString() === req.user!.userId;
     if (!canAssignOrganizationRole(req.user!.role, role, company.organizationType, isOwner)) {

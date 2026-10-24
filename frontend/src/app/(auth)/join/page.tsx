@@ -20,6 +20,9 @@ import {
   Loader2,
 } from 'lucide-react';
 import { getInitials } from '@/lib/utils';
+import { renderRich, useT } from '@/lib/i18n';
+import { useRoleLabel } from '@/lib/useRoleLabel';
+import type { OrganizationType } from '@/types';
 
 function JoinWorkspaceContent() {
   const router = useRouter();
@@ -39,10 +42,17 @@ function JoinWorkspaceContent() {
     companyId: string;
     companyName: string;
     companyLogo?: string;
+    organizationType?: OrganizationType;
     role: string;
     email?: string;
     inviterName: string;
   } | null>(null);
+  // The role the server actually assigned when joining (it re-checks the invitation).
+  const [joinedRole, setJoinedRole] = useState('');
+  const [joinedEducation, setJoinedEducation] = useState(false);
+  const t = useT('auth');
+  // Invitations name the workspace type, so roles read "Student", "School Admin", …
+  const roleLabel = useRoleLabel(inviteInfo ? { organizationType: inviteInfo.organizationType, accountType: 'company' } : null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
 
@@ -94,6 +104,8 @@ function JoinWorkspaceContent() {
 
       if (res.data.success) {
         setCompany(res.data.company);
+        setJoinedRole(res.data.role || '');
+        setJoinedEducation(Boolean(res.data.company.organizationType && res.data.company.organizationType !== 'business'));
         if (res.data.accessToken) {
           login({ ...user!, companyId: res.data.company, role: res.data.role }, res.data.accessToken);
         }
@@ -148,12 +160,13 @@ function JoinWorkspaceContent() {
               <CheckCircle2 className="h-8 w-8" />
             </div>
             <h2 className="text-2xl font-bold tracking-tight text-slate-900">
-              Welcome to {inviteInfo?.companyName || 'the Team'}! 🎉
+              {t('join.welcome', { workspace: inviteInfo?.companyName || t('join.welcomeFallback') })}
             </h2>
             <p className="mt-2 text-sm text-slate-600 leading-relaxed">
-              Your membership has been activated with role{' '}
-              <span className="font-semibold text-slate-900 capitalize">{inviteInfo?.role || 'employee'}</span>.
-              Redirecting you to the team dashboard...
+              {renderRich(t('join.activated', { role: roleLabel(joinedRole || inviteInfo?.role) }), {
+                role: (chunk) => <span className="font-semibold text-slate-900" data-testid="joined-role">{chunk}</span>,
+              })}{' '}
+              {joinedEducation ? t('join.redirectAcademic') : t('join.redirectDashboard')}
             </p>
             <div className="mt-6 flex justify-center">
               <div className="h-1.5 w-24 overflow-hidden rounded-full bg-slate-100">
@@ -232,8 +245,8 @@ function JoinWorkspaceContent() {
                         Invited by <span className="font-semibold text-slate-700">{inviteInfo.inviterName}</span>
                       </p>
                     </div>
-                    <span className="rounded-xl bg-indigo-100 px-2.5 py-1 text-[11px] font-bold text-indigo-700 capitalize shrink-0">
-                      {inviteInfo.role}
+                    <span className="rounded-xl bg-indigo-100 px-2.5 py-1 text-[11px] font-bold text-indigo-700 shrink-0" data-role={inviteInfo.role}>
+                      {roleLabel(inviteInfo.role)}
                     </span>
                   </div>
 

@@ -8,8 +8,11 @@ import { sendInviteEmail } from '../utils/email';
 import { v4 as uuidv4 } from 'uuid';
 import {
   canAssignOrganizationRole,
-  isOrganizationRoleEligible,
+  getAssignableOrganizationRoles,
+  getWorkspaceRoleCatalog,
+  isOrganizationRoleAssignable,
   isOrganizationType,
+  resolveDefaultJoinRole,
   roleMatches,
 } from '../config/organization';
 import { parsePagination } from '../utils/pagination';
@@ -93,11 +96,26 @@ export const updateCompany = async (req: AuthRequest, res: Response): Promise<vo
       return;
     }
     if (classificationChanged) {
-      const members = await User.find({ companyId: company._id, isActive: true }).select('role');
-      if (members.some((member) => !isOrganizationRoleEligible(member.role, requestedOrganizationType))) {
+      // Every member must hold a role the new type offers: a university does not
+      // keep "employee" members, and a company does not keep "student" members.
+      const members = await User.find({ companyId: company._id, isActive: true }).select('_id role');
+      const ownerId = company.ownerId.toString();
+      const blocking = members.filter((member) =>
+        member._id.toString() !== ownerId && !isOrganizationRoleAssignable(member.role, requestedOrganizationType));
+      if (requestedAccountType === 'individual' && members.some((member) => member._id.toString() !== ownerId)) {
         res.status(409).json({
           success: false,
+          code: 'WORKSPACE_HAS_MEMBERS',
+          message: 'A workspace with other members cannot become a Solo workspace.',
+        });
+        return;
+      }
+      if (blocking.length) {
+        res.status(409).json({
+          success: false,
+          code: 'MEMBER_ROLES_INCOMPATIBLE',
           message: 'Organization type cannot be changed while active members have roles that are not eligible for the new type.',
+          incompatibleMembers: blocking.length,
         });
         return;
       }
@@ -138,17 +156,14 @@ export const updateCompany = async (req: AuthRequest, res: Response): Promise<vo
     }
     if (req.body.settings !== undefined) {
       const settings = req.body.settings;
-      const allowedDefaultRoles = requestedOrganizationType === 'business'
-        ? ['employee', 'guest']
-        : ['employee', 'guest', 'student'];
+      // Invite-code joiners get a non-elevated role the workspace type offers.
+      const allowedDefaultRoles = getWorkspaceRoleCatalog(requestedOrganizationType, requestedAccountType).joinRoles;
       if (
         !settings ||
         typeof settings !== 'object' ||
         Array.isArray(settings) ||
         (settings.allowGuestAccess !== undefined && typeof settings.allowGuestAccess !== 'boolean') ||
-        (settings.defaultRole !== undefined &&
-          (!allowedDefaultRoles.includes(settings.defaultRole) ||
-            !isOrganizationRoleEligible(settings.defaultRole, requestedOrganizationType))) ||
+        (settings.defaultRole !== undefined && !allowedDefaultRoles.includes(settings.defaultRole)) ||
         Object.keys(settings).some((key) => !['allowGuestAccess', 'defaultRole'].includes(key))
       ) {
         res.status(400).json({ success: false, message: 'Workspace settings contain an unsupported value.' });
@@ -191,6 +206,11 @@ export const updateCompany = async (req: AuthRequest, res: Response): Promise<vo
     if (req.body.settings !== undefined) {
       if (req.body.settings.allowGuestAccess !== undefined) updates['settings.allowGuestAccess'] = req.body.settings.allowGuestAccess;
       if (req.body.settings.defaultRole !== undefined) updates['settings.defaultRole'] = req.body.settings.defaultRole;
+    }
+    // A new workspace type keeps a saved invite-code role only if it still applies.
+    if (classificationChanged && updates['settings.defaultRole'] === undefined) {
+      const defaultRole = resolveDefaultJoinRole(requestedOrganizationType, company.settings?.defaultRole, requestedAccountType);
+      if (defaultRole && defaultRole !== company.settings?.defaultRole) updates['settings.defaultRole'] = defaultRole;
     }
     if (req.body.academicSettings !== undefined) {
       Object.entries(req.body.academicSettings).forEach(([key, value]) => {
@@ -239,6 +259,34 @@ export const getCompanyMembers = async (req: AuthRequest, res: Response): Promis
       page: pagination.page,
       totalPages: Math.ceil(total / pagination.limit),
       hasMore: pagination.skip + members.length < total,
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+/**
+ * The roles the caller's workspace supports and which of them the caller may
+ * assign, resolved from the stored workspace and the caller's current role, so
+ * invitation and role menus match what the API accepts.
+ */
+export const getWorkspaceRoles = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const company = await Company.findById(req.user!.companyId).select('ownerId organizationType accountType settings');
+    if (!company) {
+      res.status(404).json({ success: false, code: 'WORKSPACE_NOT_FOUND', message: 'Workspace not found.' });
+      return;
+    }
+    const catalog = getWorkspaceRoleCatalog(company.organizationType, company.accountType);
+    const ownsWorkspace = company.ownerId.toString() === req.user!.userId;
+    res.json({
+      success: true,
+      organizationType: company.organizationType,
+      accountType: company.accountType,
+      roles: catalog.assignable.map((role) => ({ id: role, elevated: catalog.elevated.includes(role) })),
+      assignableRoles: getAssignableOrganizationRoles(req.user!.role, company.organizationType, company.accountType, ownsWorkspace),
+      joinRoles: catalog.joinRoles,
+      defaultJoinRole: resolveDefaultJoinRole(company.organizationType, company.settings?.defaultRole, company.accountType),
     });
   } catch (err: any) {
     res.status(500).json({ success: false, message: err.message });

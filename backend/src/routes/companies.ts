@@ -9,6 +9,7 @@ import {
   revokeInvite,
   resendInvite,
   regenerateInviteCode,
+  getWorkspaceRoles,
 } from '../controllers/company.controller';
 import { inviteMember } from '../controllers/user.controller';
 import { authenticate, requireRole } from '../middleware/auth';
@@ -21,6 +22,7 @@ router.use(authenticate);
 router.get('/', getCompany);
 router.patch('/', requireRole('owner', 'admin', 'principal'), requireOrganizationFeature('workspaceSettings'), requireWorkspaceAdministrator, updateCompany);
 router.get('/members', requireOrganizationFeature('memberDirectory'), getCompanyMembers);
+router.get('/roles', getWorkspaceRoles);
 router.get('/invites', requireRole('owner', 'admin', 'manager', 'principal'), requireOrganizationFeature('memberDirectory'), getCompanyInvites);
 router.post('/invite', requireRole('owner', 'admin', 'manager', 'principal'), requireOrganizationFeature('memberDirectory'), inviteMember);
 router.delete('/invites/:token', requireRole('owner', 'admin', 'principal'), requireOrganizationFeature('memberDirectory'), requireWorkspaceAdministrator, revokeInvite);

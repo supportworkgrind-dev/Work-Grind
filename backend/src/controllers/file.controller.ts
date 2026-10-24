@@ -20,7 +20,7 @@ import Folder from '../models/Folder';
 import Project from '../models/Project';
 import Company from '../models/Company';
 import { AuthRequest } from '../middleware/auth';
-import { isAcademicOrganizationType } from '../config/organization';
+import { isAcademicOrganizationType, permissionRole } from '../config/organization';
 import { releaseStorage, reserveStorage } from '../utils/planLimits';
 import { getEffectiveSubscription } from '../services/companySubscription';
 import { parsePagination } from '../utils/pagination';
@@ -36,7 +36,7 @@ function getAcademicFileAccessScope(req: AuthRequest, permission: 'view' | 'edit
   if (!isAcademicOrganizationType(req.user?.organizationType)) return {};
 
   const role = req.user?.role ?? '';
-  if (['owner', 'admin', 'principal'].includes(role)) return {};
+  if (['owner', 'admin', 'principal'].includes(permissionRole(role))) return {};
 
   const userId = req.user!.userId;
   return {

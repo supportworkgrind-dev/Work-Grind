@@ -423,7 +423,7 @@ export const updateAcademicRecord = async (req: AuthRequest, res: Response): Pro
           users.length !== assignedIds.length ||
           users.some((user) => !roleMatches(user.role, [requiredRole], 'university'))
         ) {
-          res.status(400).json({ success: false, message: `Department assignments must reference active ${requiredRole.toUpperCase()} members of this university.` });
+          res.status(400).json({ success: false, message: `Department assignments must reference active ${requiredRole === 'dean' ? 'Dean' : 'Head of Department'} members of this institution.` });
           return;
         }
       }

@@ -44,6 +44,7 @@ import {
   canAccessAcademicSection,
   canAccessRoute,
   isEducationOrganization,
+  roleLabelKey,
 } from '@/lib/organizationAccess';
 
 type SidebarNavItem = {
@@ -149,7 +150,8 @@ export const Sidebar = memo(function Sidebar() {
   const [showStatusMenu, setShowStatusMenu] = useState(false);
   const t = useT('shell');
   const { t: translate, tOptional } = useI18n();
-  const roleLabel = (role?: string) => (role ? tOptional(`common.roles.${role}`) ?? role : '');
+  // Titles follow the workspace type ("School Admin", "Department Head").
+  const roleLabel = (role?: string) => (role ? tOptional(roleLabelKey(role, company)) ?? role : '');
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {

@@ -69,7 +69,9 @@ test('education roles are limited to compatible institution types and assignment
   assert.equal(isOrganizationRoleEligible('dean', 'university'), true);
   assert.equal(isOrganizationRoleEligible('hod', 'university'), true);
   assert.equal(isOrganizationRoleEligible('dean', 'school'), false);
-  assert.equal(isOrganizationRoleEligible('hod', 'college'), false);
+  // Colleges have department heads; schools do not.
+  assert.equal(isOrganizationRoleEligible('hod', 'college'), true);
+  assert.equal(isOrganizationRoleEligible('hod', 'school'), false);
   assert.equal(isOrganizationRoleEligible('student', 'business'), false);
 
   assert.equal(canAssignOrganizationRole('owner', 'dean', 'university', true), true);

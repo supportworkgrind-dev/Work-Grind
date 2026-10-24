@@ -3,6 +3,9 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/store/useAuthStore';
+import { getAssignableRoles } from '@/lib/organizationAccess';
+import { useRoleLabel } from '@/lib/useRoleLabel';
+import { useT } from '@/lib/i18n';
 import { getAuthenticatedDestination, getSafeReturnPath } from '@/lib/authRedirect';
 import { api } from '@/lib/api';
 import { normalizeTheme, useThemeStore } from '@/lib/themeStore';
@@ -54,7 +57,14 @@ export default function OnboardingPage() {
   const isEducationWorkspace = ['school', 'college', 'university'].includes(
     company?.organizationType ?? user?.signupOrganizationType ?? '',
   );
-  const totalSteps = isIndividual ? 2 : 3;
+  // Schools, colleges and universities have no Projects, so their onboarding
+  // ends after inviting members instead of offering a starter project.
+  const totalSteps = isIndividual || isEducationWorkspace ? 2 : 3;
+  const ta = useT('auth');
+  const roleLabel = useRoleLabel(company);
+  // The owner may invite with any role this workspace type offers.
+  const inviteRoles = getAssignableRoles(company, 'owner', true);
+  const preferredInviteRole = isEducationWorkspace ? 'teacher' : 'employee';
   const [hasHydratedAuth, setHasHydratedAuth] = useState(false);
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [workspaceName, setWorkspaceName] = useState(company?.name || 'My Workspace');
@@ -62,7 +72,7 @@ export default function OnboardingPage() {
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileError, setProfileError] = useState('');
   const [inviteEmails, setInviteEmails] = useState<string[]>(['']);
-  const [educationInviteRole, setEducationInviteRole] = useState<'teacher' | 'student'>('teacher');
+  const [selectedInviteRole, setSelectedInviteRole] = useState('');
   const [isSendingInvites, setIsSendingInvites] = useState(false);
   const [projectTemplate, setProjectTemplate] = useState<string>(getWorkspaceProfile(user?.workspaceProfile).starterProject);
   const [isCompleting, setIsCompleting] = useState(false);
@@ -168,6 +178,10 @@ export default function OnboardingPage() {
     }
   };
 
+  const inviteRole = inviteRoles.includes(selectedInviteRole)
+    ? selectedInviteRole
+    : inviteRoles.includes(preferredInviteRole) ? preferredInviteRole : inviteRoles[inviteRoles.length - 1] ?? '';
+
   const handleSendInvitesAndNext = async () => {
     const validEmails = inviteEmails.map((email) => email.trim()).filter((email) => email && email.includes('@'));
     if (validEmails.length && company?._id) {
@@ -176,7 +190,7 @@ export default function OnboardingPage() {
         for (const email of validEmails) {
           await api.post('/companies/invite', {
             email,
-            role: isEducationWorkspace ? educationInviteRole : 'employee',
+            role: inviteRole,
           });
         }
       } catch (err) {
@@ -185,7 +199,8 @@ export default function OnboardingPage() {
         setIsSendingInvites(false);
       }
     }
-    await advanceToProjects();
+    if (isEducationWorkspace) await handleFinishOnboarding();
+    else await advanceToProjects();
   };
 
   const handleFinishOnboarding = async () => {
@@ -193,7 +208,7 @@ export default function OnboardingPage() {
     const returnTo = getSafeReturnPath(searchParams.get('redirect'));
     const defaultDestination = company?.organizationType && company.organizationType !== 'business' ? '/academic' : '/dashboard';
     try {
-      if (company?._id && projectTemplate !== 'Welcome to WorkGrind') {
+      if (company?._id && !isEducationWorkspace && projectTemplate !== 'Welcome to WorkGrind') {
         const profile = getWorkspaceProfile(selectedProfile);
         await api.post('/projects', {
           name: projectTemplate,
@@ -418,19 +433,19 @@ export default function OnboardingPage() {
                   Invite colleagues, staff, or other workspace members now, or skip this step and invite people later.
                 </p>
               </div>
-              {isEducationWorkspace && (
+              {inviteRoles.length > 0 && (
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider theme-text-secondary">
-                    Invitation Role
+                  <label htmlFor="onboarding-invite-role" className="block text-xs font-bold uppercase tracking-wider theme-text-secondary">
+                    {ta('onboarding.inviteRole')}
                   </label>
                   <select
-                    value={educationInviteRole}
-                    onChange={(event) => setEducationInviteRole(event.target.value as 'teacher' | 'student')}
+                    id="onboarding-invite-role"
+                    value={inviteRole}
+                    onChange={(event) => setSelectedInviteRole(event.target.value)}
                     className="mt-2 block w-full rounded-xl border py-2 px-3 text-xs focus:outline-none focus:ring-2"
                     style={{ background: 'var(--bg-input)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
                   >
-                    <option value="teacher">Teacher / Faculty</option>
-                    <option value="student">Student</option>
+                    {inviteRoles.map((role) => <option key={role} value={role}>{roleLabel(role)}</option>)}
                   </select>
                 </div>
               )}
@@ -482,7 +497,8 @@ export default function OnboardingPage() {
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => void advanceToProjects()}
+                    onClick={() => void (isEducationWorkspace ? handleFinishOnboarding() : advanceToProjects())}
+                    disabled={isCompleting}
                     className="rounded-xl border px-4 py-2 text-xs font-semibold theme-text-secondary hover:bg-[var(--bg-hover)]"
                     style={{ borderColor: 'var(--border-color)' }}
                   >
@@ -491,7 +507,7 @@ export default function OnboardingPage() {
                   <button
                     type="button"
                     onClick={handleSendInvitesAndNext}
-                    disabled={isSendingInvites}
+                    disabled={isSendingInvites || isCompleting}
                     className="inline-flex items-center gap-2 rounded-xl px-5 py-2 text-xs font-semibold transition-all disabled:opacity-50"
                     style={{ background: 'var(--accent)', color: 'var(--text-on-accent)' }}
                   >

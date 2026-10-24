@@ -36,9 +36,10 @@ const ROUTE_API_GATES = {
 const WORKSPACES = [
   ['solo', { organizationType: 'business', accountType: 'individual' }, ['owner']],
   ['business team', { organizationType: 'business', accountType: 'company' }, ['owner', 'founder', 'admin', 'manager', 'employee', 'guest']],
+  // Education lists include roles kept only for existing members (manager, employee, guest; principal in universities).
   ['school', { organizationType: 'school', accountType: 'company' }, ['owner', 'principal', 'admin', 'teacher', 'student', 'parent', 'manager', 'employee', 'guest']],
-  ['college', { organizationType: 'college', accountType: 'company' }, ['owner', 'principal', 'admin', 'teacher', 'faculty', 'student', 'parent']],
-  ['university', { organizationType: 'university', accountType: 'company' }, ['owner', 'principal', 'admin', 'dean', 'hod', 'teacher', 'student', 'parent']],
+  ['college', { organizationType: 'college', accountType: 'company' }, ['owner', 'principal', 'admin', 'hod', 'lecturer', 'teacher', 'faculty', 'student', 'parent', 'employee']],
+  ['university', { organizationType: 'university', accountType: 'company' }, ['owner', 'vice_chancellor', 'principal', 'admin', 'dean', 'hod', 'professor', 'lecturer', 'teacher', 'student', 'parent', 'manager', 'employee', 'guest']],
 ];
 
 async function loadFrontendPolicy() {
@@ -80,4 +81,62 @@ test('unknown workspace types are refused on both sides', async () => {
   assert.equal(resolveWorkspaceClassification('enterprise', 'company').organizationType, undefined);
   assert.equal(isOrganizationFeatureAllowed({ organizationType: 'enterprise', accountType: 'company' }, 'owner', 'workspaceContent'), false);
   assert.equal(isOrganizationFeatureAllowed({ organizationType: undefined, accountType: 'company' }, 'owner', 'workspaceContent'), false);
+});
+
+test('the frontend role catalog is the backend catalog for every workspace type', async () => {
+  const frontend = await loadFrontendPolicy();
+  const { WORKSPACE_ROLE_CATALOG } = require('../dist/config/organization');
+  const pairs = [['company', 'business'], ['school', 'school'], ['college', 'college'], ['university', 'university']];
+  for (const [frontendKey, backendKey] of pairs) {
+    const front = frontend.WORKSPACE_ROLE_CATALOG[frontendKey];
+    const back = WORKSPACE_ROLE_CATALOG[backendKey];
+    for (const field of ['assignable', 'elevated', 'legacy', 'joinRoles', 'defaultJoinRole']) {
+      assert.deepEqual(front[field], back[field], `${backendKey} ${field}`);
+    }
+  }
+});
+
+test('role menus offer exactly the roles the API lets each member assign', async () => {
+  const frontend = await loadFrontendPolicy();
+  const { getAssignableOrganizationRoles, resolveDefaultJoinRole } = require('../dist/config/organization');
+  const mismatches = [];
+  for (const [label, organization, roles] of WORKSPACES) {
+    for (const role of roles) {
+      for (const owns of [true, false]) {
+        if (owns && role !== 'owner') continue;
+        // The menu is shown to members who may manage the directory; the API is the authority.
+        const shown = frontend.getAssignableRoles(organization, role, owns);
+        const accepted = isOrganizationFeatureAllowed(organization, role, 'memberDirectory')
+          ? getAssignableOrganizationRoles(role, organization.organizationType, organization.accountType, owns)
+          : [];
+        if (JSON.stringify(shown) !== JSON.stringify(accepted)) mismatches.push(`${label} ${role}${owns ? ' (owner)' : ''}: ${shown} vs ${accepted}`);
+      }
+    }
+    for (const saved of [undefined, 'employee', 'guest', 'student', 'parent', 'principal']) {
+      const front = frontend.resolveDefaultJoinRole(organization, saved);
+      const back = resolveDefaultJoinRole(organization.organizationType, saved, organization.accountType);
+      if (front !== back) mismatches.push(`${label} default for ${saved}: ${front} vs ${back}`);
+    }
+  }
+  assert.deepEqual(mismatches, []);
+});
+
+test('feature checks agree on both sides for every role of every workspace type', async () => {
+  const frontend = await loadFrontendPolicy();
+  const { isWorkspaceAdministrator } = require('../dist/config/organization');
+  const features = ['memberDirectory', 'workspaceSettings', 'academic', 'academicAdmin', 'businessCrm', 'clientPortal', 'socialPublishing', 'soloWorkspace'];
+  const differences = [];
+  for (const [label, organization, roles] of WORKSPACES) {
+    for (const role of roles) {
+      for (const feature of features) {
+        const front = frontend.canAccessOrganizationFeature(organization, role, feature);
+        // Settings changes also pass requireWorkspaceAdministrator (backend/src/routes/companies.ts).
+        const back = isOrganizationFeatureAllowed(organization, role, feature) &&
+          (feature !== 'workspaceSettings' || isWorkspaceAdministrator(role, organization.organizationType));
+        if (front !== back) differences.push(`${label} ${role} ${feature}: frontend ${front}, backend ${back}`);
+      }
+    }
+  }
+  // Education managers (an earlier business role) keep backend directory access that the menu does not show.
+  assert.deepEqual(differences.filter((entry) => !/^(school|university) manager memberDirectory/.test(entry)), []);
 });

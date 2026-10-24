@@ -30,9 +30,11 @@ import { refreshAvatarUrls } from '../services/avatarUrls';
 import { clearRefreshCookie, getRefreshCookie, setRefreshCookie } from '../utils/authCookie';
 import {
   canAssignOrganizationRole,
+  getWorkspaceRoleCatalog,
   isOrganizationRoleEligible,
   isOrganizationType,
   normalizeOrganizationRole,
+  resolveDefaultJoinRole,
 } from '../config/organization';
 const issue = (userId: string, companyId: string, role: string) => ({
   accessToken: generateAccessToken({ userId, companyId, role }),
@@ -1060,6 +1062,8 @@ export const createCompany = async (req: AuthRequest, res: Response): Promise<vo
       accountType: isIndividual ? 'individual' : 'company',
       organizationType,
       ...(Object.keys(organizationDetails).length ? { organizationDetails } : {}),
+      // Invite-code joiners get the workspace type's member role (student in education).
+      ...(isIndividual ? {} : { settings: { allowGuestAccess: false, defaultRole: resolveDefaultJoinRole(organizationType, undefined, 'company') } }),
       inviteCode: uuidv4().split('-')[0].toUpperCase(),
       subscriptionStatus: 'trialing',
       subscriptionPlan: 'free',
@@ -1108,80 +1112,84 @@ export const createCompany = async (req: AuthRequest, res: Response): Promise<vo
     const createdChannels = await Channel.insertMany(channelsToCreate);
     const generalCh = createdChannels.find((c) => c.name === 'general');
 
-    // Seed Demo Starter Project
-    const project = await Project.create({
-      companyId: company._id,
-      name: isIndividual ? 'Personal Productivity Roadmap' : 'Welcome to WorkGrind',
-      description: isIndividual
-        ? 'Your personal workspace template to organize freelance projects, solo deliverables, and goals.'
-        : 'Your starter workspace guide to master tasks, project collaboration, and real-time chat.',
-      status: 'active',
-      progress: 25,
-      color: '#4F46E5',
-      managerId: uid,
-      assigneeId: uid,
-      members: [{ userId: uid, role: 'manager' }],
-      startDate: new Date(),
-      deadline: new Date(Date.now() + 14 * 86400000),
-    });
+    // Starter project and tasks: business and Solo workspaces only. Schools,
+    // colleges and universities have no Projects or Tasks, so they start
+    // with their academic tools instead.
+    if (organizationType === 'business') {
+      const project = await Project.create({
+        companyId: company._id,
+        name: isIndividual ? 'Personal Productivity Roadmap' : 'Welcome to WorkGrind',
+        description: isIndividual
+          ? 'Your personal workspace template to organize freelance projects, solo deliverables, and goals.'
+          : 'Your starter workspace guide to master tasks, project collaboration, and real-time chat.',
+        status: 'active',
+        progress: 25,
+        color: '#4F46E5',
+        managerId: uid,
+        assigneeId: uid,
+        members: [{ userId: uid, role: 'manager' }],
+        startDate: new Date(),
+        deadline: new Date(Date.now() + 14 * 86400000),
+      });
 
-    // Seed 4 Starter Tasks concurrently
-    const now = Date.now();
-    await Task.create([
-      {
-        companyId: company._id,
-        projectId: project._id,
-        creatorId: uid,
-        assigneeId: uid,
-        title: 'Explore your personal command center dashboard',
-        description: 'Review urgent deadlines, active roadmaps, and key metrics at a glance.',
-        status: 'completed',
-        priority: 'medium',
-        dueDate: new Date(now - 86400000),
-        completedAt: new Date(),
-      },
-      {
-        companyId: company._id,
-        projectId: project._id,
-        creatorId: uid,
-        assigneeId: uid,
-        title: 'Drag and drop tasks between Kanban status columns',
-        description: 'Move cards between To Do, In Progress, Review, and Completed to update status instantly.',
-        status: 'in_progress',
-        priority: 'high',
-        dueDate: new Date(now + 86400000),
-      },
-      {
-        companyId: company._id,
-        projectId: project._id,
-        creatorId: uid,
-        assigneeId: uid,
-        title: isIndividual
-          ? 'Customize your personal workflow in Settings'
-          : 'Invite your teammates via Workspace Settings',
-        description: isIndividual
-          ? 'Set your profile, theme, timezone, or invite clients/collaborators anytime.'
-          : 'Collaboration is better together! Invite colleagues via email or shareable invite links.',
-        status: 'todo',
-        priority: 'medium',
-        dueDate: new Date(now + 3 * 86400000),
-      },
-      {
-        companyId: company._id,
-        projectId: project._id,
-        creatorId: uid,
-        assigneeId: uid,
-        title: isIndividual
-          ? 'Track upcoming deadlines in the Workplace Calendar'
-          : 'Send a message or test attachments in #general channel',
-        description: isIndividual
-          ? 'Keep track of milestones, task due dates, and virtual meetings in one unified calendar.'
-          : 'Real-time chat with emoji reactions, quote replies, and file sharing is live.',
-        status: 'todo',
-        priority: 'low',
-        dueDate: new Date(now + 5 * 86400000),
-      },
-    ]);
+      // Seed 4 Starter Tasks concurrently
+      const now = Date.now();
+      await Task.create([
+        {
+          companyId: company._id,
+          projectId: project._id,
+          creatorId: uid,
+          assigneeId: uid,
+          title: 'Explore your personal command center dashboard',
+          description: 'Review urgent deadlines, active roadmaps, and key metrics at a glance.',
+          status: 'completed',
+          priority: 'medium',
+          dueDate: new Date(now - 86400000),
+          completedAt: new Date(),
+        },
+        {
+          companyId: company._id,
+          projectId: project._id,
+          creatorId: uid,
+          assigneeId: uid,
+          title: 'Drag and drop tasks between Kanban status columns',
+          description: 'Move cards between To Do, In Progress, Review, and Completed to update status instantly.',
+          status: 'in_progress',
+          priority: 'high',
+          dueDate: new Date(now + 86400000),
+        },
+        {
+          companyId: company._id,
+          projectId: project._id,
+          creatorId: uid,
+          assigneeId: uid,
+          title: isIndividual
+            ? 'Customize your personal workflow in Settings'
+            : 'Invite your teammates via Workspace Settings',
+          description: isIndividual
+            ? 'Set your profile, theme, timezone, or invite clients/collaborators anytime.'
+            : 'Collaboration is better together! Invite colleagues via email or shareable invite links.',
+          status: 'todo',
+          priority: 'medium',
+          dueDate: new Date(now + 3 * 86400000),
+        },
+        {
+          companyId: company._id,
+          projectId: project._id,
+          creatorId: uid,
+          assigneeId: uid,
+          title: isIndividual
+            ? 'Track upcoming deadlines in the Workplace Calendar'
+            : 'Send a message or test attachments in #general channel',
+          description: isIndividual
+            ? 'Keep track of milestones, task due dates, and virtual meetings in one unified calendar.'
+            : 'Real-time chat with emoji reactions, quote replies, and file sharing is live.',
+          status: 'todo',
+          priority: 'low',
+          dueDate: new Date(now + 5 * 86400000),
+        },
+      ]);
+    }
 
     // Send welcome message in #general
     if (generalCh) {
@@ -1189,7 +1197,9 @@ export const createCompany = async (req: AuthRequest, res: Response): Promise<vo
         companyId: company._id,
         channelId: generalCh._id,
         senderId: uid,
-        content: '🎉 Welcome to WorkGrind! Your workspace has been created. Check out your starter tasks and feel free to invite your teammates.',
+        content: organizationType === 'business'
+          ? '🎉 Welcome to WorkGrind! Your workspace has been created. Check out your starter tasks and feel free to invite your teammates.'
+          : '🎉 Welcome to WorkGrind! Your institution workspace has been created. Set up departments, courses, and classes in Academic, then invite your staff, students, and parents.',
         type: 'text',
       });
     }
@@ -1255,8 +1265,10 @@ export const validateInvite = async (req: Request, res: Response): Promise<void>
         companyId: company._id,
         companyName: company.name,
         companyLogo: company.logo,
+        organizationType: company.organizationType,
         email: invite?.email,
-        role: invite?.role || 'employee',
+        role: normalizeOrganizationRole(invite?.role, company.organizationType, '') ||
+          resolveDefaultJoinRole(company.organizationType, company.settings?.defaultRole, company.accountType),
         inviterName: (company.ownerId as any)?.fullName || 'A team administrator',
       };
     } else {
@@ -1265,13 +1277,17 @@ export const validateInvite = async (req: Request, res: Response): Promise<void>
         isActive: true,
       }).populate('ownerId', 'fullName email');
 
-      if (company) {
+      const joinRole = company
+        ? resolveDefaultJoinRole(company.organizationType, company.settings?.defaultRole, company.accountType)
+        : '';
+      if (company && joinRole) {
         inviteDetails = {
           type: 'code',
           companyId: company._id,
           companyName: company.name,
           companyLogo: company.logo,
-          role: company.settings?.defaultRole || 'employee',
+          organizationType: company.organizationType,
+          role: joinRole,
           inviterName: (company.ownerId as any)?.fullName || 'A team administrator',
         };
       }
@@ -1315,7 +1331,7 @@ export const joinCompany = async (req: AuthRequest, res: Response): Promise<void
       'pendingInvites.expiresAt': { $gt: new Date() },
     });
 
-    let assignedRole = 'employee';
+    let assignedRole = '';
 
     if (company) {
       const invite = company.pendingInvites.find((i) => i.token === codeOrToken);
@@ -1346,13 +1362,11 @@ export const joinCompany = async (req: AuthRequest, res: Response): Promise<void
             return;
           }
         } else {
-          // Legacy invitations lack inviter provenance, so only retain low-privilege assignments.
-          const legacyRoles = ['employee', 'guest', 'student'];
-          if (!legacyRoles.includes(requestedRole) || !isOrganizationRoleEligible(requestedRole, company.organizationType)) {
-            assignedRole = 'employee';
-          } else {
-            assignedRole = requestedRole;
-          }
+          // Legacy invitations lack inviter provenance, so only retain the
+          // low-privilege roles open joining allows for this workspace type.
+          assignedRole = getWorkspaceRoleCatalog(company.organizationType, company.accountType).joinRoles.includes(requestedRole)
+            ? requestedRole
+            : resolveDefaultJoinRole(company.organizationType, company.settings?.defaultRole, company.accountType);
         }
         if (invite.inviterId) assignedRole = requestedRole;
       }
@@ -1365,16 +1379,16 @@ export const joinCompany = async (req: AuthRequest, res: Response): Promise<void
       });
 
       if (company) {
-        const requestedRole = normalizeOrganizationRole(company.settings?.defaultRole, company.organizationType, '');
-        const safeRoles = ['employee', 'guest', 'student'];
-        assignedRole = safeRoles.includes(requestedRole) &&
-          isOrganizationRoleEligible(requestedRole, company.organizationType)
-          ? requestedRole
-          : 'employee';
+        assignedRole = resolveDefaultJoinRole(company.organizationType, company.settings?.defaultRole, company.accountType);
       }
     }
 
     if (!company) {
+      res.status(400).json({ success: false, message: 'Invalid or expired invite' });
+      return;
+    }
+    // A Solo workspace has no member roles, so nobody can join it.
+    if (!assignedRole || !isOrganizationRoleEligible(assignedRole, company.organizationType)) {
       res.status(400).json({ success: false, message: 'Invalid or expired invite' });
       return;
     }

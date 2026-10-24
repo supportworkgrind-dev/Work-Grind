@@ -149,8 +149,10 @@ test('created workspace ownership and membership belong only to the authenticate
     ...channel,
     _id: new mongoose.Types.ObjectId(),
   }));
-  Project.create = async (project) => ({ ...project, _id: new mongoose.Types.ObjectId() });
-  Task.create = async () => [];
+  let seededProjects = 0;
+  let seededTasks = 0;
+  Project.create = async (project) => { seededProjects += 1; return { ...project, _id: new mongoose.Types.ObjectId() }; };
+  Task.create = async () => { seededTasks += 1; return []; };
   Message.create = async () => ({});
   AuditLog.create = async () => ({});
 
@@ -179,6 +181,10 @@ test('created workspace ownership and membership belong only to the authenticate
   assert.equal(res.body.user._id, userId);
   assert.equal(res.body.company.ownerId, userId.toString());
   assert.deepEqual(createdCompany.organizationDetails, { schoolType: 'combined', gradeRange: 'mixed' });
+  // A school starts with Student as its invite-code role and no business starter project.
+  assert.equal(createdCompany.settings.defaultRole, 'student');
+  assert.equal(seededProjects, 0);
+  assert.equal(seededTasks, 0);
   assert.ok(res.body.accessToken);
   assert.equal(res.cookies.length, 1);
 });

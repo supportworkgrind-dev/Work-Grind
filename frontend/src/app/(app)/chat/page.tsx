@@ -54,6 +54,7 @@ import {
   Flag,
 } from 'lucide-react';
 import { formatTimeAgo, formatDate, getInitials } from '@/lib/utils';
+import { isWorkspaceManagerRole } from '@/lib/organizationAccess';
 
 interface DmLookupUser {
   callingId: string;
@@ -157,7 +158,7 @@ export default function ChatPage() {
   const targetChannelId = searchParams.get('channelId');
   const targetConversationId = searchParams.get('conversationId');
 
-  const { user, isAtLimit, refreshSubscription } = useAuthStore();
+  const { user, company, isAtLimit, refreshSubscription } = useAuthStore();
   const storageLimitReached = isAtLimit('storage');
   const { openCreateModal } = useAppStore();
   const { isMuted, toggleMute, playChime } = useChatSound();
@@ -1047,7 +1048,7 @@ export default function ChatPage() {
           <div>
             <div className="flex items-center justify-between px-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
               <span>{t('sidebar.channels')}</span>
-              {(user?.role === 'owner' || user?.role === 'admin' || user?.role === 'manager') && (
+              {isWorkspaceManagerRole(company ?? (user?.companyId && typeof user.companyId === 'object' ? user.companyId : null), user?.role) && (
                 <button
                   onClick={() => openCreateModal('channel')}
                   className="rounded-lg p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700 transition-colors"

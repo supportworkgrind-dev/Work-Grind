@@ -1,5 +1,5 @@
 export type UserStatus = 'online' | 'away' | 'busy' | 'offline';
-export type UserRole = 'owner' | 'founder' | 'principal' | 'director' | 'admin' | 'office_staff' | 'teacher' | 'faculty' | 'student' | 'parent' | 'guardian' | 'dean' | 'hod' | 'manager' | 'employee' | 'guest';
+export type UserRole = 'owner' | 'founder' | 'principal' | 'director' | 'admin' | 'office_staff' | 'teacher' | 'faculty' | 'student' | 'parent' | 'guardian' | 'dean' | 'hod' | 'vice_chancellor' | 'professor' | 'lecturer' | 'manager' | 'employee' | 'guest';
 export type WorkspaceProfile = 'developer' | 'creative' | 'marketing' | 'sales' | 'project_manager' | 'freelancer' | 'executive' | 'student' | 'professional';
 export type OrganizationType = 'business' | 'school' | 'college' | 'university';
 export type WorkGrindTheme = 'original' | 'midnight' | 'slate' | 'forest' | 'ocean' | 'sand' | 'plum' | 'high-contrast' | 'light' | 'aurora' | 'graphite' | 'dark' | 'neutral' | WorkspaceProfile;

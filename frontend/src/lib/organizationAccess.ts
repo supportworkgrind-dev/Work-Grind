@@ -23,43 +23,117 @@ export type OrganizationFeature =
   | 'memberDirectory'
   | 'workspaceSettings';
 
-type Experience = 'solo' | 'company' | 'school' | 'college' | 'university';
+export type WorkspaceExperience = 'solo' | 'company' | 'school' | 'college' | 'university';
+type Experience = WorkspaceExperience;
 
 const roleAliases: Record<string, string> = {
   founder: 'owner',
   director: 'principal',
   office_staff: 'admin',
-  'office staff': 'admin',
+  office_staff_member: 'admin',
+  office: 'admin',
+  staff: 'admin',
   faculty: 'teacher',
   guardian: 'parent',
   head_of_department: 'hod',
-  'head of department': 'hod',
+  head_of_dept: 'hod',
+  department_head: 'hod',
+  head: 'hod',
+  vc: 'vice_chancellor',
 };
 
-const BUSINESS_ROLES = new Set(['owner', 'admin', 'manager', 'employee', 'guest']);
-const EDUCATION_ROLES = new Set([
-  'owner', 'principal', 'admin', 'teacher', 'student', 'parent', 'manager', 'employee', 'guest', 'dean', 'hod',
-]);
+/**
+ * Institution titles that carry an existing role's permissions (mirrors the
+ * backend ROLE_PERMISSION_BASE): access checks use the base role.
+ */
+const ROLE_PERMISSION_BASE: Record<string, string> = {
+  vice_chancellor: 'principal',
+  professor: 'teacher',
+  lecturer: 'teacher',
+};
+
+export type WorkspaceRoleCatalog = {
+  /** Roles the owner can give members, in display order (owner is never assignable). */
+  assignable: readonly string[];
+  /** Assignable roles only the owner may give. */
+  elevated: readonly string[];
+  /** Roles earlier releases stored; existing members keep access, never offered. */
+  legacy: readonly string[];
+  /** Roles a workspace may give people joining with its invite code. */
+  joinRoles: readonly string[];
+  defaultJoinRole: string;
+};
+
+const EDUCATION_LEGACY_ROLES = ['manager', 'employee', 'guest'] as const;
+
+/**
+ * Roles each workspace type supports. Mirrors the backend WORKSPACE_ROLE_CATALOG
+ * (backend/src/config/organization.ts); a backend test keeps the two equal.
+ */
+export const WORKSPACE_ROLE_CATALOG: Record<Exclude<Experience, 'solo'>, WorkspaceRoleCatalog> = {
+  company: {
+    assignable: ['admin', 'manager', 'employee', 'guest'],
+    elevated: ['admin', 'manager'],
+    legacy: [],
+    joinRoles: ['employee', 'guest'],
+    defaultJoinRole: 'employee',
+  },
+  school: {
+    assignable: ['principal', 'admin', 'teacher', 'student', 'parent'],
+    elevated: ['principal', 'admin'],
+    legacy: EDUCATION_LEGACY_ROLES,
+    joinRoles: ['student', 'parent'],
+    defaultJoinRole: 'student',
+  },
+  college: {
+    assignable: ['principal', 'admin', 'hod', 'lecturer', 'teacher', 'student', 'parent'],
+    elevated: ['principal', 'admin', 'hod'],
+    legacy: EDUCATION_LEGACY_ROLES,
+    joinRoles: ['student', 'parent'],
+    defaultJoinRole: 'student',
+  },
+  university: {
+    assignable: ['vice_chancellor', 'admin', 'dean', 'hod', 'professor', 'lecturer', 'teacher', 'student', 'parent'],
+    elevated: ['vice_chancellor', 'admin', 'dean', 'hod'],
+    legacy: ['principal', ...EDUCATION_LEGACY_ROLES],
+    joinRoles: ['student', 'parent'],
+    defaultJoinRole: 'student',
+  },
+};
+
+const SOLO_ROLE_CATALOG: WorkspaceRoleCatalog = {
+  assignable: [], elevated: [], legacy: [], joinRoles: [], defaultJoinRole: '',
+};
+
+function catalogFor(experience: Experience | null): WorkspaceRoleCatalog {
+  return !experience || experience === 'solo' ? SOLO_ROLE_CATALOG : WORKSPACE_ROLE_CATALOG[experience];
+}
+
+/** Whether a member of this workspace kind may hold the (canonical) role, legacy roles included. */
+function isRoleEligible(experience: Experience, role: string): boolean {
+  if (role === 'owner') return true;
+  const catalog = catalogFor(experience);
+  return catalog.assignable.includes(role) || catalog.legacy.includes(role);
+}
+
 const INSTITUTION_ADMINS = new Set(['owner', 'principal', 'admin', 'dean', 'hod']);
-const DEPARTMENT_ROLES = new Set(['dean', 'hod']);
 const WORKSPACE_ADMINS_EDUCATION = new Set(['owner', 'principal', 'admin']);
 const EDUCATION_TYPES = new Set<OrganizationType>(['school', 'college', 'university']);
 
+const isEducationExperience = (experience: Experience) =>
+  experience === 'school' || experience === 'college' || experience === 'university';
+
+// Each policy receives the role's permission base (a lecturer is checked as a
+// teacher); eligibility for the workspace kind is checked before it is called.
 const FEATURE_POLICIES: Record<OrganizationFeature, (experience: Experience, role: string) => boolean> = {
   soloWorkspace: (experience, role) => experience === 'solo' && role === 'owner',
-  companyWorkspace: (experience, role) => experience === 'company' && BUSINESS_ROLES.has(role),
-  academic: (experience, role) => experience !== 'solo' && experience !== 'company' && EDUCATION_ROLES.has(role),
-  academicAdmin: (experience, role) =>
-    experience !== 'solo' && experience !== 'company' &&
-    (INSTITUTION_ADMINS.has(role) || (experience === 'university' && DEPARTMENT_ROLES.has(role))),
-  educationCommunication: (experience, role) =>
-    experience !== 'solo' && experience !== 'company' && EDUCATION_ROLES.has(role) && role !== 'guest',
-  educationMeetings: (experience, role) =>
-    experience !== 'solo' && experience !== 'company' && EDUCATION_ROLES.has(role) && role !== 'guest',
-  educationFiles: (experience, role) =>
-    experience !== 'solo' && experience !== 'company' && EDUCATION_ROLES.has(role) && role !== 'guest',
-  educationAi: (experience, role) =>
-    experience !== 'solo' && experience !== 'company' && EDUCATION_ROLES.has(role) && role !== 'guest',
+  companyWorkspace: (experience) => experience === 'company',
+  academic: (experience) => isEducationExperience(experience),
+  academicAdmin: (experience, role) => isEducationExperience(experience) && INSTITUTION_ADMINS.has(role),
+  educationCommunication: (experience, role) => isEducationExperience(experience) && role !== 'guest',
+  educationMeetings: (experience, role) => isEducationExperience(experience) && role !== 'guest',
+  educationFiles: (experience, role) => isEducationExperience(experience) && role !== 'guest',
+  educationAi: (experience, role) => isEducationExperience(experience) && role !== 'guest',
   businessCrm: (experience, role) => experience === 'company' && ['owner', 'admin', 'manager'].includes(role),
   clientPortal: (experience, role) => experience === 'company' && ['owner', 'admin', 'manager'].includes(role),
   businessAnalytics: (experience, role) => experience === 'company' && ['owner', 'admin', 'manager'].includes(role),
@@ -82,9 +156,16 @@ const FEATURE_POLICIES: Record<OrganizationFeature, (experience: Experience, rol
         WORKSPACE_ADMINS_EDUCATION.has(role),
 };
 
-function canonicalRole(role: UserRole | string | undefined): string {
+/** The stored role in canonical form (aliases resolved), e.g. "founder" → "owner". */
+export function canonicalRole(role: UserRole | string | undefined): string {
   const key = (role ?? '').trim().toLowerCase().replace(/[\s-]+/g, '_');
   return roleAliases[key] ?? key;
+}
+
+/** The role whose permissions this role carries, e.g. "lecturer" → "teacher". */
+export function permissionRole(role: UserRole | string | undefined): string {
+  const canonical = canonicalRole(role);
+  return ROLE_PERMISSION_BASE[canonical] ?? canonical;
 }
 
 const ORGANIZATION_TYPES = new Set<OrganizationType>(['business', 'school', 'college', 'university']);
@@ -137,13 +218,21 @@ export function canAccessOrganizationFeature(
 ): boolean {
   const experience = getWorkspaceExperience(organization);
   if (!experience) return false;
-  return FEATURE_POLICIES[feature](experience, canonicalRole(role));
+  const canonical = canonicalRole(role);
+  if (experience !== 'solo' && !isRoleEligible(experience, canonical)) return false;
+  return FEATURE_POLICIES[feature](experience, permissionRole(canonical));
+}
+
+/** The role definitions for the signed-in member's workspace. */
+export function getWorkspaceRoleCatalog(organization: OrganizationInfo | null | undefined): WorkspaceRoleCatalog {
+  return catalogFor(getWorkspaceExperience(organization));
 }
 
 /**
  * Roles the actor may assign when inviting or changing a member, matching the
  * backend's canAssignOrganizationRole: the workspace owner may assign any
- * non-owner role; other member managers only non-elevated ones.
+ * role the workspace type offers; administrators only non-elevated ones; a
+ * business manager only employees and guests.
  */
 export function getAssignableRoles(
   organization: OrganizationInfo | null | undefined,
@@ -153,16 +242,44 @@ export function getAssignableRoles(
   const experience = getWorkspaceExperience(organization);
   if (!experience || experience === 'solo') return [];
   if (!canAccessOrganizationFeature(organization, role, 'memberDirectory')) return [];
-  if (experience === 'company') {
-    return [...(ownsWorkspace ? ['admin', 'manager'] : []), 'employee', 'guest'];
-  }
-  return [
-    ...(ownsWorkspace ? ['principal', 'admin'] : []),
-    'teacher',
-    'student',
-    'parent',
-    ...(experience === 'university' && ownsWorkspace ? ['dean', 'hod'] : []),
-  ];
+  const catalog = catalogFor(experience);
+  if (ownsWorkspace) return [...catalog.assignable];
+  const base = permissionRole(role);
+  const actsAsAdmin = isEducationExperience(experience) ? INSTITUTION_ADMINS.has(base) : base === 'admin' || base === 'manager';
+  return catalog.assignable.filter((target) => {
+    if (catalog.elevated.includes(target)) return false;
+    if (actsAsAdmin) return true;
+    return base === 'manager' && ['employee', 'guest'].includes(target);
+  });
+}
+
+/** Whether the role is one this workspace type offers (legacy titles are not). */
+export function isAssignableWorkspaceRole(organization: OrganizationInfo | null | undefined, role: string | undefined): boolean {
+  return getWorkspaceRoleCatalog(organization).assignable.includes(canonicalRole(role));
+}
+
+/** The invite-code role: the saved default when the workspace type allows it, else the type's default. */
+export function resolveDefaultJoinRole(organization: OrganizationInfo | null | undefined, savedDefaultRole: string | undefined): string {
+  const catalog = getWorkspaceRoleCatalog(organization);
+  const saved = canonicalRole(savedDefaultRole);
+  return catalog.joinRoles.includes(saved) ? saved : catalog.defaultJoinRole;
+}
+
+/**
+ * Message key for a role's title in this workspace type: "admin" reads
+ * "School Admin" in a school, and "hod" reads "Department Head" in a college.
+ * Keys live under common.roles / common.roleTitles.<type>.
+ */
+export function roleLabelKey(role: UserRole | string | undefined, organization: OrganizationInfo | null | undefined): string {
+  const canonical = canonicalRole(role);
+  const experience = getWorkspaceExperience(organization);
+  const specific: Partial<Record<Experience, readonly string[]>> = {
+    school: ['admin'],
+    college: ['admin', 'hod', 'teacher'],
+    university: ['admin'],
+  };
+  if (experience && specific[experience]?.includes(canonical)) return `common.roleTitles.${experience}.${canonical}`;
+  return `common.roles.${canonical}`;
 }
 
 export function isWorkspaceOwnerRole(role: UserRole | string | undefined): boolean {
@@ -285,10 +402,10 @@ export function canAccessAcademicSection(
   section: string,
   organizationType?: OrganizationType,
 ): boolean {
-  const roleKey = canonicalRole(role);
+  const roleKey = permissionRole(role);
   if (!organizationType || !EDUCATION_TYPES.has(organizationType)) return false;
-  if (INSTITUTION_ADMINS.has(roleKey) ||
-      (organizationType === 'university' && DEPARTMENT_ROLES.has(roleKey))) return true;
+  if (!isRoleEligible(organizationType as 'school' | 'college' | 'university', canonicalRole(role))) return false;
+  if (INSTITUTION_ADMINS.has(roleKey)) return true;
   if (roleKey === 'teacher') {
     return ['overview', 'students', 'timetable', 'assignments', 'attendance', 'exams', 'results'].includes(section);
   }
@@ -299,4 +416,30 @@ export function canAccessAcademicSection(
     return ['overview', 'timetable', 'attendance', 'results', 'fees'].includes(section);
   }
   return false;
+}
+
+/**
+ * Whether the member administers the workspace or a department, so only the
+ * owner may change or suspend them (mirrors the backend's member checks).
+ */
+export function isElevatedWorkspaceRole(role: UserRole | string | undefined): boolean {
+  return ['owner', 'admin', 'manager', 'principal', 'dean', 'hod'].includes(permissionRole(role));
+}
+
+/**
+ * Members who manage shared workspace spaces such as chat channels: business
+ * owners, admins and managers; institution administrators, deans and heads of
+ * department (mirrors the backend's requireRole('owner', 'admin', 'manager')).
+ */
+export function isWorkspaceManagerRole(
+  organization: OrganizationInfo | null | undefined,
+  role: UserRole | string | undefined,
+): boolean {
+  const experience = getWorkspaceExperience(organization);
+  if (!experience) return false;
+  const canonical = canonicalRole(role);
+  if (experience !== 'solo' && !isRoleEligible(experience, canonical)) return false;
+  const base = permissionRole(canonical);
+  if (isEducationExperience(experience)) return INSTITUTION_ADMINS.has(base) || base === 'manager';
+  return ['owner', 'admin', 'manager'].includes(base);
 }

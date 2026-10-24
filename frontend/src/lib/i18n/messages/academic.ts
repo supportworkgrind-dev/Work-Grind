@@ -59,6 +59,8 @@ export const academic = defineMessages(
       heading: 'Add department',
       submit: 'Add department',
       empty: 'No departments yet.',
+      leaders: '{{code}} · {{leaders}}',
+      unassigned: '{{code}} · No head assigned',
     },
     people: {
       heading: 'Register a person',
@@ -206,6 +208,8 @@ export const academic = defineMessages(
       method: 'Method',
       parentGuardian: 'Parent / guardian',
       relationship: 'Relationship',
+      departmentHeads: 'Heads of department',
+      deans: 'Deans',
     },
     select: {
       department: 'Select department',
@@ -330,6 +334,8 @@ export const academic = defineMessages(
       heading: 'شعبہ شامل کریں',
       submit: 'شعبہ شامل کریں',
       empty: 'ابھی کوئی شعبہ نہیں۔',
+      leaders: '{{code}} · {{leaders}}',
+      unassigned: '{{code}} · کوئی سربراہ مقرر نہیں',
     },
     people: {
       heading: 'فرد کا اندراج کریں',
@@ -477,6 +483,8 @@ export const academic = defineMessages(
       method: 'طریقہ',
       parentGuardian: 'والدین / سرپرست',
       relationship: 'رشتہ',
+      departmentHeads: 'صدورِ شعبہ',
+      deans: 'ڈینز',
     },
     select: {
       department: 'شعبہ منتخب کریں',

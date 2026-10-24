@@ -1289,7 +1289,7 @@ export default function SheetsPage() {
       const workbook = new ExcelJS.Workbook();
       const usedNames = new Set<string>();
       activeWorkbook.sheets.forEach((sheet) => {
-        const worksheet = workbook.addWorksheet(excelSheetTitle(sheet.title, usedNames));
+        const worksheet = workbook.addWorksheet(excelSheetTitle(sheet.title, usedNames, t('defaults.sheetTitle')));
         sheet.data.forEach((row, rowIndex) => {
           const excelRow = worksheet.addRow(row.map((value) =>
             value.startsWith('=') ? { formula: value.slice(1) } : value,
@@ -1981,7 +1981,7 @@ export default function SheetsPage() {
                           const rawValue = activeSheet.data[row]?.[column] ?? '';
                           const displayValue = row === selectedCell.row && column === selectedCell.column && rawValue.startsWith('=')
                             ? rawValue
-                            : formattedCell(formulaCellValue(row, column), style.numberFormat);
+                            : formattedCell(formulaCellValue(row, column), style.numberFormat, { formatNumber, formatDate });
                           const leftOffset = column < (activeSheet.frozenColumns ?? 0)
                             ? 48 + Array.from({ length: column }, (_, index) => columnWidths[index] ?? 112).reduce((sum, width) => sum + width, 0)
                             : undefined;
