@@ -30,6 +30,7 @@ import {
 import { formatTimeAgo, getInitials } from '@/lib/utils';
 import { useSyncStore } from '@/store/useSyncStore';
 import { ThemeAwareLogo } from '@/components/common/ThemeAwareLogo';
+import { useT } from '@/lib/i18n';
 
 const notifIcons: Record<string, React.ReactNode> = {
   message:       <MessageSquare className="h-4 w-4 theme-text-secondary" />,
@@ -53,6 +54,7 @@ export const Navbar = memo(function Navbar() {
   const pendingCount    = useSyncStore((s) => s.pendingCount);
   const isSyncing       = useSyncStore((s) => s.isSyncing);
   const userId          = user?._id;
+  const t               = useT('shell');
 
   const [showCreate,       setShowCreate]       = useState(false);
   const [showNotifs,       setShowNotifs]       = useState(false);
@@ -145,13 +147,13 @@ export const Navbar = memo(function Navbar() {
         {/* Sidebar toggle */}
         <button
           onClick={toggleSidebar}
-          aria-label="Toggle sidebar"
+          aria-label={t('navbar.toggleSidebar')}
           className="rounded-xl p-2 theme-text-secondary hover:theme-bg-hover transition-colors focus-ring shrink-0"
         >
           <Menu className="h-5 w-5" />
         </button>
 
-        <Link href="/dashboard" aria-label="WorkGrind home" className="shrink-0">
+        <Link href="/dashboard" aria-label={t('navbar.home')} className="shrink-0">
           <span className="hidden sm:block">
             <ThemeAwareLogo size="sm" />
           </span>
@@ -163,14 +165,14 @@ export const Navbar = memo(function Navbar() {
         {/* Search trigger */}
         <button
           onClick={() => setSearchOpen(true)}
-          aria-label="Open search (Ctrl+K)"
+          aria-label={t('navbar.openSearch')}
           className="navbar-search flex h-10 items-center gap-2 rounded-xl border theme-border theme-bg-input
                      px-3 text-xs theme-text-muted hover:theme-bg-hover
                      transition-all duration-150 shadow-xs
                      w-28 sm:w-44 md:w-64 lg:w-80"
         >
           <Search className="h-3.5 w-3.5 shrink-0 theme-text-muted" />
-          <span className="hidden xs:inline flex-1 text-left">Search anything...</span>
+          <span className="hidden xs:inline flex-1 text-start">{t('navbar.searchPlaceholder')}</span>
           <kbd
             className="hidden sm:inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-semibold shrink-0"
             style={{ borderColor: 'var(--border-color)', color: 'var(--text-muted)', background: 'var(--bg-base)' }}
@@ -193,9 +195,9 @@ export const Navbar = memo(function Navbar() {
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75" />
             <span className="relative inline-flex h-2 w-2 rounded-full bg-rose-500" />
           </span>
-          <span className="truncate">Live: {activeLiveMeeting.title}</span>
+          <span className="truncate">{t('navbar.live', { title: activeLiveMeeting.title })}</span>
           <span className="shrink-0 rounded-md bg-rose-500 px-1.5 py-0.5 text-[10px] text-white font-bold">
-            Join
+            {t('navbar.join')}
           </span>
         </Link>
       )}
@@ -207,17 +209,17 @@ export const Navbar = memo(function Navbar() {
           {isSyncing ? (
             <div className="flex items-center gap-1.5 rounded-xl px-2.5 py-1 text-[11px] font-semibold text-blue-600 border border-blue-200/60 bg-blue-50">
               <RotateCw className="h-3 w-3 animate-spin" />
-              <span>Syncing</span>
+              <span>{t('navbar.syncing')}</span>
             </div>
           ) : !isOnline ? (
             <div className="flex items-center gap-1.5 rounded-xl px-2.5 py-1 text-[11px] font-semibold text-amber-700 border border-amber-200/60 bg-amber-50">
               <WifiOff className="h-3 w-3" />
-              <span>Offline{pendingCount > 0 ? ` · ${pendingCount}` : ''}</span>
+              <span>{pendingCount > 0 ? t('navbar.offlinePending', { count: pendingCount }) : t('navbar.offline')}</span>
             </div>
           ) : (
             <div className="flex items-center gap-1.5 px-2 py-1 rounded-xl">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-              <span className="text-[11px] font-medium hidden lg:inline theme-text-muted">Online</span>
+              <span className="text-[11px] font-medium hidden lg:inline theme-text-muted">{t('navbar.online')}</span>
             </div>
           )}
         </div>
@@ -231,40 +233,40 @@ export const Navbar = memo(function Navbar() {
             className="btn-primary h-9 px-3 sm:px-3.5 gap-1.5"
           >
             <Plus className="h-3.5 w-3.5 shrink-0" />
-            <span className="hidden sm:inline">New</span>
+            <span className="hidden sm:inline">{t('navbar.new')}</span>
             <ChevronDown className={`h-3 w-3 opacity-70 transition-transform duration-150 ${showCreate ? 'rotate-180' : ''}`} />
           </button>
 
           {showCreate && (
             <div
-              className="absolute right-0 top-full mt-2 w-52 rounded-2xl border p-1.5 shadow-float z-50 animate-scale-in"
+              className="absolute end-0 top-full mt-2 w-52 rounded-2xl border p-1.5 shadow-float z-50 animate-scale-in"
               style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}
               role="menu"
             >
-              <p className="section-label px-3 pt-1.5 pb-1">Create new</p>
+              <p className="section-label px-3 pt-1.5 pb-1">{t('navbar.createNew')}</p>
 
               {isOwnerAdmin && canAccessRoute(company, user?.role, '/tasks') && (
                 <>
                   <MenuAction
                     icon={<CheckSquare className="h-4 w-4 theme-text-secondary" />}
-                    label="Task"
+                    label={t('navbar.createTask')}
                     onClick={() => { openCreateModal('task'); setShowCreate(false); }}
                   />
                   <MenuAction
                     icon={<Briefcase className="h-4 w-4 theme-text-secondary" />}
-                    label="Project"
+                    label={t('navbar.createProject')}
                     onClick={() => { openCreateModal('project'); setShowCreate(false); }}
                   />
                   {canAccessRoute(company, user?.role, '/chat') && <MenuAction
                     icon={<Hash className="h-4 w-4 theme-text-secondary" />}
-                    label="Channel"
+                    label={t('navbar.createChannel')}
                     onClick={() => { openCreateModal('channel'); setShowCreate(false); }}
                   />}
                 </>
               )}
               {canAccessRoute(company, user?.role, '/meetings') && <MenuAction
                 icon={<Video className="h-4 w-4 theme-text-secondary" />}
-                label="Meeting"
+                label={t('navbar.createMeeting')}
                 onClick={() => { openCreateModal('meeting'); setShowCreate(false); }}
               />}
             </div>
@@ -275,14 +277,14 @@ export const Navbar = memo(function Navbar() {
         <div className="relative" ref={notifsRef}>
           <button
             onClick={() => setShowNotifs((p) => !p)}
-            aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`}
+            aria-label={unreadCount > 0 ? t('navbar.notificationsUnread', { count: unreadCount }) : t('navbar.notifications')}
             aria-expanded={showNotifs}
             className="relative rounded-xl p-2 theme-text-secondary hover:theme-bg-hover transition-colors focus-ring"
           >
             <Bell className="h-5 w-5" />
             {unreadCount > 0 && (
               <span
-                className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center
+                className="absolute top-1 end-1 flex h-4 w-4 items-center justify-center
                            rounded-full bg-rose-500 text-[9px] font-bold text-white
                            ring-2"
                 style={{ '--tw-ring-color': 'var(--bg-navbar)' } as React.CSSProperties}
@@ -294,15 +296,15 @@ export const Navbar = memo(function Navbar() {
 
           {showNotifs && (
             <div
-              className="absolute right-0 top-full mt-2 w-80 sm:w-96 rounded-2xl border shadow-float z-50 overflow-hidden animate-scale-in"
+              className="absolute end-0 top-full mt-2 w-80 sm:w-96 rounded-2xl border shadow-float z-50 overflow-hidden animate-scale-in"
               style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}
               role="dialog"
-              aria-label="Notifications"
+              aria-label={t('navbar.notifications')}
             >
               {/* Header */}
               <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: 'var(--border-subtle)', background: 'var(--bg-base)' }}>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold theme-text-primary">Notifications</span>
+                  <span className="text-xs font-bold theme-text-primary">{t('navbar.notifications')}</span>
                   {unreadCount > 0 && (
                     <span className="badge badge-rose">{unreadCount}</span>
                   )}
@@ -314,10 +316,10 @@ export const Navbar = memo(function Navbar() {
                       className="flex items-center gap-1 text-[11px] font-medium text-indigo-600 hover:text-indigo-700 px-2 py-1 rounded-lg hover:bg-indigo-50 transition-colors"
                     >
                       <CheckCircle2 className="h-3 w-3" />
-                      <span>Read all</span>
+                      <span>{t('navbar.readAll')}</span>
                     </button>
                   )}
-                  <button onClick={() => setShowNotifs(false)} className="rounded-lg p-1 hover:theme-bg-hover transition-colors theme-text-muted">
+                  <button onClick={() => setShowNotifs(false)} aria-label={t('navbar.closeNotifications')} className="rounded-lg p-1 hover:theme-bg-hover transition-colors theme-text-muted">
                     <X className="h-3.5 w-3.5" />
                   </button>
                 </div>
@@ -328,7 +330,7 @@ export const Navbar = memo(function Navbar() {
                 {notifications.length === 0 ? (
                   <div className="py-10 text-center">
                     <Bell className="mx-auto h-8 w-8 theme-text-muted mb-2 opacity-40" />
-                    <p className="text-xs theme-text-muted">You're all caught up</p>
+                    <p className="text-xs theme-text-muted">{t('navbar.allCaughtUp')}</p>
                   </div>
                 ) : (
                   notifications.map((n) => (
@@ -364,8 +366,8 @@ export const Navbar = memo(function Navbar() {
                   onClick={() => setShowNotifs(false)}
                   className="flex items-center justify-center gap-1.5 text-xs font-semibold text-indigo-600 hover:text-indigo-700 py-1 transition-colors"
                 >
-                  View all notifications
-                  <ArrowRight className="h-3.5 w-3.5" />
+                  {t('navbar.viewAllNotifications')}
+                  <ArrowRight className="rtl-mirror h-3.5 w-3.5" />
                 </Link>
               </div>
             </div>
@@ -375,7 +377,7 @@ export const Navbar = memo(function Navbar() {
         {/* ── User Avatar ── */}
         <Link
           href="/settings"
-          aria-label="Account settings"
+          aria-label={t('navbar.accountSettings')}
           className="flex h-8 w-8 items-center justify-center rounded-xl overflow-hidden text-xs font-bold
                      transition-all hover:ring-2 focus-ring shrink-0"
           style={{
@@ -385,7 +387,7 @@ export const Navbar = memo(function Navbar() {
           } as React.CSSProperties}
         >
           {user?.avatar
-            ? <img src={user.avatar} alt="Avatar" className="h-full w-full object-cover" />
+            ? <img src={user.avatar} alt={t('navbar.avatar')} className="h-full w-full object-cover" />
             : <span>{getInitials(user?.fullName || 'U')}</span>
           }
         </Link>

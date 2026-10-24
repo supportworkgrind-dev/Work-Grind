@@ -1001,7 +1001,7 @@ body {
   }
 
   /* ── DATA TABLE ── */
-  .data-table { @apply w-full text-left text-xs; }
+  .data-table { @apply w-full text-start text-xs; }
   .data-table thead tr {
     @apply border-b;
     border-color: var(--border-subtle);

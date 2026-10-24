@@ -50,10 +50,10 @@ export const ur: Translations = {
     headline3:   '',
     subheadline: 'WorkGrind ذاتی پیداواری صلاحیت، کاروباری تعاون اور تعلیمی انتظام کے لیے الگ ورک اسپیس تجربات فراہم کرتا ہے۔',
     stats: {
-      workspaces: 'Solo',
-      messages:   'Company',
-      tasks:      'School / Academy',
-      uptime:     'College / University',
+      workspaces: 'سولو',
+      messages:   'کمپنی',
+      tasks:      'اسکول / اکیڈمی',
+      uptime:     'کالج / یونیورسٹی',
     },
     story: {
       heading: 'ہر کام کے لیے موزوں ورک اسپیس',

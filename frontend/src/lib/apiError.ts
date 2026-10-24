@@ -45,6 +45,8 @@ function responseBody(data: unknown): { message?: string; code?: string } {
   return data && typeof data === 'object' ? data as { message?: string; code?: string } : {};
 }
 
+const DEFAULT_FALLBACK = 'Something went wrong. Please try again.';
+
 const KIND_MESSAGE_KEYS: Record<ApiErrorKind, string> = {
   forbidden: 'common.errors.forbidden',
   plan: 'common.apiCodes.PLAN_UPGRADE_REQUIRED',
@@ -70,8 +72,6 @@ function localizedMessage(info: ApiErrorInfo, code: string | undefined, serverMe
   }
   return translate(KIND_MESSAGE_KEYS[info.kind]);
 }
-
-const DEFAULT_FALLBACK = 'Something went wrong. Please try again.';
 
 export function describeApiError(error: unknown, fallback = DEFAULT_FALLBACK): ApiErrorInfo {
   const failure = (error && typeof error === 'object' ? error : {}) as AxiosLike;

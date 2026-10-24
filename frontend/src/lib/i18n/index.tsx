@@ -29,7 +29,7 @@ import { zh } from './translations/zh';
 import { appMessagesEn, appMessagesUr, type NamespaceMessages, type NamespaceName } from './messages';
 import {
   DEFAULT_LANG, LANG_COOKIE, LANG_STORAGE_KEY, LOCALE_TAGS,
-  directionOf, isLangCode, resolveMessage, setActiveLanguage,
+  directionOf, isLangCode, resolveMessage, resolveOptionalMessage, setActiveLanguage,
   formatCurrency as formatCurrencyIn, formatDate as formatDateIn, formatNumber as formatNumberIn,
   formatRelativeTime as formatRelativeTimeIn, formatTime as formatTimeIn,
   type LangCode, type MessagePath, type TranslateVars,
@@ -103,6 +103,8 @@ interface I18nContextValue extends Formatters {
   setLang: (code: LangCode) => void;
   /** Translate any dot-path key, with optional {{variable}} interpolation. */
   t: (key: string, vars?: TranslateVars) => string;
+  /** Like t(), but undefined when no language defines the key (labels for server-sent values). */
+  tOptional: (key: string, vars?: TranslateVars) => string | undefined;
   /** Marketing dictionary object — prefer t() */
   translations: Translations;
 }
@@ -123,6 +125,7 @@ const I18nContext = createContext<I18nContextValue>({
   locale: LOCALE_TAGS[DEFAULT_LANG],
   setLang: () => {},
   t: (key, vars) => resolveMessage(DICTIONARIES, DEFAULT_LANG, key, vars),
+  tOptional: (key, vars) => resolveOptionalMessage(DICTIONARIES, DEFAULT_LANG, key, vars),
   translations: en,
   ...createFormatters(DEFAULT_LANG),
 });
@@ -163,6 +166,7 @@ export function I18nProvider({ children, initialLang = DEFAULT_LANG }: { childre
     locale: LOCALE_TAGS[lang],
     setLang,
     t: (key, vars) => resolveMessage(DICTIONARIES, lang, key, vars),
+    tOptional: (key, vars) => resolveOptionalMessage(DICTIONARIES, lang, key, vars),
     translations: MARKETING[lang],
     ...createFormatters(lang),
   }), [lang, setLang]);

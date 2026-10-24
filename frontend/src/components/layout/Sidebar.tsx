@@ -39,6 +39,7 @@ import { getInitials } from '@/lib/utils';
 import { useState, memo, useCallback, useMemo, useEffect } from 'react';
 import { ThemeAwareLogo } from '@/components/common/ThemeAwareLogo';
 import { ACADEMIC_SECTIONS } from '@/lib/academicSections';
+import { useI18n, useT, type NamespaceKey } from '@/lib/i18n';
 import {
   canAccessAcademicSection,
   canAccessRoute,
@@ -46,7 +47,9 @@ import {
 } from '@/lib/organizationAccess';
 
 type SidebarNavItem = {
+  /** Stable id (React key) and message key under shell.sidebar.items or academic.sections. */
   name: string;
+  labelKey: string;
   href: string;
   icon: LucideIcon;
   entitlement?: EntitlementId;
@@ -54,69 +57,70 @@ type SidebarNavItem = {
   ownerOrAdmin?: boolean;
 };
 
-type SidebarSection = { name: string; items: readonly SidebarNavItem[]; educationOnly?: boolean };
+type SidebarSection = { name: NamespaceKey<'shell'>; items: readonly SidebarNavItem[]; educationOnly?: boolean };
 
 const navSections: readonly SidebarSection[] = [
   {
-    name: 'WORKSPACE',
+    name: 'sidebar.sections.workspace',
     items: [
-      { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
-      { name: 'Daily Focus', href: '/daily-focus', icon: Target, entitlement: 'aiAssistant' },
-      { name: 'Tasks', href: '/tasks', icon: CheckSquare, entitlement: 'tasksProjects' },
-      { name: 'Projects', href: '/projects', icon: FolderKanban, entitlement: 'tasksProjects' },
-      { name: 'Calendar', href: '/calendar', icon: Calendar, entitlement: 'meetingsCalendar' },
+      { name: 'overview', labelKey: 'shell.sidebar.items.overview', href: '/dashboard', icon: LayoutDashboard },
+      { name: 'dailyFocus', labelKey: 'shell.sidebar.items.dailyFocus', href: '/daily-focus', icon: Target, entitlement: 'aiAssistant' },
+      { name: 'tasks', labelKey: 'shell.sidebar.items.tasks', href: '/tasks', icon: CheckSquare, entitlement: 'tasksProjects' },
+      { name: 'projects', labelKey: 'shell.sidebar.items.projects', href: '/projects', icon: FolderKanban, entitlement: 'tasksProjects' },
+      { name: 'calendar', labelKey: 'shell.sidebar.items.calendar', href: '/calendar', icon: Calendar, entitlement: 'meetingsCalendar' },
     ],
   },
   {
-    name: 'EDUCATION',
+    name: 'sidebar.sections.education',
     educationOnly: true,
     items: ACADEMIC_SECTIONS.map((section) => ({
-      name: section.label,
+      name: section.id,
+      labelKey: `academic.sections.${section.id}`,
       href: `/academic?section=${section.id}`,
       icon: section.id === 'overview' ? LayoutDashboard : Users2,
     })),
   },
   {
-    name: 'CUSTOMERS',
+    name: 'sidebar.sections.customers',
     items: [
-      { name: 'CRM', href: '/crm', icon: Users, entitlement: 'crm' },
-      { name: 'Client Portal', href: '/client-portal-mgmt', icon: ShieldCheck, managerOrAbove: true },
+      { name: 'crm', labelKey: 'shell.sidebar.items.crm', href: '/crm', icon: Users, entitlement: 'crm' },
+      { name: 'clientPortal', labelKey: 'shell.sidebar.items.clientPortal', href: '/client-portal-mgmt', icon: ShieldCheck, managerOrAbove: true },
     ],
   },
   {
-    name: 'COLLABORATE',
+    name: 'sidebar.sections.collaborate',
     items: [
-      { name: 'Chat', href: '/chat', icon: MessageSquare, entitlement: 'teamChat' },
-      { name: 'Meetings', href: '/meetings', icon: Calendar, entitlement: 'meetingsCalendar' },
+      { name: 'chat', labelKey: 'shell.sidebar.items.chat', href: '/chat', icon: MessageSquare, entitlement: 'teamChat' },
+      { name: 'meetings', labelKey: 'shell.sidebar.items.meetings', href: '/meetings', icon: Calendar, entitlement: 'meetingsCalendar' },
 
-      { name: 'Global Calling', href: '/calling', icon: PhoneCall },
-      { name: 'Whiteboard', href: '/whiteboard', icon: Paintbrush2 },
-      { name: 'Docs', href: '/docs', icon: FileText, entitlement: 'fileStorage' },
+      { name: 'calling', labelKey: 'shell.sidebar.items.calling', href: '/calling', icon: PhoneCall },
+      { name: 'whiteboard', labelKey: 'shell.sidebar.items.whiteboard', href: '/whiteboard', icon: Paintbrush2 },
+      { name: 'docs', labelKey: 'shell.sidebar.items.docs', href: '/docs', icon: FileText, entitlement: 'fileStorage' },
     ],
   },
   {
-    name: 'RESOURCES',
+    name: 'sidebar.sections.resources',
     items: [
-      { name: 'Files', href: '/files', icon: Folder, entitlement: 'fileStorage' },
-      { name: 'Sheets', href: '/sheets', icon: Table2, entitlement: 'fileStorage' },
-      { name: 'Analytics', href: '/analytics', icon: BarChart3, entitlement: 'advancedAnalytics' },
-      { name: 'Automation', href: '/workflows', icon: Workflow },
-      { name: 'Social Publishing', href: '/social-publishing', icon: Share2 },
+      { name: 'files', labelKey: 'shell.sidebar.items.files', href: '/files', icon: Folder, entitlement: 'fileStorage' },
+      { name: 'sheets', labelKey: 'shell.sidebar.items.sheets', href: '/sheets', icon: Table2, entitlement: 'fileStorage' },
+      { name: 'analytics', labelKey: 'shell.sidebar.items.analytics', href: '/analytics', icon: BarChart3, entitlement: 'advancedAnalytics' },
+      { name: 'automation', labelKey: 'shell.sidebar.items.automation', href: '/workflows', icon: Workflow },
+      { name: 'socialPublishing', labelKey: 'shell.sidebar.items.socialPublishing', href: '/social-publishing', icon: Share2 },
     ],
   },
   {
-    name: 'INTELLIGENCE',
+    name: 'sidebar.sections.intelligence',
     items: [
-      { name: 'Tavro AI', href: '/ai', icon: Sparkles, entitlement: 'aiAssistant' },
+      { name: 'tavro', labelKey: 'shell.sidebar.items.tavro', href: '/ai', icon: Sparkles, entitlement: 'aiAssistant' },
     ],
   },
   {
-    name: 'ADMIN',
+    name: 'sidebar.sections.admin',
     items: [
-      { name: 'Team', href: '/team', icon: Users2 },
-      { name: 'Notifications', href: '/notifications', icon: Bell },
-      { name: 'Billing', href: '/billing', icon: CreditCard },
-      { name: 'Settings', href: '/settings', icon: Settings },
+      { name: 'team', labelKey: 'shell.sidebar.items.team', href: '/team', icon: Users2 },
+      { name: 'notifications', labelKey: 'shell.sidebar.items.notifications', href: '/notifications', icon: Bell },
+      { name: 'billing', labelKey: 'shell.sidebar.items.billing', href: '/billing', icon: CreditCard },
+      { name: 'settings', labelKey: 'shell.sidebar.items.settings', href: '/settings', icon: Settings },
     ],
   },
 ];
@@ -128,12 +132,6 @@ const statusColors = {
   offline: 'bg-slate-300',
 } as const;
 
-const statusLabels = {
-  online:  'Online',
-  away:    'Away',
-  busy:    'Do not disturb',
-  offline: 'Appear offline',
-} as const;
 
 // ── Granular selectors — each sub-component only re-renders for its own data ─
 export const Sidebar = memo(function Sidebar() {
@@ -149,6 +147,9 @@ export const Sidebar = memo(function Sidebar() {
   const isSidebarOpen  = useAppStore((s) => s.isSidebarOpen);
   const setSidebarOpen = useAppStore((s) => s.setSidebarOpen);
   const [showStatusMenu, setShowStatusMenu] = useState(false);
+  const t = useT('shell');
+  const { t: translate, tOptional } = useI18n();
+  const roleLabel = (role?: string) => (role ? tOptional(`common.roles.${role}`) ?? role : '');
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
@@ -203,15 +204,15 @@ export const Sidebar = memo(function Sidebar() {
       {isMobile && isSidebarOpen && (
         <button
           type="button"
-          aria-label="Close sidebar"
+          aria-label={t('sidebar.closeSidebar')}
           onClick={() => setSidebarOpen(false)}
           className="fixed inset-0 z-30 bg-slate-950/45 backdrop-blur-[1px] lg:hidden"
         />
       )}
       <aside
-        className={`workspace-sidebar fixed inset-y-0 left-0 z-40 flex flex-col border-r theme-bg-sidebar theme-border transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]
+        className={`workspace-sidebar fixed inset-y-0 start-0 z-40 flex flex-col border-e theme-bg-sidebar theme-border transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]
           ${isMobile ? 'w-[82vw] max-w-[280px]' : isSidebarOpen ? 'w-64' : 'w-[4.5rem]'}
-          ${isMobile ? (isSidebarOpen ? 'translate-x-0' : '-translate-x-full') : 'translate-x-0'}`}
+          ${isMobile ? (isSidebarOpen ? 'translate-x-0' : '-translate-x-full rtl:translate-x-full') : 'translate-x-0'}`}
         style={{ boxShadow: isSidebarOpen ? 'var(--shadow-sm)' : 'none' }}
       >
       {/* ── WORKSPACE HEADER ── */}
@@ -221,7 +222,7 @@ export const Sidebar = memo(function Sidebar() {
           className="flex h-9 w-9 shrink-0 items-center justify-center"
         >
           {company?.logo ? (
-            <img src={company.logo} alt="Workspace logo" className="h-9 w-9 object-contain" />
+            <img src={company.logo} alt={t('sidebar.workspaceLogo')} className="h-9 w-9 object-contain" />
           ) : (
             <ThemeAwareLogo size="sm" showWordmark={false} surface="auto" />
           )}
@@ -233,13 +234,13 @@ export const Sidebar = memo(function Sidebar() {
               {company?.name || 'WorkGrind'}
             </span>
             <span className="text-[10px] font-semibold uppercase tracking-wider leading-tight mt-0.5 theme-text-muted">
-              {company?.accountType === 'individual' ? 'Personal workspace' : user?.role ?? 'Workspace'}
+              {company?.accountType === 'individual' ? t('sidebar.personalWorkspace') : roleLabel(user?.role) || t('sidebar.workspace')}
             </span>
           </div>
         )}
 
         {isSidebarOpen && (
-          <ChevronRight className="h-3.5 w-3.5 theme-text-muted shrink-0 opacity-40" />
+          <ChevronRight className="rtl-mirror h-3.5 w-3.5 theme-text-muted shrink-0 opacity-40" />
         )}
       </div>
 
@@ -253,12 +254,13 @@ export const Sidebar = memo(function Sidebar() {
             <section key={section.name}>
               {isSidebarOpen && (
                 <span className="section-label block px-3 pb-1 pt-1.5 text-[9px] font-semibold">
-                  {section.name}
+                  {t(section.name)}
                 </span>
               )}
               <div className="space-y-0.5">
           {section.items.map((item) => {
             const Icon = item.icon;
+            const label = translate(item.labelKey);
             const [itemPath, itemQuery] = item.href.split('?');
             const itemSection = itemQuery ? new URLSearchParams(itemQuery).get('section') : null;
             const isAcademicItem = itemPath === '/academic' && itemSection !== null;
@@ -272,8 +274,8 @@ export const Sidebar = memo(function Sidebar() {
                 href={item.href}
                 prefetch={true}
                 onClick={() => { if (isMobile) setSidebarOpen(false); }}
-                title={!isSidebarOpen ? item.name : undefined}
-                aria-label={item.name}
+                title={!isSidebarOpen ? label : undefined}
+                aria-label={label}
                 aria-current={isActive ? 'page' : undefined}
                 className={`
                   group relative flex items-center gap-3 rounded-xl
@@ -284,7 +286,7 @@ export const Sidebar = memo(function Sidebar() {
               >
                 {isActive && (
                   <span
-                    className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-full"
+                    className="absolute start-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-full"
                     style={{ background: 'var(--accent)' }}
                   />
                 )}
@@ -296,11 +298,11 @@ export const Sidebar = memo(function Sidebar() {
                 />
 
                 {isSidebarOpen && (
-                  <span className="flex-1 truncate text-[13px] font-medium">{item.name}</span>
+                  <span className="flex-1 truncate text-[13px] font-medium">{label}</span>
                 )}
 
                 {!isSidebarOpen && (
-                  <span className="nav-tooltip">{item.name}</span>
+                  <span className="nav-tooltip">{label}</span>
                 )}
               </Link>
             );
@@ -330,12 +332,12 @@ export const Sidebar = memo(function Sidebar() {
                 style={{ background: 'var(--accent-subtle)', color: 'var(--accent-text)' }}
               >
                 {user?.avatar
-                  ? <img src={user.avatar} alt="Avatar" className="h-8 w-8 object-cover" />
+                  ? <img src={user.avatar} alt={t('sidebar.avatar')} className="h-8 w-8 object-cover" />
                   : <span>{getInitials(user?.fullName || 'U')}</span>
                 }
               </div>
               <span
-                className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ring-2 ${statusColors[userStatus]}`}
+                className={`absolute -bottom-0.5 -end-0.5 h-2.5 w-2.5 rounded-full ring-2 ${statusColors[userStatus]}`}
                 style={{ '--tw-ring-color': 'var(--bg-sidebar)' } as React.CSSProperties}
               />
             </div>
@@ -344,10 +346,10 @@ export const Sidebar = memo(function Sidebar() {
               <>
                 <div className="flex min-w-0 flex-1 flex-col">
                   <span className="truncate text-[12px] font-semibold theme-text-primary leading-tight">
-                    {user?.fullName || 'My Account'}
+                    {user?.fullName || t('sidebar.myAccount')}
                   </span>
                   <span className="truncate text-[10px] theme-text-muted leading-tight capitalize">
-                    {user?.jobTitle || user?.role || 'Team Member'}
+                    {user?.jobTitle || roleLabel(user?.role) || t('sidebar.teamMember')}
                   </span>
                 </div>
                 <ChevronDown className={`h-3.5 w-3.5 theme-text-muted shrink-0 transition-transform duration-150 ${showStatusMenu ? 'rotate-180' : ''}`} />
@@ -357,7 +359,7 @@ export const Sidebar = memo(function Sidebar() {
 
           {showStatusMenu && (
             <div
-              className="absolute bottom-full left-0 mb-2 w-56 rounded-2xl border p-2 shadow-xl z-50 animate-scale-in"
+              className="absolute bottom-full start-0 mb-2 w-56 rounded-2xl border p-2 shadow-xl z-50 animate-scale-in"
               style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}
               role="menu"
             >
@@ -377,7 +379,7 @@ export const Sidebar = memo(function Sidebar() {
                 </div>
               </div>
 
-              <p className="section-label px-2.5 py-1.5">Set status</p>
+              <p className="section-label px-2.5 py-1.5">{t('sidebar.setStatus')}</p>
 
               {(['online', 'away', 'busy', 'offline'] as const).map((st) => (
                 <button
@@ -389,7 +391,7 @@ export const Sidebar = memo(function Sidebar() {
                   style={{ color: 'var(--text-secondary)' }}
                 >
                   <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${statusColors[st]}`} />
-                  <span className="flex-1 text-left">{statusLabels[st]}</span>
+                  <span className="flex-1 text-start">{t(`sidebar.status.${st}`)}</span>
                   {userStatus === st && (
                     <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--accent)' }} />
                   )}
@@ -404,7 +406,7 @@ export const Sidebar = memo(function Sidebar() {
                 className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-rose-500 hover:bg-rose-50 transition-all"
               >
                 <LogOut className="h-3.5 w-3.5 shrink-0" />
-                <span>Sign out</span>
+                <span>{t('sidebar.signOut')}</span>
               </button>
             </div>
           )}

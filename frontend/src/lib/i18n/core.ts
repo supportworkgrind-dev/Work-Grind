@@ -47,9 +47,14 @@ export type MessageTree = { readonly [key: string]: string | MessageTree };
 /** Same keys as T, any string values: a translation must cover every key. */
 export type Mirror<T> = { readonly [K in keyof T]: T[K] extends string ? string : Mirror<T[K]> };
 
-/** Every dot-path in T that ends in a string, e.g. "actions.save". */
+/**
+ * Every dot-path in T that ends in a string, e.g. "actions.save". A plural
+ * group ({ one, other }) is also addressable by its own path, with `count`.
+ */
 export type MessagePath<T> = {
-  [K in keyof T & string]: T[K] extends string ? K : `${K}.${MessagePath<T[K]>}`;
+  [K in keyof T & string]: T[K] extends string
+    ? K
+    : (T[K] extends { readonly other: string } ? K : never) | `${K}.${MessagePath<T[K]>}`;
 }[keyof T & string];
 
 /**
@@ -125,6 +130,24 @@ export function resolveMessage(
     return key;
   }
   return interpolate(node, used, vars);
+}
+
+/**
+ * Like resolveMessage, but returns undefined when no language defines the key.
+ * For labels of values that come from the server (roles, statuses), where an
+ * unknown value should show as-is rather than as a key.
+ */
+export function resolveOptionalMessage(
+  dictionaries: Partial<Record<LangCode, unknown>>,
+  lang: LangCode,
+  key: string,
+  vars?: TranslateVars,
+): string | undefined {
+  const known = [lang, DEFAULT_LANG].some((code) => {
+    const node = selectPlural(lookup(dictionaries[code], key), code, vars);
+    return typeof node === 'string';
+  });
+  return known ? resolveMessage(dictionaries, lang, key, vars) : undefined;
 }
 
 // ── Active language for code outside React render ──────────────────────────
