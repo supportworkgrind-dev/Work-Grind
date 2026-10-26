@@ -2,8 +2,8 @@ import { expect, test, type Page, type Route } from '@playwright/test';
 
 const USER_ID = 'academic-admin-id';
 
-async function setupAcademicPage(page: Page, options: { role?: string; organizationType?: 'school' | 'college' | 'university' } = {}) {
-  const { role = 'admin', organizationType = 'school' } = options;
+async function setupAcademicPage(page: Page, options: { role?: string; organizationType?: 'school' | 'college' | 'university'; importsError?: boolean } = {}) {
+  const { role = 'admin', organizationType = 'school', importsError = false } = options;
 
   await page.addInitScript(() => {
     sessionStorage.setItem('workgrind_access_token', 'test-academic-token');
@@ -65,6 +65,7 @@ async function setupAcademicPage(page: Page, options: { role?: string; organizat
   const assessments = [
     { _id: 'assess-1', title: 'Midterm Exam', type: 'exam', pointsPossible: 100, classId: { _id: 'class-1', name: 'Grade 10 Science' } },
   ];
+  const importJobs: Array<Record<string, unknown>> = [];
 
   await page.route('**/api/**', async (route: Route) => {
     const request = route.request();
@@ -134,9 +135,29 @@ async function setupAcademicPage(page: Page, options: { role?: string; organizat
       return json({ success: true, charges: feeCharges });
     }
     if (pathname === '/academic/imports/modules') {
+      if (importsError) return json({ success: false, message: 'Import service unavailable.' }, 503);
       return json({ success: true, modules: [{ id: 'students', label: 'Students and admissions', description: 'Student profiles', headers: ['externalId', 'firstName', 'lastName'], required: ['externalId', 'firstName', 'lastName'] }] });
     }
-    if (pathname === '/academic/imports/history') return json({ success: true, jobs: [] });
+    if (pathname.startsWith('/academic/imports/templates/')) {
+      return route.fulfill({ status: 200, headers, contentType: 'text/csv', body: '# WorkGrind template\nexternalId,firstName,lastName\n' });
+    }
+    if (pathname === '/academic/imports/preview') {
+      return json({
+        success: true,
+        preview: {
+          sheets: ['CSV'], worksheet: 'CSV', headers: ['externalid', 'firstname', 'lastname'], totalRows: 2,
+          preview: [{ externalid: 'STU-1', firstname: 'Ayesha', lastname: 'Khan' }, { externalid: 'STU-1', firstname: 'Duplicate', lastname: 'Student' }],
+          issues: [{ rowNumber: 3, field: 'externalId', code: 'duplicate_upload', message: 'The stable matching key is duplicated in this upload.' }],
+          validRows: 1, invalidRows: 1,
+        },
+      });
+    }
+    if (pathname === '/academic/imports/jobs' && request.method() === 'POST') {
+      const job = { id: 'import-job-1', module: 'students', mode: 'create_only', originalFilename: 'students.csv', status: 'completed_with_errors', totalRows: 2, processedRows: 2, successfulRows: 1, skippedRows: 0, failedRows: 1, issueCount: 1, createdAt: new Date().toISOString() };
+      importJobs.push(job);
+      return json({ success: true, job }, 201);
+    }
+    if (pathname === '/academic/imports/history') return json({ success: true, jobs: importJobs });
     if (pathname.startsWith('/academic/fees/') && pathname.endsWith('/payments')) {
       const data = request.postDataJSON();
       const charge = feeCharges[0];
@@ -224,4 +245,34 @@ test('Academic Imports — administration panel exposes real template and valida
   await expect(page.getByRole('button', { name: 'Download XLSX template' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Preview and validate' })).toBeDisabled();
   await expect(page.getByText('Google Sheets sync is not connected yet. File imports are available now.')).toBeVisible();
+});
+
+test('Academic Imports — downloads a template, previews validation issues, confirms, and refreshes history', async ({ page }) => {
+  await setupAcademicPage(page);
+  await page.goto('/academic?section=imports');
+
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download CSV template' }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe('workgrind-students-template.csv');
+
+  await page.locator('input[type="file"]').setInputFiles({
+    name: 'students.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from('externalId,firstName,lastName\nSTU-1,Ayesha,Khan\nSTU-1,Duplicate,Student\n'),
+  });
+  await page.getByRole('button', { name: 'Preview and validate' }).click();
+  await expect(page.getByText('2 rows · 1 valid · 1 with issues')).toBeVisible();
+  await expect(page.getByText('The stable matching key is duplicated in this upload.')).toBeVisible();
+
+  await page.once('dialog', (dialog) => dialog.accept());
+  await page.getByRole('button', { name: 'Confirm import' }).click();
+  await expect(page.getByRole('status')).toContainText('1 imported, 0 skipped, 1 failed.');
+  await expect(page.getByText('students.csv')).toBeVisible();
+});
+
+test('Academic Imports — shows a service error while loading import options', async ({ page }) => {
+  await setupAcademicPage(page, { importsError: true });
+  await page.goto('/academic?section=imports');
+  await expect(page.getByRole('alert')).toContainText('Import service unavailable.');
 });

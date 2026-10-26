@@ -1,6 +1,5 @@
 import ExcelJS from 'exceljs';
 import mongoose from 'mongoose';
-import AcademicAssignment from '../models/AcademicAssignment';
 import AcademicAssessment from '../models/AcademicAssessment';
 import AcademicAttendance from '../models/AcademicAttendance';
 import AcademicClass from '../models/AcademicClass';
@@ -115,8 +114,8 @@ function parseCsv(buffer: Buffer): { sheets: string[]; headers: string[]; rows: 
   if (!contentRows.length) return { sheets: ['CSV'], headers: [], rows: [] };
   const headerRow = contentRows.shift()!.map((value) => value.trim());
   const headers = headerRow.map(normalizeHeader);
+  if (contentRows.length > MAX_IMPORT_ROWS) throw new Error(`Import files may contain at most ${MAX_IMPORT_ROWS.toLocaleString()} data rows.`);
   const parsedRows = contentRows
-    .slice(0, MAX_IMPORT_ROWS)
     .map((values, index) => ({
       rowNumber: index + 2,
       values: Object.fromEntries(headers.map((header, column) => [header, (values[column] ?? '').trim()])),
@@ -125,6 +124,7 @@ function parseCsv(buffer: Buffer): { sheets: string[]; headers: string[]; rows: 
 }
 
 async function parseWorkbook(buffer: Buffer, filename: string, requestedSheet?: string): Promise<{ sheets: string[]; headers: string[]; rows: RawRow[] }> {
+  if (buffer.length > MAX_IMPORT_BYTES) throw new Error(`Import files may not exceed ${Math.round(MAX_IMPORT_BYTES / (1024 * 1024))} MB.`);
   const extension = filename.toLowerCase().split('.').pop();
   if (extension === 'csv') return parseCsv(buffer);
   if (extension !== 'xlsx') throw new Error('Only UTF-8 CSV and .xlsx workbooks are supported. Legacy .xls files must be saved as .xlsx first.');
@@ -142,9 +142,9 @@ async function parseWorkbook(buffer: Buffer, filename: string, requestedSheet?: 
   });
   if (!matrix.length) return { sheets, headers: [], rows: [] };
   const headers = matrix.shift()!.map(normalizeHeader);
-  const rows = matrix
-    .filter((values) => !values[0]?.trim().startsWith('#'))
-    .slice(0, MAX_IMPORT_ROWS)
+  const dataRows = matrix.filter((values) => !values[0]?.trim().startsWith('#'));
+  if (dataRows.length > MAX_IMPORT_ROWS) throw new Error(`Import files may contain at most ${MAX_IMPORT_ROWS.toLocaleString()} data rows.`);
+  const rows = dataRows
     .map((values, index) => ({
       rowNumber: index + 2,
       values: Object.fromEntries(headers.map((header, column) => [header, (values[column] ?? '').trim()])),
@@ -245,7 +245,11 @@ async function validateRow(module: AcademicImportModule, row: RawRow, context: I
   if (module === 'timetables') {
     const academicClass = context.classesById.get(value('classId'));
     if (!academicClass) issues.push(issue(row.rowNumber, 'classId', 'unknown_reference', 'classId does not belong to this workspace.'));
-    if (value('courseCode') && !context.courses.has(value('courseCode').toUpperCase())) issues.push(issue(row.rowNumber, 'courseCode', 'unknown_reference', 'Course code does not belong to this workspace.'));
+    if (value('courseCode')) {
+      const course = context.courses.get(value('courseCode').toUpperCase());
+      if (!course) issues.push(issue(row.rowNumber, 'courseCode', 'unknown_reference', 'Course code does not belong to this workspace.'));
+      else if (!academicClass?.courseIds.some((id) => id.toString() === course._id.toString())) issues.push(issue(row.rowNumber, 'courseCode', 'invalid_relationship', 'The course must belong to the selected class.'));
+    }
     const day = Number(value('dayOfWeek'));
     if (!Number.isInteger(day) || day < 1 || day > 7) issues.push(issue(row.rowNumber, 'dayOfWeek', 'invalid_number', 'dayOfWeek must be an integer from 1 to 7.'));
     if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(value('startTime'))) issues.push(issue(row.rowNumber, 'startTime', 'invalid_time', 'startTime must use HH:mm.'));
@@ -260,15 +264,39 @@ async function validateRow(module: AcademicImportModule, row: RawRow, context: I
           { $or: [{ validFrom: { $exists: false } }, { validFrom: null }, { validFrom: { $lte: validUntil } }] },
         ],
       };
-      const conflict = await AcademicSchedule.findOne({
-        companyId: context.companyId,
-        classId: academicClass._id,
-        dayOfWeek: Number(value('dayOfWeek')),
-        startTime: { $lt: value('endTime') },
-        endTime: { $gt: value('startTime') },
-        ...dateRange,
-      }).select('_id');
-      if (conflict) issues.push(issue(row.rowNumber, 'startTime', 'schedule_conflict', 'This class already has an overlapping timetable session.'));
+      if (validFrom > validUntil) {
+        issues.push(issue(row.rowNumber, 'validUntil', 'invalid_date_range', 'validUntil must not be earlier than validFrom.'));
+      } else {
+        const sameSession = await AcademicSchedule.findOne({
+          companyId: context.companyId,
+          classId: academicClass._id,
+          dayOfWeek: Number(value('dayOfWeek')),
+          startTime: value('startTime'),
+          ...dateRange,
+        }).select('_id');
+        if (!sameSession) {
+          const conflict = await AcademicSchedule.findOne({
+            companyId: context.companyId,
+            classId: academicClass._id,
+            dayOfWeek: Number(value('dayOfWeek')),
+            startTime: { $lt: value('endTime') },
+            endTime: { $gt: value('startTime') },
+            ...dateRange,
+          }).select('_id');
+          const location = value('location');
+          const locationConflict = location
+            ? await AcademicSchedule.findOne({
+              companyId: context.companyId,
+              dayOfWeek: Number(value('dayOfWeek')),
+              startTime: { $lt: value('endTime') },
+              endTime: { $gt: value('startTime') },
+              location: { $regex: `^${location.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' },
+              ...dateRange,
+            }).select('_id')
+            : null;
+          if (conflict || locationConflict) issues.push(issue(row.rowNumber, 'startTime', 'schedule_conflict', conflict ? 'This class already has an overlapping timetable session.' : 'This location already has an overlapping timetable session.'));
+        }
+      }
     }
     return { issues, key: `${value('classId')}::${value('dayOfWeek')}::${value('startTime')}` };
   }
@@ -306,13 +334,14 @@ async function validateRow(module: AcademicImportModule, row: RawRow, context: I
     const student = getPerson(context, value('studentExternalId'), 'student');
     if (!student) issues.push(issue(row.rowNumber, 'studentExternalId', 'unknown_reference', 'Active student externalId was not found in this workspace.'));
     if (assessment && student && !await AcademicEnrollment.exists({ companyId: context.companyId, classId: assessment.classId, studentId: student._id, status: 'active' })) issues.push(issue(row.rowNumber, 'studentExternalId', 'invalid_relationship', 'The student is not actively enrolled in the assessment class.'));
-    if (!Number.isFinite(Number(value('pointsEarned'))) || Number(value('pointsEarned')) < 0) issues.push(issue(row.rowNumber, 'pointsEarned', 'invalid_number', 'pointsEarned must be a non-negative number.'));
+    if (!Number.isFinite(Number(value('pointsEarned'))) || Number(value('pointsEarned')) < 0 || (assessment && Number(value('pointsEarned')) > assessment.pointsPossible)) issues.push(issue(row.rowNumber, 'pointsEarned', 'invalid_number', 'pointsEarned must be between zero and the assessment maximum.'));
     return { issues, key: `${value('assessmentId')}::${value('studentExternalId').toUpperCase()}` };
   }
   if (module === 'fees') {
     if (!getPerson(context, value('studentExternalId'), 'student')) issues.push(issue(row.rowNumber, 'studentExternalId', 'unknown_reference', 'Active student externalId was not found in this workspace.'));
     if (!Number.isSafeInteger(Number(value('amountMinor'))) || Number(value('amountMinor')) <= 0) issues.push(issue(row.rowNumber, 'amountMinor', 'invalid_amount', 'amountMinor must be a positive integer.'));
     if (!/^[A-Za-z]{3}$/.test(value('currency'))) issues.push(issue(row.rowNumber, 'currency', 'invalid_currency', 'Currency must be a three-letter ISO code.'));
+    if (!/^[A-Za-z0-9-]{1,40}$/.test(value('invoiceNumber'))) issues.push(issue(row.rowNumber, 'invoiceNumber', 'invalid_identifier', 'invoiceNumber may contain only letters, numbers, and hyphens.'));
     if (value('dueAt') && !validDate(value('dueAt'))) issues.push(issue(row.rowNumber, 'dueAt', 'invalid_date', 'dueAt must be a valid date.'));
     return { issues, key: value('invoiceNumber').toUpperCase() };
   }
@@ -329,11 +358,14 @@ export async function previewImport(
   const definition = moduleDefinition(module);
   const parsed = await parseWorkbook(buffer, filename, worksheet);
   const requiredHeaders = definition.required.map(normalizeHeader);
+  const duplicateHeaders = [...new Set(parsed.headers.filter((header, index) => parsed.headers.indexOf(header) !== index))];
   const headerIssues = requiredHeaders
     .filter((header) => !parsed.headers.includes(header))
     .map((header) => issue(1, header, 'missing_header', `Required column ${header} is missing.`));
-  if (headerIssues.length || !parsed.headers.length) {
-    return { sheets: parsed.sheets, worksheet: worksheet || parsed.sheets[0], headers: parsed.headers, totalRows: parsed.rows.length, preview: [], issues: headerIssues.length ? headerIssues : [issue(1, undefined, 'empty_file', 'The file contains no header row or data.')], validRows: 0, invalidRows: parsed.rows.length || 0 };
+  const duplicateHeaderIssues = duplicateHeaders.map((header) => issue(1, header, 'duplicate_header', `Column ${header} appears more than once.`));
+  if (headerIssues.length || duplicateHeaderIssues.length || !parsed.headers.length) {
+    const issues = [...headerIssues, ...duplicateHeaderIssues];
+    return { sheets: parsed.sheets, worksheet: worksheet || parsed.sheets[0], headers: parsed.headers, totalRows: parsed.rows.length, preview: [], issues: issues.length ? issues : [issue(1, undefined, 'empty_file', 'The file contains no header row or data.')], validRows: 0, invalidRows: parsed.rows.length || 0 };
   }
   const context = await buildContext(companyId);
   const issues: AcademicImportIssue[] = [];
@@ -362,6 +394,36 @@ export async function previewImport(
 }
 
 function rowValue(row: RawRow, field: string): string { return row.values[normalizeHeader(field)] ?? ''; }
+
+async function ensureScheduleNoConflict(
+  companyId: mongoose.Types.ObjectId,
+  classId: mongoose.Types.ObjectId,
+  dayOfWeek: number,
+  startTime: string,
+  endTime: string,
+  location: string,
+  validFrom: Date | null,
+  validUntil: Date | null,
+  excludeId?: mongoose.Types.ObjectId,
+): Promise<void> {
+  const dateStart = validFrom ?? new Date(0);
+  const dateEnd = validUntil ?? new Date('9999-12-31T23:59:59.999Z');
+  const dateRange = {
+    $and: [
+      { $or: [{ validUntil: { $exists: false } }, { validUntil: null }, { validUntil: { $gte: dateStart } }] },
+      { $or: [{ validFrom: { $exists: false } }, { validFrom: null }, { validFrom: { $lte: dateEnd } }] },
+    ],
+  };
+  const exclude = excludeId ? { _id: { $ne: excludeId } } : {};
+  const timeRange = { startTime: { $lt: endTime }, endTime: { $gt: startTime } };
+  const classConflict = await AcademicSchedule.findOne({ companyId, classId, dayOfWeek, ...timeRange, ...dateRange, ...exclude }).select('_id');
+  if (classConflict) throw new Error('This class already has an overlapping timetable session.');
+  if (location) {
+    const escapedLocation = location.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const locationConflict = await AcademicSchedule.findOne({ companyId, dayOfWeek, ...timeRange, ...dateRange, ...exclude, location: { $regex: `^${escapedLocation}$`, $options: 'i' } }).select('_id');
+    if (locationConflict) throw new Error('This location already has an overlapping timetable session.');
+  }
+}
 
 async function writeRow(module: AcademicImportModule, row: RawRow, context: ImportContext, userId: mongoose.Types.ObjectId, mode: AcademicImportMode): Promise<'created' | 'updated' | 'skipped'> {
   const value = (field: string) => rowValue(row, field);
@@ -433,6 +495,7 @@ async function writeRow(module: AcademicImportModule, row: RawRow, context: Impo
     const existing = await AcademicSchedule.findOne({ companyId: context.companyId, classId, dayOfWeek, startTime: value('startTime') }).select('_id');
     if (existing && (mode === 'create_only' || mode === 'skip_duplicates')) return 'skipped';
     if (!existing && mode === 'update_only') throw new Error('Matching timetable session does not exist.');
+    await ensureScheduleNoConflict(context.companyId, classId!, dayOfWeek, value('startTime'), value('endTime'), value('location'), validDate(value('validFrom')), validDate(value('validUntil')), existing?._id);
     const payload = { courseId: value('courseCode') ? context.courses.get(value('courseCode').toUpperCase())?._id : undefined, endTime: value('endTime'), ...(value('location') ? { location: value('location') } : {}), ...(value('validFrom') ? { validFrom: validDate(value('validFrom'))! } : {}), ...(value('validUntil') ? { validUntil: validDate(value('validUntil'))! } : {}) };
     if (existing) { await AcademicSchedule.updateOne({ _id: existing._id, companyId: context.companyId }, { $set: payload }); return 'updated'; }
     await AcademicSchedule.create({ companyId: context.companyId, classId, dayOfWeek, startTime: value('startTime'), ...payload }); return 'created';
@@ -465,15 +528,14 @@ async function writeRow(module: AcademicImportModule, row: RawRow, context: Impo
     await AcademicResult.create({ companyId: context.companyId, assessmentId: assessment._id, studentId: student!._id, ...payload }); return 'created';
   }
   if (module === 'fees') {
-    const existing = await AcademicFeeCharge.findOne({ companyId: context.companyId, invoiceNumber: value('invoiceNumber').toUpperCase() }).select('_id');
+    const existing = await AcademicFeeCharge.findOne({ companyId: context.companyId, invoiceNumber: value('invoiceNumber').toUpperCase() }).select('_id paidAmountMinor isVoided');
     if (existing && (mode === 'create_only' || mode === 'skip_duplicates')) return 'skipped';
     if (!existing && mode === 'update_only') throw new Error('Matching invoiceNumber does not exist.');
+    if (existing?.isVoided) throw new Error('Voided fee charges cannot be updated.');
+    if (existing && existing.paidAmountMinor > Number(value('amountMinor'))) throw new Error('The fee amount cannot be reduced below the amount already paid.');
     const payload = { studentId: student!._id, description: value('description'), amountMinor: Number(value('amountMinor')), currency: value('currency').toUpperCase(), ...(value('dueAt') ? { dueAt: validDate(value('dueAt'))! } : {}) };
-    if (existing) { await AcademicFeeCharge.updateOne({ _id: existing._id, companyId: context.companyId, paidAmountMinor: { $lte: Number(value('amountMinor')) } }, { $set: payload }); return 'updated'; }
+    if (existing) { await AcademicFeeCharge.updateOne({ _id: existing._id, companyId: context.companyId }, { $set: payload }); return 'updated'; }
     await AcademicFeeCharge.create({ companyId: context.companyId, invoiceNumber: value('invoiceNumber'), createdBy: userId, ...payload }); return 'created';
-  }
-  if (module === 'assignments') {
-    throw new Error('Assignments are not enabled for bulk import.');
   }
   return 'skipped';
 }
