@@ -250,6 +250,7 @@ export default function AcademicPage() {
   const [feeDescription, setFeeDescription] = useState('');
   const [feeAmountMinor, setFeeAmountMinor] = useState('');
   const [feeCurrency, setFeeCurrency] = useState('USD');
+  const [feeDueAt, setFeeDueAt] = useState('');
   const [paymentChargeId, setPaymentChargeId] = useState('');
   const [paymentAmountMinor, setPaymentAmountMinor] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'bank_transfer' | 'other'>('bank_transfer');
@@ -334,16 +335,22 @@ export default function AcademicPage() {
 
   const submit = async (event: FormEvent, operation: () => Promise<void>) => {
     event.preventDefault();
+    if (saving) return;
     await runAdminMutation(operation);
   };
 
   const runAdminMutation = async (operation: () => Promise<void>, successMessage = t('toast.saved')) => {
+    if (saving) return;
     setSaving(true);
     setError('');
     setSuccess('');
     try {
       await operation();
-      await loadAdminData();
+      try {
+        await loadAdminData();
+      } catch (loadError) {
+        console.error('Failed to reload academic data after mutation', loadError);
+      }
       setSuccess(successMessage);
     } catch (requestError) {
       setError(describeApiError(requestError, t('errors.saveFailed')).message);
@@ -361,7 +368,7 @@ export default function AcademicPage() {
 
   const saveEdit = async (event: FormEvent) => {
     event.preventDefault();
-    if (!editing) return;
+    if (saving || !editing) return;
     const payload: Record<string, unknown> = {};
     for (const field of editing.fields) {
       const value = editDraft[field.key] ?? '';
@@ -378,6 +385,7 @@ export default function AcademicPage() {
       if (field.type === 'number' || field.key === 'dayOfWeek') payload[field.key] = Number(value);
       else if (field.type === 'multiselect') payload[field.key] = value ? value.split(',').filter(Boolean) : [];
       else if (field.type === 'date') payload[field.key] = value ? new Date(value).toISOString() : null;
+      else if (field.key === 'currency') payload[field.key] = String(value).trim().toUpperCase();
       else payload[field.key] = value;
     }
     await runAdminMutation(async () => {
@@ -387,6 +395,7 @@ export default function AcademicPage() {
   };
 
   const deleteRecord = async (resource: AcademicCrudResource, id: string, title: string) => {
+    if (saving) return;
     const question = resource === 'fees' ? t('confirm.void', { title }) : t('confirm.delete', { title });
     if (!window.confirm(question)) return;
     await runAdminMutation(async () => {
@@ -475,7 +484,7 @@ export default function AcademicPage() {
                 onDelete={() => void deleteRecord('departments', department._id, department.name)} />) : <EmptyState label={t('departments.empty')} />}</div>
             </section>
 
-            <section className={`academic-card ${sectionClass('students')} ${sectionClass('teachers')} ${sectionClass('parents')}`}>
+            <section className={`academic-card ${['overview', 'students', 'teachers', 'parents'].includes(activeSection) ? '' : 'hidden'}`}>
               <h2 className="academic-heading">{t('people.heading')}</h2>
               <form className="academic-form" onSubmit={(event) => submit(event, async () => {
                 const type = activeSection === 'teachers' ? 'teacher' : activeSection === 'parents' ? 'parent' : personType;
@@ -511,7 +520,7 @@ export default function AcademicPage() {
                 <label>{t('fields.courseCode')}<input required maxLength={30} value={courseCode} onChange={(event) => setCourseCode(event.target.value)} /></label>
                 <label>{t('fields.department')}<select required value={courseDepartmentId} onChange={(event) => setCourseDepartmentId(event.target.value)}><option value="">{t('select.department')}</option>{departments.map((department) => <option key={department._id} value={department._id}>{department.name}</option>)}</select></label>
                 <label>{t('fields.credits')}<input type="number" min="0" max="100" value={courseCredits} onChange={(event) => setCourseCredits(event.target.value)} /></label>
-                <SubmitButton saving={saving || departments.length === 0} label={t('courses.submit')} />
+                <SubmitButton saving={saving} disabled={departments.length === 0} label={t('courses.submit')} />
                 {departments.length === 0 && <p className="text-xs text-amber-700">{t('courses.needsDepartment')}</p>}
               </form>
               <div className="mt-5 space-y-2">{courses.length ? courses.map((course) => <RecordRow key={course._id} title={course.name} detail={`${course.code} · ${getPopulatedName(course.departmentId, t('fallback.department'))}`}
@@ -535,7 +544,7 @@ export default function AcademicPage() {
                 <label>{t('fields.className')}<input required maxLength={120} value={className} onChange={(event) => setClassName(event.target.value)} /></label>
                 <label>{t('fields.academicYear')}<input required maxLength={30} placeholder="2026–2027" value={academicYear} onChange={(event) => setAcademicYear(event.target.value)} /></label>
                 <label>{t('fields.department')}<select required value={classDepartmentId} onChange={(event) => setClassDepartmentId(event.target.value)}><option value="">{t('select.department')}</option>{departments.map((department) => <option key={department._id} value={department._id}>{department.name}</option>)}</select></label>
-                <SubmitButton saving={saving || departments.length === 0} label={t('classes.submit')} />
+                <SubmitButton saving={saving} disabled={departments.length === 0} label={t('classes.submit')} />
                 {departments.length === 0 && <p className="text-xs text-amber-700">{t('classes.needsDepartment')}</p>}
               </form>
               <div className="mt-5 space-y-2">{classes.length ? classes.map((academicClass) => <RecordRow key={academicClass._id} title={academicClass.name} detail={academicClass.academicYear}
@@ -557,7 +566,7 @@ export default function AcademicPage() {
               })}>
                 <label>{t('fields.student')}<select required value={enrollmentStudentId} onChange={(event) => setEnrollmentStudentId(event.target.value)}><option value="">{t('select.student')}</option>{people.filter((person) => person.type === 'student').map((person) => <option key={person._id} value={person._id}>{person.firstName} {person.lastName}</option>)}</select></label>
                 <label>{t('fields.class')}<select required value={enrollmentClassId} onChange={(event) => setEnrollmentClassId(event.target.value)}><option value="">{t('select.class')}</option>{classes.map((academicClass) => <option key={academicClass._id} value={academicClass._id}>{academicClass.name} · {academicClass.academicYear}</option>)}</select></label>
-                <SubmitButton saving={saving} label={t('enrollments.submit')} />
+                <SubmitButton saving={saving} disabled={!people.some((person) => person.type === 'student') || classes.length === 0} label={t('enrollments.submit')} />
               </form>
               <div className="mt-5 space-y-2">{enrollments.length ? enrollments.map((enrollment) => <RecordRow key={enrollment._id} title={getPopulatedName(enrollment.studentId, t('fallback.student'))} detail={getPopulatedName(enrollment.classId, t('fallback.class'))}
                 onEdit={() => beginEdit('enrollments', enrollment._id, getPopulatedName(enrollment.studentId, t('fallback.student')), [
@@ -575,7 +584,7 @@ export default function AcademicPage() {
               })}>
                 <label>{t('fields.teacher')}<select required value={teachingTeacherId} onChange={(event) => setTeachingTeacherId(event.target.value)}><option value="">{t('select.teacher')}</option>{people.filter((person) => person.type === 'teacher').map((person) => <option key={person._id} value={person._id}>{person.firstName} {person.lastName}</option>)}</select></label>
                 <label>{t('fields.class')}<select required value={teachingClassId} onChange={(event) => setTeachingClassId(event.target.value)}><option value="">{t('select.class')}</option>{classes.map((academicClass) => <option key={academicClass._id} value={academicClass._id}>{academicClass.name} · {academicClass.academicYear}</option>)}</select></label>
-                <SubmitButton saving={saving || !people.some((person) => person.type === 'teacher') || classes.length === 0} label={t('teaching.submit')} />
+                <SubmitButton saving={saving} disabled={!people.some((person) => person.type === 'teacher') || classes.length === 0} label={t('teaching.submit')} />
               </form>
               <div className="mt-5 space-y-2">{teachingAssignments.length ? teachingAssignments.map((assignment) => <RecordRow key={assignment._id} title={getPopulatedName(assignment.teacherId, t('fallback.teacher'))} detail={getPopulatedName(assignment.classId, t('fallback.class'))}
                 onEdit={() => beginEdit('teaching-assignments', assignment._id, getPopulatedName(assignment.teacherId, t('fallback.teacher')), [
@@ -595,7 +604,7 @@ export default function AcademicPage() {
                 <label>{t('fields.weekday')}<select value={scheduleDay} onChange={(event) => setScheduleDay(event.target.value)}>{weekdayOptions.map((day) => <option key={day.value} value={day.value}>{day.label}</option>)}</select></label>
                 <div className="grid grid-cols-2 gap-3"><label>{t('fields.start')}<input type="time" required value={scheduleStart} onChange={(event) => setScheduleStart(event.target.value)} /></label><label>{t('fields.end')}<input type="time" required value={scheduleEnd} onChange={(event) => setScheduleEnd(event.target.value)} /></label></div>
                 <label>{t('fields.location')}<input maxLength={160} value={scheduleLocation} onChange={(event) => setScheduleLocation(event.target.value)} /></label>
-                <SubmitButton saving={saving || classes.length === 0} label={t('timetable.submit')} />
+                <SubmitButton saving={saving} disabled={classes.length === 0} label={t('timetable.submit')} />
               </form>
               <div className="mt-5 space-y-2">{schedules.length ? schedules.map((schedule) => <RecordRow key={schedule._id} title={getPopulatedName(schedule.classId, t('fallback.class'))} detail={scheduleDetail(schedule)}
                 onEdit={() => beginEdit('schedules', schedule._id, getPopulatedName(schedule.classId, t('fallback.class')), [
@@ -617,7 +626,7 @@ export default function AcademicPage() {
                 <label>{t('fields.class')}<select required value={assignmentClassId} onChange={(event) => setAssignmentClassId(event.target.value)}><option value="">{t('select.class')}</option>{classes.map((academicClass) => <option key={academicClass._id} value={academicClass._id}>{academicClass.name} · {academicClass.academicYear}</option>)}</select></label>
                 <label>{t('fields.title')}<input required maxLength={180} value={assignmentTitle} onChange={(event) => setAssignmentTitle(event.target.value)} /></label>
                 <label>{t('fields.pointsPossible')}<input required type="number" min="0" max="100000" value={assignmentPoints} onChange={(event) => setAssignmentPoints(event.target.value)} /></label>
-                <SubmitButton saving={saving || classes.length === 0} label={t('assignments.submit')} />
+                <SubmitButton saving={saving} disabled={classes.length === 0} label={t('assignments.submit')} />
               </form>
               <div className="mt-5 space-y-2">{assignments.length ? assignments.map((assignment) => <RecordRow key={assignment._id} title={assignment.title} detail={`${getPopulatedName(assignment.classId, t('fallback.class'))} · ${formatPoints(assignment.pointsPossible)}`}
                 onEdit={() => beginEdit('assignments', assignment._id, assignment.title, [
@@ -635,10 +644,10 @@ export default function AcademicPage() {
                 await api.put('/academic/attendance', { classId: attendanceClassId, studentId: attendanceStudentId, date: attendanceDate, status: attendanceStatus });
               })}>
                 <label>{t('fields.class')}<select required value={attendanceClassId} onChange={(event) => { setAttendanceClassId(event.target.value); setAttendanceStudentId(''); }}><option value="">{t('select.class')}</option>{classes.map((academicClass) => <option key={academicClass._id} value={academicClass._id}>{academicClass.name}</option>)}</select></label>
-                <label>{t('fields.student')}<select required value={attendanceStudentId} onChange={(event) => setAttendanceStudentId(event.target.value)}><option value="">{t('select.student')}</option>{people.filter((person) => person.type === 'student' && enrollments.some((enrollment) => typeof enrollment.studentId === 'object' && enrollment.studentId._id === person._id && enrollment.classId && typeof enrollment.classId === 'object' && enrollment.classId._id === attendanceClassId)).map((person) => <option key={person._id} value={person._id}>{person.firstName} {person.lastName}</option>)}</select></label>
+                <label>{t('fields.student')}<select required value={attendanceStudentId} onChange={(event) => setAttendanceStudentId(event.target.value)}><option value="">{t('select.student')}</option>{people.filter((person) => person.type === 'student' && enrollments.some((enrollment) => getRecordId(enrollment.studentId) === person._id && getRecordId(enrollment.classId) === attendanceClassId)).map((person) => <option key={person._id} value={person._id}>{person.firstName} {person.lastName}</option>)}</select></label>
                 <label>{t('fields.date')}<input required type="date" value={attendanceDate} onChange={(event) => setAttendanceDate(event.target.value)} /></label>
                 <label>{t('fields.status')}<select value={attendanceStatus} onChange={(event) => setAttendanceStatus(event.target.value as AcademicAttendance['status'])}>{ATTENDANCE_STATUSES.map((status) => <option key={status} value={status}>{t(`options.attendanceStatus.${status}`)}</option>)}</select></label>
-                <SubmitButton saving={saving || classes.length === 0} label={t('attendance.submit')} />
+                <SubmitButton saving={saving} disabled={classes.length === 0} label={t('attendance.submit')} />
               </form>
               <div className="mt-5 space-y-2">{attendance.length ? attendance.map((entry) => <RecordRow key={entry._id} title={getPopulatedName(entry.studentId, t('fallback.student'))} detail={`${formatDate(entry.date, RECORD_DATE)} · ${valueLabel('attendanceStatus', entry.status)}`}
                 onEdit={() => beginEdit('attendance', entry._id, getPopulatedName(entry.studentId, t('fallback.student')), [
@@ -658,7 +667,7 @@ export default function AcademicPage() {
                 <label>{t('fields.title')}<input required maxLength={180} value={assessmentTitle} onChange={(event) => setAssessmentTitle(event.target.value)} /></label>
                 <label>{t('fields.type')}<select value={assessmentType} onChange={(event) => setAssessmentType(event.target.value as AcademicAssessment['type'])}>{ASSESSMENT_TYPES.map((type) => <option key={type} value={type}>{t(`options.assessmentType.${type}`)}</option>)}</select></label>
                 <label>{t('fields.maximumPoints')}<input required type="number" min="0" max="100000" value={assessmentPoints} onChange={(event) => setAssessmentPoints(event.target.value)} /></label>
-                <SubmitButton saving={saving || classes.length === 0} label={t('exams.submit')} />
+                <SubmitButton saving={saving} disabled={classes.length === 0} label={t('exams.submit')} />
               </form>
               <div className="mt-5 space-y-2">{assessments.length ? assessments.map((assessment) => <RecordRow key={assessment._id} title={assessment.title} detail={`${valueLabel('assessmentType', assessment.type)} · ${formatPoints(assessment.pointsPossible)}`}
                 onEdit={() => beginEdit('assessments', assessment._id, assessment.title, [
@@ -677,10 +686,10 @@ export default function AcademicPage() {
                 await api.put('/academic/results', { assessmentId: resultAssessmentId, studentId: resultStudentId, pointsEarned: Number(resultPoints) });
                 setResultPoints('');
               })}>
-                <label>{t('fields.assessment')}<select required value={resultAssessmentId} onChange={(event) => setResultAssessmentId(event.target.value)}><option value="">{t('select.assessment')}</option>{assessments.map((assessment) => <option key={assessment._id} value={assessment._id}>{assessment.title}</option>)}</select></label>
-                <label>{t('fields.student')}<select required value={resultStudentId} onChange={(event) => setResultStudentId(event.target.value)}><option value="">{t('select.student')}</option>{people.filter((person) => person.type === 'student' && enrollments.some((enrollment) => typeof enrollment.studentId === 'object' && enrollment.studentId._id === person._id && enrollment.classId && typeof enrollment.classId === 'object' && enrollment.classId._id === assessments.find((assessment) => assessment._id === resultAssessmentId)?.classId)).map((person) => <option key={person._id} value={person._id}>{person.firstName} {person.lastName}</option>)}</select></label>
+                <label>{t('fields.assessment')}<select required value={resultAssessmentId} onChange={(event) => { setResultAssessmentId(event.target.value); setResultStudentId(''); }}><option value="">{t('select.assessment')}</option>{assessments.map((assessment) => <option key={assessment._id} value={assessment._id}>{assessment.title}</option>)}</select></label>
+                <label>{t('fields.student')}<select required value={resultStudentId} onChange={(event) => setResultStudentId(event.target.value)}><option value="">{t('select.student')}</option>{people.filter((person) => person.type === 'student' && enrollments.some((enrollment) => getRecordId(enrollment.studentId) === person._id && getRecordId(enrollment.classId) === getRecordId(assessments.find((assessment) => assessment._id === resultAssessmentId)?.classId))).map((person) => <option key={person._id} value={person._id}>{person.firstName} {person.lastName}</option>)}</select></label>
                 <label>{t('fields.pointsEarned')}<input required type="number" min="0" max={assessments.find((assessment) => assessment._id === resultAssessmentId)?.pointsPossible ?? 100000} value={resultPoints} onChange={(event) => setResultPoints(event.target.value)} /></label>
-                <SubmitButton saving={saving || !assessments.length} label={t('results.submit')} />
+                <SubmitButton saving={saving} disabled={!assessments.length || !resultAssessmentId} label={t('results.submit')} />
               </form>
               <div className="mt-5 space-y-2">{results.length ? results.map((result) => <RecordRow key={result._id} title={getPopulatedName(result.studentId, t('fallback.student'))} detail={`${getPopulatedName(result.assessmentId, t('fallback.assessment'))} · ${formatPoints(result.pointsEarned)}`}
                 onEdit={() => beginEdit('results', result._id, getPopulatedName(result.studentId, t('fallback.student')), [
@@ -695,20 +704,23 @@ export default function AcademicPage() {
               <form className="academic-form" onSubmit={(event) => submit(event, async () => {
                 await api.post('/academic/fees', {
                   studentId: feeStudentId,
-                  invoiceNumber: feeInvoiceNumber,
-                  description: feeDescription,
+                  invoiceNumber: feeInvoiceNumber.trim().toUpperCase(),
+                  description: feeDescription.trim(),
                   amountMinor: Number(feeAmountMinor),
-                  currency: feeCurrency,
+                  currency: feeCurrency.trim().toUpperCase(),
+                  ...(feeDueAt ? { dueAt: new Date(feeDueAt).toISOString() } : {}),
                 });
                 setFeeInvoiceNumber('');
                 setFeeDescription('');
                 setFeeAmountMinor('');
+                setFeeDueAt('');
               })}>
                 <label>{t('fields.student')}<select required value={feeStudentId} onChange={(event) => setFeeStudentId(event.target.value)}><option value="">{t('select.student')}</option>{people.filter((person) => person.type === 'student').map((person) => <option key={person._id} value={person._id}>{person.firstName} {person.lastName}</option>)}</select></label>
                 <label>{t('fields.invoiceNumber')}<input required maxLength={40} value={feeInvoiceNumber} onChange={(event) => setFeeInvoiceNumber(event.target.value)} /></label>
                 <label>{t('fields.description')}<input required maxLength={180} value={feeDescription} onChange={(event) => setFeeDescription(event.target.value)} /></label>
                 <div className="grid grid-cols-2 gap-3"><label>{t('fields.amountMinor')}<input required type="number" min="1" step="1" value={feeAmountMinor} onChange={(event) => setFeeAmountMinor(event.target.value)} /></label><label>{t('fields.isoCurrency')}<input required minLength={3} maxLength={3} pattern="[A-Za-z]{3}" value={feeCurrency} onChange={(event) => setFeeCurrency(event.target.value.toUpperCase())} /></label></div>
-                <SubmitButton saving={saving || !people.some((person) => person.type === 'student')} label={t('fees.submit')} />
+                <label>{t('fields.dueDate')}<input type="date" value={feeDueAt} onChange={(event) => setFeeDueAt(event.target.value)} /></label>
+                <SubmitButton saving={saving} disabled={!people.some((person) => person.type === 'student')} label={t('fees.submit')} />
               </form>
             </section>
 
@@ -719,10 +731,19 @@ export default function AcademicPage() {
                 await api.post(`/academic/fees/${paymentChargeId}/payments`, { amountMinor: Number(paymentAmountMinor), method: paymentMethod });
                 setPaymentAmountMinor('');
               })}>
-                <label>{t('fields.openCharge')}<select required value={paymentChargeId} onChange={(event) => setPaymentChargeId(event.target.value)}><option value="">{t('select.charge')}</option>{feeCharges.filter((charge) => !charge.isVoided && charge.paidAmountMinor < charge.amountMinor).map((charge) => <option key={charge._id} value={charge._id}>{t('fees.chargeOption', { student: getPopulatedName(charge.studentId, t('fallback.student')), invoice: charge.invoiceNumber, amount: formatMinorCurrency(charge.amountMinor - charge.paidAmountMinor, charge.currency) })}</option>)}</select></label>
+                <label>{t('fields.openCharge')}<select required value={paymentChargeId} onChange={(event) => {
+                  const nextId = event.target.value;
+                  setPaymentChargeId(nextId);
+                  const selected = feeCharges.find((charge) => charge._id === nextId);
+                  if (selected && selected.paidAmountMinor < selected.amountMinor) {
+                    setPaymentAmountMinor(String(selected.amountMinor - selected.paidAmountMinor));
+                  } else {
+                    setPaymentAmountMinor('');
+                  }
+                }}><option value="">{t('select.charge')}</option>{feeCharges.filter((charge) => !charge.isVoided && charge.paidAmountMinor < charge.amountMinor).map((charge) => <option key={charge._id} value={charge._id}>{t('fees.chargeOption', { student: getPopulatedName(charge.studentId, t('fallback.student')), invoice: charge.invoiceNumber, amount: formatMinorCurrency(charge.amountMinor - charge.paidAmountMinor, charge.currency) })}</option>)}</select></label>
                 <label>{t('fields.paymentAmountMinor')}<input required type="number" min="1" step="1" max={selectedPaymentCharge ? selectedPaymentCharge.amountMinor - selectedPaymentCharge.paidAmountMinor : undefined} value={paymentAmountMinor} onChange={(event) => setPaymentAmountMinor(event.target.value)} /></label>
                 <label>{t('fields.method')}<select value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value as typeof paymentMethod)}><option value="bank_transfer">{t('options.paymentMethod.bankTransfer')}</option><option value="cash">{t('options.paymentMethod.cash')}</option><option value="other">{t('options.paymentMethod.other')}</option></select></label>
-                <SubmitButton saving={saving || !feeCharges.some((charge) => charge._id === paymentChargeId && charge.paidAmountMinor < charge.amountMinor)} label={t('fees.paymentSubmit')} />
+                <SubmitButton saving={saving} disabled={!paymentChargeId || !feeCharges.some((charge) => charge._id === paymentChargeId && charge.paidAmountMinor < charge.amountMinor)} label={t('fees.paymentSubmit')} />
               </form>
             </section>
 
@@ -749,7 +770,7 @@ export default function AcademicPage() {
                 <label>{t('fields.student')}<select required value={guardianStudentId} onChange={(event) => setGuardianStudentId(event.target.value)}><option value="">{t('select.student')}</option>{people.filter((person) => person.type === 'student').map((person) => <option key={person._id} value={person._id}>{person.firstName} {person.lastName}</option>)}</select></label>
                 <label>{t('fields.parentGuardian')}<select required value={guardianParentId} onChange={(event) => setGuardianParentId(event.target.value)}><option value="">{t('select.parent')}</option>{people.filter((person) => person.type === 'parent').map((person) => <option key={person._id} value={person._id}>{person.firstName} {person.lastName}</option>)}</select></label>
                 <label>{t('fields.relationship')}<select value={guardianRelationship} onChange={(event) => setGuardianRelationship(event.target.value as AcademicGuardianLink['relationship'])}>{GUARDIAN_RELATIONSHIPS.map((relationship) => <option key={relationship} value={relationship}>{t(`options.relationship.${relationship}`)}</option>)}</select></label>
-                <SubmitButton saving={saving || !people.some((person) => person.type === 'parent') || !people.some((person) => person.type === 'student')} label={t('guardians.submit')} />
+                <SubmitButton saving={saving} disabled={!people.some((person) => person.type === 'parent') || !people.some((person) => person.type === 'student')} label={t('guardians.submit')} />
               </form>
               <div className="mt-5 space-y-2">{guardianLinks.length ? guardianLinks.map((link) => {
                 const student = people.find((person) => person._id === link.studentId);
@@ -884,8 +905,23 @@ function SummaryCard({ label, value, icon: Icon }: { label: string; value: numbe
   return <div className="academic-card flex items-center gap-4"><div className="rounded-xl p-3" style={{ background: 'var(--accent-subtle)', color: 'var(--accent-text)' }}><Icon className="h-5 w-5" /></div><div><p className="text-xs" style={{ color: 'var(--text-muted)' }}>{label}</p><p className="text-2xl font-semibold" style={{ color: 'var(--text-primary)' }}>{value}</p></div></div>;
 }
 
-function SubmitButton({ saving, label }: { saving: boolean; label: string }) {
-  return <button type="submit" className="btn-primary" disabled={saving}>{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}{label}</button>;
+function SubmitButton({
+  saving,
+  disabled = false,
+  label,
+  icon: Icon = Plus,
+}: {
+  saving: boolean;
+  disabled?: boolean;
+  label: string;
+  icon?: typeof Plus;
+}) {
+  return (
+    <button type="submit" className="btn-primary" disabled={saving || disabled}>
+      {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Icon className="h-4 w-4" />}
+      {label}
+    </button>
+  );
 }
 
 function EmptyState({ label }: { label: string }) {

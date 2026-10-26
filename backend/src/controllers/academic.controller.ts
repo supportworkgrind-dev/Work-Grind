@@ -258,7 +258,7 @@ function normalizeAcademicUpdate(
           break;
         }
         if (typeof value !== 'string') return null;
-        values[key] = value.trim();
+        values[key] = key === 'currency' ? value.trim().toUpperCase() : value.trim();
         break;
       case 'number':
         if (typeof value !== 'number' || !Number.isFinite(value)) return null;
@@ -380,6 +380,13 @@ async function academicRelationsBelongToTenant(
     ]);
     if (!student || !academicClass) return false;
     return !!await AcademicEnrollment.findOne({ companyId, studentId, classId, status: 'active' }).select('_id');
+  }
+  if (resource === 'fees') {
+    const charge = await AcademicFeeCharge.findOne({ _id: values._id, companyId }).select('isVoided paidAmountMinor currency');
+    if (!charge || charge.isVoided) return false;
+    if (typeof values.amountMinor === 'number' && values.amountMinor < charge.paidAmountMinor) return false;
+    if (typeof values.currency === 'string' && charge.paidAmountMinor > 0 && values.currency.toUpperCase() !== charge.currency) return false;
+    return true;
   }
   return true;
 }
