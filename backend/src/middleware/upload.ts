@@ -184,6 +184,22 @@ export const upload = multer({
   },
 });
 
+/** Spreadsheet-only upload policy used by Education imports. */
+export const academicImportUpload = multer({
+  storage: multer.memoryStorage(),
+  fileFilter: (_req: Request, file, cb) => {
+    const extension = path.extname(file.originalname).toLowerCase();
+    const allowedMime = file.mimetype === 'text/csv' ||
+      file.mimetype === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    if (!['.csv', '.xlsx'].includes(extension) || !allowedMime) {
+      cb(invalidUpload('Education imports accept UTF-8 CSV or XLSX files only.'));
+      return;
+    }
+    cb(null, true);
+  },
+  limits: { fileSize: 50 * 1024 * 1024, files: 1, fields: 10 },
+});
+
 const PROFILE_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
 const PROFILE_IMAGE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp']);
 

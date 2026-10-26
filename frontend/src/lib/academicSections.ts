@@ -14,6 +14,7 @@ const ACADEMIC_SECTION_IDS = [
   'exams',
   'results',
   'fees',
+  'imports',
 ] as const;
 
 /**

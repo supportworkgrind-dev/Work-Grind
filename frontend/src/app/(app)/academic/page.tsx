@@ -11,6 +11,7 @@ import { BookOpen, GraduationCap, Loader2, Pencil, Plus, Trash2, Users } from 'l
 import { ACADEMIC_SECTIONS, isAcademicSection } from '@/lib/academicSections';
 import { canAccessAcademicSection, canAccessOrganizationFeature, isEducationOrganization, permissionRole } from '@/lib/organizationAccess';
 import { renderRich, useI18n, useT } from '@/lib/i18n';
+import { AcademicImportPanel } from '@/components/academic/AcademicImportPanel';
 
 type AcademicPerson = {
   _id: string;
@@ -455,6 +456,7 @@ export default function AcademicPage() {
           </div>}
 
           <div className="grid gap-6 xl:grid-cols-2">
+            {activeSection === 'imports' && <AcademicImportPanel />}
             <section className={`academic-card ${sectionClass('departments')}`}>
               <h2 className="academic-heading">{t('departments.heading')}</h2>
               <form className="academic-form" onSubmit={(event) => submit(event, async () => {

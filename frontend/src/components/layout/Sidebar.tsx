@@ -34,6 +34,7 @@ import {
   PhoneCall,
   BookOpen,
   ClipboardCheck,
+  UploadCloud,
   type LucideIcon,
 } from 'lucide-react';
 import { premiumIconClass } from '@/components/common/AppIcons';
@@ -111,6 +112,16 @@ const academicNavGroups: readonly SidebarSection[] = [
       labelKey: `academic.sections.${section.id}`,
       href: `/academic?section=${section.id}`,
       icon: CreditCard,
+    })),
+  },
+  {
+    name: 'sidebar.sections.educationAdministration',
+    educationOnly: true,
+    items: ACADEMIC_SECTIONS.filter(({ id }) => id === 'imports').map((section) => ({
+      name: section.id,
+      labelKey: `academic.sections.${section.id}`,
+      href: `/academic?section=${section.id}`,
+      icon: UploadCloud,
     })),
   },
 ];

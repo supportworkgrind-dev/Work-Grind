@@ -133,6 +133,10 @@ async function setupAcademicPage(page: Page, options: { role?: string; organizat
       }
       return json({ success: true, charges: feeCharges });
     }
+    if (pathname === '/academic/imports/modules') {
+      return json({ success: true, modules: [{ id: 'students', label: 'Students and admissions', description: 'Student profiles', headers: ['externalId', 'firstName', 'lastName'], required: ['externalId', 'firstName', 'lastName'] }] });
+    }
+    if (pathname === '/academic/imports/history') return json({ success: true, jobs: [] });
     if (pathname.startsWith('/academic/fees/') && pathname.endsWith('/payments')) {
       const data = request.postDataJSON();
       const charge = feeCharges[0];
@@ -208,4 +212,16 @@ test('Academic Results — Student dropdown displays actively enrolled students 
   // Student dropdown should now list Alice Johnson
   const studentSelect = resultsSection.getByLabel('Student');
   await expect(studentSelect.locator('option')).toContainText(['Alice Johnson']);
+});
+
+test('Academic Imports — administration panel exposes real template and validation actions', async ({ page }) => {
+  await setupAcademicPage(page);
+  await page.goto('/academic?section=imports');
+
+  await expect(page.locator('h1')).toContainText('Bulk import');
+  await expect(page.getByRole('heading', { name: 'Bulk import' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Download CSV template' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Download XLSX template' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Preview and validate' })).toBeDisabled();
+  await expect(page.getByText('Google Sheets sync is not connected yet. File imports are available now.')).toBeVisible();
 });

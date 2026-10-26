@@ -33,10 +33,28 @@ import {
 import { authenticate } from '../middleware/auth';
 import { requireAcademicAdmin } from '../middleware/academicOrganization';
 import { requireAssignedAcademicDepartment } from '../middleware/academicDepartmentAccess';
+import { academicImportUpload, validateUploadedContent } from '../middleware/upload';
+import {
+  createImportJob,
+  downloadImportErrors,
+  downloadImportTemplate,
+  getImportJob,
+  listImportHistory,
+  listImportModules,
+  previewImportFile,
+} from '../controllers/academicImport.controller';
 
 const router = Router();
 
 router.use(authenticate, requireAcademicAdmin, requireAssignedAcademicDepartment);
+
+router.get('/imports/modules', listImportModules);
+router.get('/imports/templates/:module', downloadImportTemplate);
+router.get('/imports/history', listImportHistory);
+router.get('/imports/jobs/:id', getImportJob);
+router.get('/imports/jobs/:id/errors.csv', downloadImportErrors);
+router.post('/imports/preview', academicImportUpload.single('file'), validateUploadedContent, previewImportFile);
+router.post('/imports/jobs', academicImportUpload.single('file'), validateUploadedContent, createImportJob);
 
 router.get('/people', listPeople);
 router.post('/people', createPerson);
