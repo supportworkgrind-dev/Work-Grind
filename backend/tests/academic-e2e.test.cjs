@@ -7,6 +7,7 @@ const AcademicAssessment = require('../dist/models/AcademicAssessment').default;
 const AcademicClass = require('../dist/models/AcademicClass').default;
 const AcademicResult = require('../dist/models/AcademicResult').default;
 const AcademicAttendance = require('../dist/models/AcademicAttendance').default;
+const AcademicSchedule = require('../dist/models/AcademicSchedule').default;
 const AcademicEnrollment = require('../dist/models/AcademicEnrollment').default;
 const AuditLog = require('../dist/models/AuditLog').default;
 const academicController = require('../dist/controllers/academic.controller');
@@ -255,5 +256,82 @@ test('Academic Attendance — Recording attendance validates student enrollment'
     AcademicEnrollment.findOne = originalEnrollmentFind;
     AcademicAttendance.findOneAndUpdate = originalAttendanceUpsert;
     AuditLog.create = originalAuditCreate;
+  }
+});
+
+test('Academic Timetable — rejects overlapping sessions for the same class', async () => {
+  const originalClassFind = AcademicClass.findOne;
+  const originalScheduleFind = AcademicSchedule.findOne;
+  const originalScheduleCreate = AcademicSchedule.create;
+
+  AcademicClass.findOne = () => ({
+    select: async () => ({ _id: classId, courseIds: [] }),
+  });
+  AcademicSchedule.findOne = () => ({
+    select: async () => ({ _id: new mongoose.Types.ObjectId() }),
+  });
+  AcademicSchedule.create = async () => {
+    throw new Error('An overlapping timetable must be rejected before persistence.');
+  };
+
+  try {
+    const res = makeResponse();
+    await academicController.createSchedule({
+      body: {
+        classId: classId.toString(),
+        dayOfWeek: 1,
+        startTime: '09:00',
+        endTime: '10:00',
+        location: 'Room 1',
+      },
+      user: { companyId: companyId.toString(), userId: userId.toString(), role: 'admin' },
+    }, res);
+
+    assert.equal(res.statusCode, 409);
+    assert.equal(res.body.code, 'ACADEMIC_SCHEDULE_CONFLICT');
+    assert.match(res.body.message, /overlapping timetable/);
+  } finally {
+    AcademicClass.findOne = originalClassFind;
+    AcademicSchedule.findOne = originalScheduleFind;
+    AcademicSchedule.create = originalScheduleCreate;
+  }
+});
+
+test('Academic Timetable — applies conflict checks when editing a session', async () => {
+  const originalClassFind = AcademicClass.findOne;
+  const originalScheduleFind = AcademicSchedule.findOne;
+  const originalScheduleUpdate = AcademicSchedule.findOneAndUpdate;
+
+  AcademicClass.findOne = () => ({
+    select: async () => ({ _id: classId, courseIds: [] }),
+  });
+  AcademicSchedule.findOne = () => ({
+    select: async () => ({
+      _id: classId,
+      classId,
+      dayOfWeek: 1,
+      startTime: '09:00',
+      endTime: '10:00',
+      location: 'Room 1',
+    }),
+  });
+  AcademicSchedule.findOneAndUpdate = async () => {
+    throw new Error('An overlapping timetable must be rejected before persistence.');
+  };
+
+  try {
+    const res = makeResponse();
+    await academicController.updateAcademicRecord({
+      params: { resource: 'schedules', id: new mongoose.Types.ObjectId().toString() },
+      body: { startTime: '09:30', endTime: '10:30' },
+      user: { companyId: companyId.toString(), userId: userId.toString(), role: 'admin' },
+    }, res);
+
+    assert.equal(res.statusCode, 409);
+    assert.equal(res.body.code, 'ACADEMIC_SCHEDULE_CONFLICT');
+  } finally {
+    AcademicClass.findOne = originalClassFind;
+    AcademicSchedule.findOne = originalScheduleFind;
+    AcademicSchedule.findOneAndUpdate = originalScheduleUpdate;
   }
 });

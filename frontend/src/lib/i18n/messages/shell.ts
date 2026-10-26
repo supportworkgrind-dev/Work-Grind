@@ -7,6 +7,11 @@ export const shell = defineMessages(
       sections: {
         workspace: 'Workspace',
         education: 'Education',
+        educationOverview: 'Overview',
+        educationPeople: 'People',
+        educationAcademics: 'Academics',
+        educationOperations: 'Academic operations',
+        educationFinance: 'Finance',
         customers: 'Customers',
         collaborate: 'Collaborate',
         resources: 'Resources',
@@ -85,6 +90,11 @@ export const shell = defineMessages(
       sections: {
         workspace: 'ورک اسپیس',
         education: 'تعلیم',
+        educationOverview: 'جائزہ',
+        educationPeople: 'افراد',
+        educationAcademics: 'تعلیمی امور',
+        educationOperations: 'تعلیمی آپریشنز',
+        educationFinance: 'مالیات',
         customers: 'گاہک',
         collaborate: 'مل کر کام',
         resources: 'وسائل',

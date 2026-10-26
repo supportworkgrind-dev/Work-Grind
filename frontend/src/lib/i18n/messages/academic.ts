@@ -20,6 +20,11 @@ export const academic = defineMessages(
       fees: 'Fees',
     },
     sectionsNav: 'Academic sections',
+    institutionTypes: {
+      school: 'School',
+      college: 'College',
+      university: 'University',
+    },
     header: {
       subtitle: 'Education workspace. Academic tools depend on your role.',
       subtitleWithWorkspace: '{{workspace}} · Education workspace. Academic tools depend on your role.',
@@ -295,6 +300,11 @@ export const academic = defineMessages(
       fees: 'فیس',
     },
     sectionsNav: 'تعلیمی حصے',
+    institutionTypes: {
+      school: 'اسکول',
+      college: 'کالج',
+      university: 'یونیورسٹی',
+    },
     header: {
       subtitle: 'تعلیمی ورک اسپیس۔ دستیاب تعلیمی ٹولز آپ کے کردار پر منحصر ہیں۔',
       subtitleWithWorkspace: '{{workspace}} · تعلیمی ورک اسپیس۔ دستیاب تعلیمی ٹولز آپ کے کردار پر منحصر ہیں۔',

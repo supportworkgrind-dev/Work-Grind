@@ -119,7 +119,7 @@ async function setupAcademicPage(page: Page, options: { role?: string; organizat
         const data = request.postDataJSON();
         const created = {
           _id: `fee-${Date.now()}`,
-          studentId: people.find((p) => p._id === data.studentId),
+          studentId: people.find((p) => p._id === data.studentId)!,
           invoiceNumber: data.invoiceNumber,
           description: data.description,
           amountMinor: data.amountMinor,
@@ -149,17 +149,19 @@ test('Academic Fees — Create Fee Challan does not render an infinite loader an
 
   await expect(page.locator('h1')).toContainText('Fees');
 
+  const createFeeSection = page.locator('section:has(h2:has-text("Create fee charge"))');
+  const submitButton = createFeeSection.locator('button[type="submit"]:has-text("Create fee charge")');
+
   // Verify the submit button is present and NOT in an infinite spinning loading state
-  const submitButton = page.locator('button[type="submit"]:has-text("Create fee charge")');
   await expect(submitButton).toBeVisible();
   await expect(submitButton.locator('.animate-spin')).toHaveCount(0);
 
   // Fill in Fee Challan form
-  await page.locator('select').first().selectOption({ label: 'Alice Johnson' });
-  await page.locator('input').nth(0).fill('CHALLAN-101');
-  await page.locator('input').nth(1).fill('Annual Laboratory Fee');
-  await page.locator('input').nth(2).fill('15000');
-  await page.locator('input').nth(3).fill('USD');
+  await createFeeSection.getByLabel('Student').selectOption({ label: 'Alice Johnson' });
+  await createFeeSection.getByLabel('Invoice number').fill('CHALLAN-101');
+  await createFeeSection.getByLabel('Description').fill('Annual Laboratory Fee');
+  await createFeeSection.getByLabel('Amount (minor units)').fill('15000');
+  await createFeeSection.getByLabel('ISO currency').fill('USD');
 
   // Submit fee challan
   await submitButton.click();
@@ -197,11 +199,13 @@ test('Academic Results — Student dropdown displays actively enrolled students 
 
   await expect(page.locator('h1')).toContainText('Results');
 
+  const resultsSection = page.locator('section:has(h2:has-text("Record a result"))');
+
   // Select the assessment
-  const assessmentSelect = page.locator('select').first();
+  const assessmentSelect = resultsSection.getByLabel('Assessment');
   await assessmentSelect.selectOption({ label: 'Midterm Exam' });
 
   // Student dropdown should now list Alice Johnson
-  const studentSelect = page.locator('select').nth(1);
+  const studentSelect = resultsSection.getByLabel('Student');
   await expect(studentSelect.locator('option')).toContainText(['Alice Johnson']);
 });

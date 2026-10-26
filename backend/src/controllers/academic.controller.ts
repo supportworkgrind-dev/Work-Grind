@@ -63,6 +63,63 @@ function handleOperationError(res: Response, error: unknown, resource: string): 
   res.status(500).json({ success: false, message: 'Unable to complete the academic record operation.' });
 }
 
+type ScheduleConflictInput = {
+  companyId: mongoose.Types.ObjectId;
+  classId: mongoose.Types.ObjectId;
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+  location?: string;
+  validFrom?: Date;
+  validUntil?: Date;
+  excludeId?: mongoose.Types.ObjectId;
+};
+
+/**
+ * Timetable records are recurring weekly sessions. A conflict exists when the
+ * weekday, time range, and effective date range overlap. The class check is
+ * always applied; a room check is applied only when the institution supplied a
+ * named location. Teacher conflicts cannot be inferred because schedules do
+ * not currently store a teacher assignment.
+ */
+async function findScheduleConflict(input: ScheduleConflictInput): Promise<'class' | 'location' | null> {
+  const dateStart = input.validFrom ?? new Date(0);
+  const dateEnd = input.validUntil ?? new Date('9999-12-31T23:59:59.999Z');
+  const dateRange = {
+    $and: [
+      { $or: [{ validUntil: { $exists: false } }, { validUntil: null }, { validUntil: { $gte: dateStart } }] },
+      { $or: [{ validFrom: { $exists: false } }, { validFrom: null }, { validFrom: { $lte: dateEnd } }] },
+    ],
+  };
+  const timeRange = {
+    startTime: { $lt: input.endTime },
+    endTime: { $gt: input.startTime },
+  };
+  const exclude = input.excludeId ? { _id: { $ne: input.excludeId } } : {};
+  const baseFilter = {
+    companyId: input.companyId,
+    dayOfWeek: input.dayOfWeek,
+    ...timeRange,
+    ...dateRange,
+    ...exclude,
+  };
+
+  const classConflict = await AcademicSchedule.findOne({
+    ...baseFilter,
+    classId: input.classId,
+  }).select('_id');
+  if (classConflict) return 'class';
+
+  const location = input.location?.trim();
+  if (!location) return null;
+  const escapedLocation = location.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const locationConflict = await AcademicSchedule.findOne({
+    ...baseFilter,
+    location: { $regex: `^${escapedLocation}$`, $options: 'i' },
+  }).select('_id');
+  return locationConflict ? 'location' : null;
+}
+
 async function recordAcademicAudit(
   req: AuthRequest,
   resource: string,
@@ -441,22 +498,52 @@ export const updateAcademicRecord = async (req: AuthRequest, res: Response): Pro
       return;
     }
     if (resource === 'schedules') {
-      const schedule = await AcademicSchedule.findOne({ _id: id, companyId }).select('startTime endTime validFrom validUntil');
+      const schedule = await AcademicSchedule.findOne({ _id: id, companyId }).select('classId dayOfWeek startTime endTime location validFrom validUntil');
       if (!schedule) {
         res.status(404).json({ success: false, message: 'Academic record not found.' });
         return;
       }
+      const classId = values.classId ?? schedule.classId;
+      const dayOfWeek = Number(values.dayOfWeek ?? schedule.dayOfWeek);
       const startTime = String(values.startTime ?? schedule.startTime);
       const endTime = String(values.endTime ?? schedule.endTime);
+      const location = Object.prototype.hasOwnProperty.call(values, 'location')
+        ? String(values.location ?? '')
+        : schedule.location;
       const validFrom = Object.prototype.hasOwnProperty.call(values, 'validFrom') ? values.validFrom : schedule.validFrom;
       const validUntil = Object.prototype.hasOwnProperty.call(values, 'validUntil') ? values.validUntil : schedule.validUntil;
       if (
+        !mongoose.isValidObjectId(classId) ||
+        !Number.isInteger(dayOfWeek) ||
+        dayOfWeek < 1 ||
+        dayOfWeek > 7 ||
         !/^([01]\d|2[0-3]):[0-5]\d$/.test(startTime) ||
         !/^([01]\d|2[0-3]):[0-5]\d$/.test(endTime) ||
         startTime >= endTime ||
         (validFrom instanceof Date && validUntil instanceof Date && validFrom > validUntil)
       ) {
         res.status(400).json({ success: false, message: 'Timetable sessions require a valid time range and date range.' });
+        return;
+      }
+      const conflict = await findScheduleConflict({
+        companyId,
+        classId: new mongoose.Types.ObjectId(String(classId)),
+        dayOfWeek,
+        startTime,
+        endTime,
+        location,
+        validFrom: validFrom instanceof Date ? validFrom : undefined,
+        validUntil: validUntil instanceof Date ? validUntil : undefined,
+        excludeId: new mongoose.Types.ObjectId(id),
+      });
+      if (conflict) {
+        res.status(409).json({
+          success: false,
+          code: 'ACADEMIC_SCHEDULE_CONFLICT',
+          message: conflict === 'class'
+            ? 'This class already has an overlapping timetable session.'
+            : 'This location already has an overlapping timetable session.',
+        });
         return;
       }
     }
@@ -1061,6 +1148,26 @@ export const createSchedule = async (req: AuthRequest, res: Response): Promise<v
     const academicClass = await AcademicClass.findOne({ _id: classId, companyId }).select('courseIds');
     if (!academicClass || (courseId && !academicClass.courseIds.some((id) => id.toString() === courseId))) {
       res.status(400).json({ success: false, message: 'The class and optional course must belong to this organization.' });
+      return;
+    }
+    const conflict = await findScheduleConflict({
+      companyId,
+      classId: new mongoose.Types.ObjectId(classId),
+      dayOfWeek,
+      startTime,
+      endTime,
+      location: typeof location === 'string' ? location : undefined,
+      validFrom: validFrom ? new Date(validFrom) : undefined,
+      validUntil: validUntil ? new Date(validUntil) : undefined,
+    });
+    if (conflict) {
+      res.status(409).json({
+        success: false,
+        code: 'ACADEMIC_SCHEDULE_CONFLICT',
+        message: conflict === 'class'
+          ? 'This class already has an overlapping timetable session.'
+          : 'This location already has an overlapping timetable session.',
+      });
       return;
     }
     const schedule = await AcademicSchedule.create({

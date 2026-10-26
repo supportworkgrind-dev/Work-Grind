@@ -32,6 +32,8 @@ import {
   Table2,
   Phone,
   PhoneCall,
+  BookOpen,
+  ClipboardCheck,
   type LucideIcon,
 } from 'lucide-react';
 import { premiumIconClass } from '@/components/common/AppIcons';
@@ -60,6 +62,59 @@ type SidebarNavItem = {
 
 type SidebarSection = { name: NamespaceKey<'shell'>; items: readonly SidebarNavItem[]; educationOnly?: boolean };
 
+const academicNavGroups: readonly SidebarSection[] = [
+  {
+    name: 'sidebar.sections.educationOverview',
+    educationOnly: true,
+    items: ACADEMIC_SECTIONS.filter(({ id }) => id === 'overview').map((section) => ({
+      name: section.id,
+      labelKey: `academic.sections.${section.id}`,
+      href: `/academic?section=${section.id}`,
+      icon: LayoutDashboard,
+    })),
+  },
+  {
+    name: 'sidebar.sections.educationPeople',
+    educationOnly: true,
+    items: ACADEMIC_SECTIONS.filter(({ id }) => ['students', 'teachers', 'parents'].includes(id)).map((section) => ({
+      name: section.id,
+      labelKey: `academic.sections.${section.id}`,
+      href: `/academic?section=${section.id}`,
+      icon: Users2,
+    })),
+  },
+  {
+    name: 'sidebar.sections.educationAcademics',
+    educationOnly: true,
+    items: ACADEMIC_SECTIONS.filter(({ id }) => ['departments', 'courses', 'classes', 'timetable', 'assignments'].includes(id)).map((section) => ({
+      name: section.id,
+      labelKey: `academic.sections.${section.id}`,
+      href: `/academic?section=${section.id}`,
+      icon: section.id === 'timetable' ? Calendar : section.id === 'assignments' ? CheckSquare : BookOpen,
+    })),
+  },
+  {
+    name: 'sidebar.sections.educationOperations',
+    educationOnly: true,
+    items: ACADEMIC_SECTIONS.filter(({ id }) => ['attendance', 'exams', 'results'].includes(id)).map((section) => ({
+      name: section.id,
+      labelKey: `academic.sections.${section.id}`,
+      href: `/academic?section=${section.id}`,
+      icon: ClipboardCheck,
+    })),
+  },
+  {
+    name: 'sidebar.sections.educationFinance',
+    educationOnly: true,
+    items: ACADEMIC_SECTIONS.filter(({ id }) => id === 'fees').map((section) => ({
+      name: section.id,
+      labelKey: `academic.sections.${section.id}`,
+      href: `/academic?section=${section.id}`,
+      icon: CreditCard,
+    })),
+  },
+];
+
 const navSections: readonly SidebarSection[] = [
   {
     name: 'sidebar.sections.workspace',
@@ -71,16 +126,7 @@ const navSections: readonly SidebarSection[] = [
       { name: 'calendar', labelKey: 'shell.sidebar.items.calendar', href: '/calendar', icon: Calendar, entitlement: 'meetingsCalendar' },
     ],
   },
-  {
-    name: 'sidebar.sections.education',
-    educationOnly: true,
-    items: ACADEMIC_SECTIONS.map((section) => ({
-      name: section.id,
-      labelKey: `academic.sections.${section.id}`,
-      href: `/academic?section=${section.id}`,
-      icon: section.id === 'overview' ? LayoutDashboard : Users2,
-    })),
-  },
+  ...academicNavGroups,
   {
     name: 'sidebar.sections.customers',
     items: [

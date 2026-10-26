@@ -262,6 +262,9 @@ export default function AcademicPage() {
 
   // Values the API sends keep their raw text when no label exists for them.
   const valueLabel = (group: ValueGroup, value: string) => tOptional(`academic.values.${group}.${value}`) ?? value;
+  const institutionLabel = company?.organizationType && company.organizationType !== 'business'
+    ? t(`institutionTypes.${company.organizationType}`)
+    : t('sections.overview');
   const formatMinorCurrency = (amountMinor: number, currency: string) => formatCurrency(toMajorUnits(amountMinor, currency), currency);
   const formatPoints = (points: number) => t('points', { points: String(points) });
   const weekdayOptions = WEEKDAYS.map((day, index) => ({ value: String(index + 1), label: t(`weekdays.long.${day}`) }));
@@ -425,8 +428,8 @@ export default function AcademicPage() {
       <PageHeader
         title={sectionTitle}
         subtitle={company?.name
-          ? t('header.subtitleWithWorkspace', { workspace: company.name })
-          : t('header.subtitle')}
+          ? `${institutionLabel} · ${t('header.subtitleWithWorkspace', { workspace: company.name })}`
+          : `${institutionLabel} · ${t('header.subtitle')}`}
         icon={GraduationCap}
       />
       {error && <div role="alert" className="rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-800">{error}</div>}
