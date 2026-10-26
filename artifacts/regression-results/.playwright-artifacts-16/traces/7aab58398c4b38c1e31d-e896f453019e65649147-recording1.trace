@@ -1,0 +1,1 @@
+{"version":10,"type":"context-options","origin":"library","browserName":"","playwrightVersion":"1.64.0","options":{},"platform":"win32","wallTime":1793008363756,"monotonicTime":576018.549,"sdkLanguage":"javascript","title":"billing-ai-regressions.spec.ts:366 › Tavro remains on the same route when /auth/me recovers through refresh"}

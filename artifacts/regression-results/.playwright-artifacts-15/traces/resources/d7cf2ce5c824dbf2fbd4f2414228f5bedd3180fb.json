@@ -1,0 +1,1 @@
+{"success":true,"user":{"_id":"playwright-member","fullName":"Workspace Member","email":"member@example.invalid","role":"owner","companyId":{"_id":"65f000000000000000000001","name":"Expired Agency","organizationType":"business","accountType":"company"},"theme":"light","preferredLanguage":"en"}}
