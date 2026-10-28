@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { IntentLink } from '@/components/common/IntentLink';
 import { api } from '@/lib/api';
 import { describeApiError, type ApiErrorInfo } from '@/lib/apiError';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -237,7 +238,7 @@ export function DailyFocusCard({ className = '', onRefresh }: DailyFocusCardProp
           </div>
         ) : (
           displayedItems.map((item, idx) => (
-            <Link
+            <IntentLink
               key={item.id || idx}
               href={item.link}
               className="group flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-slate-200/80 bg-white p-3.5 sm:p-4 shadow-2xs hover:border-indigo-300 hover:shadow-md transition-all"
@@ -282,7 +283,7 @@ export function DailyFocusCard({ className = '', onRefresh }: DailyFocusCardProp
                   <ArrowRight className="h-3.5 w-3.5" />
                 </div>
               </div>
-            </Link>
+            </IntentLink>
           ))
         )}
       </div>

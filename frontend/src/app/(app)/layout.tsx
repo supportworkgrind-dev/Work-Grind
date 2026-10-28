@@ -9,11 +9,7 @@ import { useI18n } from '@/lib/i18n';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Navbar } from '@/components/layout/Navbar';
 import { OfflineBanner } from '@/components/common/OfflineBanner';
-import { GlobalSearchModal } from '@/components/modals/GlobalSearchModal';
-import { CreateTaskModal } from '@/components/modals/CreateTaskModal';
-import { CreateProjectModal } from '@/components/modals/CreateProjectModal';
-import { ScheduleMeetingModal } from '@/components/modals/ScheduleMeetingModal';
-import { CreateChannelModal } from '@/components/modals/CreateChannelModal';
+import { ShellModals } from '@/components/layout/ShellModals';
 import { IncomingCallManager } from '@/components/calling/IncomingCallManager';
 import { ThemeAwareLogo } from '@/components/common/ThemeAwareLogo';
 import { ExpiredSubscriptionExperience } from '@/components/subscription/ExpiredSubscriptionExperience';
@@ -53,11 +49,7 @@ const AppShell = memo(function AppShell({
           {children}
         </main>
       </div>
-      <GlobalSearchModal />
-      <CreateTaskModal />
-      <CreateProjectModal />
-      <ScheduleMeetingModal />
-      <CreateChannelModal />
+      <ShellModals />
       <IncomingCallManager />
     </div>
   );

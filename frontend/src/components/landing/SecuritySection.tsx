@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { motion } from 'framer-motion';
+import { m } from 'framer-motion';
 import { Shield, Lock, Users, Eye } from 'lucide-react';
 
 const PILLARS = [
@@ -24,7 +24,7 @@ export function SecuritySection() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-14 items-center">
 
           {/* Copy */}
-          <motion.div
+          <m.div
             initial={{ opacity: 0, x: -24 }}
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true, margin: '-80px' }}
@@ -69,10 +69,10 @@ export function SecuritySection() {
                 ))}
               </div>
             </div>
-          </motion.div>
+          </m.div>
 
           {/* 4 compact trust cards */}
-          <motion.div
+          <m.div
             initial={{ opacity: 0, x: 24 }}
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true, margin: '-80px' }}
@@ -82,7 +82,7 @@ export function SecuritySection() {
             {PILLARS.map((p, i) => {
               const Icon = p.Icon;
               return (
-                <motion.div
+                <m.div
                   key={p.title}
                   initial={{ opacity: 0, y: 12 }}
                   whileInView={{ opacity: 1, y: 0 }}
@@ -95,10 +95,10 @@ export function SecuritySection() {
                   </div>
                   <h3 className="text-[13px] font-bold text-white mb-1">{p.title}</h3>
                   <p className="text-xs text-slate-400 leading-relaxed">{p.desc}</p>
-                </motion.div>
+                </m.div>
               );
             })}
-          </motion.div>
+          </m.div>
         </div>
       </div>
     </section>

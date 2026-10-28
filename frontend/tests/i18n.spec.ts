@@ -1,5 +1,6 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
-import { appMessagesEn, appMessagesUr, namespaceNames } from '../src/lib/i18n/messages';
+import { appMessagesEn, namespaceNames } from '../src/lib/i18n/messages';
+import { appMessagesUr } from '../src/lib/i18n/messages/ur';
 import { en as marketingEn } from '../src/lib/i18n/translations/en';
 import { ur as marketingUr } from '../src/lib/i18n/translations/ur';
 import { formatCurrency, formatDate, formatRelativeTime, resolveMessage } from '../src/lib/i18n/core';

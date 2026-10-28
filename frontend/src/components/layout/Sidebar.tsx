@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import Link from 'next/link';
+import { IntentLink } from '@/components/common/IntentLink';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/store/useAuthStore';
 import type { EntitlementId } from '@/types';
@@ -328,10 +328,9 @@ export const Sidebar = memo(function Sidebar() {
               : pathname === itemPath || (itemPath !== '/dashboard' && pathname.startsWith(itemPath));
 
             return (
-              <Link
+              <IntentLink
                 key={item.name}
                 href={item.href}
-                prefetch={true}
                 onClick={() => { if (isMobile) setSidebarOpen(false); }}
                 title={!isSidebarOpen ? label : undefined}
                 aria-label={label}
@@ -363,7 +362,7 @@ export const Sidebar = memo(function Sidebar() {
                 {!isSidebarOpen && (
                   <span className="nav-tooltip">{label}</span>
                 )}
-              </Link>
+              </IntentLink>
             );
           })}
               </div>

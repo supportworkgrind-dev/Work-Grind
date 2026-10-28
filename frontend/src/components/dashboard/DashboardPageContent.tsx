@@ -204,29 +204,42 @@ export default function DashboardPage() {
   const isOwnerAdmin = user?.role === 'owner' || user?.role === 'admin' || user?.role === 'manager';
 
   useEffect(() => {
+    let active = true;
+    (async () => {
+      setLoading(true);
+      // Each card loads independently: one failing request must not blank the others.
+      const [statsRes, tasksRes, projRes, meetRes, crmRes] = await Promise.allSettled([
+        api.get('/companies/stats'),
+        api.get('/tasks/my?limit=8'),
+        api.get('/projects?limit=4'),
+        api.get('/meetings?limit=4'),
+        canSeeCrm ? api.get('/crm/stats') : Promise.resolve(null),
+      ]);
+      if (!active) return;
+      const data = <T,>(result: PromiseSettledResult<T>) => (result.status === 'fulfilled' ? result.value : null);
+      const meetingsData = data(meetRes)?.data;
+      if (data(statsRes)?.data?.success) setStats({
+        ...data(statsRes)!.data.stats,
+        upcomingMeetings: meetingsData?.meetings?.filter((m: any) => m.status === 'scheduled' || m.status === 'active').length ?? 0,
+      });
+      if (data(tasksRes)?.data?.success) setMyTasks(data(tasksRes)!.data.tasks);
+      if (data(projRes)?.data?.success)  setProjects(data(projRes)!.data.projects);
+      if (meetingsData?.success)         setMeetings(meetingsData.meetings);
+      if (data(crmRes)?.data?.success)   setCrmStats(data(crmRes)!.data.stats);
+      setLoading(false);
+    })();
+    // Recent messages come from the member's default channel (messages are
+    // always read per channel); this card fills in without delaying the rest.
     (async () => {
       try {
-        setLoading(true);
-        const [statsRes, tasksRes, projRes, meetRes, msgRes, crmRes] = await Promise.all([
-          api.get('/companies/stats'),
-          api.get('/tasks/my?limit=8'),
-          api.get('/projects?limit=4'),
-          api.get('/meetings?limit=4'),
-          api.get('/messages?limit=5'),
-          canSeeCrm ? api.get('/crm/stats').catch(() => null) : Promise.resolve(null),
-        ]);
-        if (statsRes.data.success) setStats({
-          ...statsRes.data.stats,
-          upcomingMeetings: meetRes.data.meetings?.filter((m: any) => m.status === 'scheduled' || m.status === 'active').length ?? 0,
-        });
-        if (tasksRes.data.success) setMyTasks(tasksRes.data.tasks);
-        if (projRes.data.success)  setProjects(projRes.data.projects);
-        if (meetRes.data.success)  setMeetings(meetRes.data.meetings);
-        if (msgRes.data.success)   setMessages(msgRes.data.messages);
-        if (crmRes?.data?.success) setCrmStats(crmRes.data.stats);
-      } catch { /* silent */ }
-      finally { setLoading(false); }
+        const channelsRes = await api.get('/channels?limit=1');
+        const channelId = channelsRes.data.channels?.[0]?._id;
+        if (!channelId) return;
+        const msgRes = await api.get('/messages', { params: { channelId, limit: 5 } });
+        if (active && msgRes.data.success) setMessages(msgRes.data.messages);
+      } catch { /* chat may be unavailable for this workspace or plan */ }
     })();
+    return () => { active = false; };
   }, [canSeeCrm]);
 
   /* ── Helpers ── */

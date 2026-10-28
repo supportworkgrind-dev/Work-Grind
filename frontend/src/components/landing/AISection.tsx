@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { motion, AnimatePresence, useInView } from 'framer-motion';
+import { m, AnimatePresence, useInView } from 'framer-motion';
 import { Sparkles, ArrowRight, MessageSquare, CheckSquare } from 'lucide-react';
 import Link from 'next/link';
 
@@ -52,7 +52,7 @@ export function AISection() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-14 items-center">
 
           {/* Left: Tavro AI workspace flow */}
-          <motion.div
+          <m.div
             initial={{ opacity: 0, x: -24 }}
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true, margin: '-80px' }}
@@ -72,9 +72,9 @@ export function AISection() {
                     <MessageSquare className="h-4 w-4" aria-hidden="true" /> You
                   </div>
                   <AnimatePresence mode="wait">
-                    <motion.p key={activeIdx} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="text-xs leading-5 text-slate-300">
+                    <m.p key={activeIdx} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="text-xs leading-5 text-slate-300">
                       {PROMPTS[activeIdx]}
-                    </motion.p>
+                    </m.p>
                   </AnimatePresence>
                 </div>
                 <ArrowRight className="mx-auto h-4 w-4 rotate-90 text-slate-500 sm:rotate-0" aria-hidden="true" />
@@ -91,22 +91,22 @@ export function AISection() {
                   </div>
                   <AnimatePresence mode="wait">
                     {showResponse ? (
-                      <motion.p key={`${activeIdx}-result`} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="text-xs leading-5 text-slate-300">
+                      <m.p key={`${activeIdx}-result`} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="text-xs leading-5 text-slate-300">
                         {AI_RESPONSES[activeIdx]}
-                      </motion.p>
+                      </m.p>
                     ) : (
-                      <motion.p key="thinking" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="text-xs text-slate-500">
+                      <m.p key="thinking" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="text-xs text-slate-500">
                         Preparing workspace context…
-                      </motion.p>
+                      </m.p>
                     )}
                   </AnimatePresence>
                 </div>
               </div>
             </div>
-          </motion.div>
+          </m.div>
 
           {/* Right: copy — concise */}
-          <motion.div
+          <m.div
             initial={{ opacity: 0, x: 24 }}
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true, margin: '-80px' }}
@@ -136,7 +136,7 @@ export function AISection() {
               Try Tavro AI
               <ArrowRight className="h-4 w-4" />
             </Link>
-          </motion.div>
+          </m.div>
         </div>
       </div>
     </section>

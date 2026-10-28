@@ -25,7 +25,7 @@ import React, {
 } from 'react';
 import Link from 'next/link';
 import {
-  motion, AnimatePresence, useReducedMotion,
+  m, AnimatePresence, useReducedMotion,
 } from 'framer-motion';
 import {
   ArrowRight, ChevronRight,
@@ -142,7 +142,7 @@ function Bar({
   return (
     <div className="h-[3px] w-full rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.07)' }}>
       {/* Animate scaleX (compositor-only) rather than width, which relaid out every frame. */}
-      <motion.div
+      <m.div
         className="h-full rounded-full origin-left rtl:origin-right"
         style={{ background: col, width: `${pct}%` }}
         initial={{ scaleX: 0 }}
@@ -247,7 +247,7 @@ function SceneOverview({ reduced }: { reduced: boolean }) {
         <p className="text-[9px] text-slate-500 uppercase tracking-wider font-bold mb-1.5">{t('hero.demo.overview.myTasks')}</p>
         <div className="space-y-1">
           {D.tasks.slice(0, 3).map((task, i) => (
-            <motion.div key={task.id}
+            <m.div key={task.id}
               initial={{ opacity: 0, x: -6 }} animate={{ opacity: 1, x: 0 }}
               transition={{ duration: reduced ? 0 : 0.3, delay: reduced ? 0 : i * 0.07 }}
               className="flex items-center gap-2 rounded-lg border border-white/[0.04] bg-white/[0.02] px-2.5 py-1.5">
@@ -261,7 +261,7 @@ function SceneOverview({ reduced }: { reduced: boolean }) {
                 style={{ color: PRIO_COL[task.priority], background: PRIO_COL[task.priority] + '18' }}>
                 {t(`sample.priority.${task.priority}`)}
               </span>
-            </motion.div>
+            </m.div>
           ))}
         </div>
       </div>
@@ -313,7 +313,7 @@ function SceneCRM({ reduced }: { reduced: boolean }) {
         {D.crm.map((c, i) => {
           const ss = ST_STYLE[c.st];
           return (
-            <motion.div key={c.name}
+            <m.div key={c.name}
               initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
               transition={{ duration: reduced ? 0 : 0.35, delay: reduced ? 0 : i * 0.08 }}
               className="flex items-center gap-2.5 px-3 py-2 hover:bg-white/[0.02]">
@@ -326,7 +326,7 @@ function SceneCRM({ reduced }: { reduced: boolean }) {
               <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-md whitespace-nowrap"
                 style={{ color: ss.col, background: ss.bg }}>{t(`hero.demo.crm.stages.${c.stage}`)}</span>
               <span className="text-[9px] font-bold text-slate-400 shrink-0">{c.value}</span>
-            </motion.div>
+            </m.div>
           );
         })}
       </div>
@@ -349,7 +349,7 @@ function SceneTeam({ reduced }: { reduced: boolean }) {
         <span className="text-[9px] text-slate-500">{t('sample.members', { count: 23 })}</span>
       </div>
       {D.team.map((team, i) => (
-        <motion.div key={team.dept}
+        <m.div key={team.dept}
           initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
           transition={{ duration: reduced ? 0 : 0.3, delay: reduced ? 0 : i * 0.07 }}>
           <div className="flex items-center justify-between mb-1.5">
@@ -363,7 +363,7 @@ function SceneTeam({ reduced }: { reduced: boolean }) {
             </div>
           </div>
           <Bar pct={team.pct} col={team.col} delay={i * 0.09} reduced={reduced} />
-        </motion.div>
+        </m.div>
       ))}
       {/* Quick member avatars */}
       <div className="pt-1">
@@ -396,7 +396,7 @@ function SceneTasks({ reduced }: { reduced: boolean }) {
         </button>
       </div>
       {D.tasks.map((task, i) => (
-        <motion.div key={task.id}
+        <m.div key={task.id}
           initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
           transition={{ duration: reduced ? 0 : 0.3, delay: reduced ? 0 : i * 0.07 }}
           className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-2.5">
@@ -421,7 +421,7 @@ function SceneTasks({ reduced }: { reduced: boolean }) {
               {task.pct}%
             </span>
           </div>
-        </motion.div>
+        </m.div>
       ))}
     </div>
   );
@@ -441,7 +441,7 @@ function SceneChat({ reduced }: { reduced: boolean }) {
       {/* Messages */}
       <div className="flex-1 p-3 space-y-3 overflow-hidden">
         {D.chat.messages.map((msg, i) => (
-          <motion.div key={i}
+          <m.div key={i}
             initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
             transition={{ duration: reduced ? 0 : 0.35, delay: reduced ? 0 : i * 0.14 }}
             className="flex items-start gap-2.5">
@@ -454,7 +454,7 @@ function SceneChat({ reduced }: { reduced: boolean }) {
               </div>
               <p className="text-[10px] text-slate-400 leading-relaxed">{t(`hero.demo.chat.messages.${msg.id}`)}</p>
             </div>
-          </motion.div>
+          </m.div>
         ))}
       </div>
       {/* Input bar */}
@@ -518,16 +518,16 @@ function SceneAI({ reduced }: { reduced: boolean }) {
           <div className="rounded-xl bg-white/[0.04] border border-white/[0.06] px-2.5 py-1.5 flex-1 min-h-[28px]">
             <AnimatePresence mode="wait">
               {!showResp ? (
-                <motion.p key="typing" className="text-[10px] text-slate-600"
+                <m.p key="typing" className="text-[10px] text-slate-600"
                   initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                   {t('hero.demo.ai.thinking')}{dots}
-                </motion.p>
+                </m.p>
               ) : (
-                <motion.p key="resp" className="text-[10px] text-slate-300 leading-relaxed"
+                <m.p key="resp" className="text-[10px] text-slate-300 leading-relaxed"
                   initial={{ opacity: 0, y: 3 }} animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.3 }}>
                   {t('hero.demo.ai.answer')}
-                </motion.p>
+                </m.p>
               )}
             </AnimatePresence>
           </div>
@@ -652,7 +652,7 @@ function ProductDemo({ reduced }: { reduced: boolean }) {
         {/* Scene content — crossfades between scenes */}
         <div className="flex-1 overflow-hidden relative">
           <AnimatePresence mode="wait">
-            <motion.div
+            <m.div
               key={scene.key}
               variants={sceneVariants}
               initial="enter"
@@ -661,7 +661,7 @@ function ProductDemo({ reduced }: { reduced: boolean }) {
               className="absolute inset-0 flex flex-col overflow-hidden"
             >
               <SceneContent scene={scene.key} reduced={reduced} />
-            </motion.div>
+            </m.div>
           </AnimatePresence>
         </div>
       </div>
@@ -671,7 +671,7 @@ function ProductDemo({ reduced }: { reduced: boolean }) {
         <div className="flex items-center gap-3">
           <SceneIndicator current={sceneIdx} total={SCENES.length} col={scene.col} />
           <AnimatePresence mode="wait">
-            <motion.div key={scene.key} className="flex items-center gap-1.5"
+            <m.div key={scene.key} className="flex items-center gap-1.5"
               initial={{ opacity: 0, x: 6 }} animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -4 }} transition={{ duration: 0.25 }}>
               {React.createElement(scene.icon as React.ElementType, {
@@ -679,7 +679,7 @@ function ProductDemo({ reduced }: { reduced: boolean }) {
                 style: { color: scene.col },
               })}
               <span className="text-[9px] font-semibold" style={{ color: scene.col }}>{sceneLabel(scene.key)}</span>
-            </motion.div>
+            </m.div>
           </AnimatePresence>
         </div>
         <div className="flex items-center gap-1.5">

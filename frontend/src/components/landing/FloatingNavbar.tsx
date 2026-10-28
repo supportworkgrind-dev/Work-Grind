@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { motion, AnimatePresence, useScroll } from 'framer-motion';
+import { m, AnimatePresence, useScroll } from 'framer-motion';
 import { ThemeAwareLogo } from '@/components/common/ThemeAwareLogo';
 import { Menu, X, ArrowRight } from 'lucide-react';
 import { LangSelector } from './PublicNavbar';
@@ -46,7 +46,7 @@ export function FloatingNavbar({ isAuthenticated = false }: FloatingNavbarProps)
 
   return (
     <>
-      <motion.header
+      <m.header
         initial={{ y: -72, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
@@ -105,12 +105,12 @@ export function FloatingNavbar({ isAuthenticated = false }: FloatingNavbarProps)
             {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
         </div>
-      </motion.header>
+      </m.header>
 
       {/* Mobile drawer */}
       <AnimatePresence>
         {mobileOpen && (
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: -12 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -12 }}
@@ -136,7 +136,7 @@ export function FloatingNavbar({ isAuthenticated = false }: FloatingNavbarProps)
                 {t('nav.getStarted')}
               </Link>
             </div>
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
     </>

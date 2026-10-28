@@ -56,20 +56,7 @@ export function GlobalSearchModal() {
 
   const inputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-        e.preventDefault();
-        setSearchOpen(true);
-      }
-      if (e.key === 'Escape') {
-        setSearchOpen(false);
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [setSearchOpen]);
+  // Cmd/Ctrl+K and Escape are handled by ShellModals, which also mounts this modal.
 
   useEffect(() => {
     if (isSearchOpen) {

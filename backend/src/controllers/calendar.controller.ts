@@ -11,14 +11,19 @@ export const getEvents = async (req: AuthRequest, res: Response): Promise<void> 
   try {
     const { start, end } = req.query;
     const filter: any = { companyId: req.user!.companyId };
-
+    // The calendar asks for one visible range; tasks and meetings are limited
+    // to it as well, instead of loading every dated record in the workspace.
+    let range: { $gte: Date; $lte: Date } | undefined;
     if (start && end) {
-      filter.startDate = { $gte: new Date(start as string), $lte: new Date(end as string) };
+      range = { $gte: new Date(start as string), $lte: new Date(end as string) };
+      if (Number.isNaN(range.$gte.getTime()) || Number.isNaN(range.$lte.getTime())) {
+        res.status(400).json({ success: false, message: 'start and end must be valid dates.' });
+        return;
+      }
+      filter.startDate = range;
     }
 
-    const postDateFilter = start && end
-      ? { $gte: new Date(start as string), $lte: new Date(end as string) }
-      : { $gte: new Date() };
+    const postDateFilter = range ?? { $gte: new Date() };
     const organizationType = req.user!.organizationType;
     const accountType = req.user!.accountType;
     const canSeeSocialPosts = isOrganizationType(organizationType) &&
@@ -34,18 +39,24 @@ export const getEvents = async (req: AuthRequest, res: Response): Promise<void> 
         .populate('attendees', 'fullName avatar email')
         .populate('meetingId', 'meetingLink title')
         .populate('projectId', 'name color')
-        .sort({ startDate: 1 }),
+        .sort({ startDate: 1 })
+        .lean(),
       Task.find({
         companyId: req.user!.companyId,
-        dueDate: { $exists: true, $ne: null },
+        dueDate: range ?? { $exists: true, $ne: null },
         isArchived: false,
       })
+        .select('companyId title description priority status dueDate projectId assigneeId')
         .populate('projectId', 'name color')
-        .populate('assigneeId', 'fullName avatar'),
+        .populate('assigneeId', 'fullName avatar')
+        .lean(),
       Meeting.find({
         companyId: req.user!.companyId,
-        scheduledAt: { $exists: true, $ne: null },
-      }).populate('hostId', 'fullName avatar'),
+        scheduledAt: range ?? { $exists: true, $ne: null },
+      })
+        .select('companyId hostId title description scheduledAt endedAt duration meetingLink participants.userId')
+        .populate('hostId', 'fullName avatar')
+        .lean(),
       canSeeSocialPosts
         ? SocialPost.find({
           companyId: req.user!.companyId,
@@ -54,6 +65,7 @@ export const getEvents = async (req: AuthRequest, res: Response): Promise<void> 
         }).select('platform text authorId scheduledAt scheduleTimeZone')
           .populate('authorId', 'fullName avatar')
           .sort({ scheduledAt: 1 })
+          .lean()
         : Promise.resolve([]),
     ]);
 

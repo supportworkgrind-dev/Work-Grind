@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { motion } from 'framer-motion';
+import { m } from 'framer-motion';
 import { ArrowRight, Users, Briefcase, CheckSquare, Sparkles, Building2, BarChart3, MessageSquare, Calendar, Grid3X3, GraduationCap, BookOpen, UserRound } from 'lucide-react';
 
 const PILLARS = [
@@ -66,7 +66,7 @@ export function ProductShowcase() {
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
         {/* Heading */}
-        <motion.div
+        <m.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: '-60px' }}
@@ -80,14 +80,14 @@ export function ProductShowcase() {
           <p className="text-base text-slate-400 leading-relaxed">
             WorkGrind brings personal work, business and office teams, and education administration together. Choose Solo, Company, School / Academy, College, or University; available features depend on workspace, role, and plan.
           </p>
-        </motion.div>
+        </m.div>
 
         {/* Workspace-specific capability groups */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
           {PILLARS.map((p, i) => {
             const Icon = p.icon;
             return (
-              <motion.div
+              <m.div
                 key={p.id}
                 initial={{ opacity: 0, y: 24 }}
                 whileInView={{ opacity: 1, y: 0 }}
@@ -133,13 +133,13 @@ export function ProductShowcase() {
                     </div>
                   </div>
                 )}
-              </motion.div>
+              </m.div>
             );
           })}
         </div>
 
         {/* Connective tagline */}
-        <motion.div
+        <m.div
           initial={{ opacity: 0, y: 12 }}
           whileInView={{ opacity: 1 }}
           viewport={{ once: true }}
@@ -168,7 +168,7 @@ export function ProductShowcase() {
               </li>
             ))}
           </ol>
-        </motion.div>
+        </m.div>
       </div>
     </section>
   );

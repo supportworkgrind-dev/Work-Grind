@@ -6,7 +6,7 @@
 ────────────────────────────────────────────────────────────────────────────── */
 
 import React, { useState } from 'react';
-import { motion } from 'framer-motion';
+import { m } from 'framer-motion';
 import { Building2, Search, Phone, Mail, CheckSquare, ArrowRight, Plus, MoreHorizontal, Users, Briefcase, CalendarDays } from 'lucide-react';
 
 const CRM_CONTACTS = [
@@ -47,7 +47,7 @@ export function FeatureNetwork() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-start">
 
           {/* LEFT: Copy */}
-          <motion.div
+          <m.div
             initial={{ opacity: 0, x: -24 }}
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true, margin: '-60px' }}
@@ -80,10 +80,10 @@ export function FeatureNetwork() {
                 </li>
               ))}
             </ul>
-          </motion.div>
+          </m.div>
 
           {/* RIGHT: CRM UI */}
-          <motion.div
+          <m.div
             initial={{ opacity: 0, x: 24 }}
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true, margin: '-60px' }}
@@ -238,7 +238,7 @@ export function FeatureNetwork() {
                 </div>
               </div>
             </div>
-          </motion.div>
+          </m.div>
         </div>
       </div>
     </section>

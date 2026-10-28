@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { motion } from 'framer-motion';
+import { m } from 'framer-motion';
 import { Users, CheckSquare, MessageSquare, Video, Sparkles, ArrowRight, BarChart3, Calendar, Briefcase, Zap, GitBranch, CheckCircle2, CalendarDays } from 'lucide-react';
 
 /* ── Reusable section container ── */
@@ -41,7 +41,7 @@ function TeamSection() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
 
           {/* UI — LEFT */}
-          <motion.div
+          <m.div
             initial={{ opacity: 0, x: -24 }}
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true, margin: '-60px' }}
@@ -94,10 +94,10 @@ function TeamSection() {
                 ))}
               </div>
             </div>
-          </motion.div>
+          </m.div>
 
           {/* Copy — RIGHT */}
-          <motion.div
+          <m.div
             initial={{ opacity: 0, x: 24 }}
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true, margin: '-60px' }}
@@ -122,7 +122,7 @@ function TeamSection() {
                 </li>
               ))}
             </ul>
-          </motion.div>
+          </m.div>
         </div>
       </div>
     </Section>
@@ -223,7 +223,7 @@ function WorkflowSection() {
       </div>
 
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <motion.div
+        <m.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: '-60px' }}
@@ -236,14 +236,14 @@ function WorkflowSection() {
           <p className="text-base text-slate-400">
             Bring chats, tasks, projects, meetings, and follow-up together in a shared workspace.
           </p>
-        </motion.div>
+        </m.div>
 
         {/* Flow */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
           {steps.map((s, i) => {
             const Icon = s.icon;
             return (
-              <motion.div
+              <m.div
                 key={s.step}
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
@@ -271,7 +271,7 @@ function WorkflowSection() {
                   </div>
                   {s.preview}
                 </div>
-              </motion.div>
+              </m.div>
             );
           })}
         </div>
@@ -349,7 +349,7 @@ function TasksSection() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-start">
 
           {/* Copy */}
-          <motion.div
+          <m.div
             initial={{ opacity: 0, x: -24 }}
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true, margin: '-60px' }}
@@ -373,10 +373,10 @@ function TasksSection() {
                 </li>
               ))}
             </ul>
-          </motion.div>
+          </m.div>
 
           {/* Kanban UI */}
-          <motion.div
+          <m.div
             initial={{ opacity: 0, x: 24 }}
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true, margin: '-60px' }}
@@ -433,7 +433,7 @@ function TasksSection() {
                 </div>
               </div>
             </div>
-          </motion.div>
+          </m.div>
         </div>
       </div>
     </Section>

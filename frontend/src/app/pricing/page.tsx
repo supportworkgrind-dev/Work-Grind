@@ -310,8 +310,17 @@ export default function PricingPage() {
 
         {/* ── Plan cards ── */}
         {loadingPlans ? (
-          <div className="flex justify-center py-20">
-            <Loader2 className="h-8 w-8 animate-spin text-indigo-400" />
+          // Placeholders reserve the plan grid (and, for visitors, the education
+          // section) so the content below does not jump when plans arrive.
+          <div role="status" aria-label="Loading plans">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-20" aria-hidden="true">
+              {[0, 1, 2].map((index) => (
+                <div key={index} className="h-[556px] sm:h-[596px] lg:h-[556px] animate-pulse rounded-3xl border border-white/[0.07] bg-[#0d1117]" />
+              ))}
+            </div>
+            {!authReady && (
+              <div className="mb-20 h-[1150px] sm:h-[535px] lg:h-[445px] animate-pulse rounded-3xl border border-white/[0.07] bg-[#0d1117]" aria-hidden="true" />
+            )}
           </div>
         ) : !authReady ? (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-20">

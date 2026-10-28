@@ -58,7 +58,7 @@ const loading = new Map<LangCode, Promise<void>>();
  * repeated calls, so React's use() can suspend on it during the first render.
  */
 export function loadLanguage(code: LangCode): Promise<void> {
-  if (code === DEFAULT_LANG) return Promise.resolve();
+  if (code === 'en') return Promise.resolve();
   let promise = loading.get(code);
   if (!promise) {
     promise = LOADERS[code]().then(({ marketing, app }) => {
@@ -160,9 +160,6 @@ const I18nContext = createContext<I18nContextValue>({
 export function I18nProvider({ children, initialLang = DEFAULT_LANG }: { children: ReactNode; initialLang?: LangCode }) {
   // The server rendered `initialLang` (from the cookie), so hydration matches.
   const [lang, setLangState] = useState<LangCode>(initialLang);
-  // Both the server render and hydration wait for a non-English dictionary,
-  // so the first paint is already in the chosen language.
-  if (!DICTIONARIES[lang]) use(loadLanguage(lang));
 
   // Code outside render (stores, interceptors) follows the rendered language.
   if (typeof window !== 'undefined') setActiveLanguage(lang, DICTIONARIES);
@@ -196,11 +193,26 @@ export function I18nProvider({ children, initialLang = DEFAULT_LANG }: { childre
     setLang,
     t: (key, vars) => resolveMessage(DICTIONARIES, lang, key, vars),
     tOptional: (key, vars) => resolveOptionalMessage(DICTIONARIES, lang, key, vars),
-    translations: MARKETING[lang] ?? en,
+    // Read on access: a non-English dictionary may arrive after this value is created.
+    get translations() { return MARKETING[lang] ?? en; },
     ...createFormatters(lang),
   }), [lang, setLang]);
 
-  return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
+  return (
+    <I18nContext.Provider value={value}>
+      <DictionaryGate lang={lang}>{children}</DictionaryGate>
+    </I18nContext.Provider>
+  );
+}
+
+/**
+ * Waits for a non-English dictionary before rendering the page, on the server
+ * and during hydration, so the first paint is already in the chosen language.
+ * It has no other hooks, so suspending here cannot disturb the provider's.
+ */
+function DictionaryGate({ lang, children }: { lang: LangCode; children: ReactNode }) {
+  if (!DICTIONARIES[lang]) use(loadLanguage(lang));
+  return children;
 }
 
 // ── Hooks ──────────────────────────────────────────────────────────────────
