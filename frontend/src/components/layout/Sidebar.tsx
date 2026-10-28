@@ -41,11 +41,12 @@ import { premiumIconClass } from '@/components/common/AppIcons';
 import { getInitials } from '@/lib/utils';
 import { useState, memo, useCallback, useMemo, useEffect } from 'react';
 import { ThemeAwareLogo } from '@/components/common/ThemeAwareLogo';
-import { ACADEMIC_SECTIONS } from '@/lib/academicSections';
+import { ACADEMIC_SECTIONS, academicSectionLabelKey, type AcademicSection } from '@/lib/academicSections';
 import { useI18n, useT, type NamespaceKey } from '@/lib/i18n';
 import {
   canAccessAcademicSection,
   canAccessRoute,
+  getWorkspaceExperience,
   isEducationOrganization,
   roleLabelKey,
 } from '@/lib/organizationAccess';
@@ -209,6 +210,13 @@ export const Sidebar = memo(function Sidebar() {
   const { t: translate, tOptional } = useI18n();
   // Titles follow the workspace type ("School Admin", "Department Head").
   const roleLabel = (role?: string) => (role ? tOptional(roleLabelKey(role, company)) ?? role : '');
+  // "Personal workspace", or the workspace type with the member's title ("School · Principal").
+  const experience = getWorkspaceExperience(company);
+  const workspaceSubtitle = experience === 'solo'
+    ? t('sidebar.personalWorkspace')
+    : experience
+      ? t('sidebar.workspaceTypeWithRole', { type: t(`sidebar.workspaceTypes.${experience}`), role: roleLabel(user?.role) || t('sidebar.workspace') })
+      : roleLabel(user?.role) || t('sidebar.workspace');
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
@@ -292,8 +300,9 @@ export const Sidebar = memo(function Sidebar() {
             <span className="truncate text-[13px] font-bold theme-text-primary leading-tight">
               {company?.name || 'WorkGrind'}
             </span>
-            <span className="text-[10px] font-semibold uppercase tracking-wider leading-tight mt-0.5 theme-text-muted">
-              {company?.accountType === 'individual' ? t('sidebar.personalWorkspace') : roleLabel(user?.role) || t('sidebar.workspace')}
+            <span className="workspace-type-label flex min-w-0 items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider leading-tight mt-0.5" data-testid="workspace-type-label">
+              <span className="workspace-type-dot h-1.5 w-1.5 shrink-0 rounded-full" aria-hidden="true" />
+              <span className="truncate">{workspaceSubtitle}</span>
             </span>
           </div>
         )}
@@ -319,7 +328,9 @@ export const Sidebar = memo(function Sidebar() {
               <div className="space-y-0.5">
           {section.items.map((item) => {
             const Icon = item.icon;
-            const label = translate(item.labelKey);
+            const label = section.educationOnly
+              ? translate(academicSectionLabelKey(item.name as AcademicSection, company?.organizationType))
+              : translate(item.labelKey);
             const [itemPath, itemQuery] = item.href.split('?');
             const itemSection = itemQuery ? new URLSearchParams(itemQuery).get('section') : null;
             const isAcademicItem = itemPath === '/academic' && itemSection !== null;

@@ -14,7 +14,7 @@ import { IncomingCallManager } from '@/components/calling/IncomingCallManager';
 import { ThemeAwareLogo } from '@/components/common/ThemeAwareLogo';
 import { ExpiredSubscriptionExperience } from '@/components/subscription/ExpiredSubscriptionExperience';
 import { DeveloperShell } from '@/components/layout/DeveloperShell';
-import { canAccessRoute, getWorkspaceHome } from '@/lib/organizationAccess';
+import { canAccessRoute, getWorkspaceExperience, getWorkspaceHome } from '@/lib/organizationAccess';
 import { useSubscriptionRevalidation } from '@/lib/useSubscriptionRevalidation';
 import Link from 'next/link';
 
@@ -31,9 +31,11 @@ const AppShell = memo(function AppShell({
 }) {
   const pathname = usePathname();
   const workspace = pathname.split('/').filter(Boolean).join('-') || 'dashboard';
+  // Business, Solo and each institution type get their own accent (globals.css).
+  const workspaceType = useAuthStore((s) => getWorkspaceExperience(s.company)) ?? undefined;
 
   return (
-    <div className="theme-scope min-h-screen theme-bg-base flex overflow-x-hidden" data-workspace-shell={workspace}>
+    <div className="theme-scope min-h-screen theme-bg-base flex overflow-x-hidden" data-workspace-shell={workspace} data-workspace-type={workspaceType}>
       <Sidebar />
       <div
         className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${

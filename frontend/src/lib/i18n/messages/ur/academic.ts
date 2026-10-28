@@ -20,6 +20,10 @@ export const academicUr: Mirror<typeof academic.en> = {
     imports: 'امپورٹ / ایکسپورٹ',
   },
   sectionsNav: 'تعلیمی حصے',
+  sectionsByType: {
+    school: { courses: 'مضامین' },
+    university: { teachers: 'فیکلٹی' },
+  },
   institutionTypes: {
     school: 'اسکول',
     college: 'کالج',

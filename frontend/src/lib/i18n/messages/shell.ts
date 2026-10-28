@@ -46,6 +46,14 @@ export const shell = defineMessages(
       closeSidebar: 'Close sidebar',
       workspaceLogo: 'Workspace logo',
       personalWorkspace: 'Personal workspace',
+      // Shown with the workspace's accent in the sidebar header.
+      workspaceTypes: {
+        company: 'Business',
+        school: 'School',
+        college: 'College',
+        university: 'University',
+      },
+      workspaceTypeWithRole: '{{type}} · {{role}}',
       workspace: 'Workspace',
       myAccount: 'My Account',
       teamMember: 'Team Member',

@@ -5,9 +5,11 @@ import Link from 'next/link';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useAppStore } from '@/store/useAppStore';
 import { api } from '@/lib/api';
-import { canAccessRoute } from '@/lib/organizationAccess';
+import { canAccessRoute, getWorkspaceExperience } from '@/lib/organizationAccess';
+import { useRoleLabel } from '@/lib/useRoleLabel';
 import { Task, Project, Meeting, Message, CrmPipelineStats, DealStage } from '@/types';
 import { DailyFocusCard } from '@/components/dashboard/DailyFocusCard';
+import { AgendaCard } from '@/components/dashboard/AgendaCard';
 import { TrialBanner } from '@/components/subscription/TrialBanner';
 import { StatCard } from '@/components/common/StatCard';
 import { Avatar } from '@/components/common/Avatar';
@@ -189,9 +191,16 @@ function DashboardSkeleton() {
    DASHBOARD PAGE
 ══════════════════════════════════════════════════════════════════════════════ */
 export default function DashboardPage() {
-  const { user, company } = useAuthStore();
+  const { user, company, canUse } = useAuthStore();
   const { openCreateModal } = useAppStore();
   const canSeeCrm = canAccessRoute(company, user?.role, '/crm');
+  // Solo workspaces have no team meetings or chat (the API refuses them), so
+  // their dashboard shows a personal agenda instead of those cards.
+  const isSolo = getWorkspaceExperience(company) === 'solo';
+  const canUseMeetings = canAccessRoute(company, user?.role, '/meetings');
+  const canUseChat = canAccessRoute(company, user?.role, '/chat');
+  const canUseCalendar = canAccessRoute(company, user?.role, '/calendar') && canUse('meetingsCalendar');
+  const roleLabel = useRoleLabel(company);
 
   const [stats, setStats]             = useState({ totalTasks: 0, completedTasks: 0, pendingTasks: 0, activeProjects: 0, upcomingMeetings: 0 });
   const [myTasks, setMyTasks]         = useState<Task[]>([]);
@@ -212,7 +221,7 @@ export default function DashboardPage() {
         api.get('/companies/stats'),
         api.get('/tasks/my?limit=8'),
         api.get('/projects?limit=4'),
-        api.get('/meetings?limit=4'),
+        canUseMeetings ? api.get('/meetings?limit=4') : Promise.resolve(null),
         canSeeCrm ? api.get('/crm/stats') : Promise.resolve(null),
       ]);
       if (!active) return;
@@ -230,7 +239,7 @@ export default function DashboardPage() {
     })();
     // Recent messages come from the member's default channel (messages are
     // always read per channel); this card fills in without delaying the rest.
-    (async () => {
+    if (canUseChat) (async () => {
       try {
         const channelsRes = await api.get('/channels?limit=1');
         const channelId = channelsRes.data.channels?.[0]?._id;
@@ -240,7 +249,7 @@ export default function DashboardPage() {
       } catch { /* chat may be unavailable for this workspace or plan */ }
     })();
     return () => { active = false; };
-  }, [canSeeCrm]);
+  }, [canSeeCrm, canUseChat, canUseMeetings]);
 
   /* ── Helpers ── */
   const getGreeting = () => {
@@ -289,7 +298,7 @@ export default function DashboardPage() {
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight" style={{ color: 'var(--text-primary)' }}>
               {getGreeting()}, {user?.fullName?.split(' ')[0] ?? 'there'} 👋
             </h1>
-            <p className="text-xs font-bold uppercase tracking-widest mt-0.5 mb-0.5" style={{ color: 'var(--accent)' }}>Overview</p>
+            <p className="workspace-type-label text-xs font-bold uppercase tracking-widest mt-0.5 mb-0.5">{isSolo ? 'Personal overview' : 'Business overview'}</p>
             <p className="mt-1 text-sm" style={{ color: 'var(--text-secondary)' }}>
               {company?.accountType === 'individual'
                 ? 'Your personal workspace for tasks and projects: '
@@ -297,8 +306,8 @@ export default function DashboardPage() {
               <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>
                 {company?.name ?? 'your workspace'}
               </span>
-              {user?.role && (
-                <span className="ml-2 badge badge-indigo capitalize">{user.role}</span>
+              {user?.role && !isSolo && (
+                <span className="ml-2 badge badge-indigo">{roleLabel(user.role)}</span>
               )}
             </p>
           </div>
@@ -311,9 +320,11 @@ export default function DashboardPage() {
               <button onClick={() => openCreateModal('project')} className="btn-secondary btn-interactive h-9 px-4">
                 <Briefcase className="h-3.5 w-3.5" style={{ color: 'var(--accent)' }} /><span>New Project</span>
               </button>
-              <button onClick={() => openCreateModal('meeting')} className="btn-secondary btn-interactive h-9 px-4">
-                <Video className="h-3.5 w-3.5 text-blue-500" /><span>Meeting</span>
-              </button>
+              {canUseMeetings && (
+                <button onClick={() => openCreateModal('meeting')} className="btn-secondary btn-interactive h-9 px-4">
+                  <Video className="h-3.5 w-3.5 text-blue-500" /><span>Meeting</span>
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -322,14 +333,14 @@ export default function DashboardPage() {
       {/* ═══ STAT CARDS ═══ */}
       {/* stagger-grid: each card scales+fades in with 50ms stagger */}
       <div
-        className="overview-metrics stagger-grid grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 sm:gap-4"
+        className={`overview-metrics stagger-grid grid grid-cols-2 gap-3 sm:gap-4 ${canUseMeetings ? 'sm:grid-cols-3 lg:grid-cols-5' : 'lg:grid-cols-4'}`}
         style={{ '--reveal-delay': '40ms' } as React.CSSProperties}
       >
-        <StatCard label="Total Tasks"    value={stats.totalTasks}       sub="Across workspace"  icon={CheckSquare}  iconBg="bg-indigo-50"  iconColor="text-indigo-600"  accentColor="#6366f1" />
+        <StatCard label="Total Tasks"    value={stats.totalTasks}       sub={isSolo ? 'All your tasks' : 'Across workspace'}  icon={CheckSquare}  iconBg="bg-indigo-50"  iconColor="text-indigo-600"  accentColor="#6366f1" />
         <StatCard label="Completed"      value={stats.completedTasks}   sub="Delivered"          icon={CheckCircle2} iconBg="bg-emerald-50" iconColor="text-emerald-600" accentColor="#10b981" />
         <StatCard label="In Progress"    value={stats.pendingTasks}     sub="Active tasks"       icon={Clock}        iconBg="bg-amber-50"   iconColor="text-amber-600"   accentColor="#f59e0b" />
         <StatCard label="Active Projects" value={stats.activeProjects}  sub="Projects in progress" icon={Briefcase} iconBg="bg-violet-50" iconColor="text-violet-600" accentColor="#8b5cf6" />
-        <StatCard label="Meetings"       value={stats.upcomingMeetings} sub="Upcoming / active" icon={Video}        iconBg="bg-blue-50"    iconColor="text-blue-600"    accentColor="#3b82f6" className="col-span-2 sm:col-span-1" />
+        {canUseMeetings && <StatCard label="Meetings"       value={stats.upcomingMeetings} sub="Upcoming / active" icon={Video}        iconBg="bg-blue-50"    iconColor="text-blue-600"    accentColor="#3b82f6" className="col-span-2 sm:col-span-1" />}
       </div>
 
       {/* ═══ URGENT DEADLINES BANNER ═══ */}
@@ -490,80 +501,86 @@ export default function DashboardPage() {
         {/* RIGHT col */}
         <div className="stagger-children space-y-6">
 
-          {/* ── Upcoming Meetings ── */}
-          <div className="surface surface-interactive rounded-2xl overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: 'var(--border-subtle)' }}>
-              <div className="flex items-center gap-2.5">
-                <div className="h-8 w-8 rounded-xl bg-blue-50 flex items-center justify-center">
-                  <Video className="h-4 w-4 text-blue-600" />
-                </div>
-                <h3 className="text-sm font-bold theme-text-primary">Meetings</h3>
-              </div>
-              <button onClick={() => openCreateModal('meeting')} className="btn-ghost h-7 w-7 p-0 rounded-lg" aria-label="Schedule meeting">
-                <Plus className="h-4 w-4" />
-              </button>
-            </div>
-
-            {meetings.length === 0 ? (
-              <div className="p-5">
-                <EmptyState icon={Video} title="No meetings scheduled" description="Schedule a meeting when you need to meet with others." compact />
-              </div>
-            ) : (
-              <div className="divide-y" style={{ borderColor: 'var(--border-subtle)' }}>
-                {meetings.slice(0, 4).map((m) => (
-                  <div key={m._id} className="table-row-hover px-5 py-3.5">
-                    <div className="flex items-start justify-between gap-2">
-                      <p className="text-[13px] font-semibold theme-text-primary truncate">{m.title}</p>
-                      <span className={`badge shrink-0 ${m.status === 'active' ? 'badge-rose' : 'badge-slate'}`}>
-                        {m.status}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between mt-2">
-                      <p className="text-[11px] theme-text-muted flex items-center gap-1">
-                        <CalendarIcon className="h-3 w-3" />
-                        {m.scheduledAt ? formatDate(m.scheduledAt, 'MMM d, h:mm a') : 'Instant'}
-                      </p>
-                      <Link href={`/meetings/${m._id}`} className="btn-primary h-6 px-2 rounded-lg text-[10px]">
-                        {m.status === 'active' ? 'Join' : 'View'}
-                      </Link>
-                    </div>
+          {/* ── Upcoming Meetings, or the personal agenda ── */}
+          {canUseMeetings ? (
+            <div className="surface surface-interactive rounded-2xl overflow-hidden">
+              <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: 'var(--border-subtle)' }}>
+                <div className="flex items-center gap-2.5">
+                  <div className="h-8 w-8 rounded-xl bg-blue-50 flex items-center justify-center">
+                    <Video className="h-4 w-4 text-blue-600" />
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* ── Workspace Pulse ── */}
-          <div className="surface surface-interactive rounded-2xl overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: 'var(--border-subtle)' }}>
-              <div className="flex items-center gap-2.5">
-                <div className="h-8 w-8 rounded-xl bg-emerald-50 flex items-center justify-center">
-                  <Activity className="h-4 w-4 text-emerald-600" />
+                  <h3 className="text-sm font-bold theme-text-primary">Meetings</h3>
                 </div>
-                <h3 className="text-sm font-bold theme-text-primary">Workspace Pulse</h3>
+                <button onClick={() => openCreateModal('meeting')} className="btn-ghost h-7 w-7 p-0 rounded-lg" aria-label="Schedule meeting">
+                  <Plus className="h-4 w-4" />
+                </button>
               </div>
-              <Link href="/chat" className="text-xs font-semibold text-indigo-600 hover:text-indigo-700">Open chat →</Link>
-            </div>
 
-            {recentMessages.length === 0 ? (
-              <div className="px-5 py-4 text-[12px] theme-text-muted text-center">No recent messages</div>
-            ) : (
-              <div className="divide-y" style={{ borderColor: 'var(--border-subtle)' }}>
-                {recentMessages.map((msg) => (
-                  <div key={msg._id} className="table-row-hover flex gap-3 px-5 py-3 transition-colors">
-                    <Avatar name={msg.senderId?.fullName ?? 'User'} src={msg.senderId?.avatar} size="sm" className="shrink-0 mt-0.5" />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-baseline gap-1.5 flex-wrap">
-                        <span className="text-[12px] font-semibold theme-text-primary">{msg.senderId?.fullName}</span>
-                        <span className="text-[10px] theme-text-muted">{formatTimeAgo(msg.createdAt)}</span>
+              {meetings.length === 0 ? (
+                <div className="p-5">
+                  <EmptyState icon={Video} title="No meetings scheduled" description="Schedule a meeting when you need to meet with others." compact />
+                </div>
+              ) : (
+                <div className="divide-y" style={{ borderColor: 'var(--border-subtle)' }}>
+                  {meetings.slice(0, 4).map((m) => (
+                    <div key={m._id} className="table-row-hover px-5 py-3.5">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-[13px] font-semibold theme-text-primary truncate">{m.title}</p>
+                        <span className={`badge shrink-0 ${m.status === 'active' ? 'badge-rose' : 'badge-slate'}`}>
+                          {m.status}
+                        </span>
                       </div>
-                      <p className="text-[11px] theme-text-secondary truncate mt-0.5">{msg.content || '[Attachment]'}</p>
+                      <div className="flex items-center justify-between mt-2">
+                        <p className="text-[11px] theme-text-muted flex items-center gap-1">
+                          <CalendarIcon className="h-3 w-3" />
+                          {m.scheduledAt ? formatDate(m.scheduledAt, 'MMM d, h:mm a') : 'Instant'}
+                        </p>
+                        <Link href={`/meetings/${m._id}`} className="btn-primary h-6 px-2 rounded-lg text-[10px]">
+                          {m.status === 'active' ? 'Join' : 'View'}
+                        </Link>
+                      </div>
                     </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : canUseCalendar ? (
+            <AgendaCard />
+          ) : null}
+
+          {/* ── Workspace Pulse (team chat) ── */}
+          {canUseChat && (
+            <div className="surface surface-interactive rounded-2xl overflow-hidden">
+              <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: 'var(--border-subtle)' }}>
+                <div className="flex items-center gap-2.5">
+                  <div className="h-8 w-8 rounded-xl bg-emerald-50 flex items-center justify-center">
+                    <Activity className="h-4 w-4 text-emerald-600" />
                   </div>
-                ))}
+                  <h3 className="text-sm font-bold theme-text-primary">Workspace Pulse</h3>
+                </div>
+                <Link href="/chat" className="text-xs font-semibold text-indigo-600 hover:text-indigo-700">Open chat →</Link>
               </div>
-            )}
-          </div>
+
+              {recentMessages.length === 0 ? (
+                <div className="px-5 py-4 text-[12px] theme-text-muted text-center">No recent messages</div>
+              ) : (
+                <div className="divide-y" style={{ borderColor: 'var(--border-subtle)' }}>
+                  {recentMessages.map((msg) => (
+                    <div key={msg._id} className="table-row-hover flex gap-3 px-5 py-3 transition-colors">
+                      <Avatar name={msg.senderId?.fullName ?? 'User'} src={msg.senderId?.avatar} size="sm" className="shrink-0 mt-0.5" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-baseline gap-1.5 flex-wrap">
+                          <span className="text-[12px] font-semibold theme-text-primary">{msg.senderId?.fullName}</span>
+                          <span className="text-[10px] theme-text-muted">{formatTimeAgo(msg.createdAt)}</span>
+                        </div>
+                        <p className="text-[11px] theme-text-secondary truncate mt-0.5">{msg.content || '[Attachment]'}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

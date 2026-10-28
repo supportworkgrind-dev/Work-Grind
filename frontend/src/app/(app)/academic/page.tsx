@@ -8,7 +8,7 @@ import { describeApiError } from '@/lib/apiError';
 import { useAuthStore } from '@/store/useAuthStore';
 import { PageHeader } from '@/components/common/PageHeader';
 import { BookOpen, FileSpreadsheet, GraduationCap, Loader2, Pencil, Plus, Trash2, Users } from 'lucide-react';
-import { ACADEMIC_SECTIONS, isAcademicSection } from '@/lib/academicSections';
+import { ACADEMIC_SECTIONS, academicSectionLabelKey, isAcademicSection } from '@/lib/academicSections';
 import { canAccessAcademicSection, canAccessOrganizationFeature, isEducationOrganization, permissionRole } from '@/lib/organizationAccess';
 import { renderRich, useI18n, useT } from '@/lib/i18n';
 import { AcademicImportPanel } from '@/components/academic/AcademicImportPanel';
@@ -260,7 +260,7 @@ export default function AcademicPage() {
   const [editDraft, setEditDraft] = useState<Record<string, string>>({});
   const t = useT('academic');
   const tc = useT('common');
-  const { tOptional, formatDate, formatCurrency } = useI18n();
+  const { t: translate, tOptional, formatDate, formatCurrency } = useI18n();
 
   // Values the API sends keep their raw text when no label exists for them.
   const valueLabel = (group: ValueGroup, value: string) => tOptional(`academic.values.${group}.${value}`) ?? value;
@@ -421,7 +421,7 @@ export default function AcademicPage() {
     return <div className="academic-card m-6"><h1 className="academic-heading">{t('gate.title')}</h1><p className="text-sm" style={{ color: 'var(--text-muted)' }}>{renderRich(t('gate.body'), { link: (chunk) => <Link className="underline" href="/settings">{chunk}</Link> })}</p></div>;
   }
 
-  const sectionTitle = t(`sections.${activeSection}`);
+  const sectionTitle = translate(academicSectionLabelKey(activeSection, company?.organizationType));
   const sectionClass = (section: string) => activeSection === section ? '' : 'hidden';
   const peopleEmptyKey = activeSection === 'students' || activeSection === 'teachers' || activeSection === 'parents' ? activeSection : 'overview';
 
@@ -439,7 +439,7 @@ export default function AcademicPage() {
       <nav aria-label={t('sectionsNav')} className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 lg:hidden">
         {visibleAcademicSections.map((section) => (
           <Link key={section.id} href={`/academic?section=${section.id}`} aria-current={activeSection === section.id ? 'page' : undefined} className={`shrink-0 rounded-full border px-3 py-2 text-xs font-medium ${activeSection === section.id ? 'border-[var(--accent)] bg-[var(--accent-subtle)]' : 'theme-border'}`}>
-            {t(`sections.${section.id}`)}
+            {translate(academicSectionLabelKey(section.id, company?.organizationType))}
           </Link>
         ))}
       </nav>

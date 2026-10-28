@@ -4711,3 +4711,21 @@ body::selection {
 .admin-auth-shell.theme-scope [class~="border-indigo-500/30"] {
   border-color: var(--border-color) !important;
 }
+
+/* Workspace identity: each workspace type has its own accent, shown next to
+   (never instead of) the member's chosen theme accent. The type comes from the
+   server-provided organization on the app shell (data-workspace-type). */
+[data-workspace-type] { --workspace-accent: var(--accent); }
+[data-workspace-type="solo"] { --workspace-accent: #0f766e; }
+[data-workspace-type="company"] { --workspace-accent: #4338ca; }
+[data-workspace-type="school"] { --workspace-accent: #b45309; }
+[data-workspace-type="college"] { --workspace-accent: #6d28d9; }
+[data-workspace-type="university"] { --workspace-accent: #9f1239; }
+:is([data-theme="dark"], [data-theme="midnight"], [data-theme="aurora"], [data-theme="ocean"], [data-theme="graphite"]) [data-workspace-type="solo"] { --workspace-accent: #5eead4; }
+:is([data-theme="dark"], [data-theme="midnight"], [data-theme="aurora"], [data-theme="ocean"], [data-theme="graphite"]) [data-workspace-type="company"] { --workspace-accent: #a5b4fc; }
+:is([data-theme="dark"], [data-theme="midnight"], [data-theme="aurora"], [data-theme="ocean"], [data-theme="graphite"]) [data-workspace-type="school"] { --workspace-accent: #fcd34d; }
+:is([data-theme="dark"], [data-theme="midnight"], [data-theme="aurora"], [data-theme="ocean"], [data-theme="graphite"]) [data-workspace-type="college"] { --workspace-accent: #c4b5fd; }
+:is([data-theme="dark"], [data-theme="midnight"], [data-theme="aurora"], [data-theme="ocean"], [data-theme="graphite"]) [data-workspace-type="university"] { --workspace-accent: #fda4af; }
+
+.workspace-type-label { color: var(--workspace-accent); }
+.workspace-type-dot { background: var(--workspace-accent); }

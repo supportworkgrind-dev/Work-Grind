@@ -46,6 +46,13 @@ export const shellUr: Mirror<typeof shell.en> = {
     closeSidebar: 'سائیڈ بار بند کریں',
     workspaceLogo: 'ورک اسپیس کا لوگو',
     personalWorkspace: 'ذاتی ورک اسپیس',
+    workspaceTypes: {
+      company: 'کاروبار',
+      school: 'اسکول',
+      college: 'کالج',
+      university: 'یونیورسٹی',
+    },
+    workspaceTypeWithRole: '{{type}} · {{role}}',
     workspace: 'ورک اسپیس',
     myAccount: 'میرا اکاؤنٹ',
     teamMember: 'ٹیم کا رکن',

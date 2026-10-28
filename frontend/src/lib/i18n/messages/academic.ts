@@ -21,6 +21,11 @@ export const academic = defineMessages(
       imports: 'Import / Export',
     },
     sectionsNav: 'Academic sections',
+    // Institution-specific names for a few sections (see academicSectionLabelKey).
+    sectionsByType: {
+      school: { courses: 'Subjects' },
+      university: { teachers: 'Faculty' },
+    },
     institutionTypes: {
       school: 'School',
       college: 'College',

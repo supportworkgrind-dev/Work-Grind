@@ -28,3 +28,14 @@ export type AcademicSection = (typeof ACADEMIC_SECTIONS)[number]['id'];
 export function isAcademicSection(value: string | null): value is AcademicSection {
   return ACADEMIC_SECTIONS.some((section) => section.id === value);
 }
+
+/**
+ * Message key for a section's name in the given institution type: schools say
+ * "Subjects" for courses and universities say "Faculty" for teachers.
+ */
+export function academicSectionLabelKey(section: AcademicSection, organizationType?: string | null): string {
+  const overrides = academic.en.sectionsByType as Record<string, Partial<Record<AcademicSection, string>>>;
+  return organizationType && overrides[organizationType]?.[section]
+    ? `academic.sectionsByType.${organizationType}.${section}`
+    : `academic.sections.${section}`;
+}
