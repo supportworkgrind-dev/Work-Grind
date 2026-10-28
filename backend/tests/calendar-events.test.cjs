@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const CalendarEvent = require('../dist/models/CalendarEvent').default;
 const Task = require('../dist/models/Task').default;
 const Meeting = require('../dist/models/Meeting').default;
+const SocialPost = require('../dist/models/SocialPost').default;
 const calendarController = require('../dist/controllers/calendar.controller');
 
 const companyId = new mongoose.Types.ObjectId().toString();
@@ -43,6 +44,7 @@ test('calendar limits tasks and meetings to the requested range and reads lean, 
     replace(CalendarEvent, 'find', (filter) => { filters.events = filter; return query([{ _id: 'e1', title: 'Planning', startDate: new Date('2026-10-02T09:00:00Z') }], calls.events); }),
     replace(Task, 'find', (filter) => { filters.tasks = filter; return query([{ _id: 't1', companyId, title: 'Ship', priority: 'urgent', status: 'todo', dueDate: due }], calls.tasks); }),
     replace(Meeting, 'find', (filter) => { filters.meetings = filter; return query([{ _id: 'm1', companyId, title: 'Sync', scheduledAt: new Date('2026-10-20T10:00:00Z'), duration: 30, participants: [{ userId: 'u1' }] }], calls.meetings); }),
+    replace(SocialPost, 'find', (filter) => { filters.posts = filter; return query([], []); }),
   ];
   try {
     const res = makeResponse();
@@ -52,6 +54,7 @@ test('calendar limits tasks and meetings to the requested range and reads lean, 
     assert.deepEqual(filters.events.startDate, range);
     assert.deepEqual(filters.tasks.dueDate, range, 'tasks outside the visible range are not loaded');
     assert.deepEqual(filters.meetings.scheduledAt, range, 'meetings outside the visible range are not loaded');
+    assert.deepEqual(filters.posts.scheduledAt, range);
     assert.equal(filters.tasks.companyId, companyId);
     assert.equal(filters.meetings.companyId, companyId);
     for (const list of Object.values(calls)) assert.ok(list.some(([name]) => name === 'lean'));

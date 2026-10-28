@@ -361,14 +361,17 @@ test('Academic Imports — exports records and shows onboarding statuses with re
 test('Academic Imports — people sections link to Import / Export and department heads are kept out', async ({ page }) => {
   await setupAcademicPage(page);
   await page.goto('/academic?section=students');
-  await page.getByRole('link', { name: 'Import / Export' }).first().click();
+  // The sidebar's section link has the same name; use the one in the people card.
+  await page.locator('section:has(h2:has-text("Register a person"))').getByRole('link', { name: 'Import / Export' }).click();
   await expect(page).toHaveURL(/section=imports&module=students/);
   await expect(page.getByLabel('Import module')).toHaveValue('students');
 
   await page.unrouteAll({ behavior: 'ignoreErrors' });
   await setupAcademicPage(page, { role: 'hod', organizationType: 'university' });
   await page.goto('/academic?section=imports');
-  await expect(page.getByText('Imports, exports and invitations are available to institution administrators.')).toBeVisible();
+  // Department heads are sent back to the overview and have no Import / Export entry.
+  await expect(page.locator('h1')).toContainText('Academic Overview');
+  await expect(page.getByRole('link', { name: 'Import / Export' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Download CSV template' })).toHaveCount(0);
 });
 
@@ -447,5 +450,6 @@ test('Academic invitation — a different signed-in email cannot accept, and inv
   await expect(page.getByRole('button', { name: /Link my account/ })).toHaveCount(0);
 
   await page.goto('/academic-invite?token=invalid-token-value');
-  await expect(page.getByRole('alert')).toContainText('invalid, expired, or has already been used');
+  // Next's route announcer is also role="alert", so match the message itself.
+  await expect(page.getByRole('alert').filter({ hasText: 'invalid, expired, or has already been used' })).toBeVisible();
 });
