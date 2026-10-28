@@ -7,7 +7,7 @@ import { api } from '@/lib/api';
 import { describeApiError } from '@/lib/apiError';
 import { useAuthStore } from '@/store/useAuthStore';
 import { PageHeader } from '@/components/common/PageHeader';
-import { BookOpen, GraduationCap, Loader2, Pencil, Plus, Trash2, Users } from 'lucide-react';
+import { BookOpen, FileSpreadsheet, GraduationCap, Loader2, Pencil, Plus, Trash2, Users } from 'lucide-react';
 import { ACADEMIC_SECTIONS, isAcademicSection } from '@/lib/academicSections';
 import { canAccessAcademicSection, canAccessOrganizationFeature, isEducationOrganization, permissionRole } from '@/lib/organizationAccess';
 import { renderRich, useI18n, useT } from '@/lib/i18n';
@@ -186,6 +186,7 @@ export default function AcademicPage() {
   const visibleAcademicSections = ACADEMIC_SECTIONS.filter((section) =>
     canAccessAcademicSection(user?.role, section.id, company?.organizationType),
   );
+  const canManageImports = canAccessAcademicSection(user?.role, 'imports', company?.organizationType);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -456,7 +457,7 @@ export default function AcademicPage() {
           </div>}
 
           <div className="grid gap-6 xl:grid-cols-2">
-            {activeSection === 'imports' && <AcademicImportPanel />}
+            {activeSection === 'imports' && (canManageImports ? <AcademicImportPanel /> : <section className="academic-card xl:col-span-2"><EmptyState label={t('imports.restricted')} /></section>)}
             <section className={`academic-card ${sectionClass('departments')}`}>
               <h2 className="academic-heading">{t('departments.heading')}</h2>
               <form className="academic-form" onSubmit={(event) => submit(event, async () => {
@@ -490,7 +491,12 @@ export default function AcademicPage() {
             </section>
 
             <section className={`academic-card ${['overview', 'students', 'teachers', 'parents'].includes(activeSection) ? '' : 'hidden'}`}>
-              <h2 className="academic-heading">{t('people.heading')}</h2>
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <h2 className="academic-heading">{t('people.heading')}</h2>
+                {canManageImports && <Link href={`/academic?section=imports${activeSection === 'students' || activeSection === 'teachers' || activeSection === 'parents' ? `&module=${activeSection}` : ''}`} className="btn-secondary text-xs no-underline">
+                  <FileSpreadsheet className="h-4 w-4" aria-hidden="true" />{t('imports.openFromPeople')}
+                </Link>}
+              </div>
               <form className="academic-form" onSubmit={(event) => submit(event, async () => {
                 const type = activeSection === 'teachers' ? 'teacher' : activeSection === 'parents' ? 'parent' : personType;
                 await api.post('/academic/people', { type, firstName: personFirstName, lastName: personLastName });

@@ -405,6 +405,9 @@ export function canAccessAcademicSection(
   const roleKey = permissionRole(role);
   if (!organizationType || !EDUCATION_TYPES.has(organizationType)) return false;
   if (!isRoleEligible(organizationType as 'school' | 'college' | 'university', canonicalRole(role))) return false;
+  // Imports, exports and invitations span the whole institution, so department
+  // leaders (deans, heads) do not get them (mirrors the backend academic routes).
+  if (section === 'imports') return WORKSPACE_ADMINS_EDUCATION.has(roleKey);
   if (INSTITUTION_ADMINS.has(roleKey)) return true;
   if (roleKey === 'teacher') {
     return ['overview', 'students', 'timetable', 'assignments', 'attendance', 'exams', 'results'].includes(section);

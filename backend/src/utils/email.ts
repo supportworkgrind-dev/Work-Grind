@@ -376,6 +376,50 @@ export const sendClientPortalInvite = async (email: string, clientName: string, 
   return safeSend(email, 'You have been invited to a WorkGrind client portal', html);
 };
 
+// ─── 5c. Academic Onboarding Invite ──────────────────────────────────────────
+/**
+ * Throws EmailProviderConfigurationError (with the missing variable names)
+ * when invitation emails cannot be sent, before any invitation is created.
+ */
+export const assertEmailDeliveryConfigured = async (): Promise<void> => {
+  getFromAddress();
+  getBaseUrl();
+  await getTransporter();
+};
+
+export const sendAcademicInvitationEmail = async (params: {
+  email: string;
+  firstName: string;
+  institutionName: string;
+  roleLabel: string;
+  token: string;
+  expiresAt: Date;
+}): Promise<EmailSendResult> => {
+  let link: string;
+  try {
+    link = `${getBaseUrl()}/academic-invite?token=${encodeURIComponent(params.token)}`;
+  } catch (error) {
+    logEmailError('academic_invitation', 'configuration', error);
+    return { success: false, error: 'Email delivery is not configured.' };
+  }
+  const institution = escapeHtml(params.institutionName);
+  const days = Math.max(1, Math.round((params.expiresAt.getTime() - Date.now()) / 86_400_000));
+  const html = emailWrapper(`
+    <h2 style="margin:0 0 8px;color:#0f172a;font-size:24px;font-weight:800;">Join ${institution} on WorkGrind</h2>
+    <p style="margin:0 0 20px;color:#64748b;font-size:15px;">
+      Hi <strong>${escapeHtml(params.firstName)}</strong>, ${institution} has added you as a ${escapeHtml(params.roleLabel)}.
+      Verify this email address and create or link your WorkGrind account to see your classes, timetable and results.
+    </p>
+    <div style="text-align:center;margin:32px 0;">
+      <a href="${link}" style="display:inline-block;background:#2563eb;color:#ffffff;font-size:15px;font-weight:700;text-decoration:none;padding:14px 36px;border-radius:12px;">
+        Accept invitation →
+      </a>
+    </div>
+    <p style="margin:0;color:#94a3b8;font-size:13px;">This single-use link expires in <strong>${days} day${days === 1 ? '' : 's'}</strong>. WorkGrind will never email you a password. If you weren't expecting this, you can ignore it.</p>
+  `);
+  return safeSend(params.email, `${params.institutionName.replace(/[\r\n]/g, ' ')} invited you to WorkGrind`, html, undefined, 'academic_invitation');
+};
+
 // ─── 6. Contact Us Inquiries ────────────────────────────────────────────────
 export const sendContactInquiryEmail = async (inquiry: {
   name: string;

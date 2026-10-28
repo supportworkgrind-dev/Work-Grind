@@ -26,7 +26,8 @@ export function getAuthenticatedDestination(
   returnTo?: string | null,
 ): string {
   const safeReturnPath = getSafeReturnPath(returnTo);
-  if (safeReturnPath === '/join' || safeReturnPath?.startsWith('/join?') || safeReturnPath?.startsWith('/join#')) {
+  // Invitation pages finish joining the workspace themselves.
+  if (safeReturnPath && ['/join', '/academic-invite'].some((path) => safeReturnPath === path || safeReturnPath.startsWith(`${path}?`) || safeReturnPath.startsWith(`${path}#`))) {
     return safeReturnPath;
   }
   if (!user.companyId) return getWorkspaceSetupDestination(safeReturnPath);

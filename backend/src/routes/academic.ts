@@ -31,30 +31,47 @@ import {
   deleteAcademicRecord,
 } from '../controllers/academic.controller';
 import { authenticate } from '../middleware/auth';
-import { requireAcademicAdmin } from '../middleware/academicOrganization';
+import { requireAcademicAdmin, requireAcademicRole } from '../middleware/academicOrganization';
 import { requireAssignedAcademicDepartment } from '../middleware/academicDepartmentAccess';
 import { academicImportUpload, validateUploadedContent } from '../middleware/upload';
 import {
   createImportJob,
   downloadImportErrors,
   downloadImportTemplate,
+  exportAcademicData,
   getImportJob,
+  getImportProgress,
+  getImportSettings,
   listImportHistory,
   listImportModules,
   previewImportFile,
+  updateImportSettings,
 } from '../controllers/academicImport.controller';
+import { listInvitations, revokeInvitation, sendInvitations } from '../controllers/academicInvitation.controller';
 
 const router = Router();
 
 router.use(authenticate, requireAcademicAdmin, requireAssignedAcademicDepartment);
 
-router.get('/imports/modules', listImportModules);
-router.get('/imports/templates/:module', downloadImportTemplate);
-router.get('/imports/history', listImportHistory);
-router.get('/imports/jobs/:id', getImportJob);
-router.get('/imports/jobs/:id/errors.csv', downloadImportErrors);
-router.post('/imports/preview', academicImportUpload.single('file'), validateUploadedContent, previewImportFile);
-router.post('/imports/jobs', academicImportUpload.single('file'), validateUploadedContent, createImportJob);
+// Whole-institution data movement: deans and heads of department act only on
+// their own departments, so imports, exports and invitations stay with
+// institution administrators.
+const requireInstitutionDataAdmin = requireAcademicRole('owner', 'founder', 'principal', 'director', 'admin', 'office_staff');
+
+router.get('/imports/modules', requireInstitutionDataAdmin, listImportModules);
+router.get('/imports/templates/:module', requireInstitutionDataAdmin, downloadImportTemplate);
+router.get('/imports/settings', requireInstitutionDataAdmin, getImportSettings);
+router.put('/imports/settings', requireInstitutionDataAdmin, updateImportSettings);
+router.get('/imports/history', requireInstitutionDataAdmin, listImportHistory);
+router.get('/imports/progress/:key', requireInstitutionDataAdmin, getImportProgress);
+router.get('/imports/jobs/:id', requireInstitutionDataAdmin, getImportJob);
+router.get('/imports/jobs/:id/errors.csv', requireInstitutionDataAdmin, downloadImportErrors);
+router.post('/imports/preview', requireInstitutionDataAdmin, academicImportUpload.single('file'), validateUploadedContent, previewImportFile);
+router.post('/imports/jobs', requireInstitutionDataAdmin, academicImportUpload.single('file'), validateUploadedContent, createImportJob);
+router.get('/exports/:module', requireInstitutionDataAdmin, exportAcademicData);
+router.get('/invitations', requireInstitutionDataAdmin, listInvitations);
+router.post('/invitations/send', requireInstitutionDataAdmin, sendInvitations);
+router.post('/invitations/:id/revoke', requireInstitutionDataAdmin, revokeInvitation);
 
 router.get('/people', listPeople);
 router.post('/people', createPerson);
