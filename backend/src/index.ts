@@ -370,8 +370,10 @@ app.use('/api/auth', authRoutes);
 app.use('/api/whatsapp', whatsappRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/companies', companyRoutes);
-app.use('/api/academic', academicRoutes);
+// The portal serves students, parents and teachers, so it must be matched
+// before the administrator-only academic router claims every /api/academic path.
 app.use('/api/academic/portal', academicPortalRoutes);
+app.use('/api/academic', academicRoutes);
 app.use('/api/academic-invitations', academicInvitationRoutes);
 app.use('/api/channels', channelRoutes);
 app.use('/api/messages', messageRoutes);

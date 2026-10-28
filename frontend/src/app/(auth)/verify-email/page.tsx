@@ -17,6 +17,7 @@ function VerifyEmailContent() {
   const email = (searchParams.get('email') || '').trim();
   const legacyToken = searchParams.get('token');
   const invite = searchParams.get('invite');
+  const academicInvite = searchParams.get('academicInvite');
   const workspaceId = searchParams.get('workspace');
   const workspaceLabel = {
     solo: 'Solo / Individual',
@@ -25,7 +26,7 @@ function VerifyEmailContent() {
     college: 'College',
     university: 'University',
   }[workspaceId || ''];
-  const isWorkspaceSignup = Boolean(workspaceLabel) && !invite;
+  const isWorkspaceSignup = Boolean(workspaceLabel) && !invite && !academicInvite;
   const { login, setCompany } = useAuthStore();
   const [code, setCode] = useState('');
   const [status, setStatus] = useState<'entry' | 'checking' | 'success' | 'legacy' | 'error'>(legacyToken ? 'checking' : 'entry');
@@ -62,7 +63,18 @@ function VerifyEmailContent() {
     try {
       const response = await api.post('/auth/verify-registration-code', { email, code });
       login(response.data.user, response.data.accessToken);
-      if (invite) {
+      if (academicInvite) {
+        // The verified email now matches the invitation, so the account can be linked.
+        try {
+          const accepted = await api.post('/academic-invitations/accept', { token: academicInvite });
+          setCompany(accepted.data.company);
+          login({ ...accepted.data.user, companyId: accepted.data.company, role: accepted.data.role }, accepted.data.accessToken);
+          setStatus('success');
+          window.setTimeout(() => router.push('/academic'), 700);
+        } catch {
+          router.replace(`/academic-invite?token=${encodeURIComponent(academicInvite)}`);
+        }
+      } else if (invite) {
         try {
           const joined = await api.post('/auth/join-company', { inviteToken: invite, inviteCode: invite });
           setCompany(joined.data.company);
@@ -124,7 +136,7 @@ function VerifyEmailContent() {
           <p className="auth-form-subtitle">
             {status === 'legacy'
               ? 'Your email is confirmed. Sign in to continue to your workspace.'
-              : invite ? 'Your account is ready. Joining the invited workspace…' : 'Your email is confirmed. Continuing to workspace setup…'}
+              : invite || academicInvite ? 'Your account is ready. Joining the invited workspace…' : 'Your email is confirmed. Continuing to workspace setup…'}
           </p>
           {status === 'legacy' && <Link href="/login" className="auth-primary no-underline">Continue to sign in <ArrowRight size={16} /></Link>}
         </div>

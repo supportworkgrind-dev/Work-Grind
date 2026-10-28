@@ -1,1 +1,0 @@
-{"success":true,"user":{"_id":"feature-user","fullName":"Fixture User","email":"fixture@example.invalid","role":"teacher","companyId":{"_id":"feature-company","name":"Fixture Workspace","ownerId":"feature-user","organizationType":"school","accountType":"company"},"theme":"light","preferredLanguage":"en"}}

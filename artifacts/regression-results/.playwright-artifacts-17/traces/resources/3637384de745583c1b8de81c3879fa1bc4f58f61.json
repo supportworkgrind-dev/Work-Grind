@@ -1,1 +1,0 @@
-{"success":false,"message":"CORS: origin http://127.0.0.1:3101 not allowed","debug":"Error: CORS: origin http://127.0.0.1:3101 not allowed\n    at origin (/var/task/backend/src/index.js:302:25)\n    at /var/task/backend/node_modules/cors/lib/index.js:219:13\n    at optionsCallback (/var/task/backend/node_modules/cors/lib/index.js:199:9)"}

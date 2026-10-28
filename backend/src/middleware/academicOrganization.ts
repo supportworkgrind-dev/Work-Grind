@@ -1,7 +1,7 @@
 import { NextFunction, Response } from 'express';
 import Company from '../models/Company';
 import User from '../models/User';
-import { isAcademicOrganizationType, roleMatches } from '../config/organization';
+import { isAcademicOrganizationType, isWorkspaceAdministrator, roleMatches } from '../config/organization';
 import { AuthRequest } from './auth';
 
 async function getAcademicMember(
@@ -67,3 +67,22 @@ export const requireAcademicOrganization = async (
 };
 
 export const requireAcademicAdmin = requireAcademicRole('owner', 'founder', 'principal', 'director', 'admin', 'office_staff', 'dean', 'hod');
+
+/**
+ * Owners, principals and administrators (including office staff) only. Unlike
+ * requireAcademicAdmin, deans and heads of department are excluded because
+ * they act on their own departments, not the whole institution.
+ */
+export const requireAcademicInstitutionAdmin = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  const member = await getAcademicMember(req, res);
+  if (!member) return;
+  if (!isWorkspaceAdministrator(member.role, member.organizationType)) {
+    res.status(403).json({ success: false, message: 'Only institution administrators can import, export, or invite records.' });
+    return;
+  }
+  next();
+};

@@ -31,7 +31,7 @@ import {
   deleteAcademicRecord,
 } from '../controllers/academic.controller';
 import { authenticate } from '../middleware/auth';
-import { requireAcademicAdmin, requireAcademicRole } from '../middleware/academicOrganization';
+import { requireAcademicAdmin, requireAcademicInstitutionAdmin } from '../middleware/academicOrganization';
 import { requireAssignedAcademicDepartment } from '../middleware/academicDepartmentAccess';
 import { academicImportUpload, validateUploadedContent } from '../middleware/upload';
 import {
@@ -56,7 +56,7 @@ router.use(authenticate, requireAcademicAdmin, requireAssignedAcademicDepartment
 // Whole-institution data movement: deans and heads of department act only on
 // their own departments, so imports, exports and invitations stay with
 // institution administrators.
-const requireInstitutionDataAdmin = requireAcademicRole('owner', 'founder', 'principal', 'director', 'admin', 'office_staff');
+const requireInstitutionDataAdmin = requireAcademicInstitutionAdmin;
 
 router.get('/imports/modules', requireInstitutionDataAdmin, listImportModules);
 router.get('/imports/templates/:module', requireInstitutionDataAdmin, downloadImportTemplate);

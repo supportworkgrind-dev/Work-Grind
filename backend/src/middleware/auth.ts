@@ -29,6 +29,8 @@ const BILLING_AND_BOOTSTRAP_PATHS = new Set([
   '/api/auth/change-password',
   '/api/auth/create-company',
   '/api/auth/join-company',
+  // Accepting an institution invitation joins it; the institution's own subscription is checked there.
+  '/api/academic-invitations/accept',
   '/api/auth/oauth/google/start',
   '/api/auth/oauth/apple/start',
   '/api/auth/oauth/linkedin/start',
