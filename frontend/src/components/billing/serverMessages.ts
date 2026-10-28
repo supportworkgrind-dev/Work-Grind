@@ -3,7 +3,8 @@ import {
   LANG_COOKIE, isLangCode, resolveMessage,
   type LangCode, type MessagePath, type TranslateVars,
 } from '@/lib/i18n/core';
-import { appMessagesEn, appMessagesUr, type NamespaceMessages } from '@/lib/i18n/messages';
+import { appMessagesEn, type NamespaceMessages } from '@/lib/i18n/messages';
+import { appMessagesUr } from '@/lib/i18n/messages/ur';
 
 const DICTIONARIES = { en: appMessagesEn, ur: appMessagesUr };
 

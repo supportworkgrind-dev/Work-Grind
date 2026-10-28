@@ -14,16 +14,4 @@ export const auth = defineMessages(
       inviteRole: 'Invitation Role',
     },
   },
-  {
-    join: {
-      welcome: '{{workspace}} میں خوش آمدید! 🎉',
-      welcomeFallback: 'ٹیم',
-      activated: 'آپ کی رکنیت <role>{{role}}</role> کے کردار کے ساتھ فعال کر دی گئی ہے۔',
-      redirectDashboard: 'آپ کو ٹیم ڈیش بورڈ پر لے جایا جا رہا ہے…',
-      redirectAcademic: 'آپ کو آپ کی تعلیمی ورک اسپیس پر لے جایا جا رہا ہے…',
-    },
-    onboarding: {
-      inviteRole: 'دعوت نامے کا کردار',
-    },
-  },
 );

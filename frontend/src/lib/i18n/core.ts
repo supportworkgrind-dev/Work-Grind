@@ -59,11 +59,13 @@ export type MessagePath<T> = {
 
 /**
  * Declares one namespace of interface text. English is the source of truth;
- * the Urdu object must have exactly the same keys (checked by TypeScript).
+ * its Urdu mirror lives in messages/ur/<namespace>.ts, typed as
+ * Mirror<typeof namespace.en> so it must have exactly the same keys, and is
+ * loaded only when Urdu is the active language.
  * Plurals are objects with `one` and `other` keys, chosen by the `count` variable.
  */
-export function defineMessages<const T extends MessageTree>(en: T, ur: Mirror<T>): { en: T; ur: Mirror<T> } {
-  return { en, ur };
+export function defineMessages<const T extends MessageTree>(en: T): { en: T } {
+  return { en };
 }
 
 export type TranslateVars = Record<string, string | number>;

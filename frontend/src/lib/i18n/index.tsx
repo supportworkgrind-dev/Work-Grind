@@ -12,21 +12,16 @@
  *    development. English is the source of truth for every key.
  *  - Signed-in members' language is their profile's `preferredLanguage`
  *    (applied by the app layout); see useLanguagePreference for changing it.
+ *  - Only English is bundled up front. Another language's dictionary is a
+ *    separate chunk, loaded before it is first rendered (see loadLanguage).
  */
 
 import React, {
-  createContext, useContext, useState, useEffect, useLayoutEffect,
+  createContext, use, useContext, useState, useEffect, useLayoutEffect,
   useCallback, useMemo, type ReactNode,
 } from 'react';
 import { en, type Translations } from './translations';
-import { ar } from './translations/ar';
-import { de } from './translations/de';
-import { es } from './translations/es';
-import { fr } from './translations/fr';
-import { hi } from './translations/hi';
-import { ur } from './translations/ur';
-import { zh } from './translations/zh';
-import { appMessagesEn, appMessagesUr, type NamespaceMessages, type NamespaceName } from './messages';
+import { appMessagesEn, type NamespaceMessages, type NamespaceName } from './messages';
 import {
   DEFAULT_LANG, LANG_COOKIE, LANG_STORAGE_KEY, LOCALE_TAGS,
   directionOf, isLangCode, resolveMessage, resolveOptionalMessage, setActiveLanguage,
@@ -38,14 +33,44 @@ import {
 export type { LangCode, TranslateVars } from './core';
 export { LANG_COOKIE, isLangCode, directionOf, translate, getActiveLanguage } from './core';
 
-// Marketing dictionaries (all languages) plus app namespaces (English and Urdu).
-// Keys a language lacks resolve to English.
-const DICTIONARIES: Record<LangCode, object> = {
-  en: { ...en, ...appMessagesEn },
-  ur: { ...ur, ...appMessagesUr },
-  ar, fr, de, es, zh, hi,
+// Marketing dictionaries plus app namespaces (only Urdu translates those so
+// far). Keys a language lacks resolve to English, which is always present.
+const DICTIONARIES: Partial<Record<LangCode, object>> = { en: { ...en, ...appMessagesEn } };
+const MARKETING: Partial<Record<LangCode, Translations>> = { en };
+
+const LOADERS: Record<Exclude<LangCode, 'en'>, () => Promise<{ marketing: Translations; app?: object }>> = {
+  ur: async () => {
+    const [{ ur }, { appMessagesUr }] = await Promise.all([import('./translations/ur'), import('./messages/ur')]);
+    return { marketing: ur, app: appMessagesUr };
+  },
+  ar: async () => ({ marketing: (await import('./translations/ar')).ar }),
+  de: async () => ({ marketing: (await import('./translations/de')).de }),
+  es: async () => ({ marketing: (await import('./translations/es')).es }),
+  fr: async () => ({ marketing: (await import('./translations/fr')).fr }),
+  hi: async () => ({ marketing: (await import('./translations/hi')).hi }),
+  zh: async () => ({ marketing: (await import('./translations/zh')).zh }),
 };
-const MARKETING: Record<LangCode, Translations> = { en, ur, ar, fr, de, es, zh, hi };
+
+const loading = new Map<LangCode, Promise<void>>();
+
+/**
+ * Loads a language's dictionary once. The same promise is returned for
+ * repeated calls, so React's use() can suspend on it during the first render.
+ */
+export function loadLanguage(code: LangCode): Promise<void> {
+  if (code === DEFAULT_LANG) return Promise.resolve();
+  let promise = loading.get(code);
+  if (!promise) {
+    promise = LOADERS[code]().then(({ marketing, app }) => {
+      MARKETING[code] = marketing;
+      DICTIONARIES[code] = { ...marketing, ...app };
+    });
+    // A failed download can be retried on the next attempt; English keeps working meanwhile.
+    promise.catch(() => loading.delete(code));
+    loading.set(code, promise);
+  }
+  return promise;
+}
 
 export const LANGUAGES: { code: LangCode; label: string; native: string }[] = [
   { code: 'en', label: 'English', native: 'English'  },
@@ -135,6 +160,9 @@ const I18nContext = createContext<I18nContextValue>({
 export function I18nProvider({ children, initialLang = DEFAULT_LANG }: { children: ReactNode; initialLang?: LangCode }) {
   // The server rendered `initialLang` (from the cookie), so hydration matches.
   const [lang, setLangState] = useState<LangCode>(initialLang);
+  // Both the server render and hydration wait for a non-English dictionary,
+  // so the first paint is already in the chosen language.
+  if (!DICTIONARIES[lang]) use(loadLanguage(lang));
 
   // Code outside render (stores, interceptors) follows the rendered language.
   if (typeof window !== 'undefined') setActiveLanguage(lang, DICTIONARIES);
@@ -150,14 +178,15 @@ export function I18nProvider({ children, initialLang = DEFAULT_LANG }: { childre
     try { stored = localStorage.getItem(LANG_STORAGE_KEY); } catch {}
     if (isLangCode(stored)) {
       persistLang(stored);
-      if (stored !== initialLang) setLangState(stored);
+      if (stored !== initialLang) void loadLanguage(stored).then(() => setLangState(stored), () => undefined);
     }
   }, [initialLang]);
 
   const setLang = useCallback((code: LangCode) => {
     if (!isLangCode(code)) return;
     persistLang(code);
-    setLangState(code);
+    // Switch once the dictionary is here, so the interface never suspends mid-session.
+    void loadLanguage(code).then(() => setLangState(code), () => undefined);
   }, []);
 
   const value = useMemo<I18nContextValue>(() => ({
@@ -167,7 +196,7 @@ export function I18nProvider({ children, initialLang = DEFAULT_LANG }: { childre
     setLang,
     t: (key, vars) => resolveMessage(DICTIONARIES, lang, key, vars),
     tOptional: (key, vars) => resolveOptionalMessage(DICTIONARIES, lang, key, vars),
-    translations: MARKETING[lang],
+    translations: MARKETING[lang] ?? en,
     ...createFormatters(lang),
   }), [lang, setLang]);
 

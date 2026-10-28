@@ -1,8 +1,8 @@
 /**
  * Interface text for the signed-in app and public site, one module per area.
  * English is the source of truth; every namespace must define Urdu for every
- * English key (enforced by defineMessages). Other languages fall back to
- * English until they are translated.
+ * English key in ./ur (enforced by the Mirror types there). Other languages
+ * fall back to English until they are translated.
  */
 import { common } from './common';
 import { shell } from './shell';
@@ -72,12 +72,7 @@ type Namespaces = typeof namespaces;
 export type NamespaceName = keyof Namespaces;
 export type NamespaceMessages<N extends NamespaceName> = Namespaces[N]['en'];
 
-function pick<L extends 'en' | 'ur'>(lang: L) {
-  return Object.fromEntries(
-    Object.entries(namespaces).map(([name, messages]) => [name, messages[lang]]),
-  ) as { [N in NamespaceName]: Namespaces[N][L] };
-}
-
-export const appMessagesEn = pick('en');
-export const appMessagesUr = pick('ur');
+export const appMessagesEn = Object.fromEntries(
+  Object.entries(namespaces).map(([name, messages]) => [name, messages.en]),
+) as { [N in NamespaceName]: Namespaces[N]['en'] };
 export const namespaceNames = Object.keys(namespaces) as NamespaceName[];
