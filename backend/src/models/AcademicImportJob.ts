@@ -24,6 +24,8 @@ export interface AcademicImportIssue {
   field?: string;
   code: string;
   message: string;
+  /** Warnings are reported but do not stop the row from importing. */
+  severity?: 'error' | 'warning';
 }
 
 export interface IAcademicImportJob extends Document {
@@ -34,6 +36,13 @@ export interface IAcademicImportJob extends Document {
   originalFilename: string;
   worksheet?: string;
   idempotencyKey?: string;
+  /** SHA-256 of the uploaded file, used to flag accidental re-imports. */
+  fileSha256?: string;
+  /** Source column chosen for each template field. */
+  mapping?: Record<string, string>;
+  /** People created or updated by this job (for follow-up invitations). */
+  personIds: mongoose.Types.ObjectId[];
+  generatedIdCount: number;
   status: AcademicImportStatus;
   totalRows: number;
   processedRows: number;
@@ -53,6 +62,7 @@ const AcademicImportIssueSchema = new Schema<AcademicImportIssue>(
     field: { type: String, trim: true, maxlength: 80 },
     code: { type: String, required: true, trim: true, maxlength: 80 },
     message: { type: String, required: true, trim: true, maxlength: 500 },
+    severity: { type: String, enum: ['error', 'warning'] },
   },
   { _id: false },
 );
@@ -70,6 +80,10 @@ const AcademicImportJobSchema = new Schema<IAcademicImportJob>(
     originalFilename: { type: String, required: true, trim: true, maxlength: 255 },
     worksheet: { type: String, trim: true, maxlength: 120 },
     idempotencyKey: { type: String, trim: true, maxlength: 120 },
+    fileSha256: { type: String, match: /^[a-f0-9]{64}$/ },
+    mapping: { type: Map, of: String },
+    personIds: { type: [{ type: Schema.Types.ObjectId, ref: 'AcademicPerson' }], default: [] },
+    generatedIdCount: { type: Number, min: 0, default: 0 },
     status: { type: String, enum: ['queued', 'processing', 'completed', 'completed_with_errors', 'failed', 'cancelled'], required: true, default: 'queued' },
     totalRows: { type: Number, required: true, min: 0, default: 0 },
     processedRows: { type: Number, required: true, min: 0, default: 0 },
@@ -84,6 +98,7 @@ const AcademicImportJobSchema = new Schema<IAcademicImportJob>(
 );
 
 AcademicImportJobSchema.index({ companyId: 1, createdAt: -1 });
+AcademicImportJobSchema.index({ companyId: 1, fileSha256: 1, module: 1 });
 AcademicImportJobSchema.index(
   { companyId: 1, idempotencyKey: 1 },
   { unique: true, partialFilterExpression: { idempotencyKey: { $type: 'string' } } },

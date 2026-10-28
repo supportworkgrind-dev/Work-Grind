@@ -240,7 +240,7 @@ test('Academic Imports — administration panel exposes real template and valida
   await page.goto('/academic?section=imports');
 
   await expect(page.locator('h1')).toContainText('Bulk import');
-  await expect(page.getByRole('heading', { name: 'Bulk import' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Bulk import', level: 2 })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Download CSV template' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Download XLSX template' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Preview and validate' })).toBeDisabled();
@@ -274,5 +274,5 @@ test('Academic Imports — downloads a template, previews validation issues, con
 test('Academic Imports — shows a service error while loading import options', async ({ page }) => {
   await setupAcademicPage(page, { importsError: true });
   await page.goto('/academic?section=imports');
-  await expect(page.getByRole('alert')).toContainText('Import service unavailable.');
+  await expect(page.locator('p[role="alert"]')).toContainText('Import service unavailable.');
 });

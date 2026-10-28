@@ -9,6 +9,8 @@ export interface IAcademicEnrollment extends Document {
   status: AcademicEnrollmentStatus;
   enrolledAt: Date;
   completedAt?: Date;
+  /** Roll number within the class; unique per class when present. */
+  rollNumber?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -21,6 +23,7 @@ const AcademicEnrollmentSchema = new Schema<IAcademicEnrollment>(
     status: { type: String, enum: ['active', 'completed', 'withdrawn'], default: 'active', required: true },
     enrolledAt: { type: Date, default: Date.now, required: true },
     completedAt: Date,
+    rollNumber: { type: String, trim: true, maxlength: 40 },
   },
   { timestamps: true }
 );
@@ -28,5 +31,9 @@ const AcademicEnrollmentSchema = new Schema<IAcademicEnrollment>(
 AcademicEnrollmentSchema.index({ companyId: 1, studentId: 1, classId: 1 }, { unique: true });
 AcademicEnrollmentSchema.index({ companyId: 1, classId: 1, status: 1 });
 AcademicEnrollmentSchema.index({ companyId: 1, studentId: 1, status: 1 });
+AcademicEnrollmentSchema.index(
+  { companyId: 1, classId: 1, rollNumber: 1 },
+  { unique: true, partialFilterExpression: { rollNumber: { $type: 'string' } } }
+);
 
 export default mongoose.model<IAcademicEnrollment>('AcademicEnrollment', AcademicEnrollmentSchema);
