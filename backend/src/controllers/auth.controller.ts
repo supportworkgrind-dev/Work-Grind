@@ -18,6 +18,12 @@ import Company, { ICompany } from '../models/Company';
 import AuditLog from '../models/AuditLog';
 import { TRIAL_DAYS } from '../config/subscription';
 import { checkMemberLimit, withCompanyCapacityLock } from '../utils/planLimits';
+import {
+  RegistrationField,
+  resolveRegistrationInvitation,
+  validateAccountFields,
+  validateWorkspaceChoice,
+} from '../services/registrationValidation';
 import Channel from '../models/Channel';
 import Project from '../models/Project';
 import Task from '../models/Task';
@@ -175,19 +181,40 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     const fullName = typeof req.body?.fullName === 'string' ? req.body.fullName.trim() : '';
     const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
     const password = typeof req.body?.password === 'string' ? req.body.password : '';
-    const accountType = req.body?.accountType;
-    const organizationType = req.body?.organizationType;
+    let accountType = req.body?.accountType;
+    let organizationType = req.body?.organizationType;
     const genericResponse = {
       success: true,
       message: 'If these details can be registered, the verification request will be processed.',
     };
 
-    if (!fullName || fullName.length > 100 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
-        password.length < 8 || !/[A-Z]/.test(password) || !/[a-z]/.test(password) ||
-        !/[0-9]/.test(password) || !/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password) ||
-        !['company', 'individual'].includes(accountType) || !isOrganizationType(organizationType) ||
-        (accountType === 'individual' && organizationType !== 'business')) {
-      res.status(400).json({ success: false, message: 'Choose a valid account type and organization, then enter a valid name, email, and password with at least 8 characters including uppercase, lowercase, a number, and a symbol.' });
+    const errors = validateAccountFields({ fullName, email, password });
+    const inviteToken = typeof req.body?.inviteToken === 'string' ? req.body.inviteToken.trim() : '';
+    const academicInviteToken = typeof req.body?.academicInviteToken === 'string' ? req.body.academicInviteToken.trim() : '';
+    if (inviteToken || academicInviteToken) {
+      // Invited people join an existing workspace: its type comes from the
+      // invitation on the server, never from the client.
+      const invitation = await resolveRegistrationInvitation({ inviteToken, academicInviteToken });
+      if (!invitation) {
+        errors.invitation = 'This invitation link or code is invalid or has expired. Ask the workspace administrator for a new invitation.';
+      } else {
+        accountType = 'company';
+        organizationType = invitation.organizationType;
+        if (invitation.email && email && invitation.email !== email && !errors.email) {
+          errors.email = 'This invitation was sent to a different email address. Register with the invited email address.';
+        }
+      }
+    } else {
+      Object.assign(errors, validateWorkspaceChoice(accountType, organizationType));
+    }
+    const fields = Object.keys(errors) as RegistrationField[];
+    if (fields.length) {
+      res.status(400).json({
+        success: false,
+        code: 'REGISTRATION_INVALID',
+        message: fields.length === 1 ? errors[fields[0]] : 'Some details need attention. Check the highlighted fields.',
+        errors,
+      });
       return;
     }
 

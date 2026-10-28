@@ -10,6 +10,7 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { ThemeAwareLogo } from '@/components/common/ThemeAwareLogo';
 import { getInitials } from '@/lib/utils';
 import type { OrganizationType } from '@/types';
+import { passwordError, registrationErrorsFrom, type RegistrationErrors } from '@/lib/passwordPolicy';
 
 type AcademicInvitation = {
   institutionName: string;
@@ -27,7 +28,6 @@ const ROLE_LABELS: Record<AcademicInvitation['role'], string> = {
   parent: 'Parent / guardian',
 };
 
-const PASSWORD_RULE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{8,}$/;
 
 /**
  * Accepts an academic onboarding invitation: the recipient signs in or creates
@@ -47,6 +47,7 @@ function AcademicInviteContent() {
   const [showSignup, setShowSignup] = useState(false);
   const [fullName, setFullName] = useState('');
   const [password, setPassword] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<RegistrationErrors>({});
   const [error, setError] = useState('');
   const [done, setDone] = useState(false);
 
@@ -89,23 +90,29 @@ function AcademicInviteContent() {
   const register = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!invitation) return;
-    if (!PASSWORD_RULE.test(password)) {
-      setError('Use at least 8 characters with uppercase and lowercase letters, a number, and a symbol.');
-      return;
-    }
+    // Same rules as the server, so problems show before anything is sent.
+    const localErrors: RegistrationErrors = {};
+    if (!fullName.trim()) localErrors.fullName = 'Enter your full name.';
+    const passwordProblem = passwordError(password);
+    if (passwordProblem) localErrors.password = passwordProblem;
+    setFieldErrors(localErrors);
+    if (Object.keys(localErrors).length) return;
     setRegistering(true);
     setError('');
     try {
+      // The server takes the institution type from this invitation, not from the form.
       await api.post('/auth/register', {
         fullName: fullName.trim(),
         email: invitation.email,
         password,
-        accountType: 'company',
-        organizationType: invitation.organizationType,
+        academicInviteToken: token,
       });
       router.push(`/verify-email?email=${encodeURIComponent(invitation.email)}&academicInvite=${encodeURIComponent(token)}`);
     } catch (requestError) {
-      setError(describeApiError(requestError, 'Your account could not be created. Please try again.').message);
+      const serverErrors = registrationErrorsFrom(requestError);
+      setFieldErrors(serverErrors);
+      const shownBesideFields = Boolean(serverErrors.fullName || serverErrors.password);
+      setError(serverErrors.invitation || serverErrors.email || (shownBesideFields ? '' : describeApiError(requestError, 'Your account could not be created. Please try again.').message));
     } finally {
       setRegistering(false);
     }
@@ -167,14 +174,18 @@ function AcademicInviteContent() {
                 ) : (
                   <form onSubmit={(event) => void register(event)} className="space-y-3.5">
                     <label className="block text-[11px] font-semibold uppercase text-slate-700">Full name
-                      <input type="text" required maxLength={100} value={fullName} onChange={(event) => setFullName(event.target.value)} className="mt-1 block w-full rounded-xl border border-slate-200 px-3 py-2 text-xs normal-case text-slate-900" />
+                      <input type="text" required maxLength={100} autoComplete="name" value={fullName} onChange={(event) => { setFullName(event.target.value); setFieldErrors((current) => ({ ...current, fullName: undefined })); }} aria-invalid={Boolean(fieldErrors.fullName)} aria-describedby={fieldErrors.fullName ? 'invite-full-name-error' : undefined} className="mt-1 block w-full rounded-xl border border-slate-200 px-3 py-2 text-xs normal-case text-slate-900" />
                     </label>
+                    {fieldErrors.fullName && <p id="invite-full-name-error" className="-mt-2 text-[11px] text-rose-600">{fieldErrors.fullName}</p>}
                     <label className="block text-[11px] font-semibold uppercase text-slate-700">Email address
                       <input type="email" value={invitation.email} readOnly aria-readonly="true" className="mt-1 block w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs normal-case text-slate-600" />
                     </label>
                     <label className="block text-[11px] font-semibold uppercase text-slate-700">Password
-                      <input type="password" required minLength={8} autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} className="mt-1 block w-full rounded-xl border border-slate-200 px-3 py-2 text-xs normal-case text-slate-900" />
+                      <input type="password" required minLength={8} autoComplete="new-password" value={password} onChange={(event) => { setPassword(event.target.value); setFieldErrors((current) => ({ ...current, password: undefined })); }} aria-invalid={Boolean(fieldErrors.password)} aria-describedby="invite-password-help" className="mt-1 block w-full rounded-xl border border-slate-200 px-3 py-2 text-xs normal-case text-slate-900" />
                     </label>
+                    <p id="invite-password-help" className={`-mt-2 text-[11px] ${fieldErrors.password ? 'text-rose-600' : 'text-slate-500'}`}>
+                      {fieldErrors.password ?? 'At least 8 characters with uppercase and lowercase letters, a number, and a symbol.'}
+                    </p>
                     <p className="text-[11px] text-slate-500">We will email a six-digit code to verify this address before linking your account.</p>
                     <div className="flex items-center justify-between gap-3 pt-2">
                       <button type="button" onClick={() => setShowSignup(false)} className="text-xs font-semibold text-slate-500 hover:text-slate-700">← Back</button>

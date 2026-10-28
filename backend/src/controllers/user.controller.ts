@@ -403,7 +403,7 @@ export const inviteMember = async (req: AuthRequest, res: Response): Promise<voi
   try {
     const { email } = req.body;
     if (typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-      res.status(400).json({ success: false, message: 'A valid email address is required.' });
+      res.status(400).json({ success: false, message: 'Enter a valid email address to invite.', errors: { email: 'Enter a valid email address to invite.' } });
       return;
     }
     const company = await Company.findById(req.user!.companyId);
@@ -448,7 +448,13 @@ export const inviteMember = async (req: AuthRequest, res: Response): Promise<voi
       return;
     }
 
-    await sendInviteEmail(email.trim().toLowerCase(), admission.inviterName, company.name, admission.token);
+    // Only report success once the provider accepted the email; the pending
+    // invitation stays saved either way so it can be resent.
+    const delivery = await sendInviteEmail(email.trim().toLowerCase(), admission.inviterName, company.name, admission.token);
+    if (!delivery.success) {
+      res.status(502).json({ success: false, code: 'INVITE_EMAIL_FAILED', message: 'The invitation was saved, but its email could not be delivered. Check the workspace email settings, then resend it from Pending invitations.' });
+      return;
+    }
     res.json({ success: true, message: 'Invitation sent' });
   } catch (e: any) { res.status(500).json({ success: false, message: e.message }); }
 };

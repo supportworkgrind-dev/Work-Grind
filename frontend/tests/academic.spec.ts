@@ -432,7 +432,11 @@ test('Academic invitation — a new student creates an account with the invited 
   await page.getByLabel('Password').fill('Str0ng!Passw0rd');
   await page.getByRole('button', { name: 'Create account and verify email' }).click();
   await expect(page).toHaveURL(/\/verify-email\?email=ayesha%40student\.test&academicInvite=A{43}/);
-  expect(requests.find((request) => request.path === '/auth/register')?.body).toMatchObject({ email: 'ayesha@student.test', organizationType: 'school', accountType: 'company' });
+  // The institution type comes from the invitation on the server, not from the page.
+  const registration = requests.find((request) => request.path === '/auth/register')?.body as Record<string, unknown>;
+  expect(registration).toMatchObject({ email: 'ayesha@student.test', academicInviteToken: INVITE_TOKEN });
+  expect(registration).not.toHaveProperty('organizationType');
+  expect(registration).not.toHaveProperty('accountType');
 });
 
 test('Academic invitation — a signed-in account with the invited email links to the institution', async ({ page }) => {

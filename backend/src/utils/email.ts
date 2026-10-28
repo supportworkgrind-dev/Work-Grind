@@ -342,11 +342,19 @@ export const sendPasswordChangedNotificationEmail = async (email: string, name: 
 
 // ─── 5. Team / Workspace Invite ──────────────────────────────────────────────
 export const sendInviteEmail = async (email: string, inviterName: string, companyName: string, token: string) => {
-  const link = `${getBaseUrl()}/join?token=${encodeURIComponent(token)}`;
+  let link: string;
+  try {
+    link = `${getBaseUrl()}/join?token=${encodeURIComponent(token)}`;
+  } catch (error) {
+    logEmailError('workspace_invitation', 'configuration', error);
+    return { success: false, error: 'Email delivery is not configured.' };
+  }
+  const inviter = escapeHtml(inviterName);
+  const workspace = escapeHtml(companyName);
   const html = emailWrapper(`
     <h2 style="margin:0 0 8px;color:#0f172a;font-size:24px;font-weight:800;">You're invited! 🎊</h2>
     <p style="margin:0 0 20px;color:#64748b;font-size:15px;">
-      <strong>${inviterName}</strong> has invited you to join the <strong>${companyName}</strong> workspace on WorkGrind.
+      <strong>${inviter}</strong> has invited you to join the <strong>${workspace}</strong> workspace on WorkGrind.
     </p>
     <div style="text-align:center;margin:32px 0;">
       <a href="${link}" style="display:inline-block;background:#2563eb;color:#ffffff;font-size:15px;font-weight:700;text-decoration:none;padding:14px 36px;border-radius:12px;">
@@ -355,7 +363,7 @@ export const sendInviteEmail = async (email: string, inviterName: string, compan
     </div>
     <p style="margin:0;color:#94a3b8;font-size:13px;">This invitation expires in <strong>7 days</strong>. If you weren't expecting this, you can safely ignore it.</p>
   `);
-  return safeSend(email, `${inviterName} invited you to the ${companyName} workspace on WorkGrind`, html);
+  return safeSend(email, `${inviterName} invited you to the ${companyName} workspace on WorkGrind`.replace(/[\r\n]/g, ' '), html, undefined, 'workspace_invitation');
 };
 
 // ─── 5b. Client Portal Invite ────────────────────────────────────────────────

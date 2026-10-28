@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { AuthShell } from '@/components/auth/AuthShell';
+import { PASSWORD_SYMBOL, passwordError, registrationErrorsFrom } from '@/lib/passwordPolicy';
 import { SocialAuthButtons } from '@/components/auth/SocialAuthButtons';
 import type { OrganizationType } from '@/types';
 
@@ -82,7 +83,7 @@ function SignUpContent() {
     password.length >= 8,
     /[A-Z]/.test(password) && /[a-z]/.test(password),
     /[0-9]/.test(password),
-    /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password),
+    PASSWORD_SYMBOL.test(password),
   ];
   const strength = checks.filter(Boolean).length;
 
@@ -121,8 +122,9 @@ function SignUpContent() {
       setError('Your passwords do not match.');
       return;
     }
-    if (!checks.every(Boolean)) {
-      setError('Use at least 8 characters with uppercase and lowercase letters, a number, and a symbol.');
+    const passwordProblem = passwordError(password);
+    if (passwordProblem) {
+      setError(passwordProblem);
       return;
     }
 
@@ -138,7 +140,11 @@ function SignUpContent() {
       });
       router.push(`/verify-email?email=${encodeURIComponent(email.trim())}&workspace=${selectedOption.id}`);
     } catch (requestError: unknown) {
-      setError((requestError as AxiosError<{ message?: string }>).response?.data?.message || 'We could not start your signup. Please try again.');
+      // Name each field the server rejected rather than one combined message.
+      const fieldMessages = Object.values(registrationErrorsFrom(requestError));
+      setError(fieldMessages.length
+        ? fieldMessages.join(' ')
+        : (requestError as AxiosError<{ message?: string }>).response?.data?.message || 'We could not start your signup. Please try again.');
     } finally {
       submitting.current = false;
       setLoading(false);

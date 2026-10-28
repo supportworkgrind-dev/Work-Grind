@@ -413,7 +413,11 @@ export const resendInvite = async (req: AuthRequest, res: Response): Promise<voi
     invite.expiresAt = new Date(Date.now() + 7 * 86400000);
     await company.save();
     const inviter = await User.findById(req.user!.userId);
-    await sendInviteEmail(invite.email, inviter?.fullName || 'A teammate', company.name, invite.token);
+    const delivery = await sendInviteEmail(invite.email, inviter?.fullName || 'A teammate', company.name, invite.token);
+    if (!delivery.success) {
+      res.status(502).json({ success: false, code: 'INVITE_EMAIL_FAILED', message: 'The invitation was saved, but its email could not be delivered. Check the workspace email settings, then resend it from Pending invitations.' });
+      return;
+    }
     res.json({ success: true, message: 'Invite resent successfully' });
   } catch (err: any) {
     res.status(500).json({ success: false, message: err.message });

@@ -255,7 +255,7 @@ test('a member of another workspace is not found', async () => {
 function stubAdmission() {
   planLimits.withCompanyCapacityLock = async (_id, run) => run();
   planLimits.checkMemberLimit = async () => ({ allowed: true });
-  email.sendInviteEmail = async () => {};
+  email.sendInviteEmail = async () => ({ success: true, messageId: 'accepted' });
 }
 
 test('a university invitation without a role defaults to Student, and Employee is refused', async () => {

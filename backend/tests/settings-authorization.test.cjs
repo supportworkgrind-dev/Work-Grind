@@ -246,7 +246,7 @@ function mockInviteCompany(inviteRole) {
   };
   Company.findById = async (id) => (String(id) === companyId.toString() ? company : null);
   User.findById = async () => ({ fullName: 'Manager' });
-  email.sendInviteEmail = async () => undefined;
+  email.sendInviteEmail = async () => ({ success: true, messageId: 'accepted' });
   return company;
 }
 

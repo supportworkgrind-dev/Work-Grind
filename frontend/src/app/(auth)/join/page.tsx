@@ -23,6 +23,7 @@ import { getInitials } from '@/lib/utils';
 import { renderRich, useT } from '@/lib/i18n';
 import { useRoleLabel } from '@/lib/useRoleLabel';
 import type { OrganizationType } from '@/types';
+import { passwordError, registrationErrorsFrom, type RegistrationErrors } from '@/lib/passwordPolicy';
 
 function JoinWorkspaceContent() {
   const router = useRouter();
@@ -61,6 +62,7 @@ function JoinWorkspaceContent() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showSignup, setShowSignup] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<RegistrationErrors>({});
 
   const validateCode = async (codeToValidate: string) => {
     if (!codeToValidate.trim()) return;
@@ -128,18 +130,37 @@ function JoinWorkspaceContent() {
     const code = inputCode.trim() || urlToken;
     if (!code) return;
 
+    // Same rules as the server, so problems show before anything is sent.
+    const localErrors: RegistrationErrors = {};
+    if (!fullName.trim()) localErrors.fullName = 'Enter your full name.';
+    else if (fullName.trim().length > 100) localErrors.fullName = 'Your name must be 100 characters or fewer.';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) localErrors.email = 'Enter a valid email address, like name@example.com.';
+    else if (inviteInfo?.email && inviteInfo.email.toLowerCase() !== email.trim().toLowerCase()) {
+      localErrors.email = 'This invitation was sent to a different email address. Register with the invited email address.';
+    }
+    const passwordProblem = passwordError(password);
+    if (passwordProblem) localErrors.password = passwordProblem;
+    setFieldErrors(localErrors);
+    if (Object.keys(localErrors).length) return;
+
     setLoading(true);
     setError('');
 
     try {
+      // The server takes the workspace type from this invitation, not from the form.
       await api.post('/auth/register', {
-        fullName,
-        email,
+        fullName: fullName.trim(),
+        email: email.trim(),
         password,
+        inviteToken: code,
       });
-      router.push(`/verify-email?email=${encodeURIComponent(email)}&invite=${encodeURIComponent(code)}`);
+      router.push(`/verify-email?email=${encodeURIComponent(email.trim())}&invite=${encodeURIComponent(code)}`);
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Registration or joining failed. Please try again.');
+      const serverErrors = registrationErrorsFrom(err);
+      setFieldErrors(serverErrors);
+      // Field problems are shown beside their fields; the banner covers the rest.
+      const shownBesideFields = Boolean(serverErrors.fullName || serverErrors.email || serverErrors.password);
+      setError(serverErrors.invitation || (shownBesideFields ? '' : err.response?.data?.message || 'Registration or joining failed. Please try again.'));
     } finally {
       setLoading(false);
     }
@@ -316,46 +337,66 @@ function JoinWorkspaceContent() {
                           </h4>
 
                           <div>
-                            <label className="block text-[11px] font-semibold text-slate-700 uppercase">
+                            <label htmlFor="join-full-name" className="block text-[11px] font-semibold text-slate-700 uppercase">
                               Full Name
                             </label>
                             <input
+                              id="join-full-name"
                               type="text"
                               required
+                              maxLength={100}
+                              autoComplete="name"
                               value={fullName}
-                              onChange={(e) => setFullName(e.target.value)}
+                              onChange={(e) => { setFullName(e.target.value); setFieldErrors((current) => ({ ...current, fullName: undefined })); }}
                               placeholder="e.g. Maya Chen"
+                              aria-invalid={Boolean(fieldErrors.fullName)}
+                              aria-describedby={fieldErrors.fullName ? 'join-full-name-error' : undefined}
                               className="mt-1 block w-full rounded-xl border border-slate-200 py-2 px-3 text-xs text-slate-900 focus:ring-2 focus:ring-indigo-600"
                             />
+                            {fieldErrors.fullName && <p id="join-full-name-error" className="mt-1 text-[11px] text-rose-600">{fieldErrors.fullName}</p>}
                           </div>
 
                           <div>
-                            <label className="block text-[11px] font-semibold text-slate-700 uppercase">
+                            <label htmlFor="join-email" className="block text-[11px] font-semibold text-slate-700 uppercase">
                               Email Address
                             </label>
                             <input
+                              id="join-email"
                               type="email"
                               required
+                              autoComplete="email"
                               value={email}
-                              onChange={(e) => setEmail(e.target.value)}
+                              // An invitation sent to one address can only be accepted with it.
+                              readOnly={Boolean(inviteInfo?.email)}
+                              onChange={(e) => { setEmail(e.target.value); setFieldErrors((current) => ({ ...current, email: undefined })); }}
                               placeholder="you@company.com"
+                              aria-invalid={Boolean(fieldErrors.email)}
+                              aria-describedby={fieldErrors.email ? 'join-email-error' : undefined}
                               className="mt-1 block w-full rounded-xl border border-slate-200 py-2 px-3 text-xs text-slate-900 focus:ring-2 focus:ring-indigo-600"
                             />
+                            {fieldErrors.email && <p id="join-email-error" className="mt-1 text-[11px] text-rose-600">{fieldErrors.email}</p>}
                           </div>
 
                           <div>
-                            <label className="block text-[11px] font-semibold text-slate-700 uppercase">
+                            <label htmlFor="join-password" className="block text-[11px] font-semibold text-slate-700 uppercase">
                               Password
                             </label>
                             <input
+                              id="join-password"
                               type="password"
                               required
-                              minLength={6}
+                              minLength={8}
+                              autoComplete="new-password"
                               value={password}
-                              onChange={(e) => setPassword(e.target.value)}
+                              onChange={(e) => { setPassword(e.target.value); setFieldErrors((current) => ({ ...current, password: undefined })); }}
                               placeholder="Choose a strong password"
+                              aria-invalid={Boolean(fieldErrors.password)}
+                              aria-describedby="join-password-help"
                               className="mt-1 block w-full rounded-xl border border-slate-200 py-2 px-3 text-xs text-slate-900 focus:ring-2 focus:ring-indigo-600"
                             />
+                            <p id="join-password-help" className={`mt-1 text-[11px] ${fieldErrors.password ? 'text-rose-600' : 'text-slate-500'}`}>
+                              {fieldErrors.password ?? 'At least 8 characters with uppercase and lowercase letters, a number, and a symbol.'}
+                            </p>
                           </div>
 
                           <div className="pt-2 flex items-center justify-between gap-3">
